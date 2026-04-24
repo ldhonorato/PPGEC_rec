@@ -154,14 +154,10 @@ class Processo(models.Model):
         OUTRO = "OUTRO", "Outro"
 
     class StatusProcesso(models.TextChoices):
-        ABERTO = "ABERTO", "Aberto"
         EM_ANALISE = "EM_ANALISE", "Em analise"
         AGUARDANDO_DOCUMENTO = "AGUARDANDO_DOCUMENTO", "Aguardando documento"
-        ENCAMINHADO = "ENCAMINHADO", "Encaminhado"
-        DEFERIDO = "DEFERIDO", "Deferido"
-        INDEFERIDO = "INDEFERIDO", "Indeferido"
+        AGUARDANDO_CIENCIA = "AGUARDANDO_CIENCIA", "Aguardando ciencia"
         FINALIZADO = "FINALIZADO", "Finalizado"
-        ARQUIVADO = "ARQUIVADO", "Arquivado"
 
     class Prioridade(models.TextChoices):
         BAIXA = "BAIXA", "Baixa"
@@ -187,7 +183,7 @@ class Processo(models.Model):
     status = models.CharField(
         max_length=25,
         choices=StatusProcesso.choices,
-        default=StatusProcesso.ABERTO,
+        default=StatusProcesso.EM_ANALISE,
     )
     prioridade = models.CharField(
         max_length=10,
@@ -202,6 +198,7 @@ class Processo(models.Model):
     )
     numero = models.CharField(max_length=20, unique=True, editable=False, blank=True)
     finalizado_em = models.DateTimeField(null=True, blank=True)
+    termo_finalizacao = models.TextField(blank=True)
     observacoes_internas = models.TextField(blank=True)
 
     class Meta:
@@ -212,12 +209,7 @@ class Processo(models.Model):
 
     @property
     def esta_finalizado(self) -> bool:
-        return self.finalizado_em is not None or self.status in {
-            self.StatusProcesso.DEFERIDO,
-            self.StatusProcesso.INDEFERIDO,
-            self.StatusProcesso.FINALIZADO,
-            self.StatusProcesso.ARQUIVADO,
-        }
+        return self.finalizado_em is not None or self.status == self.StatusProcesso.FINALIZADO
 
     @classmethod
     def gerar_numero(cls) -> str:
@@ -236,10 +228,9 @@ class Processo(models.Model):
 
     def clean(self):
         if self.finalizado_em and self.status in {
-            self.StatusProcesso.ABERTO,
             self.StatusProcesso.EM_ANALISE,
             self.StatusProcesso.AGUARDANDO_DOCUMENTO,
-            self.StatusProcesso.ENCAMINHADO,
+            self.StatusProcesso.AGUARDANDO_CIENCIA,
         }:
             raise ValidationError(
                 {"status": "Status em andamento nao pode ter data de finalizacao."}
@@ -268,6 +259,7 @@ class Processo(models.Model):
         enviado_por: User,
         texto: str = "",
         arquivo=None,
+        restricao_tipo: str = "NAO",
         tipo_documento: str | None = None,
     ):
         return Documento.objects.create(
@@ -275,9 +267,41 @@ class Processo(models.Model):
             titulo=titulo,
             texto=texto,
             arquivo=arquivo,
+            restricao_tipo=restricao_tipo,
             enviado_por=enviado_por,
             tipo_documento=tipo_documento or "",
         )
+
+    def obter_orientador_responsavel(self):
+        aluno = Aluno.objects.filter(pk=self.usuario_criado_por_id).select_related("orientador").first()
+        if not aluno:
+            return None
+        return aluno.orientador
+
+    def solicitar_ciente_orientador(self, *, solicitado_por, mensagem_solicitacao: str = ""):
+        orientador = self.obter_orientador_responsavel()
+        if not orientador:
+            raise ValidationError("Processo sem orientador definido para solicitar ciente.")
+
+        pendente = self.manifestacoes.filter(
+            tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
+            status=ManifestacaoProcesso.StatusManifestacao.PENDENTE,
+        ).exists()
+        if pendente:
+            raise ValidationError("Ja existe solicitacao de ciente do orientador pendente.")
+
+        manifestacao = ManifestacaoProcesso.objects.create(
+            processo=self,
+            tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
+            status=ManifestacaoProcesso.StatusManifestacao.PENDENTE,
+            responsavel=orientador,
+            solicitado_por=solicitado_por,
+            mensagem_solicitacao=mensagem_solicitacao,
+        )
+        if self.status != self.StatusProcesso.AGUARDANDO_CIENCIA:
+            self.status = self.StatusProcesso.AGUARDANDO_CIENCIA
+            self.save(update_fields=["status", "atualizado_em"])
+        return manifestacao
 
     def encaminhar(
         self,
@@ -289,8 +313,13 @@ class Processo(models.Model):
     ):
         if self.esta_finalizado:
             raise ValidationError("Nao e permitido encaminhar processo finalizado.")
+        if self.manifestacoes.filter(
+            tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
+            status=ManifestacaoProcesso.StatusManifestacao.PENDENTE,
+        ).exists():
+            raise ValidationError("Nao e permitido encaminhar com ciente do orientador pendente.")
 
-        status_novo = status_resultante or self.StatusProcesso.ENCAMINHADO
+        status_novo = status_resultante or self.StatusProcesso.EM_ANALISE
         setor_origem = self.setor_atual
 
         with transaction.atomic():
@@ -307,19 +336,29 @@ class Processo(models.Model):
                 status_resultante=status_novo,
             )
 
-    def finalizar(self, *, status_final: str | None = None):
+    def finalizar(self, *, termo_finalizacao: str, status_final: str | None = None):
         if self.esta_finalizado:
             raise ValidationError("Processo ja finalizado.")
+        termo_finalizacao = (termo_finalizacao or "").strip()
+        if not termo_finalizacao:
+            raise ValidationError("Informe o termo de finalizacao do processo.")
 
         self.status = status_final or self.StatusProcesso.FINALIZADO
         self.finalizado_em = timezone.now()
-        self.save(update_fields=["status", "finalizado_em", "atualizado_em"])
+        self.termo_finalizacao = termo_finalizacao
+        self.save(update_fields=["status", "finalizado_em", "termo_finalizacao", "atualizado_em"])
 
     def deferir(self):
-        self.finalizar(status_final=self.StatusProcesso.DEFERIDO)
+        self.finalizar(
+            termo_finalizacao="Processo deferido.",
+            status_final=self.StatusProcesso.FINALIZADO,
+        )
 
     def indeferir(self):
-        self.finalizar(status_final=self.StatusProcesso.INDEFERIDO)
+        self.finalizar(
+            termo_finalizacao="Processo indeferido.",
+            status_final=self.StatusProcesso.FINALIZADO,
+        )
 
 
 class Documento(models.Model):
@@ -330,6 +369,37 @@ class Documento(models.Model):
         COMPROVANTE = "COMPROVANTE", "Comprovante"
         OUTRO = "OUTRO", "Outro"
 
+    class RestricaoAcesso(models.TextChoices):
+        NAO = "NAO", "Não"
+        INFORMACAO_PESSOAL = (
+            "INFORMACAO_PESSOAL",
+            "Informação pessoal (Art. 31 da Lei de Acesso à Informação (Lei nº 12.527/2011))",
+        )
+        DOCUMENTO_PREPARATORIO = (
+            "DOCUMENTO_PREPARATORIO",
+            "Documento preparatório / processo decisório (Art. 7º, §3º da Lei de Acesso à Informação (Lei nº 12.527/2011))",
+        )
+        INVESTIGACAO_ADMINISTRATIVA = (
+            "INVESTIGACAO_ADMINISTRATIVA",
+            "Investigação ou apuração administrativa (Art. 150 da Lei nº 8.112/1990)",
+        )
+        SIGILO_ACADEMICO = (
+            "SIGILO_ACADEMICO",
+            "Sigilo acadêmico (avaliações, pareceres, bancas) (Art. 31 da Lei de Acesso à Informação (Lei nº 12.527/2011))",
+        )
+        PROPRIEDADE_INTELECTUAL = (
+            "PROPRIEDADE_INTELECTUAL",
+            "Propriedade intelectual / direito autoral (Art. 24, III da Lei nº 9.610/1998; Art. 2º da Lei nº 9.609/1998)",
+        )
+        SEGREDO_INDUSTRIAL = (
+            "SEGREDO_INDUSTRIAL",
+            "Segredo industrial ou informação estratégica (Art. 195, XIV da Lei nº 9.279/1996)",
+        )
+        SIGILO_LEGAL_ESPECIFICO = (
+            "SIGILO_LEGAL_ESPECIFICO",
+            "Sigilo legal específico (fiscal, bancário, etc.) (Art. 198 do CTN; LC nº 105/2001)",
+        )
+
     processo = models.ForeignKey(
         Processo,
         on_delete=models.CASCADE,
@@ -338,6 +408,23 @@ class Documento(models.Model):
     titulo = models.CharField(max_length=255)
     texto = models.TextField(blank=True)
     arquivo = models.FileField(upload_to="documentos/processos/", blank=True, null=True)
+    restrito = models.BooleanField(default=False)
+    restricao_tipo = models.CharField(
+        max_length=40,
+        choices=RestricaoAcesso.choices,
+        default=RestricaoAcesso.NAO,
+    )
+    restricao_outro = models.CharField(max_length=255, blank=True)
+    arquivo_removido = models.BooleanField(default=False)
+    arquivo_removido_em = models.DateTimeField(blank=True, null=True)
+    arquivo_removido_motivo = models.TextField(blank=True)
+    arquivo_removido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="documentos_com_arquivo_removido",
+    )
     enviado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -357,8 +444,60 @@ class Documento(models.Model):
         return self.titulo
 
     def clean(self):
+        self.restricao_outro = ""
+
+        self.restrito = self.restricao_tipo != self.RestricaoAcesso.NAO
+
+        if self.arquivo_removido:
+            return
+
         if not (self.texto or "").strip() and not self.arquivo:
             raise ValidationError("Documento deve possuir texto ou arquivo.")
+
+    def pode_visualizar_arquivo(self, user) -> bool:
+        if self.arquivo_removido or not self.arquivo:
+            return False
+
+        if not self.restrito:
+            return True
+
+        if not user or not user.is_authenticated:
+            return False
+
+        if user.id == self.enviado_por_id:
+            return True
+
+        if getattr(user, "tipo_usuario", None) == User.TipoUsuario.SERVIDOR:
+            return True
+
+        if getattr(user, "tipo_usuario", None) == User.TipoUsuario.DOCENTE:
+            try:
+                return bool(user.docente.coordenador)
+            except Docente.DoesNotExist:
+                return False
+
+        return False
+
+    def remover_arquivo(self, *, removido_por, motivo: str):
+        if self.arquivo_removido:
+            return
+
+        motivo = (motivo or "").strip()
+        if not motivo:
+            raise ValidationError("Informe o motivo da remocao do arquivo.")
+
+        self.arquivo_removido = True
+        self.arquivo_removido_em = timezone.now()
+        self.arquivo_removido_motivo = motivo
+        self.arquivo_removido_por = removido_por
+        self.save(
+            update_fields=[
+                "arquivo_removido",
+                "arquivo_removido_em",
+                "arquivo_removido_motivo",
+                "arquivo_removido_por",
+            ]
+        )
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -402,3 +541,84 @@ class TramitacaoProcesso(models.Model):
 
     def __str__(self) -> str:
         return f"Tramitacao {self.processo.numero} -> {self.setor_destino.nome}"
+
+
+class ManifestacaoProcesso(models.Model):
+    class TipoManifestacao(models.TextChoices):
+        CIENTE_ORIENTADOR = "CIENTE_ORIENTADOR", "Ciente do orientador"
+
+    class StatusManifestacao(models.TextChoices):
+        PENDENTE = "PENDENTE", "Pendente"
+        CIENTE = "CIENTE", "Ciente"
+        RECUSADO = "RECUSADO", "Recusado"
+
+    processo = models.ForeignKey(
+        Processo,
+        on_delete=models.CASCADE,
+        related_name="manifestacoes",
+    )
+    tipo = models.CharField(max_length=40, choices=TipoManifestacao.choices)
+    status = models.CharField(
+        max_length=20,
+        choices=StatusManifestacao.choices,
+        default=StatusManifestacao.PENDENTE,
+    )
+    responsavel = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="manifestacoes_pendentes",
+    )
+    solicitado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="manifestacoes_solicitadas",
+    )
+    mensagem_solicitacao = models.TextField(blank=True)
+    mensagem_manifestacao = models.TextField(blank=True)
+    data_solicitacao = models.DateTimeField(auto_now_add=True)
+    data_manifestacao = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-data_solicitacao"]
+
+    def __str__(self) -> str:
+        return f"{self.get_tipo_display()} - {self.processo.numero}"
+
+    def registrar_manifestacao(self, *, autor, aceito: bool, mensagem: str = ""):
+        if self.status != self.StatusManifestacao.PENDENTE:
+            raise ValidationError("Manifestacao ja concluida.")
+        if autor.id != self.responsavel_id:
+            raise ValidationError("Apenas o responsavel pode se manifestar.")
+
+        self.status = self.StatusManifestacao.CIENTE if aceito else self.StatusManifestacao.RECUSADO
+        self.mensagem_manifestacao = (mensagem or "").strip()
+        self.data_manifestacao = timezone.now()
+        self.save(update_fields=["status", "mensagem_manifestacao", "data_manifestacao"])
+        if not self.processo.manifestacoes.filter(
+            tipo=self.TipoManifestacao.CIENTE_ORIENTADOR,
+            status=self.StatusManifestacao.PENDENTE,
+        ).exists() and self.processo.status == Processo.StatusProcesso.AGUARDANDO_CIENCIA:
+            self.processo.status = Processo.StatusProcesso.EM_ANALISE
+            self.processo.save(update_fields=["status", "atualizado_em"])
+
+
+class ComentarioProcesso(models.Model):
+    processo = models.ForeignKey(
+        Processo,
+        on_delete=models.CASCADE,
+        related_name="comentarios",
+    )
+    autor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="comentarios_processo",
+    )
+    anonimo = models.BooleanField(default=False)
+    texto = models.TextField()
+    data_criacao = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-data_criacao"]
+
+    def __str__(self) -> str:
+        return f"Comentario em {self.processo.numero}"

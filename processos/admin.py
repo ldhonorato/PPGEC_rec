@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.hashers import identify_hasher
 
 from .models import (
     Aluno,
@@ -12,8 +13,24 @@ from .models import (
 )
 
 
+class EnsurePasswordHashedAdminMixin:
+    def _ensure_hashed_password(self, obj):
+        password = getattr(obj, "password", "")
+        if not password:
+            return
+
+        try:
+            identify_hasher(password)
+        except ValueError:
+            obj.set_password(password)
+
+    def save_model(self, request, obj, form, change):
+        self._ensure_hashed_password(obj)
+        super().save_model(request, obj, form, change)
+
+
 @admin.register(User)
-class UserAdmin(BaseUserAdmin):
+class UserAdmin(EnsurePasswordHashedAdminMixin, BaseUserAdmin):
     ordering = ("email",)
     list_display = ("email", "nome", "tipo_usuario", "is_staff", "is_active")
     list_filter = ("tipo_usuario", "is_staff", "is_superuser", "is_active")
@@ -40,7 +57,7 @@ class UserAdmin(BaseUserAdmin):
 
 
 @admin.register(Aluno)
-class AlunoAdmin(admin.ModelAdmin):
+class AlunoAdmin(EnsurePasswordHashedAdminMixin, admin.ModelAdmin):
     list_display = ("email", "nome", "ingresso", "orientador", "matricula", "is_active")
     list_filter = ("ingresso", "is_active")
     search_fields = ("email", "nome", "matricula")
@@ -48,7 +65,7 @@ class AlunoAdmin(admin.ModelAdmin):
 
 
 @admin.register(Docente)
-class DocenteAdmin(admin.ModelAdmin):
+class DocenteAdmin(EnsurePasswordHashedAdminMixin, admin.ModelAdmin):
     list_display = ("email", "nome", "externo", "permanente", "coordenador", "is_active")
     list_filter = ("externo", "permanente", "coordenador", "is_active")
     search_fields = ("email", "nome")

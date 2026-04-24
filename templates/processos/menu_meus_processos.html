@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Meus Processos | PPGEC{% endblock %}
+{% block content %}
+<section class="card" style="margin-bottom: 1rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap;">
+        <h1 class="section-title" style="margin-bottom: 0;">Meus processos</h1>
+        <a class="btn" href="{% url 'novo_processo' %}">Novo processo</a>
+    </div>
+
+    <form method="get" style="margin-top: 0.8rem; margin-bottom: 0.8rem;">
+        <div class="grid-two">
+            <div class="field">
+                <label for="id_my_q">Busca</label>
+                <input id="id_my_q" type="text" name="my_q" value="{{ my_filtro_q }}" placeholder="numero, assunto ou descricao">
+            </div>
+            <div class="field">
+                <label for="id_my_tipo">Tipo</label>
+                <select id="id_my_tipo" name="my_tipo">
+                    <option value="">Todos</option>
+                    {% for value, label in my_tipos %}
+                        <option value="{{ value }}" {% if my_filtro_tipo == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="id_my_status">Status</label>
+                <select id="id_my_status" name="my_status">
+                    <option value="">Todos</option>
+                    {% for value, label in my_status_list %}
+                        <option value="{{ value }}" {% if my_filtro_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="id_my_data_inicio">Data inicial</label>
+                <input id="id_my_data_inicio" type="date" name="my_data_inicio" value="{{ my_filtro_data_inicio }}">
+            </div>
+            <div class="field">
+                <label for="id_my_data_fim">Data final</label>
+                <input id="id_my_data_fim" type="date" name="my_data_fim" value="{{ my_filtro_data_fim }}">
+            </div>
+        </div>
+        <button class="btn" type="submit">Filtrar</button>
+    </form>
+
+    {% if meus_processos %}
+        <ul class="list" style="margin-top: 0.8rem;">
+            {% for processo in meus_processos %}
+                <li>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                        <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
+                        <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
+                    </div>
+                    <small class="muted">
+                        Tipo: {{ processo.get_tipo_display }} | Status: {{ processo.get_status_display }} | Setor: {{ processo.setor_atual.nome }}
+                    </small>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhum processo encontrado.</p>
+    {% endif %}
+</section>
+{% endblock %}

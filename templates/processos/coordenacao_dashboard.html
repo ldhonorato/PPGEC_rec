@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | Coordenacao{% endblock %}
+{% block content %}
+<section class="card">
+    <h1 class="section-title">Dashboard de docentes e orientandos</h1>
+    <p class="muted">Principal indicador: quantidade de alunos orientandos por docente.</p>
+
+    {% if docentes %}
+        <style>
+            .docente-item { margin-bottom: 0.8rem; }
+            .docente-item summary {
+                list-style: none;
+                cursor: pointer;
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                padding: 0.7rem 0.85rem;
+                background: #fff;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.8rem;
+            }
+            .docente-item summary::-webkit-details-marker { display: none; }
+            .docente-toggle {
+                font-weight: 700;
+                color: var(--primary);
+                font-size: 1.1rem;
+                min-width: 1rem;
+                text-align: center;
+            }
+            .docente-item[open] .docente-toggle::before { content: "-"; }
+            .docente-item:not([open]) .docente-toggle::before { content: "+"; }
+            .orientandos-lista {
+                margin: 0.45rem 0 0 1.2rem;
+                padding-left: 1rem;
+            }
+            .orientandos-lista li { margin: 0.35rem 0; }
+        </style>
+
+        {% for docente in docentes %}
+            <details class="docente-item">
+                <summary>
+                    <span>
+                        <strong>{{ docente.nome }}</strong> ({{ docente.total_orientandos }} orientandos)
+                    </span>
+                    <span class="docente-toggle" aria-hidden="true"></span>
+                </summary>
+                {% if docente.orientandos.all %}
+                    <ul class="orientandos-lista">
+                        {% for aluno in docente.orientandos.all %}
+                            <li>
+                                <strong>{{ aluno.nome }}</strong>:
+                                <span class="muted">{{ aluno.email }}{% if aluno.matricula %} | Matricula: {{ aluno.matricula }}{% endif %}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="muted" style="margin: 0.45rem 0 0 1.2rem;">Sem orientandos.</p>
+                {% endif %}
+            </details>
+        {% endfor %}
+    {% else %}
+        <p class="muted">Nenhum docente encontrado.</p>
+    {% endif %}
+</section>
+{% endblock %}

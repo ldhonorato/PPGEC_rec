@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Processos no Pleno | PPGEC{% endblock %}
+{% block content %}
+<section class="card">
+    <h1 class="section-title">Processos no Colegiado PPGEC (Pleno)</h1>
+    {% if processos_pleno %}
+        <ul class="list">
+            {% for processo in processos_pleno %}
+                <li>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                        <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
+                        <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
+                    </div>
+                    <small class="muted">
+                        Requerente: {{ processo.usuario_criado_por.nome }} |
+                        Status: {{ processo.get_status_display }} |
+                        Setor: {{ processo.setor_atual.nome }}
+                    </small>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nao ha processos no setor do Pleno.</p>
+    {% endif %}
+</section>
+{% endblock %}

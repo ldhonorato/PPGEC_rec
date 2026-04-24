@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Caixa de processos | Coordenacao{% endblock %}
+{% block content %}
+<section class="card">
+    <h1 class="section-title">Caixa de processos</h1>
+    {% if opcoes_caixa %}
+        <form method="get" style="max-width: 340px; margin-bottom: 0.8rem;">
+            <div class="field">
+                <label for="id_caixa">Visualizar caixa</label>
+                <select id="id_caixa" name="caixa" onchange="this.form.submit()">
+                    {% for opcao in opcoes_caixa %}
+                        <option value="{{ opcao.value }}" {% if selected_caixa == opcao.value %}selected{% endif %}>
+                            {{ opcao.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    {% endif %}
+    <p class="muted">Mostra todos os processos cujo setor atual e {{ nomes_setores_caixa_texto }}.</p>
+    <div style="display: flex; gap: 0.6rem; margin: 0.8rem 0 1rem 0; flex-wrap: wrap;">
+        <a
+            class="btn {% if status_caixa == 'EM_ANALISE' %}{% else %}btn-secondary{% endif %}"
+            href="?{% if selected_caixa %}caixa={{ selected_caixa }}&{% endif %}status_caixa=EM_ANALISE"
+        >
+            Em analise
+        </a>
+        <a
+            class="btn {% if status_caixa == 'AGUARDANDO_CIENCIA' %}{% else %}btn-secondary{% endif %}"
+            href="?{% if selected_caixa %}caixa={{ selected_caixa }}&{% endif %}status_caixa=AGUARDANDO_CIENCIA"
+        >
+            Aguardando ciencia
+        </a>
+    </div>
+
+    {% if processos %}
+        <ul class="list">
+            {% for processo in processos %}
+                <li>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                        <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
+                        <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
+                    </div>
+                    <small class="muted">
+                        Usuario: {{ processo.usuario_criado_por.nome }} |
+                        Status: {{ processo.get_status_display }} |
+                        Setor: {{ processo.setor_atual.nome }}
+                    </small>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nao ha processos na caixa dos setores {{ nomes_setores_caixa_texto }}.</p>
+    {% endif %}
+</section>
+{% endblock %}

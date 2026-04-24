@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Meus Orientandos | PPGEC{% endblock %}
+{% block content %}
+<section class="card">
+    <h1 class="section-title">Meus orientandos</h1>
+    {% if orientandos %}
+        <ul class="list">
+            {% for aluno in orientandos %}
+                <li>
+                    <strong>{{ aluno.nome }}</strong><br>
+                    <small class="muted">{{ aluno.email }}{% if aluno.matricula %} | Matricula: {{ aluno.matricula }}{% endif %}</small>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhum orientando vinculado.</p>
+    {% endif %}
+</section>
+{% endblock %}

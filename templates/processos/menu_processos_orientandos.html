@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Processos dos Orientandos | PPGEC{% endblock %}
+{% block content %}
+<section class="card">
+    <h1 class="section-title">Processos dos orientandos</h1>
+    {% if processos_orientandos %}
+        <ul class="list">
+            {% for processo in processos_orientandos %}
+                <li>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                        <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
+                        <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
+                    </div>
+                    <small class="muted">Aluno: {{ processo.usuario_criado_por.nome }} | Status: {{ processo.get_status_display }} | Setor: {{ processo.setor_atual.nome }}</small>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhum processo de orientando encontrado.</p>
+    {% endif %}
+</section>
+{% endblock %}

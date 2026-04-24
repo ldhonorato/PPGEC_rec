@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}/me | PPGEC{% endblock %}
+{% block content %}
+<section class="grid-two">
+    <article class="card">
+        <h1 class="section-title">Meu perfil</h1>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="save_profile" value="1">
+            {% for field in profile_form %}
+                <div class="field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+            {% endfor %}
+            <button type="submit" class="btn">Salvar perfil</button>
+        </form>
+    </article>
+
+    <article class="card">
+        <h2 class="section-title">Alterar senha</h2>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="change_password" value="1">
+            {% for field in password_form %}
+                <div class="field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+            {% endfor %}
+            <button type="submit" class="btn">Atualizar senha</button>
+        </form>
+    </article>
+</section>
+{% endblock %}

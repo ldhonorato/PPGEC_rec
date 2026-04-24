@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Processos | Coordenacao{% endblock %}
+{% block content %}
+<section class="card" style="margin-bottom: 1rem;">
+    <h1 class="section-title">Processos</h1>
+    <form method="get">
+        <div class="grid-two">
+            <div class="field">
+                <label for="id_q">Busca</label>
+                <input id="id_q" type="text" name="q" value="{{ filtro_q }}" placeholder="numero, assunto, descricao ou usuario">
+            </div>
+            <div class="field">
+                <label for="id_setor">Setor</label>
+                <select id="id_setor" name="setor">
+                    <option value="">Todos</option>
+                    {% for setor in setores %}
+                        <option value="{{ setor.id }}" {% if filtro_setor == setor.id|stringformat:"s" %}selected{% endif %}>{{ setor.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="id_tipo">Tipo</label>
+                <select id="id_tipo" name="tipo">
+                    <option value="">Todos</option>
+                    {% for value, label in tipos %}
+                        <option value="{{ value }}" {% if filtro_tipo == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="id_status">Status</label>
+                <select id="id_status" name="status">
+                    <option value="">Todos</option>
+                    {% for value, label in status_list %}
+                        <option value="{{ value }}" {% if filtro_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <button class="btn" type="submit">Filtrar</button>
+    </form>
+</section>
+
+<section class="card">
+    {% if processos %}
+        <ul class="list">
+            {% for processo in processos %}
+                <li>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                        <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
+                        <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
+                    </div>
+                    <small class="muted">
+                        Usuario: {{ processo.usuario_criado_por.nome }} |
+                        Tipo: {{ processo.get_tipo_display }} |
+                        Status: {{ processo.get_status_display }} |
+                        Setor: {{ processo.setor_atual.nome }}
+                    </small>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhum processo encontrado com os filtros informados.</p>
+    {% endif %}
+</section>
+{% endblock %}

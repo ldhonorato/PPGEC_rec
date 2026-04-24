@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Ciencias Manifestadas | PPGEC{% endblock %}
+{% block content %}
+<section class="card">
+    <h1 class="section-title">Ciencias do orientador ja manifestadas</h1>
+    {% if ciencias_manifestadas %}
+        <ul class="list">
+            {% for manifestacao in ciencias_manifestadas %}
+                <li>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                        <strong>{{ manifestacao.processo.numero }} - {{ manifestacao.processo.assunto }}</strong>
+                        <a class="btn" href="{% url 'processo_detalhe' manifestacao.processo.id %}">Ver detalhes</a>
+                    </div>
+                    <small class="muted">
+                        Status: {{ manifestacao.get_status_display }} |
+                        Solicitado por: {{ manifestacao.solicitado_por.nome }} |
+                        Solicitado em: {{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}
+                        {% if manifestacao.data_manifestacao %}| Manifestado em: {{ manifestacao.data_manifestacao|date:"d/m/Y H:i" }}{% endif %}
+                    </small>
+                    {% if manifestacao.mensagem_manifestacao %}
+                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Manifestacao: {{ manifestacao.mensagem_manifestacao }}</small></p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhuma ciencia manifestada encontrada.</p>
+    {% endif %}
+</section>
+{% endblock %}

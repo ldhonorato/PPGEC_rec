@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+{% block title %}Processo {{ processo.numero }}{% endblock %}
+{% block content %}
+<section class="card" style="margin-bottom: 1rem;">
+    <h1 class="section-title">Processo {{ processo.numero }}</h1>
+    <p style="margin: 0.35rem 0;"><strong>Assunto:</strong> {{ processo.assunto }}</p>
+    <p style="margin: 0.35rem 0;"><strong>Tipo:</strong> {{ processo.get_tipo_display }}</p>
+    <p style="margin: 0.35rem 0;"><strong>Status:</strong> {{ processo.get_status_display }}</p>
+    <p style="margin: 0.35rem 0;"><strong>Setor atual:</strong> {{ processo.setor_atual.nome }}</p>
+    <p style="margin: 0.35rem 0;"><strong>Criado por:</strong> {{ processo.usuario_criado_por.nome }} ({{ processo.usuario_criado_por.email }})</p>
+    <p style="margin: 0.35rem 0;"><strong>Criado em:</strong> {{ processo.data_criacao|date:"d/m/Y H:i" }}</p>
+    <p style="margin: 0.35rem 0;"><strong>Ultima atualizacao:</strong> {{ processo.atualizado_em|date:"d/m/Y H:i" }}</p>
+    {% if processo.prioridade %}
+        <p style="margin: 0.35rem 0;"><strong>Prioridade:</strong> {{ processo.get_prioridade_display }}</p>
+    {% endif %}
+    {% if processo.finalizado_em %}
+        <p style="margin: 0.35rem 0;"><strong>Finalizado em:</strong> {{ processo.finalizado_em|date:"d/m/Y H:i" }}</p>
+        {% if processo.termo_finalizacao %}
+            <p style="margin: 0.35rem 0;"><strong>Termo de finalizacao:</strong> {{ processo.termo_finalizacao }}</p>
+        {% endif %}
+    {% endif %}
+    {% if processo.observacoes_internas %}
+        <p style="margin: 0.35rem 0;"><strong>Observacoes internas:</strong> {{ processo.observacoes_internas }}</p>
+    {% endif %}
+    <div style="margin-top: 0.8rem;">
+        <strong>Descricao</strong>
+        <p style="margin: 0.4rem 0 0 0; white-space: pre-wrap;">{{ processo.descricao }}</p>
+    </div>
+</section>
+
+{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo %}
+<section class="card" style="margin-bottom: 1rem;">
+    <h2 class="section-title">Acoes</h2>
+    <div style="display: flex; gap: 0.7rem; flex-wrap: wrap;">
+        {% if can_add_documento %}
+            <button type="button" class="btn" id="btn-abrir-modal-documento">Adicionar documento</button>
+        {% endif %}
+        {% if can_encaminhar_processo %}
+            {% if can_manage_requerente %}
+                <button type="button" class="btn" id="btn-abrir-modal-encaminhar">Devolver processo</button>
+            {% else %}
+                <button type="button" class="btn" id="btn-abrir-modal-encaminhar">Encaminhar processo</button>
+            {% endif %}
+        {% endif %}
+        {% if can_solicitar_ciente %}
+            <button type="button" class="btn" id="btn-abrir-modal-ciente">Solicitar ciente do orientador</button>
+        {% endif %}
+        {% if can_manifestar_ciente %}
+            <button type="button" class="btn" id="btn-abrir-modal-ciente">Manifestar ciente do orientador</button>
+        {% endif %}
+        {% if can_finalizar_processo %}
+            <button type="button" class="btn btn-secondary" id="btn-abrir-modal-finalizar">Finalizar processo</button>
+        {% endif %}
+    </div>
+</section>
+{% elif not can_comment_pleno %}
+<section class="card" style="margin-bottom: 1rem;">
+    <p class="muted" style="margin: 0;">
+        Voce nao tem permissao para adicionar documento ou encaminhar neste processo.
+    </p>
+</section>
+{% endif %}
+
+<section class="card" style="margin-bottom: 1rem;">
+    <h2 class="section-title">Ciente do orientador</h2>
+    {% if orientador_responsavel %}
+        <p class="muted" style="margin: 0 0 0.7rem 0;">Orientador responsavel: {{ orientador_responsavel.nome }} ({{ orientador_responsavel.email }})</p>
+    {% else %}
+        <p class="muted" style="margin: 0 0 0.7rem 0;">Nao ha orientador vinculado ao requerente deste processo.</p>
+    {% endif %}
+
+    {% if processo.manifestacoes.all %}
+        <ul class="list">
+            {% for manifestacao in processo.manifestacoes.all %}
+                <li>
+                    <strong>{{ manifestacao.get_tipo_display }}</strong> - {{ manifestacao.get_status_display }}<br>
+                    <small class="muted">
+                        Responsavel: {{ manifestacao.responsavel.nome }} |
+                        Solicitado por: {{ manifestacao.solicitado_por.nome }} |
+                        Solicitado em: {{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}
+                        {% if manifestacao.data_manifestacao %}| Manifestado em: {{ manifestacao.data_manifestacao|date:"d/m/Y H:i" }}{% endif %}
+                    </small>
+                    {% if manifestacao.mensagem_solicitacao %}
+                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Solicitacao: {{ manifestacao.mensagem_solicitacao }}</small></p>
+                    {% endif %}
+                    {% if manifestacao.mensagem_manifestacao %}
+                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Manifestacao: {{ manifestacao.mensagem_manifestacao }}</small></p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhuma solicitacao de ciente registrada.</p>
+    {% endif %}
+</section>
+
+{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo %}
+<dialog id="modal-documento" style="width: min(680px, 92vw); border: 1px solid #d8e0ea; border-radius: 12px; padding: 0;">
+    <div style="padding: 1rem 1rem 0 1rem;">
+        <h2 class="section-title">Adicionar documento</h2>
+    </div>
+    <form method="post" enctype="multipart/form-data" style="padding: 0 1rem 1rem 1rem;">
+        {% csrf_token %}
+        <input type="hidden" name="adicionar_documento" value="1">
+        {% for field in documento_form %}
+            <div class="field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {{ field.errors }}
+            </div>
+        {% endfor %}
+        <div style="display: flex; gap: 0.7rem; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary" id="btn-fechar-modal-documento">Cancelar</button>
+            <button type="submit" class="btn">Salvar documento</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="modal-encaminhamento" style="width: min(680px, 92vw); border: 1px solid #d8e0ea; border-radius: 12px; padding: 0;">
+    <div style="padding: 1rem 1rem 0 1rem;">
+        {% if can_manage_requerente %}
+            <h2 class="section-title">Devolver processo ao setor solicitante</h2>
+            {% if setor_solicitante %}
+                <p class="muted" style="margin: 0;">Setor solicitante: {{ setor_solicitante.nome }}</p>
+            {% endif %}
+        {% else %}
+            <h2 class="section-title">Encaminhar processo</h2>
+        {% endif %}
+    </div>
+    <form method="post" style="padding: 0 1rem 1rem 1rem;">
+        {% csrf_token %}
+        <input type="hidden" name="encaminhar_processo" value="1">
+        {% for field in encaminhamento_form %}
+            <div class="field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {{ field.errors }}
+            </div>
+        {% endfor %}
+        <div style="display: flex; gap: 0.7rem; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary" id="btn-fechar-modal-encaminhamento">Cancelar</button>
+            {% if can_manage_requerente %}
+                <button type="submit" class="btn">Devolver</button>
+            {% else %}
+                <button type="submit" class="btn">Encaminhar</button>
+            {% endif %}
+        </div>
+    </form>
+</dialog>
+
+<dialog id="modal-ciente" style="width: min(680px, 92vw); border: 1px solid #d8e0ea; border-radius: 12px; padding: 0;">
+    <div style="padding: 1rem 1rem 0 1rem;">
+        {% if can_manifestar_ciente %}
+            <h2 class="section-title">Manifestar ciente do orientador</h2>
+        {% else %}
+            <h2 class="section-title">Solicitar ciente do orientador</h2>
+        {% endif %}
+    </div>
+    <form method="post" style="padding: 0 1rem 1rem 1rem;">
+        {% csrf_token %}
+        {% if can_manifestar_ciente %}
+            <input type="hidden" name="manifestar_ciente_orientador" value="1">
+            {% for field in manifestar_ciente_form %}
+                <div class="field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+            {% endfor %}
+            <div style="display: flex; gap: 0.7rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="btn-fechar-modal-ciente">Cancelar</button>
+                <button type="submit" class="btn btn-secondary" name="acao_ciente" value="recusar">Recusar</button>
+                <button type="submit" class="btn" name="acao_ciente" value="ciente">Dar ciente</button>
+            </div>
+        {% else %}
+            <input type="hidden" name="solicitar_ciente_orientador" value="1">
+            {% for field in solicitar_ciente_form %}
+                <div class="field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+            {% endfor %}
+            <div style="display: flex; gap: 0.7rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="btn-fechar-modal-ciente">Cancelar</button>
+                <button type="submit" class="btn">Solicitar</button>
+            </div>
+        {% endif %}
+    </form>
+</dialog>
+
+<dialog id="modal-finalizacao" style="width: min(680px, 92vw); border: 1px solid #d8e0ea; border-radius: 12px; padding: 0;">
+    <div style="padding: 1rem 1rem 0 1rem;">
+        <h2 class="section-title">Finalizar processo</h2>
+    </div>
+    <form method="post" style="padding: 0 1rem 1rem 1rem;">
+        {% csrf_token %}
+        <input type="hidden" name="finalizar_processo" value="1">
+        {% for field in finalizar_form %}
+            <div class="field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {{ field.errors }}
+            </div>
+        {% endfor %}
+        <div style="display: flex; gap: 0.7rem; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary" id="btn-fechar-modal-finalizar">Cancelar</button>
+            <button type="submit" class="btn">Confirmar finalizacao</button>
+        </div>
+    </form>
+</dialog>
+{% endif %}
+
+<section class="card" style="margin-bottom: 1rem;">
+    <h2 class="section-title">Documentos</h2>
+    {% if documentos_exibicao %}
+        <ul class="list">
+            {% for item in documentos_exibicao %}
+                {% with documento=item.obj %}
+                <li>
+                    <strong>{{ documento.titulo }}</strong><br>
+                    <small class="muted">
+                        Enviado por: {{ documento.enviado_por.nome }} |
+                        Data: {{ documento.data_envio|date:"d/m/Y H:i" }}
+                        {% if documento.tipo_documento %}| Tipo: {{ documento.get_tipo_documento_display }}{% endif %}
+                        {% if documento.restrito %}| Restricao: {{ documento.get_restricao_tipo_display }}{% endif %}
+                    </small>
+                    {% if documento.texto %}
+                        <p style="margin: 0.4rem 0 0 0;">{{ documento.texto }}</p>
+                    {% endif %}
+                    {% if documento.arquivo_removido %}
+                        <p style="margin: 0.4rem 0 0 0;">
+                            <span class="muted">
+                                Arquivo removido por {{ documento.arquivo_removido_por.nome|default:"usuario indefinido" }}
+                                em {{ documento.arquivo_removido_em|date:"d/m/Y H:i"|default:"-" }}.
+                            </span>
+                        </p>
+                        {% if documento.arquivo_removido_motivo %}
+                            <p style="margin: 0.3rem 0 0 0;"><small class="muted">Motivo: {{ documento.arquivo_removido_motivo }}</small></p>
+                        {% endif %}
+                    {% elif documento.arquivo and item.can_view_file %}
+                        <p style="margin: 0.4rem 0 0 0;">
+                            <a href="{{ documento.arquivo.url }}" target="_blank" rel="noopener">Abrir arquivo</a>
+                        </p>
+                    {% elif documento.arquivo and not item.can_view_file %}
+                        <p style="margin: 0.4rem 0 0 0;">
+                            <span class="muted">Arquivo restrito.</span>
+                        </p>
+                    {% endif %}
+                    {% if item.can_remove_file %}
+                        <button
+                            type="button"
+                            class="btn btn-secondary btn-abrir-remocao"
+                            style="margin-top: 0.5rem;"
+                            data-documento-id="{{ documento.id }}"
+                            data-documento-titulo="{{ documento.titulo }}"
+                        >
+                            Remover arquivo
+                        </button>
+                    {% endif %}
+                </li>
+                {% endwith %}
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nao ha documentos vinculados.</p>
+    {% endif %}
+</section>
+
+{% if can_comment_pleno %}
+<section class="card" style="margin-bottom: 1rem;">
+    <h2 class="section-title">Comentarios do Pleno</h2>
+    <form method="post" style="margin-bottom: 1rem;">
+        {% csrf_token %}
+        <input type="hidden" name="adicionar_comentario" value="1">
+        {% for field in comentario_form %}
+            <div class="field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {{ field.errors }}
+            </div>
+        {% endfor %}
+        <button type="submit" class="btn">Adicionar comentario</button>
+    </form>
+
+    {% if processo.comentarios.all %}
+        <ul class="list">
+            {% for comentario in processo.comentarios.all %}
+                <li>
+                    <small class="muted">
+                        {% if comentario.anonimo %}
+                            Comentario anonimo
+                        {% else %}
+                            {{ comentario.autor.nome }}
+                        {% endif %}
+                        | {{ comentario.data_criacao|date:"d/m/Y H:i" }}
+                    </small>
+                    <p style="margin: 0.35rem 0 0 0; white-space: pre-wrap;">{{ comentario.texto }}</p>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhum comentario registrado para este processo.</p>
+    {% endif %}
+</section>
+{% endif %}
+
+<section class="card">
+    <h2 class="section-title">Historico do processo</h2>
+    <ul class="list">
+        <li>
+            <strong>Abertura do processo</strong><br>
+            <small class="muted">
+                Data: {{ processo.data_criacao|date:"d/m/Y H:i" }} |
+                Criado por: {{ processo.usuario_criado_por.nome }} |
+                Status inicial: {{ processo.get_status_inicial_display|default:"-" }}
+            </small>
+        </li>
+        {% for tramitacao in processo.tramitacoes.all %}
+            <li>
+                <strong>Tramitacao em {{ tramitacao.data_encaminhamento|date:"d/m/Y H:i" }}</strong><br>
+                <small class="muted">
+                    De: {% if tramitacao.setor_origem %}{{ tramitacao.setor_origem.nome }}{% else %}-{% endif %} |
+                    Para: {{ tramitacao.setor_destino.nome }} |
+                    Por: {{ tramitacao.encaminhado_por.nome }}
+                    {% if tramitacao.status_resultante %}| Status resultante: {{ tramitacao.get_status_resultante_display }}{% endif %}
+                </small>
+                {% if tramitacao.observacao %}
+                    <p style="margin: 0.4rem 0 0 0;">{{ tramitacao.observacao }}</p>
+                {% endif %}
+            </li>
+        {% empty %}
+            <li>
+                <small class="muted">Ainda nao ha tramitacoes registradas.</small>
+            </li>
+        {% endfor %}
+        {% if processo.finalizado_em %}
+            <li>
+                <strong>Finalizacao em {{ processo.finalizado_em|date:"d/m/Y H:i" }}</strong><br>
+                <small class="muted">Status final: {{ processo.get_status_display }}</small>
+                {% if processo.termo_finalizacao %}
+                    <p style="margin: 0.4rem 0 0 0; white-space: pre-wrap;">{{ processo.termo_finalizacao }}</p>
+                {% endif %}
+            </li>
+        {% endif %}
+    </ul>
+</section>
+{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo %}
+<dialog id="modal-remocao-arquivo" style="width: min(680px, 92vw); border: 1px solid #d8e0ea; border-radius: 12px; padding: 0;">
+    <div style="padding: 1rem 1rem 0 1rem;">
+        <h2 class="section-title">Confirmar remocao de arquivo</h2>
+        <p class="muted" id="texto-remocao-documento" style="margin: 0.4rem 0 0 0;"></p>
+    </div>
+    <form method="post" style="padding: 0 1rem 1rem 1rem;" id="form-remocao-arquivo">
+        {% csrf_token %}
+        <input type="hidden" name="remover_arquivo_documento" value="1">
+        <input type="hidden" name="documento_id" id="input-documento-id-remocao">
+        <div class="field">
+            <label for="id_motivo_remocao">Motivo da remocao</label>
+            <textarea id="id_motivo_remocao" name="motivo_remocao" rows="4" required></textarea>
+        </div>
+        <div style="display: flex; gap: 0.7rem; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary" id="btn-cancelar-remocao">Cancelar</button>
+            <button type="submit" class="btn">Confirmar remocao</button>
+        </div>
+    </form>
+</dialog>
+{% endif %}
+{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo %}
+<script>
+    (function () {
+        const modalDocumento = document.getElementById("modal-documento");
+        const modalEncaminhamento = document.getElementById("modal-encaminhamento");
+        const modalRemocao = document.getElementById("modal-remocao-arquivo");
+        const modalCiente = document.getElementById("modal-ciente");
+        const modalFinalizacao = document.getElementById("modal-finalizacao");
+        const btnAbrirDocumento = document.getElementById("btn-abrir-modal-documento");
+        const btnAbrirEncaminhar = document.getElementById("btn-abrir-modal-encaminhar");
+        const btnAbrirCiente = document.getElementById("btn-abrir-modal-ciente");
+        const btnAbrirFinalizar = document.getElementById("btn-abrir-modal-finalizar");
+        const btnAbrirRemocao = Array.from(document.querySelectorAll(".btn-abrir-remocao"));
+        const btnFecharDocumento = document.getElementById("btn-fechar-modal-documento");
+        const btnFecharEncaminhamento = document.getElementById("btn-fechar-modal-encaminhamento");
+        const btnFecharCiente = document.getElementById("btn-fechar-modal-ciente");
+        const btnFecharFinalizar = document.getElementById("btn-fechar-modal-finalizar");
+        const btnCancelarRemocao = document.getElementById("btn-cancelar-remocao");
+        const inputDocumentoIdRemocao = document.getElementById("input-documento-id-remocao");
+        const textoRemocaoDocumento = document.getElementById("texto-remocao-documento");
+        const inputMotivoRemocao = document.getElementById("id_motivo_remocao");
+
+        if (btnAbrirDocumento && modalDocumento) {
+            btnAbrirDocumento.addEventListener("click", () => modalDocumento.showModal());
+        }
+        if (btnAbrirEncaminhar && modalEncaminhamento) {
+            btnAbrirEncaminhar.addEventListener("click", () => modalEncaminhamento.showModal());
+        }
+        if (btnAbrirCiente && modalCiente) {
+            btnAbrirCiente.addEventListener("click", () => modalCiente.showModal());
+        }
+        if (btnAbrirFinalizar && modalFinalizacao) {
+            btnAbrirFinalizar.addEventListener("click", () => modalFinalizacao.showModal());
+        }
+        if (modalRemocao && btnAbrirRemocao.length) {
+            btnAbrirRemocao.forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    if (inputDocumentoIdRemocao) inputDocumentoIdRemocao.value = btn.dataset.documentoId || "";
+                    if (textoRemocaoDocumento) {
+                        textoRemocaoDocumento.textContent = "Documento: " + (btn.dataset.documentoTitulo || "-");
+                    }
+                    if (inputMotivoRemocao) inputMotivoRemocao.value = "";
+                    modalRemocao.showModal();
+                });
+            });
+        }
+        if (btnFecharDocumento && modalDocumento) {
+            btnFecharDocumento.addEventListener("click", () => modalDocumento.close());
+        }
+        if (btnFecharEncaminhamento && modalEncaminhamento) {
+            btnFecharEncaminhamento.addEventListener("click", () => modalEncaminhamento.close());
+        }
+        if (btnFecharCiente && modalCiente) {
+            btnFecharCiente.addEventListener("click", () => modalCiente.close());
+        }
+        if (btnFecharFinalizar && modalFinalizacao) {
+            btnFecharFinalizar.addEventListener("click", () => modalFinalizacao.close());
+        }
+        if (btnCancelarRemocao && modalRemocao) {
+            btnCancelarRemocao.addEventListener("click", () => modalRemocao.close());
+        }
+        {% if open_documento_modal %}
+            if (modalDocumento) modalDocumento.showModal();
+        {% endif %}
+        {% if open_encaminhamento_modal %}
+            if (modalEncaminhamento) modalEncaminhamento.showModal();
+        {% endif %}
+        {% if open_ciente_modal %}
+            if (modalCiente) modalCiente.showModal();
+        {% endif %}
+        {% if open_finalizar_modal %}
+            if (modalFinalizacao) modalFinalizacao.showModal();
+        {% endif %}
+    })();
+</script>
+{% endif %}
+{% endblock %}

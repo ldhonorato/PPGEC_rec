@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Inicio | PPGEC{% endblock %}
+{% block content %}
+<section class="card" style="margin-bottom: 1rem;">
+    <h1 class="section-title">Bem-vindo ao Sistema de Gestao do PPGEC</h1>
+    <p class="muted" style="margin: 0 0 0.8rem 0;">
+        Utilize o menu lateral para acessar as funcionalidades disponiveis para o seu perfil.
+    </p>
+</section>
+<!-- 
+<section class="card" style="margin-bottom: 1rem;">
+    <h1 class="section-title">Usuario</h1>
+    <p class="muted" style="margin: 0;">
+        <strong>{{ user.nome }}</strong> ({{ user.get_tipo_usuario_display }}) - {{ user.email }}
+    </p>
+</section> -->
+
+{% if can_add_processo and meus_processos_requerente %}
+<section class="card" style="margin-bottom: 1rem;">
+    <h2 class="section-title" style="color: #b00020;">Acoes pendentes no Requerente</h2>
+    <ul class="list">
+        {% for processo in meus_processos_requerente %}
+            <li style="border-color: #f2b8c0; background: #fff6f8;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                    <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
+                    <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Resolver pendencia</a>
+                </div>
+                <small class="muted">Este processo esta no setor Requerente e pode exigir envio de documentacao.</small>
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
+{% if user.tipo_usuario == "DOCENTE" and cientes_pendentes_orientador %}
+<section class="card" style="margin-bottom: 1rem;">
+    <h2 class="section-title" style="color: #1f5aa6;">Pedidos de ciencia pendentes</h2>
+    <ul class="list">
+        {% for manifestacao in cientes_pendentes_orientador %}
+            <li style="border-color: #bcd0ea; background: #f7fbff;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                    <strong>{{ manifestacao.processo.numero }} - {{ manifestacao.processo.assunto }}</strong>
+                    <a class="btn" href="{% url 'processo_detalhe' manifestacao.processo.id %}">Analisar ciencia</a>
+                </div>
+                <small class="muted">
+                    Solicitado por: {{ manifestacao.solicitado_por.nome }} |
+                    Em: {{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}
+                </small>
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+{% endblock %}
