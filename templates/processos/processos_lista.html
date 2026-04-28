@@ -36,6 +36,12 @@
                     {% endfor %}
                 </select>
             </div>
+            <div class="field">
+                <label>
+                    <input type="checkbox" name="atrasados" value="1" {% if filtro_atrasados %}checked{% endif %}>
+                    Apenas atrasados
+                </label>
+            </div>
         </div>
         <button class="btn" type="submit">Filtrar</button>
     </form>
@@ -54,7 +60,9 @@
                         Usuario: {{ processo.usuario_criado_por.nome }} |
                         Tipo: {{ processo.get_tipo_display }} |
                         Status: {{ processo.get_status_display }} |
-                        Setor: {{ processo.setor_atual.nome }}
+                        Setor: {{ processo.setor_atual.nome }} |
+                        Prazo: {{ processo.prazo_limite|date:"d/m/Y"|default:"-" }}
+                        {% if processo.esta_atrasado %}| <span class="badge badge-no">Atrasado</span>{% endif %}
                     </small>
                 </li>
             {% endfor %}

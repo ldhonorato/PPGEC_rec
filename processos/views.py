@@ -7,6 +7,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
 from .forms import (
     AlunoComentarioForm,
@@ -284,7 +285,12 @@ def processos_view(request):
     status = request.GET.get("status", "").strip()
     setor_id = request.GET.get("setor", "").strip()
     termo = request.GET.get("q", "").strip()
+    somente_atrasados = request.GET.get("atrasados") == "1"
 
+    if somente_atrasados:
+        queryset = queryset.filter(prazo_limite__lt=timezone.localdate()).exclude(
+            status=Processo.StatusProcesso.FINALIZADO
+        )
     if tipo:
         queryset = queryset.filter(tipo=tipo)
     if status:
@@ -310,6 +316,7 @@ def processos_view(request):
             "filtro_status": status,
             "filtro_setor": setor_id,
             "filtro_q": termo,
+            "filtro_atrasados": somente_atrasados,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -1024,7 +1031,12 @@ def menu_meus_processos_view(request):
     filtro_status = request.GET.get("my_status", "").strip()
     filtro_data_inicio = request.GET.get("my_data_inicio", "").strip()
     filtro_data_fim = request.GET.get("my_data_fim", "").strip()
+    filtro_atrasados = request.GET.get("my_atrasados") == "1"
 
+    if filtro_atrasados:
+        meus_processos = meus_processos.filter(prazo_limite__lt=timezone.localdate()).exclude(
+            status=Processo.StatusProcesso.FINALIZADO
+        )
     if filtro_q:
         meus_processos = meus_processos.filter(
             Q(numero__icontains=filtro_q)
@@ -1055,6 +1067,7 @@ def menu_meus_processos_view(request):
             "my_filtro_status": filtro_status,
             "my_filtro_data_inicio": filtro_data_inicio,
             "my_filtro_data_fim": filtro_data_fim,
+            "my_filtro_atrasados": filtro_atrasados,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),

@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
@@ -214,6 +216,19 @@ class Setor(models.Model):
 
 
 class Processo(models.Model):
+    PRAZOS_DIAS_POR_TIPO = {
+        "APROVEITAMENTO_CREDITOS": 30,
+        "DISPENSA_DISCIPLINA": 30,
+        "TRANCAMENTO_MATRICULA": 15,
+        "PRORROGACAO_PRAZO": 20,
+        "REINGRESSO": 30,
+        "MUDANCA_ORIENTADOR": 20,
+        "QUALIFICACAO": 30,
+        "DEFESA": 45,
+        "RECURSO": 15,
+        "OUTRO": 30,
+    }
+
     class TipoProcesso(models.TextChoices):
         APROVEITAMENTO_CREDITOS = "APROVEITAMENTO_CREDITOS", "Aproveitamento de Creditos"
         DISPENSA_DISCIPLINA = "DISPENSA_DISCIPLINA", "Dispensa de Disciplina"
@@ -270,6 +285,7 @@ class Processo(models.Model):
         related_name="processos_atuais",
     )
     numero = models.CharField(max_length=20, unique=True, editable=False, blank=True)
+    prazo_limite = models.DateField(null=True, blank=True)
     finalizado_em = models.DateTimeField(null=True, blank=True)
     termo_finalizacao = models.TextField(blank=True)
     observacoes_internas = models.TextField(blank=True)
@@ -283,6 +299,18 @@ class Processo(models.Model):
     @property
     def esta_finalizado(self) -> bool:
         return self.finalizado_em is not None or self.status == self.StatusProcesso.FINALIZADO
+
+    @property
+    def esta_atrasado(self) -> bool:
+        return bool(
+            self.prazo_limite
+            and self.prazo_limite < timezone.localdate()
+            and not self.esta_finalizado
+        )
+
+    @classmethod
+    def prazo_dias_para_tipo(cls, tipo_processo: str) -> int:
+        return cls.PRAZOS_DIAS_POR_TIPO.get(tipo_processo, 30)
 
     @classmethod
     def gerar_numero(cls) -> str:
@@ -312,6 +340,9 @@ class Processo(models.Model):
     def save(self, *args, **kwargs):
         if self._state.adding and not self.status_inicial:
             self.status_inicial = self.status
+
+        if self._state.adding and not self.prazo_limite:
+            self.prazo_limite = timezone.localdate() + timedelta(days=self.prazo_dias_para_tipo(self.tipo))
 
         if not self.numero:
             for _ in range(5):

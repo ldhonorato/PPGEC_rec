@@ -1,27 +1,190 @@
 {% extends "base.html" %}
-{% block title %}Inicio | PPGEC{% endblock %}
+{% block title %}Inicio | AcadFlow{% endblock %}
 {% block content %}
-<section class="card" style="margin-bottom: 1rem;">
-    <h1 class="section-title">Bem-vindo ao Sistema de Gestao do PPGEC</h1>
-    <p class="muted" style="margin: 0 0 0.8rem 0;">
-        Utilize o menu lateral para acessar as funcionalidades disponiveis para o seu perfil.
-    </p>
+<section class="card hero-card">
+    <div class="hero-mark" aria-hidden="true"></div>
+    <div class="hero-content">
+        <p class="hero-kicker">Bem-vindo ao</p>
+        <h1 class="hero-title">Acad<span>Flow</span></h1>
+        <p class="hero-subtitle">Sistema de Gestao Academica do PPGEC</p>
+        <p class="hero-copy">
+            Utilize o menu lateral para acessar as funcionalidades disponiveis para o seu perfil.
+        </p>
+    </div>
 </section>
-<!-- 
-<section class="card" style="margin-bottom: 1rem;">
-    <h1 class="section-title">Usuario</h1>
-    <p class="muted" style="margin: 0;">
-        <strong>{{ user.nome }}</strong> ({{ user.get_tipo_usuario_display }}) - {{ user.email }}
-    </p>
-</section> -->
+
+<h2 class="overview-title">Visao geral</h2>
+<section class="metric-grid" aria-label="Visao geral">
+    {% if user.tipo_usuario == "DOCENTE" %}
+        <article class="card metric-card">
+            <span class="metric-icon">P</span>
+            <div>
+                <p class="metric-value">{{ meus_processos_requerente|length }}</p>
+                <p class="metric-label">Pendencias</p>
+            </div>
+            <a class="metric-link" href="{% url 'menu_meus_processos' %}">Ver todos -></a>
+        </article>
+        <article class="card metric-card is-green">
+            <span class="metric-icon">O</span>
+            <div>
+                <p class="metric-value">{% if orientandos %}{{ orientandos|length }}{% else %}0{% endif %}</p>
+                <p class="metric-label">Orientandos</p>
+            </div>
+            <a class="metric-link" href="{% url 'menu_meus_orientandos' %}">Ver todos -></a>
+        </article>
+        <article class="card metric-card is-purple">
+            <span class="metric-icon">C</span>
+            <div>
+                <p class="metric-value">{% if processos_orientandos %}{{ processos_orientandos|length }}{% else %}0{% endif %}</p>
+                <p class="metric-label">Processos dos orientandos</p>
+            </div>
+            <a class="metric-link" href="{% url 'menu_processos_orientandos' %}">Ver todos -></a>
+        </article>
+        <article class="card metric-card is-orange">
+            <span class="metric-icon">M</span>
+            <div>
+                <p class="metric-value">{% if cientes_pendentes_orientador %}{{ cientes_pendentes_orientador|length }}{% else %}0{% endif %}</p>
+                <p class="metric-label">Ciencias pendentes</p>
+            </div>
+            <a class="metric-link" href="{% url 'menu_ciencias_manifestadas' %}">Ver todos -></a>
+        </article>
+    {% elif user.tipo_usuario == "ALUNO" %}
+        <article class="card metric-card">
+            <span class="metric-icon">P</span>
+            <div>
+                <p class="metric-value">{{ meus_processos_requerente|length }}</p>
+                <p class="metric-label">Pendencias</p>
+            </div>
+            <a class="metric-link" href="{% url 'menu_meus_processos' %}">Ver todos -></a>
+        </article>
+        <article class="card metric-card is-green">
+            <span class="metric-icon">N</span>
+            <div>
+                <p class="metric-value">+</p>
+                <p class="metric-label">Novo processo</p>
+            </div>
+            <a class="metric-link" href="{% url 'novo_processo' %}">Abrir -></a>
+        </article>
+        <article class="card metric-card is-purple">
+            <span class="metric-icon">V</span>
+            <div>
+                <p class="metric-value">1</p>
+                <p class="metric-label">Documento de vinculo</p>
+            </div>
+            <a class="metric-link" href="{% url 'aluno_documento_vinculo' %}">Acessar -></a>
+        </article>
+        <article class="card metric-card is-orange">
+            <span class="metric-icon">H</span>
+            <div>
+                <p class="metric-value">1</p>
+                <p class="metric-label">Historico academico</p>
+            </div>
+            <a class="metric-link" href="{% url 'aluno_documento_historico' %}">Acessar -></a>
+        </article>
+    {% else %}
+        <article class="card metric-card">
+            <span class="metric-icon">D</span>
+            <div>
+                <p class="metric-value">1</p>
+                <p class="metric-label">Dashboard</p>
+            </div>
+            <a class="metric-link" href="{% url 'coordenacao_dashboard' %}">Acessar -></a>
+        </article>
+        <article class="card metric-card is-green">
+            <span class="metric-icon">A</span>
+            <div>
+                <p class="metric-value">1</p>
+                <p class="metric-label">Alunos</p>
+            </div>
+            <a class="metric-link" href="{% url 'coordenacao_alunos' %}">Acessar -></a>
+        </article>
+        <article class="card metric-card is-purple">
+            <span class="metric-icon">P</span>
+            <div>
+                <p class="metric-value">1</p>
+                <p class="metric-label">Processos</p>
+            </div>
+            <a class="metric-link" href="{% url 'coordenacao_processos' %}">Acessar -></a>
+        </article>
+        <article class="card metric-card is-orange">
+            <span class="metric-icon">C</span>
+            <div>
+                <p class="metric-value">1</p>
+                <p class="metric-label">Caixa de processos</p>
+            </div>
+            <a class="metric-link" href="{% url 'coordenacao_caixa_processos' %}">Acessar -></a>
+        </article>
+    {% endif %}
+</section>
+
+<section class="dashboard-grid">
+    <article class="card">
+        <div class="actions-row">
+            <h2 class="section-title">Atividades recentes</h2>
+            <a class="text-link" href="{% url 'menu_meus_processos' %}">Ver todas</a>
+        </div>
+        <ul class="activity-list">
+            {% if meus_processos_requerente %}
+                {% for processo in meus_processos_requerente|slice:":4" %}
+                    <li>
+                        <span class="soft-icon">!</span>
+                        <span>
+                            <strong>{{ processo.numero }}</strong> aguarda acao do requerente
+                        </span>
+                        <time>{{ processo.atualizado_em|date:"d/m/Y" }}</time>
+                    </li>
+                {% endfor %}
+            {% elif cientes_pendentes_orientador %}
+                {% for manifestacao in cientes_pendentes_orientador|slice:":4" %}
+                    <li>
+                        <span class="soft-icon">C</span>
+                        <span>
+                            Ciencia pendente no processo <strong>{{ manifestacao.processo.numero }}</strong>
+                        </span>
+                        <time>{{ manifestacao.data_solicitacao|date:"d/m/Y" }}</time>
+                    </li>
+                {% endfor %}
+            {% else %}
+                <li>
+                    <span class="soft-icon">OK</span>
+                    <span>Nenhuma atividade pendente para o seu perfil.</span>
+                    <time>Hoje</time>
+                </li>
+            {% endif %}
+        </ul>
+    </article>
+
+    <article class="card">
+        <h2 class="section-title">Acesso rapido</h2>
+        <div class="quick-list">
+            {% if can_add_processo %}
+                <a href="{% url 'novo_processo' %}">
+                    <span class="soft-icon">N</span>
+                    <strong>Novo requerimento</strong>
+                    <span>-></span>
+                </a>
+            {% endif %}
+            <a href="{% url 'menu_meus_processos' %}">
+                <span class="soft-icon">B</span>
+                <strong>Consultar processos</strong>
+                <span>-></span>
+            </a>
+            <a href="{% url 'me' %}">
+                <span class="soft-icon">U</span>
+                <strong>Meu perfil</strong>
+                <span>-></span>
+            </a>
+        </div>
+    </article>
+</section>
 
 {% if can_add_processo and meus_processos_requerente %}
-<section class="card" style="margin-bottom: 1rem;">
-    <h2 class="section-title" style="color: #b00020;">Acoes pendentes no Requerente</h2>
+<section class="card panel alert-danger">
+    <h2 class="section-title">Acoes pendentes no Requerente</h2>
     <ul class="list">
         {% for processo in meus_processos_requerente %}
-            <li style="border-color: #f2b8c0; background: #fff6f8;">
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+            <li>
+                <div class="item-row">
                     <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
                     <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Resolver pendencia</a>
                 </div>
@@ -33,12 +196,12 @@
 {% endif %}
 
 {% if user.tipo_usuario == "DOCENTE" and cientes_pendentes_orientador %}
-<section class="card" style="margin-bottom: 1rem;">
-    <h2 class="section-title" style="color: #1f5aa6;">Pedidos de ciencia pendentes</h2>
+<section class="card panel alert-info">
+    <h2 class="section-title">Pedidos de ciencia pendentes</h2>
     <ul class="list">
         {% for manifestacao in cientes_pendentes_orientador %}
-            <li style="border-color: #bcd0ea; background: #f7fbff;">
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+            <li>
+                <div class="item-row">
                     <strong>{{ manifestacao.processo.numero }} - {{ manifestacao.processo.assunto }}</strong>
                     <a class="btn" href="{% url 'processo_detalhe' manifestacao.processo.id %}">Analisar ciencia</a>
                 </div>

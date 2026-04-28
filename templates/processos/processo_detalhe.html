@@ -7,6 +7,10 @@
     <p style="margin: 0.35rem 0;"><strong>Tipo:</strong> {{ processo.get_tipo_display }}</p>
     <p style="margin: 0.35rem 0;"><strong>Status:</strong> {{ processo.get_status_display }}</p>
     <p style="margin: 0.35rem 0;"><strong>Setor atual:</strong> {{ processo.setor_atual.nome }}</p>
+    <p style="margin: 0.35rem 0;">
+        <strong>Prazo limite:</strong> {{ processo.prazo_limite|date:"d/m/Y"|default:"-" }}
+        {% if processo.esta_atrasado %}<span class="badge badge-no">Atrasado</span>{% endif %}
+    </p>
     <p style="margin: 0.35rem 0;"><strong>Criado por:</strong> {{ processo.usuario_criado_por.nome }} ({{ processo.usuario_criado_por.email }})</p>
     <p style="margin: 0.35rem 0;"><strong>Criado em:</strong> {{ processo.data_criacao|date:"d/m/Y H:i" }}</p>
     <p style="margin: 0.35rem 0;"><strong>Ultima atualizacao:</strong> {{ processo.atualizado_em|date:"d/m/Y H:i" }}</p>
@@ -95,7 +99,7 @@
 </section>
 
 {% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo %}
-<dialog id="modal-documento" style="width: min(680px, 92vw); border: 1px solid #d8e0ea; border-radius: 12px; padding: 0;">
+<dialog id="modal-documento" class="modal-dialog">
     <div style="padding: 1rem 1rem 0 1rem;">
         <h2 class="section-title">Adicionar documento</h2>
     </div>
@@ -116,7 +120,7 @@
     </form>
 </dialog>
 
-<dialog id="modal-encaminhamento" style="width: min(680px, 92vw); border: 1px solid #d8e0ea; border-radius: 12px; padding: 0;">
+<dialog id="modal-encaminhamento" class="modal-dialog">
     <div style="padding: 1rem 1rem 0 1rem;">
         {% if can_manage_requerente %}
             <h2 class="section-title">Devolver processo ao setor solicitante</h2>
@@ -148,7 +152,7 @@
     </form>
 </dialog>
 
-<dialog id="modal-ciente" style="width: min(680px, 92vw); border: 1px solid #d8e0ea; border-radius: 12px; padding: 0;">
+<dialog id="modal-ciente" class="modal-dialog">
     <div style="padding: 1rem 1rem 0 1rem;">
         {% if can_manifestar_ciente %}
             <h2 class="section-title">Manifestar ciente do orientador</h2>
@@ -189,7 +193,7 @@
     </form>
 </dialog>
 
-<dialog id="modal-finalizacao" style="width: min(680px, 92vw); border: 1px solid #d8e0ea; border-radius: 12px; padding: 0;">
+<dialog id="modal-finalizacao" class="modal-dialog">
     <div style="padding: 1rem 1rem 0 1rem;">
         <h2 class="section-title">Finalizar processo</h2>
     </div>
@@ -346,7 +350,7 @@
     </ul>
 </section>
 {% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo %}
-<dialog id="modal-remocao-arquivo" style="width: min(680px, 92vw); border: 1px solid #d8e0ea; border-radius: 12px; padding: 0;">
+<dialog id="modal-remocao-arquivo" class="modal-dialog">
     <div style="padding: 1rem 1rem 0 1rem;">
         <h2 class="section-title">Confirmar remocao de arquivo</h2>
         <p class="muted" id="texto-remocao-documento" style="margin: 0.4rem 0 0 0;"></p>

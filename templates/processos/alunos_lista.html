@@ -37,7 +37,7 @@
         <ul class="list">
             {% for aluno in alunos %}
                 <li>
-                    <strong><a href="{% url 'aluno_detalhe' aluno.id %}" style="text-decoration: none; color: var(--primary);">{{ aluno.nome }}</a></strong><br>
+                    <strong><a class="text-link" href="{% url 'aluno_detalhe' aluno.id %}">{{ aluno.nome }}</a></strong><br>
                     <small class="muted">
                         {{ aluno.email }}
                         {% if aluno.matricula %} | Matricula: {{ aluno.matricula }}{% endif %}

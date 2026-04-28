@@ -11,10 +11,10 @@
             .docente-item summary {
                 list-style: none;
                 cursor: pointer;
-                border: 1px solid var(--border);
-                border-radius: 10px;
+                border: 1px solid var(--color-border);
+                border-radius: var(--radius-sm);
                 padding: 0.7rem 0.85rem;
-                background: #fff;
+                background: #ffffff;
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
@@ -22,8 +22,8 @@
             }
             .docente-item summary::-webkit-details-marker { display: none; }
             .docente-toggle {
-                font-weight: 700;
-                color: var(--primary);
+                font-weight: 800;
+                color: var(--color-primary);
                 font-size: 1.1rem;
                 min-width: 1rem;
                 text-align: center;
@@ -49,7 +49,7 @@
                     <ul class="orientandos-lista">
                         {% for aluno in docente.orientandos.all %}
                             <li>
-                                <strong><a href="{% url 'aluno_detalhe' aluno.id %}" style="text-decoration: none; color: var(--primary);">{{ aluno.nome }}</a></strong>:
+                                <strong><a class="text-link" href="{% url 'aluno_detalhe' aluno.id %}">{{ aluno.nome }}</a></strong>:
                                 <span class="muted">{{ aluno.email }}{% if aluno.matricula %} | Matricula: {{ aluno.matricula }}{% endif %}</span>
                             </li>
                         {% endfor %}

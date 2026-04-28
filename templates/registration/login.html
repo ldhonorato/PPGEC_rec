@@ -1,34 +1,34 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}Login | PPGEC{% endblock %}
+{% block title %}Login | AcadFlow{% endblock %}
 {% block content %}
-<section class="card" style="max-width: 520px; margin: 3rem auto;">
-    <div style="text-align: center; margin-bottom: 1rem;">
-        <img
-            src="{% static 'img/ppgec-logomarca-5-estrelas.png' %}"
-            alt="Logomarca PPGEC 5 estrelas"
-            style="max-width: 240px; width: 100%; height: auto;"
-        >
-        <h1 style="margin: 0.8rem 0 0 0;">Acesso ao Sistema</h1>
-        <p class="muted" style="margin-top: 0.3rem;">Use seu email institucional e senha.</p>
-    </div>
+<section class="login-page">
+    <article class="card login-card">
+        <div class="login-brand">
+            <img src="{% static 'img/acadflow-logo.png' %}" alt="AcadFlow">
+            <div>
+                <h1 class="section-title">Acesso ao Sistema</h1>
+                <p class="muted">Use seu email institucional e senha.</p>
+            </div>
+        </div>
 
-    <form method="post">
-        {% csrf_token %}
-        {% if form.non_field_errors %}
-            <ul class="errorlist">{{ form.non_field_errors }}</ul>
-        {% endif %}
-        <div class="field">
-            <label for="{{ form.username.id_for_label }}">Email</label>
-            {{ form.username }}
-            {{ form.username.errors }}
-        </div>
-        <div class="field">
-            <label for="{{ form.password.id_for_label }}">Senha</label>
-            {{ form.password }}
-            {{ form.password.errors }}
-        </div>
-        <button type="submit" class="btn" style="width: 100%;">Entrar</button>
-    </form>
+        <form method="post">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <ul class="errorlist">{{ form.non_field_errors }}</ul>
+            {% endif %}
+            <div class="field">
+                <label for="{{ form.username.id_for_label }}">Email</label>
+                {{ form.username }}
+                {{ form.username.errors }}
+            </div>
+            <div class="field">
+                <label for="{{ form.password.id_for_label }}">Senha</label>
+                {{ form.password }}
+                {{ form.password.errors }}
+            </div>
+            <button type="submit" class="btn btn-full">Entrar</button>
+        </form>
+    </article>
 </section>
 {% endblock %}

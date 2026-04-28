@@ -3,17 +3,6 @@
 {% block content %}
 <style>
     .aluno-kv { margin: 0.45rem 0; }
-    .badge {
-        display: inline-block;
-        padding: 0.2rem 0.55rem;
-        border-radius: 999px;
-        font-size: 0.82rem;
-        font-weight: 700;
-        border: 1px solid transparent;
-    }
-    .badge-ok { background: #eaf7ee; color: #1e6b39; border-color: #b9e2c6; }
-    .badge-no { background: #fbeaec; color: #8e1c29; border-color: #f1bec5; }
-    .badge-info { background: #eaf2fb; color: #184c87; border-color: #bdd2ee; }
     .aluno-page-layout {
         display: grid;
         grid-template-columns: 280px minmax(0, 1fr);
@@ -30,19 +19,19 @@
     .acao-link {
         width: 100%;
         text-align: left;
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        background: #fff;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        background: #ffffff;
         padding: 0.6rem 0.7rem;
-        font-weight: 600;
+        font-weight: 800;
         cursor: pointer;
-        color: var(--text);
+        color: var(--color-text);
     }
-    .acao-link:hover { border-color: var(--primary); color: var(--primary); }
+    .acao-link:hover { border-color: var(--color-primary); color: var(--color-primary); }
     .modal-backdrop {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.45);
+        background: rgba(8, 20, 38, 0.48);
         display: none;
         align-items: center;
         justify-content: center;
@@ -52,10 +41,11 @@
     .modal-backdrop.open { display: flex; }
     .modal-card {
         width: min(650px, 96vw);
-        background: #fff;
-        border: 1px solid var(--border);
-        border-radius: 12px;
+        background: #ffffff;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
         padding: 1rem;
+        box-shadow: var(--shadow-card);
     }
     .modal-head {
         display: flex;
@@ -65,9 +55,9 @@
         margin-bottom: 0.7rem;
     }
     .modal-close {
-        border: 1px solid var(--border);
-        background: #fff;
-        border-radius: 8px;
+        border: 1px solid var(--color-border);
+        background: #ffffff;
+        border-radius: var(--radius-sm);
         padding: 0.35rem 0.55rem;
         cursor: pointer;
     }
