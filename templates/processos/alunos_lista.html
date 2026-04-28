@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Alunos | Coordenacao{% endblock %}
+{% block content %}
+<section class="card" style="margin-bottom: 1rem;">
+    <h1 class="section-title">Alunos</h1>
+    <form method="get">
+        <div class="grid-two">
+            <div class="field">
+                <label for="id_nome">Nome</label>
+                <input id="id_nome" type="text" name="nome" value="{{ filtro_nome }}" placeholder="nome do aluno">
+            </div>
+            <div class="field">
+                <label for="id_status">Status</label>
+                <select id="id_status" name="status">
+                    <option value="">Todos</option>
+                    {% for value, label in status_list %}
+                        <option value="{{ value }}" {% if filtro_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="id_ingresso_inicio">Ingresso de</label>
+                <input id="id_ingresso_inicio" type="text" name="ingresso_inicio" value="{{ filtro_ingresso_inicio }}" placeholder="YYYY.1 ou YYYY.2">
+            </div>
+            <div class="field">
+                <label for="id_ingresso_fim">Ingresso ate</label>
+                <input id="id_ingresso_fim" type="text" name="ingresso_fim" value="{{ filtro_ingresso_fim }}" placeholder="YYYY.1 ou YYYY.2">
+            </div>
+        </div>
+        <small class="muted">Formato de semestre: YYYY.1 ou YYYY.2 (ex.: 2025.1).</small><br>
+        <button class="btn" type="submit">Filtrar</button>
+    </form>
+</section>
+
+<section class="card">
+    {% if alunos %}
+        <ul class="list">
+            {% for aluno in alunos %}
+                <li>
+                    <strong><a href="{% url 'aluno_detalhe' aluno.id %}" style="text-decoration: none; color: var(--primary);">{{ aluno.nome }}</a></strong><br>
+                    <small class="muted">
+                        {{ aluno.email }}
+                        {% if aluno.matricula %} | Matricula: {{ aluno.matricula }}{% endif %}
+                        | Ingresso: {{ aluno.ingresso }}
+                        | Status: {{ aluno.get_status_aluno_display }}
+                        | Qualificado: {% if aluno.isQualificado %}Sim{% else %}Nao{% endif %}
+                        {% if aluno.prazo_qualificacao %} | Prazo qualificacao: {{ aluno.prazo_qualificacao }}{% endif %}
+                        {% if aluno.prazo_defesa %} | Prazo defesa: {{ aluno.prazo_defesa }}{% endif %}
+                        {% if aluno.orientador %} | Orientador: {{ aluno.orientador.nome }}{% endif %}
+                    </small>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhum aluno encontrado com os filtros informados.</p>
+    {% endif %}
+</section>
+{% endblock %}

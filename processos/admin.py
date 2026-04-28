@@ -3,6 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.hashers import identify_hasher
 
 from .models import (
+    AlteracaoAluno,
     Aluno,
     Docente,
     Documento,
@@ -58,8 +59,22 @@ class UserAdmin(EnsurePasswordHashedAdminMixin, BaseUserAdmin):
 
 @admin.register(Aluno)
 class AlunoAdmin(EnsurePasswordHashedAdminMixin, admin.ModelAdmin):
-    list_display = ("email", "nome", "ingresso", "orientador", "matricula", "is_active")
-    list_filter = ("ingresso", "is_active")
+    list_display = (
+        "email",
+        "nome",
+        "ingresso",
+        "prazo_qualificacao",
+        "prazo_defesa",
+        "status_aluno",
+        "isQualificado",
+        "numero_defesa",
+        "data_defesa",
+        "deposito_versao_final",
+        "orientador",
+        "matricula",
+        "is_active",
+    )
+    list_filter = ("ingresso", "status_aluno", "isQualificado", "deposito_versao_final", "is_active")
     search_fields = ("email", "nome", "matricula")
     autocomplete_fields = ("orientador",)
 
@@ -110,3 +125,12 @@ class TramitacaoProcessoAdmin(admin.ModelAdmin):
     search_fields = ("processo__numero", "observacao")
     autocomplete_fields = ("processo", "setor_origem", "setor_destino", "encaminhado_por")
     readonly_fields = ("data_encaminhamento",)
+
+
+@admin.register(AlteracaoAluno)
+class AlteracaoAlunoAdmin(admin.ModelAdmin):
+    list_display = ("aluno", "tipo", "alterado_por", "criado_em")
+    list_filter = ("tipo", "criado_em")
+    search_fields = ("aluno__nome", "aluno__email", "comentario", "valor_anterior", "valor_novo")
+    autocomplete_fields = ("aluno", "alterado_por")
+    readonly_fields = ("criado_em",)

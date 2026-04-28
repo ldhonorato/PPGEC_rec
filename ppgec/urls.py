@@ -21,6 +21,8 @@ from django.urls import path
 from django.contrib.auth.views import LoginView, LogoutView
 
 from processos.views import (
+    aluno_detalhe_view,
+    alunos_view,
     aluno_documento_historico_view,
     aluno_documento_vinculo_view,
     caixa_processos_view,
@@ -51,6 +53,8 @@ urlpatterns = [
     path("aluno/documento-historico/", aluno_documento_historico_view, name="aluno_documento_historico"),
     path("processos/novo/", novo_processo_view, name="novo_processo"),
     path("coordenacao/dashboard/", coordenacao_dashboard_view, name="coordenacao_dashboard"),
+    path("coordenacao/alunos/", alunos_view, name="coordenacao_alunos"),
+    path("coordenacao/alunos/<int:aluno_id>/", aluno_detalhe_view, name="aluno_detalhe"),
     path("coordenacao/processos/", processos_view, name="coordenacao_processos"),
     path("coordenacao/processos/<int:processo_id>/", processo_detalhe_view, name="processo_detalhe"),
     path("coordenacao/caixa-processos/", caixa_processos_view, name="coordenacao_caixa_processos"),

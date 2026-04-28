@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.db import IntegrityError
 from django.db import models
 from django.db import transaction
@@ -69,8 +70,37 @@ class User(AbstractUser):
 
 
 class Aluno(User):
-    # DateField allows precise temporal queries and avoids year-only ambiguity.
-    ingresso = models.DateField()
+    class StatusAluno(models.TextChoices):
+        ATIVO = "ATIVO", "Ativo"
+        DESLIGADO = "DESLIGADO", "Desligado"
+        DEFENDEU = "DEFENDEU", "Defendeu"
+
+    semestre_validator = RegexValidator(
+        regex=r"^\d{4}\.[12]$",
+        message="Informe no formato YYYY.1 ou YYYY.2.",
+    )
+    ingresso = models.CharField(max_length=6, validators=[semestre_validator])
+    prazo_defesa = models.CharField(
+        max_length=6,
+        null=True,
+        blank=True,
+        validators=[semestre_validator],
+    )
+    prazo_qualificacao = models.CharField(
+        max_length=6,
+        null=True,
+        blank=True,
+        validators=[semestre_validator],
+    )
+    isQualificado = models.BooleanField(default=False)
+    status_aluno = models.CharField(
+        max_length=12,
+        choices=StatusAluno.choices,
+        default=StatusAluno.ATIVO,
+    )
+    numero_defesa = models.CharField(max_length=80, blank=True)
+    data_defesa = models.DateField(null=True, blank=True)
+    deposito_versao_final = models.BooleanField(default=False)
     orientador = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -94,11 +124,26 @@ class Aluno(User):
         if self.orientador and self.orientador.tipo_usuario != User.TipoUsuario.DOCENTE:
             errors["orientador"] = "Orientador deve ser um usuario do tipo DOCENTE."
 
+        if self.status_aluno == self.StatusAluno.DEFENDEU:
+            if not (self.numero_defesa or "").strip():
+                errors["numero_defesa"] = "Informe o numero da defesa para aluno com status Defendeu."
+            if not self.data_defesa:
+                errors["data_defesa"] = "Informe a data da defesa para aluno com status Defendeu."
+        else:
+            if self.deposito_versao_final:
+                errors["deposito_versao_final"] = "Deposito da versao final so pode ser marcado apos defesa."
+
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.tipo_usuario = User.TipoUsuario.ALUNO
+        self.numero_defesa = (self.numero_defesa or "").strip()
+        if self.status_aluno != self.StatusAluno.DEFENDEU:
+            self.numero_defesa = ""
+            self.data_defesa = None
+            self.deposito_versao_final = False
+        self.is_active = self.status_aluno == self.StatusAluno.ATIVO
         self.full_clean()
         return super().save(*args, **kwargs)
 
@@ -126,6 +171,34 @@ class Docente(User):
 
     def __str__(self) -> str:
         return self.nome or self.email
+
+
+class AlteracaoAluno(models.Model):
+    class TipoAlteracao(models.TextChoices):
+        STATUS = "STATUS", "Status"
+        QUALIFICACAO = "QUALIFICACAO", "Qualificacao"
+        DEFESA = "DEFESA", "Defesa"
+        DEPOSITO_FINAL = "DEPOSITO_FINAL", "Deposito versao final"
+        PRAZO_QUALIFICACAO = "PRAZO_QUALIFICACAO", "Prazo qualificacao"
+        PRAZO_DEFESA = "PRAZO_DEFESA", "Prazo defesa"
+
+    aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="alteracoes")
+    tipo = models.CharField(max_length=25, choices=TipoAlteracao.choices)
+    valor_anterior = models.TextField(blank=True)
+    valor_novo = models.TextField(blank=True)
+    comentario = models.TextField()
+    alterado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="alteracoes_alunos_realizadas",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-criado_em"]
+
+    def __str__(self) -> str:
+        return f"{self.aluno.nome} - {self.get_tipo_display()} - {self.criado_em:%Y-%m-%d %H:%M}"
 
 
 class Setor(models.Model):

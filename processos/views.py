@@ -7,9 +7,14 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils.dateparse import parse_date
 
 from .forms import (
+    AlunoComentarioForm,
+    AlunoDefesaForm,
+    AlunoDepositoFinalForm,
+    AlunoPrazoForm,
+    AlunoQualificacaoForm,
+    AlunoStatusForm,
     ManifestarCienteOrientadorForm,
     ComentarioProcessoForm,
     DocumentoCadastroForm,
@@ -20,6 +25,7 @@ from .forms import (
     UserProfileForm,
 )
 from .models import (
+    AlteracaoAluno,
     Aluno,
     ComentarioProcesso,
     Docente,
@@ -103,6 +109,29 @@ def _nomes_setores_caixa(user):
 
 def _is_setor_pleno_nome(nome: str) -> bool:
     return "pleno" in (nome or "").lower()
+
+
+def _semestre_valido(valor: str) -> bool:
+    return bool(re.fullmatch(r"\d{4}\.[12]", (valor or "").strip()))
+
+
+def _registrar_alteracao_aluno(
+    *,
+    aluno: Aluno,
+    tipo: str,
+    valor_anterior: str,
+    valor_novo: str,
+    comentario: str,
+    alterado_por: User,
+):
+    AlteracaoAluno.objects.create(
+        aluno=aluno,
+        tipo=tipo,
+        valor_anterior=valor_anterior,
+        valor_novo=valor_novo,
+        comentario=comentario.strip(),
+        alterado_por=alterado_por,
+    )
 
 
 def _is_processo_no_pleno(processo: Processo) -> bool:
@@ -269,7 +298,6 @@ def processos_view(request):
             | Q(descricao__icontains=termo)
             | Q(usuario_criado_por__nome__icontains=termo)
         )
-
     return render(
         request,
         "processos/processos_lista.html",
@@ -282,6 +310,219 @@ def processos_view(request):
             "filtro_status": status,
             "filtro_setor": setor_id,
             "filtro_q": termo,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
+@login_required
+def alunos_view(request):
+    if not _has_gestao_access(request.user):
+        raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
+
+    queryset = Aluno.objects.select_related("orientador").order_by("nome")
+    nome = request.GET.get("nome", "").strip()
+    ingresso_inicio_raw = request.GET.get("ingresso_inicio", "").strip()
+    ingresso_fim_raw = request.GET.get("ingresso_fim", "").strip()
+    status = request.GET.get("status", "").strip().upper()
+
+    if nome:
+        queryset = queryset.filter(nome__icontains=nome)
+
+    ingresso_inicio = ingresso_inicio_raw if _semestre_valido(ingresso_inicio_raw) else ""
+    ingresso_fim = ingresso_fim_raw if _semestre_valido(ingresso_fim_raw) else ""
+
+    if ingresso_inicio:
+        queryset = queryset.filter(ingresso__gte=ingresso_inicio)
+    if ingresso_fim:
+        queryset = queryset.filter(ingresso__lte=ingresso_fim)
+
+    if status:
+        queryset = queryset.filter(status_aluno=status)
+
+    return render(
+        request,
+        "processos/alunos_lista.html",
+        {
+            "alunos": queryset,
+            "filtro_nome": nome,
+            "filtro_ingresso_inicio": ingresso_inicio_raw,
+            "filtro_ingresso_fim": ingresso_fim_raw,
+            "filtro_status": status,
+            "status_list": (
+                Aluno.StatusAluno.choices
+            ),
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
+@login_required
+def aluno_detalhe_view(request, aluno_id):
+    if not _has_gestao_access(request.user):
+        raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
+
+    aluno = get_object_or_404(Aluno.objects.select_related("orientador"), pk=aluno_id)
+
+    if request.method == "POST":
+        acao = request.POST.get("acao", "").strip()
+
+        if acao == "alterar_status":
+            form = AlunoStatusForm(request.POST)
+            if form.is_valid():
+                anterior = aluno.get_status_aluno_display()
+                novo = form.cleaned_data["status_aluno"]
+                aluno.status_aluno = novo
+                aluno.save()
+                _registrar_alteracao_aluno(
+                    aluno=aluno,
+                    tipo=AlteracaoAluno.TipoAlteracao.STATUS,
+                    valor_anterior=anterior,
+                    valor_novo=aluno.get_status_aluno_display(),
+                    comentario=form.cleaned_data["comentario"],
+                    alterado_por=request.user,
+                )
+                messages.success(request, "Status do aluno atualizado.")
+                return redirect("aluno_detalhe", aluno_id=aluno.id)
+            messages.error(request, "Nao foi possivel alterar o status do aluno.")
+
+        elif acao == "alterar_qualificacao":
+            form = AlunoQualificacaoForm(request.POST)
+            if form.is_valid():
+                anterior = "Sim" if aluno.isQualificado else "Nao"
+                aluno.isQualificado = form.cleaned_data["isQualificado"]
+                aluno.save()
+                _registrar_alteracao_aluno(
+                    aluno=aluno,
+                    tipo=AlteracaoAluno.TipoAlteracao.QUALIFICACAO,
+                    valor_anterior=anterior,
+                    valor_novo="Sim" if aluno.isQualificado else "Nao",
+                    comentario=form.cleaned_data["comentario"],
+                    alterado_por=request.user,
+                )
+                messages.success(request, "Qualificacao do aluno atualizada.")
+                return redirect("aluno_detalhe", aluno_id=aluno.id)
+            messages.error(request, "Nao foi possivel atualizar a qualificacao.")
+
+        elif acao == "alterar_prazo_qualificacao":
+            form = AlunoPrazoForm(request.POST)
+            if form.is_valid():
+                semestre = form.cleaned_data["valor_semestre"].strip()
+                if not _semestre_valido(semestre):
+                    form.add_error("valor_semestre", "Informe no formato YYYY.1 ou YYYY.2.")
+                else:
+                    anterior = aluno.prazo_qualificacao or "-"
+                    aluno.prazo_qualificacao = semestre
+                    aluno.save()
+                    _registrar_alteracao_aluno(
+                        aluno=aluno,
+                        tipo=AlteracaoAluno.TipoAlteracao.PRAZO_QUALIFICACAO,
+                        valor_anterior=anterior,
+                        valor_novo=aluno.prazo_qualificacao,
+                        comentario=form.cleaned_data["comentario"],
+                        alterado_por=request.user,
+                    )
+                    messages.success(request, "Prazo de qualificacao atualizado.")
+                    return redirect("aluno_detalhe", aluno_id=aluno.id)
+            messages.error(request, "Nao foi possivel atualizar o prazo de qualificacao.")
+
+        elif acao == "alterar_prazo_defesa":
+            form = AlunoPrazoForm(request.POST)
+            if form.is_valid():
+                semestre = form.cleaned_data["valor_semestre"].strip()
+                if not _semestre_valido(semestre):
+                    form.add_error("valor_semestre", "Informe no formato YYYY.1 ou YYYY.2.")
+                else:
+                    anterior = aluno.prazo_defesa or "-"
+                    aluno.prazo_defesa = semestre
+                    aluno.save()
+                    _registrar_alteracao_aluno(
+                        aluno=aluno,
+                        tipo=AlteracaoAluno.TipoAlteracao.PRAZO_DEFESA,
+                        valor_anterior=anterior,
+                        valor_novo=aluno.prazo_defesa,
+                        comentario=form.cleaned_data["comentario"],
+                        alterado_por=request.user,
+                    )
+                    messages.success(request, "Prazo de defesa atualizado.")
+                    return redirect("aluno_detalhe", aluno_id=aluno.id)
+            messages.error(request, "Nao foi possivel atualizar o prazo de defesa.")
+
+        elif acao == "registrar_defesa":
+            form = AlunoDefesaForm(request.POST)
+            if form.is_valid():
+                anterior_numero = aluno.numero_defesa or "-"
+                anterior_data = aluno.data_defesa.isoformat() if aluno.data_defesa else "-"
+                aluno.numero_defesa = form.cleaned_data["numero_defesa"]
+                aluno.data_defesa = form.cleaned_data["data_defesa"]
+                aluno.status_aluno = Aluno.StatusAluno.DEFENDEU
+                aluno.save()
+                _registrar_alteracao_aluno(
+                    aluno=aluno,
+                    tipo=AlteracaoAluno.TipoAlteracao.DEFESA,
+                    valor_anterior=f"numero={anterior_numero};data={anterior_data}",
+                    valor_novo=f"numero={aluno.numero_defesa};data={aluno.data_defesa.isoformat()}",
+                    comentario=form.cleaned_data["comentario"],
+                    alterado_por=request.user,
+                )
+                messages.success(request, "Defesa registrada com sucesso.")
+                return redirect("aluno_detalhe", aluno_id=aluno.id)
+            messages.error(request, "Nao foi possivel registrar a defesa.")
+
+        elif acao == "registrar_deposito_final":
+            form = AlunoDepositoFinalForm(request.POST)
+            if form.is_valid():
+                if aluno.status_aluno != Aluno.StatusAluno.DEFENDEU:
+                    form.add_error("deposito_versao_final", "O aluno precisa estar com status Defendeu.")
+                else:
+                    anterior = "Sim" if aluno.deposito_versao_final else "Nao"
+                    aluno.deposito_versao_final = form.cleaned_data["deposito_versao_final"]
+                    aluno.save()
+                    _registrar_alteracao_aluno(
+                        aluno=aluno,
+                        tipo=AlteracaoAluno.TipoAlteracao.DEPOSITO_FINAL,
+                        valor_anterior=anterior,
+                        valor_novo="Sim" if aluno.deposito_versao_final else "Nao",
+                        comentario=form.cleaned_data["comentario"],
+                        alterado_por=request.user,
+                    )
+                    messages.success(request, "Registro de deposito da versao final atualizado.")
+                    return redirect("aluno_detalhe", aluno_id=aluno.id)
+            messages.error(request, "Nao foi possivel atualizar o deposito da versao final.")
+
+    processos_aluno = (
+        Processo.objects.select_related("setor_atual")
+        .filter(usuario_criado_por=aluno)
+        .order_by("-data_criacao")
+    )
+    return render(
+        request,
+        "processos/aluno_detalhe.html",
+        {
+            "aluno": aluno,
+            "processos_aluno": processos_aluno,
+            "alteracoes_aluno": aluno.alteracoes.select_related("alterado_por").all(),
+            "status_form": AlunoStatusForm(initial={"status_aluno": aluno.status_aluno}),
+            "qualificacao_form": AlunoQualificacaoForm(initial={"isQualificado": aluno.isQualificado}),
+            "prazo_qualificacao_form": AlunoPrazoForm(initial={"valor_semestre": aluno.prazo_qualificacao}),
+            "prazo_defesa_form": AlunoPrazoForm(initial={"valor_semestre": aluno.prazo_defesa}),
+            "defesa_form": AlunoDefesaForm(
+                initial={
+                    "numero_defesa": aluno.numero_defesa,
+                    "data_defesa": aluno.data_defesa,
+                }
+            ),
+            "deposito_final_form": AlunoDepositoFinalForm(
+                initial={"deposito_versao_final": aluno.deposito_versao_final}
+            ),
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -402,7 +643,29 @@ def processo_detalhe_view(request, processo_id):
     finalizar_form = FinalizarProcessoForm()
 
     if request.method == "POST":
-        if "adicionar_documento" in request.POST:
+        if "acao_rapida" in request.POST and can_manage_in_caixa:
+            acao_rapida = (request.POST.get("acao_rapida") or "").strip()
+            if acao_rapida == "deferir":
+                processo.deferir()
+                messages.success(request, "Processo deferido.")
+                return redirect("processo_detalhe", processo_id=processo.id)
+            if acao_rapida == "indeferir":
+                processo.indeferir()
+                messages.success(request, "Processo indeferido.")
+                return redirect("processo_detalhe", processo_id=processo.id)
+            if acao_rapida == "arquivar":
+                processo.finalizar(
+                    termo_finalizacao="Processo arquivado.",
+                    status_final=Processo.StatusProcesso.FINALIZADO,
+                )
+                messages.success(request, "Processo arquivado.")
+                return redirect("processo_detalhe", processo_id=processo.id)
+            if acao_rapida == "solicitar_correcao":
+                processo.status = Processo.StatusProcesso.AGUARDANDO_DOCUMENTO
+                processo.save(update_fields=["status", "atualizado_em"])
+                messages.success(request, "Correção solicitada ao aluno.")
+                return redirect("processo_detalhe", processo_id=processo.id)
+        elif "adicionar_documento" in request.POST:
             if not can_add_documento:
                 raise PermissionDenied("Voce nao pode adicionar documento neste processo.")
             documento_form = DocumentoCadastroForm(request.POST, request.FILES)

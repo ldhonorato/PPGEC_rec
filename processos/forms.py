@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
-from .models import Documento, Processo, Setor
+from .models import Aluno, Documento, Processo, Setor
 
 
 User = get_user_model()
@@ -90,3 +90,37 @@ class FinalizarProcessoForm(forms.Form):
         label="Termo de finalizacao",
         widget=forms.Textarea(attrs={"rows": 5}),
     )
+
+
+class AlunoComentarioForm(forms.Form):
+    comentario = forms.CharField(
+        label="Comentario da alteracao",
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+
+
+class AlunoStatusForm(AlunoComentarioForm):
+    status_aluno = forms.ChoiceField(choices=Aluno.StatusAluno.choices, label="Status do aluno")
+
+
+class AlunoQualificacaoForm(AlunoComentarioForm):
+    isQualificado = forms.BooleanField(required=False, label="Aluno qualificado")
+
+
+class AlunoPrazoForm(AlunoComentarioForm):
+    valor_semestre = forms.CharField(
+        label="Semestre (YYYY.1 ou YYYY.2)",
+        max_length=6,
+    )
+
+
+class AlunoDefesaForm(AlunoComentarioForm):
+    numero_defesa = forms.CharField(label="Numero da defesa", max_length=80)
+    data_defesa = forms.DateField(
+        label="Data da defesa",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+
+
+class AlunoDepositoFinalForm(AlunoComentarioForm):
+    deposito_versao_final = forms.BooleanField(required=False, label="Deposito da versao final")

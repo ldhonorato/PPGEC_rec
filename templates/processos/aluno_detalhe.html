@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% block title %}Aluno | Coordenacao{% endblock %}
+{% block content %}
+<style>
+    .aluno-kv { margin: 0.45rem 0; }
+    .badge {
+        display: inline-block;
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        border: 1px solid transparent;
+    }
+    .badge-ok { background: #eaf7ee; color: #1e6b39; border-color: #b9e2c6; }
+    .badge-no { background: #fbeaec; color: #8e1c29; border-color: #f1bec5; }
+    .badge-info { background: #eaf2fb; color: #184c87; border-color: #bdd2ee; }
+    .aluno-page-layout {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        gap: 1rem;
+        align-items: start;
+    }
+    .acao-menu {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 0.55rem;
+    }
+    .acao-link {
+        width: 100%;
+        text-align: left;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: #fff;
+        padding: 0.6rem 0.7rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--text);
+    }
+    .acao-link:hover { border-color: var(--primary); color: var(--primary); }
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+        padding: 1rem;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+        width: min(650px, 96vw);
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1rem;
+    }
+    .modal-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.6rem;
+        margin-bottom: 0.7rem;
+    }
+    .modal-close {
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 8px;
+        padding: 0.35rem 0.55rem;
+        cursor: pointer;
+    }
+    @media (max-width: 900px) {
+        .aluno-page-layout { grid-template-columns: 1fr; }
+    }
+</style>
+
+<div class="aluno-page-layout">
+    {% if has_gestao_access %}
+    <aside class="card">
+        <h3 class="section-title" style="font-size: 1.05rem;">Atualizacoes cadastrais</h3>
+        <ul class="acao-menu">
+            <li><button type="button" class="acao-link" data-modal-open="modal-status">Alterar status</button></li>
+            <li><button type="button" class="acao-link" data-modal-open="modal-qualificacao">Registrar qualificacao</button></li>
+            <li><button type="button" class="acao-link" data-modal-open="modal-defesa">Registrar defesa</button></li>
+            <li><button type="button" class="acao-link" data-modal-open="modal-deposito">Registrar deposito final</button></li>
+            <li><button type="button" class="acao-link" data-modal-open="modal-prazo-qualificacao">Alterar prazo qualificacao</button></li>
+            <li><button type="button" class="acao-link" data-modal-open="modal-prazo-defesa">Alterar prazo defesa</button></li>
+        </ul>
+    </aside>
+    {% endif %}
+
+    <section>
+        <section class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                <h1 class="section-title" style="margin-bottom: 0;">{{ aluno.nome }}</h1>
+                <a class="btn btn-secondary" href="{% url 'coordenacao_alunos' %}">Voltar para alunos</a>
+            </div>
+            <p class="aluno-kv"><strong>Email:</strong> {{ aluno.email }}</p>
+            <p class="aluno-kv"><strong>Matricula:</strong> {{ aluno.matricula|default:"-" }}</p>
+            <p class="aluno-kv"><strong>Ingresso:</strong> {{ aluno.ingresso }}</p>
+            <p class="aluno-kv"><strong>Orientador:</strong> {% if aluno.orientador %}{{ aluno.orientador.nome }}{% else %}-{% endif %}</p>
+            <p class="aluno-kv"><strong>Prazo qualificacao:</strong> {{ aluno.prazo_qualificacao|default:"-" }}</p>
+            <p class="aluno-kv"><strong>Prazo defesa:</strong> {{ aluno.prazo_defesa|default:"-" }}</p>
+            <p class="aluno-kv"><strong>Numero da defesa:</strong> {{ aluno.numero_defesa|default:"-" }}</p>
+            <p class="aluno-kv"><strong>Data da defesa:</strong> {% if aluno.data_defesa %}{{ aluno.data_defesa|date:"d/m/Y" }}{% else %}-{% endif %}</p>
+            <p class="aluno-kv">
+                <strong>Status:</strong>
+                <span class="badge badge-info">{{ aluno.get_status_aluno_display }}</span>
+            </p>
+            <p class="aluno-kv">
+                <strong>Qualificado:</strong>
+                {% if aluno.isQualificado %}
+                    <span class="badge badge-ok">Sim</span>
+                {% else %}
+                    <span class="badge badge-no">Nao</span>
+                {% endif %}
+            </p>
+            <p class="aluno-kv">
+                <strong>Deposito versao final:</strong>
+                {% if aluno.deposito_versao_final %}
+                    <span class="badge badge-ok">Sim</span>
+                {% else %}
+                    <span class="badge badge-no">Nao</span>
+                {% endif %}
+            </p>
+        </section>
+
+        <section class="card" style="margin-bottom: 1rem;">
+            <h2 class="section-title">Historico de alteracoes do aluno</h2>
+            {% if alteracoes_aluno %}
+                <ul class="list">
+                    {% for alteracao in alteracoes_aluno %}
+                        <li>
+                            <strong>{{ alteracao.get_tipo_display }}</strong><br>
+                            <small class="muted">
+                                De: {{ alteracao.valor_anterior|default:"-" }} |
+                                Para: {{ alteracao.valor_novo|default:"-" }} |
+                                Por: {{ alteracao.alterado_por.nome }} |
+                                Em: {{ alteracao.criado_em|date:"d/m/Y H:i" }}
+                            </small>
+                            <p style="margin: 0.5rem 0 0 0;">{{ alteracao.comentario }}</p>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="muted">Sem alteracoes registradas.</p>
+            {% endif %}
+        </section>
+
+        <section class="card">
+            <h2 class="section-title">Processos abertos pelo aluno</h2>
+            {% if processos_aluno %}
+                <ul class="list">
+                    {% for processo in processos_aluno %}
+                        <li>
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                                <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
+                                <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
+                            </div>
+                            <small class="muted">
+                                Tipo: {{ processo.get_tipo_display }} |
+                                Status: {{ processo.get_status_display }} |
+                                Setor: {{ processo.setor_atual.nome }} |
+                                Criado em: {{ processo.data_criacao|date:"d/m/Y H:i" }}
+                            </small>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="muted">Este aluno ainda nao abriu processos.</p>
+            {% endif %}
+        </section>
+    </section>
+</div>
+
+<div id="modal-status" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar status</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="alterar_status">
+            <label for="id_status_aluno">Status</label>
+            {{ status_form.status_aluno }}
+            <label for="id_comentario_status">Comentario</label>
+            <textarea id="id_comentario_status" name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar status</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-qualificacao" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Registrar qualificacao</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="alterar_qualificacao">
+            <label>{{ qualificacao_form.isQualificado }} Aluno qualificado</label>
+            <label for="id_comentario_qualificacao">Comentario</label>
+            <textarea id="id_comentario_qualificacao" name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar qualificacao</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-defesa" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Registrar defesa</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="registrar_defesa">
+            <label for="id_numero_defesa">Numero da defesa</label>
+            <input id="id_numero_defesa" name="numero_defesa" value="{{ defesa_form.numero_defesa.value|default:'' }}" required>
+            <label for="id_data_defesa">Data da defesa</label>
+            <input id="id_data_defesa" type="date" name="data_defesa" value="{% if defesa_form.data_defesa.value %}{{ defesa_form.data_defesa.value|date:'Y-m-d' }}{% endif %}">
+            <label for="id_comentario_defesa">Comentario</label>
+            <textarea id="id_comentario_defesa" name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Registrar defesa</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-deposito" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Registrar deposito final</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="registrar_deposito_final">
+            <label><input type="checkbox" name="deposito_versao_final" {% if aluno.deposito_versao_final %}checked{% endif %}> Deposito da versao final realizado</label>
+            <label for="id_comentario_deposito">Comentario</label>
+            <textarea id="id_comentario_deposito" name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar deposito final</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-prazo-qualificacao" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar prazo qualificacao</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="alterar_prazo_qualificacao">
+            <label for="id_prazo_qualificacao">Prazo de qualificacao (YYYY.1/2)</label>
+            <input id="id_prazo_qualificacao" name="valor_semestre" value="{{ prazo_qualificacao_form.valor_semestre.value|default:'' }}" placeholder="YYYY.1 ou YYYY.2" required>
+            <label for="id_comentario_prazo_qualificacao">Comentario</label>
+            <textarea id="id_comentario_prazo_qualificacao" name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar prazo qualificacao</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-prazo-defesa" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar prazo defesa</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="alterar_prazo_defesa">
+            <label for="id_prazo_defesa">Prazo de defesa (YYYY.1/2)</label>
+            <input id="id_prazo_defesa" name="valor_semestre" value="{{ prazo_defesa_form.valor_semestre.value|default:'' }}" placeholder="YYYY.1 ou YYYY.2" required>
+            <label for="id_comentario_prazo_defesa">Comentario</label>
+            <textarea id="id_comentario_prazo_defesa" name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar prazo defesa</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const openButtons = document.querySelectorAll("[data-modal-open]");
+        const closeButtons = document.querySelectorAll("[data-modal-close]");
+
+        function closeModal(modal) {
+            modal.classList.remove("open");
+        }
+
+        openButtons.forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const modalId = btn.getAttribute("data-modal-open");
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.classList.add("open");
+                }
+            });
+        });
+
+        closeButtons.forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const modal = btn.closest(".modal-backdrop");
+                if (modal) {
+                    closeModal(modal);
+                }
+            });
+        });
+
+        document.querySelectorAll(".modal-backdrop").forEach((modal) => {
+            modal.addEventListener("click", (event) => {
+                if (event.target === modal) {
+                    closeModal(modal);
+                }
+            });
+        });
+    })();
+</script>
+{% endblock %}

@@ -170,6 +170,9 @@
                 {% if can_view_dashboard %}
                     <a href="{% url 'coordenacao_dashboard' %}">Dashboard</a>
                 {% endif %}
+                {% if has_gestao_access %}
+                    <a href="{% url 'coordenacao_alunos' %}">Alunos</a>
+                {% endif %}
                 {% if can_view_processos %}
                     <a href="{% url 'coordenacao_processos' %}">Processos</a>
                 {% endif %}

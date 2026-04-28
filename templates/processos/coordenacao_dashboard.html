@@ -49,7 +49,7 @@
                     <ul class="orientandos-lista">
                         {% for aluno in docente.orientandos.all %}
                             <li>
-                                <strong>{{ aluno.nome }}</strong>:
+                                <strong><a href="{% url 'aluno_detalhe' aluno.id %}" style="text-decoration: none; color: var(--primary);">{{ aluno.nome }}</a></strong>:
                                 <span class="muted">{{ aluno.email }}{% if aluno.matricula %} | Matricula: {{ aluno.matricula }}{% endif %}</span>
                             </li>
                         {% endfor %}
