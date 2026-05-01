@@ -134,3 +134,6 @@ class AlteracaoAlunoAdmin(admin.ModelAdmin):
     search_fields = ("aluno__nome", "aluno__email", "comentario", "valor_anterior", "valor_novo")
     autocomplete_fields = ("aluno", "alterado_por")
     readonly_fields = ("criado_em",)
+
+
+#commit de teste 1
