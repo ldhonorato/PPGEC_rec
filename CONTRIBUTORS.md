@@ -9,7 +9,7 @@ Este arquivo lista os membros responsáveis pelo desenvolvimento do projeto.
 | Bruno Morato | Gestor de Projetos (PM) | [@brunomoratow] |
 | Ellen Barone | Desenvolvimento (teste) | [@ellenbeatryzbarone] |
 | Davi de Oliveira | Backend | [@DaveOlivae] |
-| Nome Dev 3 | Tech Lead? Backend? Frontend? | [@] |
+| Isabella Santos | Backend | [@]isabella-sn |
 | Nome Dev 4 | Tech Lead? Backend? Frontend? | [@] |
 | Nome Dev 5 | Tech Lead? Backend? Frontend? | [@] |
 
