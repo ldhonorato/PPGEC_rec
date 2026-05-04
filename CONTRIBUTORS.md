@@ -10,6 +10,6 @@ Este arquivo lista os membros responsáveis pelo desenvolvimento do projeto.
 | Ellen Barone | Desenvolvimento (teste) | [@ellenbeatryzbarone] |
 | Davi de Oliveira | Backend | [@DaveOlivae] |
 | Isabella Santos | Frontend | [@isabella-sn] |
-| Nome Dev 4 | Tech Lead? Backend? Frontend? | [@] |
+| Guilherme Valença | Backend | [gpvalencaa] |
 | Nome Dev 5 | Tech Lead? Backend? Frontend? | [@] |
 
