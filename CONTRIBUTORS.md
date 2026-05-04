@@ -11,4 +11,4 @@ Este arquivo lista os membros responsáveis pelo desenvolvimento do projeto.
 | Davi de Oliveira | Backend | [@DaveOlivae] |
 | Matheus José | Backend/Full Stack | [@matheus-albuquerque-dev] |
 | Isabella Santos | Frontend | [@isabella-sn] |
-| Nome Dev 5 | Tech Lead? Backend? Frontend? | [@] |
+| Guilherme Valença | Backend | [gpvalencaa] |
