@@ -37,6 +37,8 @@ from .models import (
     User,
 )
 
+from .tasks import send_email_novo_processo_aluno, send_email_novo_processo_orientador
+
 
 def _is_docente(user):
     return user.is_authenticated and user.tipo_usuario == User.TipoUsuario.DOCENTE
@@ -952,6 +954,11 @@ def novo_processo_view(request):
                         restricao_tipo=restricao_tipo,
                         enviado_por=request.user,
                     )
+
+                # dispara task de forma assincrona
+                send_email_novo_processo_aluno.delay(processo.id)
+                send_email_novo_processo_orientador.delay(processo.id)
+
                 messages.success(request, f"Processo {processo.numero} aberto com sucesso.")
                 return redirect("home")
     else:

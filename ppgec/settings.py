@@ -131,3 +131,21 @@ AUTH_USER_MODEL = 'processos.User'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'login'
+
+# email config
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"          # ou o SMTP do teu provedor
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "acadflow@ecomp.poli.br"
+EMAIL_HOST_PASSWORD = "sua-senha-aqui"  # use variável de ambiente em produção
+DEFAULT_FROM_EMAIL = "AcadFlow PPGEC <acadflow@ecomp.poli.br>"
+
+# celery config
+CELERY_BROKER_URL = "redis://localhost:6379/0"
+CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+
+# django-celery-results
+INSTALLED_APPS += ["django_celery_results"]
