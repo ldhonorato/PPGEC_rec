@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
+  <div style="background:#1a3a5c; padding: 24px; border-radius: 8px 8px 0 0;">
+    <h2 style="color: white; margin: 0;">AcadFlow — PPGEC</h2>
+  </div>
+  <div style="background: #f9f9f9; padding: 28px; border-radius: 0 0 8px 8px;">
+    <p>Olá, Prof. <strong>{{ orientador.nome }}</strong>,</p>
+    <p>
+      O aluno <strong>{{ aluno.nome }}</strong> iniciou o processo
+      <strong>{{ processo.numero }}</strong> — {{ processo.get_tipo_display }}.
+      Clique abaixo para revisar os detalhes no sistema.
+    </p>
+    <table style="width:100%; background:#fff; border-radius:8px; padding:16px; margin: 16px 0;">
+      <tr><td style="color:#666; padding:4px 0;">Número:</td>
+          <td><strong>{{ processo.numero }}</strong></td></tr>
+      <tr><td style="color:#666; padding:4px 0;">Tipo:</td>
+          <td>{{ processo.get_tipo_display }}</td></tr>
+      <tr><td style="color:#666; padding:4px 0;">Assunto:</td>
+          <td>{{ processo.assunto }}</td></tr>
+      <tr><td style="color:#666; padding:4px 0;">Prazo limite:</td>
+          <td>{{ processo.prazo_limite }}</td></tr>
+    </table>
+    <p style="text-align:center; margin-top: 24px;">
+      <a href="http://seu-dominio.com/coordenacao/processos/{{ processo.id }}/"
+         style="background:#1a3a5c; color:white; padding:12px 28px;
+                border-radius:6px; text-decoration:none; font-weight:bold;">
+        Revisar Processo
+      </a>
+    </p>
+    <p style="color:#999; font-size:12px; margin-top:32px;">
+      Atenciosamente,<br>Sistema PPGEC — AcadFlow
+    </p>
+  </div>
+</body>
+</html>
