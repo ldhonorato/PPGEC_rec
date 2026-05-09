@@ -1,7 +1,7 @@
-# Feat: Envio de E-mails Assíncronos na Abertura de Processos
+# Feat: Envio de E-mails Assíncronos na Abertura e Movimentação de Processos
 
 ## 🎯 Objetivo
-Implementar o envio de e-mails notificantes (para alunos e orientadores) após a abertura de um novo processo. 
+Implementar o envio de e-mails notificantes (para alunos e orientadores) após a **abertura** e **movimentação** de um processo. 
 A assincronia permite que o usuário ainda utilize o sistema mesmo que o email não tenha sido enviado, utilizamos **Redis** (contido no **Docker**) e **Celery** para tal.
 
 ## 🛠️ O que foi feito?
@@ -9,7 +9,7 @@ A assincronia permite que o usuário ainda utilize o sistema mesmo que o email n
 2. **Mensageria (Worker):** Instalação e configuração do **Celery** no ambiente virtual (Django) para processamento em background.
 3. **Segurança:** Movimentação das credenciais de e-mail (SMTP) para um arquivo `.env` (listado no .gitignore).
 4. **Tasks (`tasks.py`):** Criação de tarefas assíncronas (`@shared_task`) com suporte a tentativas de reenvio (`max_retries`) em caso de falha de conexão.
-5. **Views:** Atualização da view de criação de processo para disparar as tarefas utilizando o método `.delay()`.
+5. **Views:** Atualização da view de criação e movimentação de processos para disparar as tarefas utilizando o método `.delay()`.
 6. **Templates:** Criação de templates HTML básicos para o corpo dos e-mails.
 
 ## ⚙️ Como rodar em outras máquinas
@@ -26,10 +26,9 @@ Com seu `venv` ativado, instale as novas bibliotecas:
 
 ### 3. Configurar o arquivo `.env`
 Crie o arquivo `.env` na raiz do projeto e adicione as variáveis de e-mail (pedir credenciais à equipe):
-EMAIL_HOST=smtp.exemplo.com
-EMAIL_PORT=587
-EMAIL_HOST_USER=email@exemplo.com
-EMAIL_HOST_PASSWORD=senha_exemplo
+EMAIL_HOST_USER=email@exemplo.com 
+EMAIL_HOST_PASSWORD=senha_exemplo 
+DEFAULT_FROM_EMAIL=exemplo default@exemplo.com
 
 ### 4. Iniciar os serviços
 Você precisará de **dois terminais** rodando simultaneamente:

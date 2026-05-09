@@ -31,7 +31,7 @@ def send_email_novo_processo_aluno(self, processo_id: int):
     try:
         _send_email(
             subject=f"[PPGEC] Processo {processo.numero} aberto com sucesso",
-            template_name="emails/novo_processo_aluno.html",
+            template_name="emails/aluno/novo_processo_aluno.html",
             contexto=contexto,
             recipient=processo.usuario_criado_por.email,
         )
@@ -57,10 +57,70 @@ def send_email_novo_processo_orientador(self, processo_id: int):
     try:
         _send_email(
             subject=f"[PPGEC] Novo processo do orientando {processo.usuario_criado_por.nome}",
-            template_name="emails/novo_processo_orientador.html",
+            template_name="emails/orientador/novo_processo_orientador.html",
             contexto=contexto,
             recipient=orientador.email,
         )
     except Exception as exc:
         logger.exception("Falha ao enviar e-mail para orientador")
+        raise self.retry(exc=exc)
+    
+#ENVIO DE EMAIL, MOVIMENTAÇÃO DE PROCESSO
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_email_movimentacao_aluno(self, processo_id: int, mensagem_status: str):
+    from .models import Processo
+    try:
+        processo = Processo.objects.select_related("usuario_criado_por").get(pk=processo_id)
+    except Processo.DoesNotExist:
+        logger.error("Processo %s não encontrado", processo_id)
+        return
+
+    contexto = {
+        "processo": processo,
+        "mensagem_status": mensagem_status,
+        "aluno": processo.usuario_criado_por,
+        "orientador": processo.obter_orientador_responsavel()
+    }
+    
+    try:
+        _send_email(
+            subject=f"[PPGEC] Movimentação no Processo {processo.numero}",
+            template_name="emails/aluno/movimentacao_processo_aluno.html",
+            contexto=contexto,
+            recipient=processo.usuario_criado_por.email,
+        )
+    except Exception as exc:
+        logger.exception("Falha ao enviar e-mail de movimentação para aluno")
+        raise self.retry(exc=exc)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_email_movimentacao_orientador(self, processo_id: int, mensagem_status: str):
+    from .models import Processo
+    try:
+        processo = Processo.objects.select_related("usuario_criado_por").get(pk=processo_id)
+    except Processo.DoesNotExist:
+        logger.error("Processo %s não encontrado", processo_id)
+        return
+
+    orientador = processo.obter_orientador_responsavel()
+    if not orientador:
+        return
+
+    contexto = {
+        "processo": processo,
+        "mensagem_status": mensagem_status,
+        "aluno": processo.usuario_criado_por,
+        "orientador": orientador
+    }
+    
+    try:
+        _send_email(
+            subject=f"[PPGEC] Movimentação no Processo do Orientando {processo.usuario_criado_por.nome}",
+            template_name="emails/orientador/movimentacao_processo_orientador.html",
+            contexto=contexto,
+            recipient=orientador.email,
+        )
+    except Exception as exc:
+        logger.exception("Falha ao enviar e-mail de movimentação para orientador")
         raise self.retry(exc=exc)

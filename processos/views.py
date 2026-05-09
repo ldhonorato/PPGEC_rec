@@ -37,7 +37,12 @@ from .models import (
     User,
 )
 
-from .tasks import send_email_novo_processo_aluno, send_email_novo_processo_orientador
+from .tasks import(
+    send_email_novo_processo_aluno,
+    send_email_novo_processo_orientador,
+    send_email_movimentacao_aluno, 
+    send_email_movimentacao_orientador
+)
 
 
 def _is_docente(user):
@@ -767,6 +772,12 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Processo encaminhado com sucesso.")
+                    send_email_movimentacao_aluno.delay(
+                        processo.id, f"Encaminhado para o setor: {setor_destino.nome}"
+                    )
+                    send_email_movimentacao_orientador.delay(
+                        processo.id, f"Encaminhado para o setor: {setor_destino.nome}"
+                    )
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_encaminhamento_modal = True
         elif "finalizar_processo" in request.POST:
@@ -791,6 +802,12 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Processo finalizado com sucesso.")
+                    send_email_movimentacao_aluno.delay(
+                        processo.id, f"foi finalizado."
+                    )
+                    send_email_movimentacao_orientador.delay(
+                        processo.id, f"foi finalizado."
+                    )
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_finalizar_modal = True
         elif "remover_arquivo_documento" in request.POST:
