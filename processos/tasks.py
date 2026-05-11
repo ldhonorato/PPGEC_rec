@@ -95,6 +95,62 @@ def send_email_movimentacao_aluno(self, processo_id: int, mensagem_status: str):
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_email_conclusao_aluno(self, processo_id: int):
+    from .models import Processo
+    try:
+        processo = Processo.objects.select_related("usuario_criado_por").get(pk=processo_id)
+    except Processo.DoesNotExist:
+        logger.error("Processo %s não encontrado", processo_id)
+        return
+
+    contexto = {
+        "processo": processo,
+        "aluno": processo.usuario_criado_por,
+        "orientador": processo.obter_orientador_responsavel(),
+    }
+    try:
+        _send_email(
+            subject=f"[PPGEC] Processo {processo.numero} finalizado",
+            template_name="emails/aluno/conclusao_processo_aluno.html",
+            contexto=contexto,
+            recipient=processo.usuario_criado_por.email,
+        )
+    except Exception as exc:
+        logger.exception("Falha ao enviar e-mail de conclusão para aluno")
+        raise self.retry(exc=exc)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_email_conclusao_orientador(self, processo_id: int):
+    from .models import Processo
+    try:
+        processo = Processo.objects.select_related("usuario_criado_por").get(pk=processo_id)
+    except Processo.DoesNotExist:
+        logger.error("Processo %s não encontrado", processo_id)
+        return
+
+    orientador = processo.obter_orientador_responsavel()
+    if not orientador:
+        return
+
+    contexto = {
+        "processo": processo,
+        "aluno": processo.usuario_criado_por,
+        "orientador": orientador,
+    }
+    try:
+        _send_email(
+            subject=f"[PPGEC] Processo do orientando {processo.usuario_criado_por.nome} finalizado",
+            template_name="emails/orientador/conclusao_processo_orientador.html",
+            contexto=contexto,
+            recipient=orientador.email,
+        )
+    except Exception as exc:
+        logger.exception("Falha ao enviar e-mail de conclusão para orientador")
+        raise self.retry(exc=exc)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_email_movimentacao_orientador(self, processo_id: int, mensagem_status: str):
     from .models import Processo
     try:
