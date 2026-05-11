@@ -40,8 +40,10 @@ from .models import (
 from .tasks import(
     send_email_novo_processo_aluno,
     send_email_novo_processo_orientador,
-    send_email_movimentacao_aluno, 
-    send_email_movimentacao_orientador
+    send_email_movimentacao_aluno,
+    send_email_movimentacao_orientador,
+    send_email_conclusao_aluno,
+    send_email_conclusao_orientador,
 )
 
 
@@ -662,10 +664,14 @@ def processo_detalhe_view(request, processo_id):
             if acao_rapida == "deferir":
                 processo.deferir()
                 messages.success(request, "Processo deferido.")
+                send_email_conclusao_aluno.delay(processo.id)
+                send_email_conclusao_orientador.delay(processo.id)
                 return redirect("processo_detalhe", processo_id=processo.id)
             if acao_rapida == "indeferir":
                 processo.indeferir()
                 messages.success(request, "Processo indeferido.")
+                send_email_conclusao_aluno.delay(processo.id)
+                send_email_conclusao_orientador.delay(processo.id)
                 return redirect("processo_detalhe", processo_id=processo.id)
             if acao_rapida == "arquivar":
                 processo.finalizar(
@@ -673,6 +679,8 @@ def processo_detalhe_view(request, processo_id):
                     status_final=Processo.StatusProcesso.FINALIZADO,
                 )
                 messages.success(request, "Processo arquivado.")
+                send_email_conclusao_aluno.delay(processo.id)
+                send_email_conclusao_orientador.delay(processo.id)
                 return redirect("processo_detalhe", processo_id=processo.id)
             if acao_rapida == "solicitar_correcao":
                 processo.status = Processo.StatusProcesso.AGUARDANDO_DOCUMENTO
@@ -802,12 +810,8 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Processo finalizado com sucesso.")
-                    send_email_movimentacao_aluno.delay(
-                        processo.id, f"foi finalizado."
-                    )
-                    send_email_movimentacao_orientador.delay(
-                        processo.id, f"foi finalizado."
-                    )
+                    send_email_conclusao_aluno.delay(processo.id)
+                    send_email_conclusao_orientador.delay(processo.id)
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_finalizar_modal = True
         elif "remover_arquivo_documento" in request.POST:
