@@ -3,17 +3,72 @@
 {% block content %}
 <section class="card">
     <h1 class="section-title">Meus orientandos</h1>
-    {% if orientandos %}
+
+    <h2 class="section-title">Orientacoes ativas</h2>
+    {% if orientacoes_ativas %}
         <ul class="list">
-            {% for aluno in orientandos %}
+            {% for trajetoria in orientacoes_ativas %}
                 <li>
-                    <strong>{{ aluno.nome }}</strong><br>
-                    <small class="muted">{{ aluno.email }}{% if aluno.matricula %} | Matricula: {{ aluno.matricula }}{% endif %}</small>
+                    <strong>{{ trajetoria.aluno.nome }}</strong><br>
+                    <small class="muted">
+                        {{ trajetoria.aluno.email }}
+                        {% if trajetoria.aluno.matricula %} | Matricula: {{ trajetoria.aluno.matricula }}{% endif %}
+                        | Nivel: {{ trajetoria.get_nivel_curso_display }}
+                        | Ingresso: {{ trajetoria.ingresso }}
+                    </small>
                 </li>
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhum orientando vinculado.</p>
+        <p class="muted">Nenhuma orientacao ativa.</p>
+    {% endif %}
+
+    <h2 class="section-title">Coorientacoes</h2>
+    {% if coorientacoes_ativas %}
+        <ul class="list">
+            {% for trajetoria in coorientacoes_ativas %}
+                <li>
+                    <strong>{{ trajetoria.aluno.nome }}</strong><br>
+                    <small class="muted">
+                        {{ trajetoria.aluno.email }}
+                        {% if trajetoria.aluno.matricula %} | Matricula: {{ trajetoria.aluno.matricula }}{% endif %}
+                        | Nivel: {{ trajetoria.get_nivel_curso_display }}
+                        | Ingresso: {{ trajetoria.ingresso }}
+                        | Coorientador
+                        {% if trajetoria.orientador %} | Orientador: {{ trajetoria.orientador.nome }}{% endif %}
+                    </small>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhuma coorientacao ativa.</p>
+    {% endif %}
+
+    <h2 class="section-title">Orientacoes/coorientacoes concluidas</h2>
+    {% if vinculos_concluidos %}
+        <ul class="list">
+            {% for trajetoria in vinculos_concluidos %}
+                <li>
+                    <strong>{{ trajetoria.aluno.nome }}</strong><br>
+                    <small class="muted">
+                        {{ trajetoria.aluno.email }}
+                        {% if trajetoria.aluno.matricula %} | Matricula: {{ trajetoria.aluno.matricula }}{% endif %}
+                        | Nivel: {{ trajetoria.get_nivel_curso_display }}
+                        | Ingresso: {{ trajetoria.ingresso }}
+                        |
+                        {% if trajetoria.orientador_id == user.id and trajetoria.coorientador_id == user.id %}
+                            Orientador e coorientador
+                        {% elif trajetoria.orientador_id == user.id %}
+                            Orientador
+                        {% elif trajetoria.coorientador_id == user.id %}
+                            Coorientador
+                        {% endif %}
+                    </small>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhuma orientacao ou coorientacao concluida.</p>
     {% endif %}
 </section>
 {% endblock %}

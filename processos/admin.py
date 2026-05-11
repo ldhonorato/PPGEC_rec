@@ -9,6 +9,7 @@ from .models import (
     Documento,
     Processo,
     Setor,
+    TrajetoriaAcademica,
     TramitacaoProcesso,
     User,
 )
@@ -62,21 +63,15 @@ class AlunoAdmin(EnsurePasswordHashedAdminMixin, admin.ModelAdmin):
     list_display = (
         "email",
         "nome",
-        "ingresso",
-        "prazo_qualificacao",
-        "prazo_defesa",
         "status_aluno",
-        "isQualificado",
-        "numero_defesa",
-        "data_defesa",
-        "deposito_versao_final",
-        "orientador",
         "matricula",
         "is_active",
     )
-    list_filter = ("ingresso", "status_aluno", "isQualificado", "deposito_versao_final", "is_active")
+    list_filter = (
+        "status_aluno",
+        "is_active",
+    )
     search_fields = ("email", "nome", "matricula")
-    autocomplete_fields = ("orientador",)
 
 
 @admin.register(Docente)
@@ -84,6 +79,14 @@ class DocenteAdmin(EnsurePasswordHashedAdminMixin, admin.ModelAdmin):
     list_display = ("email", "nome", "externo", "permanente", "coordenador", "is_active")
     list_filter = ("externo", "permanente", "coordenador", "is_active")
     search_fields = ("email", "nome")
+
+
+@admin.register(TrajetoriaAcademica)
+class TrajetoriaAcademicaAdmin(admin.ModelAdmin):
+    list_display = ("aluno", "nivel_curso", "status", "ingresso", "prazo_qualificacao", "prazo_defesa")
+    list_filter = ("nivel_curso", "status", "reingressante")
+    search_fields = ("aluno__nome", "aluno__email")
+    autocomplete_fields = ("aluno", "orientador", "coorientador")
 
 
 @admin.register(Setor)
@@ -96,7 +99,7 @@ class SetorAdmin(admin.ModelAdmin):
 @admin.register(Processo)
 class ProcessoAdmin(admin.ModelAdmin):
     list_display = ("numero", "assunto", "tipo", "status", "setor_atual", "data_criacao")
-    list_filter = ("tipo", "status", "prioridade", "setor_atual")
+    list_filter = ("tipo", "status", "setor_atual")
     search_fields = ("numero", "assunto", "descricao")
     autocomplete_fields = ("usuario_criado_por", "setor_atual")
     readonly_fields = ("numero", "data_criacao", "atualizado_em", "finalizado_em")

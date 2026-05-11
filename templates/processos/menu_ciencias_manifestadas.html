@@ -1,8 +1,34 @@
 {% extends "base.html" %}
-{% block title %}Ciencias Manifestadas | PPGEC{% endblock %}
+{% block title %}Ciencias | PPGEC{% endblock %}
 {% block content %}
 <section class="card">
-    <h1 class="section-title">Ciencias do orientador ja manifestadas</h1>
+    <h1 class="section-title">Ciencias</h1>
+
+    <h2 class="section-title">Pendencias de ciencia</h2>
+    {% if ciencias_pendentes %}
+        <ul class="list">
+            {% for manifestacao in ciencias_pendentes %}
+                <li>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                        <strong>{{ manifestacao.processo.numero }} - {{ manifestacao.processo.assunto }}</strong>
+                        <a class="btn" href="{% url 'processo_detalhe' manifestacao.processo.id %}">Manifestar ciencia</a>
+                    </div>
+                    <small class="muted">
+                        Status: {{ manifestacao.get_status_display }} |
+                        Solicitado por: {{ manifestacao.solicitado_por.nome }} |
+                        Solicitado em: {{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}
+                    </small>
+                    {% if manifestacao.mensagem_solicitacao %}
+                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Solicitacao: {{ manifestacao.mensagem_solicitacao }}</small></p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhuma ciencia pendente.</p>
+    {% endif %}
+
+    <h2 class="section-title">Ciencias ja manifestadas</h2>
     {% if ciencias_manifestadas %}
         <ul class="list">
             {% for manifestacao in ciencias_manifestadas %}

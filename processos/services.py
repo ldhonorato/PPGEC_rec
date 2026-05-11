@@ -4,7 +4,7 @@ from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Aluno, Docente, Processo, User
+from .models import Aluno, Docente, Processo, TrajetoriaAcademica, User
 
 
 def processos_atrasados_base_queryset():
@@ -26,7 +26,11 @@ def processos_atrasados_queryset(user):
         if is_coordenador:
             return queryset
 
-        orientandos = Aluno.objects.filter(orientador=user).values("id")
+        orientandos = Aluno.objects.filter(
+            trajetorias__status=TrajetoriaAcademica.Status.ATIVA,
+        ).filter(
+            Q(trajetorias__orientador=user) | Q(trajetorias__coorientador=user)
+        ).values("id")
         return queryset.filter(
             Q(usuario_criado_por=user)
             | Q(usuario_criado_por__in=orientandos)

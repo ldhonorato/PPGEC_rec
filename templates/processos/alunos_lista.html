@@ -19,6 +19,23 @@
                 </select>
             </div>
             <div class="field">
+                <label for="id_nivel">Nivel</label>
+                <select id="id_nivel" name="nivel">
+                    <option value="">Todos</option>
+                    {% for value, label in nivel_list %}
+                        <option value="{{ value }}" {% if filtro_nivel == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="id_reingressante">Reingressante</label>
+                <select id="id_reingressante" name="reingressante">
+                    <option value="" {% if filtro_reingressante == "" %}selected{% endif %}>Todos</option>
+                    <option value="1" {% if filtro_reingressante == "1" %}selected{% endif %}>Sim</option>
+                    <option value="0" {% if filtro_reingressante == "0" %}selected{% endif %}>Nao</option>
+                </select>
+            </div>
+            <div class="field">
                 <label for="id_ingresso_inicio">Ingresso de</label>
                 <input id="id_ingresso_inicio" type="text" name="ingresso_inicio" value="{{ filtro_ingresso_inicio }}" placeholder="YYYY.1 ou YYYY.2">
             </div>
@@ -41,12 +58,11 @@
                     <small class="muted">
                         {{ aluno.email }}
                         {% if aluno.matricula %} | Matricula: {{ aluno.matricula }}{% endif %}
-                        | Ingresso: {{ aluno.ingresso }}
-                        | Status: {{ aluno.get_status_aluno_display }}
-                        | Qualificado: {% if aluno.isQualificado %}Sim{% else %}Nao{% endif %}
-                        {% if aluno.prazo_qualificacao %} | Prazo qualificacao: {{ aluno.prazo_qualificacao }}{% endif %}
-                        {% if aluno.prazo_defesa %} | Prazo defesa: {{ aluno.prazo_defesa }}{% endif %}
-                        {% if aluno.orientador %} | Orientador: {{ aluno.orientador.nome }}{% endif %}
+                        {% if aluno.trajetoria_atual %}
+                            | Nivel: {{ aluno.trajetoria_atual.get_nivel_curso_display }}
+                            | Ingresso: {{ aluno.trajetoria_atual.ingresso }}
+                            {% if aluno.trajetoria_atual.orientador %} | Orientador: {{ aluno.trajetoria_atual.orientador.nome }}{% endif %}
+                        {% endif %}
                     </small>
                 </li>
             {% endfor %}

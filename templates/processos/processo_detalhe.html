@@ -14,9 +14,6 @@
     <p style="margin: 0.35rem 0;"><strong>Criado por:</strong> {{ processo.usuario_criado_por.nome }} ({{ processo.usuario_criado_por.email }})</p>
     <p style="margin: 0.35rem 0;"><strong>Criado em:</strong> {{ processo.data_criacao|date:"d/m/Y H:i" }}</p>
     <p style="margin: 0.35rem 0;"><strong>Ultima atualizacao:</strong> {{ processo.atualizado_em|date:"d/m/Y H:i" }}</p>
-    {% if processo.prioridade %}
-        <p style="margin: 0.35rem 0;"><strong>Prioridade:</strong> {{ processo.get_prioridade_display }}</p>
-    {% endif %}
     {% if processo.finalizado_em %}
         <p style="margin: 0.35rem 0;"><strong>Finalizado em:</strong> {{ processo.finalizado_em|date:"d/m/Y H:i" }}</p>
         {% if processo.termo_finalizacao %}
