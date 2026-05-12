@@ -719,7 +719,7 @@ def processo_detalhe_view(request, processo_id):
             solicitar_ciente_form = SolicitarCienteOrientadorForm(request.POST)
             if solicitar_ciente_form.is_valid():
                 try:
-                    processo.solicitar_ciente_orientador(
+                    manifestacao = processo.solicitar_ciente_orientador(
                         solicitado_por=request.user,
                         mensagem_solicitacao=solicitar_ciente_form.cleaned_data["mensagem_solicitacao"],
                     )
@@ -818,12 +818,8 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Processo finalizado com sucesso.")
-                    send_email_movimentacao_aluno.delay(
-                        processo.id, f"foi finalizado."
-                    )
-                    send_email_movimentacao_orientador.delay(
-                        processo.id, f"foi finalizado."
-                    )
+                    send_email_conclusao_aluno.delay(processo.id)
+                    send_email_conclusao_orientador.delay(processo.id)
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_finalizar_modal = True
         elif "remover_arquivo_documento" in request.POST:

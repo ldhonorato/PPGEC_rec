@@ -192,12 +192,13 @@ def send_email_solicitacao_ciencia(self, manifestacao_id):
         contexto = {
             "processo": processo,
             "manifestacao": manifestacao,
-            "aluno": processo.usuario_criado_por.get_full_name() or processo.usuario_criado_por.username,
+            "aluno": processo.usuario_criado_por,
+            "orientador": orientador,
         }
-        
+
         _send_email(
             subject=f"[PPGEC] Solicitação de Ciência - Processo {processo.numero}",
-            template_name="emails/orientador/solicitacao_ciencia.html",
+            template_name="emails/aluno/solicitacao_ciencia.html",
             contexto=contexto,
             recipient=orientador.email,
         )
@@ -214,13 +215,14 @@ def send_email_devolucao_requerente(self, processo_id, observacao):
         
         contexto = {
             "processo": processo,
+            "aluno": processo.usuario_criado_por,
             "observacao": observacao,
             "data_devolucao": timezone.now(),
         }
-        
+
         _send_email(
             subject=f"[PPGEC] Ajustes necessários - Processo {processo.numero}",
-            template_name="emails/aluno/devolucao_processo.html",
+            template_name="emails/orientador/devolucao_processo.html",
             contexto=contexto,
             recipient=processo.usuario_criado_por.email,
         )
