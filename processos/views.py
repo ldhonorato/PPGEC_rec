@@ -8,6 +8,8 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from .tasks import send_email_solicitacao_ciencia
+from .tasks import send_email_devolucao_requerente
 
 from .forms import (
     AlunoComentarioForm,
@@ -44,6 +46,8 @@ from .tasks import(
     send_email_movimentacao_orientador,
     send_email_conclusao_aluno,
     send_email_conclusao_orientador,
+    send_email_solicitacao_ciencia,
+    send_email_devolucao_requerente,
 )
 
 
@@ -715,7 +719,7 @@ def processo_detalhe_view(request, processo_id):
             solicitar_ciente_form = SolicitarCienteOrientadorForm(request.POST)
             if solicitar_ciente_form.is_valid():
                 try:
-                    processo.solicitar_ciente_orientador(
+                    manifestacao = processo.solicitar_ciente_orientador(
                         solicitado_por=request.user,
                         mensagem_solicitacao=solicitar_ciente_form.cleaned_data["mensagem_solicitacao"],
                     )
@@ -723,6 +727,7 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Solicitacao de ciente do orientador registrada.")
+                    send_email_solicitacao_ciencia.delay(manifestacao.id)
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_ciente_modal = True
         elif "manifestar_ciente_orientador" in request.POST:
@@ -770,6 +775,7 @@ def processo_detalhe_view(request, processo_id):
                     else Processo.StatusProcesso.EM_ANALISE
                 )
                 try:
+                    despacho_texto = encaminhamento_form.cleaned_data["despacho"]
                     processo.encaminhar(
                         setor_destino=setor_destino,
                         encaminhado_por=request.user,
@@ -780,6 +786,8 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Processo encaminhado com sucesso.")
+                    if setor_destino and setor_destino.nome == "Requerente":
+                        send_email_devolucao_requerente.delay(processo.id, despacho_texto)
                     send_email_movimentacao_aluno.delay(
                         processo.id, f"Encaminhado para o setor: {setor_destino.nome}"
                     )

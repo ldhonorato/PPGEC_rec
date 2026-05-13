@@ -180,3 +180,52 @@ def send_email_movimentacao_orientador(self, processo_id: int, mensagem_status: 
     except Exception as exc:
         logger.exception("Falha ao enviar e-mail de movimentação para orientador")
         raise self.retry(exc=exc)
+    
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_email_solicitacao_ciencia(self, manifestacao_id):
+    from .models import ManifestacaoProcesso
+    try:
+        manifestacao = ManifestacaoProcesso.objects.select_related('processo', 'responsavel').get(id=manifestacao_id)
+        processo = manifestacao.processo
+        orientador = manifestacao.responsavel
+
+        contexto = {
+            "processo": processo,
+            "manifestacao": manifestacao,
+            "aluno": processo.usuario_criado_por,
+            "orientador": orientador,
+        }
+
+        _send_email(
+            subject=f"[PPGEC] Solicitação de Ciência - Processo {processo.numero}",
+            template_name="emails/aluno/solicitacao_ciencia.html",
+            contexto=contexto,
+            recipient=orientador.email,
+        )
+    except Exception as exc:
+        logger.exception("Falha ao enviar e-mail de solicitação de ciência")
+        raise self.retry(exc=exc)
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_email_devolucao_requerente(self, processo_id, observacao):
+    from .models import Processo
+    from django.utils import timezone
+    try:
+        processo = Processo.objects.select_related("usuario_criado_por").get(pk=processo_id)
+        
+        contexto = {
+            "processo": processo,
+            "aluno": processo.usuario_criado_por,
+            "observacao": observacao,
+            "data_devolucao": timezone.now(),
+        }
+
+        _send_email(
+            subject=f"[PPGEC] Ajustes necessários - Processo {processo.numero}",
+            template_name="emails/orientador/devolucao_processo.html",
+            contexto=contexto,
+            recipient=processo.usuario_criado_por.email,
+        )
+    except Exception as exc:
+        logger.exception("Falha ao enviar e-mail de devolução")
+        raise self.retry(exc=exc)
