@@ -8,8 +8,6 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from .tasks import send_email_solicitacao_ciencia
-from .tasks import send_email_devolucao_requerente
 
 from .forms import (
     AlunoComentarioForm,
@@ -42,12 +40,18 @@ from .models import (
 from .tasks import(
     send_email_novo_processo_aluno,
     send_email_novo_processo_orientador,
-    send_email_movimentacao_aluno,
-    send_email_movimentacao_orientador,
-    send_email_conclusao_aluno,
-    send_email_conclusao_orientador,
+
     send_email_solicitacao_ciencia,
     send_email_devolucao_requerente,
+
+    send_email_movimentacao_aluno,
+    send_email_movimentacao_orientador,
+
+    send_email_conclusao_aluno,
+    send_email_conclusao_orientador,
+
+    send_email_movimentacao_pleno,
+    send_email_processo_comentado_pleno
 )
 
 
@@ -786,14 +790,15 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Processo encaminhado com sucesso.")
+                    
                     if setor_destino and setor_destino.nome == "Requerente":
                         send_email_devolucao_requerente.delay(processo.id, despacho_texto)
-                    send_email_movimentacao_aluno.delay(
-                        processo.id, f"Encaminhado para o setor: {setor_destino.nome}"
-                    )
-                    send_email_movimentacao_orientador.delay(
-                        processo.id, f"Encaminhado para o setor: {setor_destino.nome}"
-                    )
+                    else:
+                        send_email_movimentacao_aluno.delay(processo.id, f"Encaminhado para o setor: {setor_destino.nome}")
+                        if setor_destino and _is_setor_pleno_nome(setor_destino.nome):
+                            send_email_movimentacao_pleno.delay(processo.id)
+
+                    send_email_movimentacao_orientador.delay(processo.id, f"Encaminhado para o setor: {setor_destino.nome}")
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_encaminhamento_modal = True
         elif "finalizar_processo" in request.POST:
@@ -854,12 +859,16 @@ def processo_detalhe_view(request, processo_id):
                 raise PermissionDenied("Apenas docentes podem comentar processos do Pleno.")
             comentario_form = ComentarioProcessoForm(request.POST)
             if comentario_form.is_valid():
-                ComentarioProcesso.objects.create(
+                comentario_intervencao = ComentarioProcesso.objects.create(
                     processo=processo,
                     autor=request.user,
                     anonimo=comentario_form.cleaned_data["anonimo"],
                     texto=comentario_form.cleaned_data["texto"],
                 )
+
+                if _is_processo_no_pleno(processo):#verificação de segurança
+                    send_email_processo_comentado_pleno.delay(processo.id, comentario_intervencao.id)
+
                 messages.success(request, "Comentario adicionado com sucesso.")
                 return redirect("processo_detalhe", processo_id=processo.id)
         else:
