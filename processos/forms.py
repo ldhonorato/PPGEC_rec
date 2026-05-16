@@ -52,6 +52,8 @@ class EncaminhamentoForm(forms.Form):
         self.fields["setor_destino"].queryset = queryset
 
 
+
+
 class ProcessoAberturaForm(forms.ModelForm):
     class Meta:
         model = Processo
@@ -59,6 +61,10 @@ class ProcessoAberturaForm(forms.ModelForm):
         widgets = {
             "descricao": forms.Textarea(attrs={"rows": 5}),
         }
+    
+    
+    
+
 
 
 class SolicitarCienteOrientadorForm(forms.Form):

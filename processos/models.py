@@ -239,6 +239,7 @@ class Processo(models.Model):
         QUALIFICACAO = "QUALIFICACAO", "Qualificacao"
         DEFESA = "DEFESA", "Defesa"
         RECURSO = "RECURSO", "Recurso"
+        ESTAGIO_DOCENCIA = "ESTAGIO_DOCENCIA", "Estágio Docência"
         OUTRO = "OUTRO", "Outro"
 
     class StatusProcesso(models.TextChoices):

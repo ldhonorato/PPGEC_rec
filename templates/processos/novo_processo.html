@@ -1,139 +1,218 @@
-{% extends "base.html" %}
-{% block title %}Novo processo | PPGEC{% endblock %}
+{% extends "base.html" %} {% block title %}Novo processo | PPGEC{% endblock %}
 {% block content %}
-<section class="card" style="max-width: 760px; margin: 0 auto;">
-    <h1 class="section-title">Abrir novo processo</h1>
-    <p class="muted" style="margin-top: 0;">
-        Todo processo aberto e direcionado inicialmente para o setor <strong>Secretaria PPGEC</strong>.
+<section class="card" style="max-width: 760px; margin: 0 auto">
+  <h1 class="section-title">Abrir novo processo</h1>
+  <p class="muted" style="margin-top: 0">
+    Todo processo aberto e direcionado inicialmente para o setor
+    <strong>Secretaria PPGEC</strong>.
+  </p>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %} {% for field in form %}
+    <div class="field">
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }} {{ field.errors }}
+    </div>
+    {% endfor %}
+
+    <div id="campos-estagio" style="display: none">
+      <div class="field">
+        <label for="id_professor">Professor Orientador</label>
+        <input type="text" name="professor" id="id_professor" />
+      </div>
+
+      <div class="field">
+        <input type="checkbox" name="dispensa" id="id_dispensa" />
+        <label for="id_disciplina">Solicitar dispensa</label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Documentos</label>
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.7rem;
+          flex-wrap: wrap;
+        "
+      >
+        <span class="muted"
+          >Adicione um ou mais documentos para abrir o processo.</span
+        >
+        <button type="button" class="btn" id="btn-abrir-modal-doc">
+          Adicionar documento
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="documentos-lista"
+      style="display: grid; gap: 0.7rem; margin-bottom: 0.8rem"
+    ></div>
+    <p class="muted" id="documentos-vazio" style="margin: 0 0 0.8rem 0">
+      Nenhum documento adicionado.
     </p>
 
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        {% for field in form %}
-            <div class="field">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {{ field.errors }}
-            </div>
-        {% endfor %}
-
-        <div class="field">
-            <label>Documentos</label>
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
-                <span class="muted">Adicione um ou mais documentos para abrir o processo.</span>
-                <button type="button" class="btn" id="btn-abrir-modal-doc">Adicionar documento</button>
-            </div>
-        </div>
-
-        <div id="documentos-lista" style="display: grid; gap: 0.7rem; margin-bottom: 0.8rem;"></div>
-        <p class="muted" id="documentos-vazio" style="margin: 0 0 0.8rem 0;">Nenhum documento adicionado.</p>
-
-        <div style="display: flex; gap: 0.7rem; justify-content: flex-end; flex-wrap: wrap;">
-            <a class="btn btn-secondary" href="{% url 'home' %}">Cancelar</a>
-            <button type="submit" class="btn">Abrir processo</button>
-        </div>
-    </form>
+    <div
+      style="
+        display: flex;
+        gap: 0.7rem;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+      "
+    >
+      <a class="btn btn-secondary" href="{% url 'home' %}">Cancelar</a>
+      <button type="submit" class="btn">Abrir processo</button>
+    </div>
+  </form>
 </section>
 
 <dialog id="modal-doc" class="modal-dialog">
-    <form method="dialog" id="form-modal-doc" style="padding: 1rem;">
-        <h2 class="section-title">Adicionar documento</h2>
-        <div class="field">
-            <label for="md_titulo">Titulo</label>
-            <input id="md_titulo" type="text" required>
-        </div>
-        <div class="field">
-            <label for="md_tipo">Tipo do documento</label>
-            <select id="md_tipo" required>
-                <option value="">Selecione</option>
-            </select>
-        </div>
-        <div class="field">
-            <label for="md_restricao">Documento restrito</label>
-            <select id="md_restricao" required>
-                <option value="">Selecione</option>
-            </select>
-        </div>
-        <div class="field">
-            <label for="md_arquivo">Arquivo</label>
-            <input id="md_arquivo" type="file" required>
-        </div>
-        <div style="display: flex; gap: 0.7rem; justify-content: flex-end;">
-            <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-doc">Cancelar</button>
-            <button type="submit" class="btn">Adicionar</button>
-        </div>
-    </form>
+  <form method="dialog" id="form-modal-doc" style="padding: 1rem">
+    <h2 class="section-title">Adicionar documento</h2>
+    <div class="field">
+      <label for="md_titulo">Titulo</label>
+      <input id="md_titulo" type="text" required />
+    </div>
+    <div class="field">
+      <label for="md_tipo">Tipo do documento</label>
+      <select id="md_tipo" required>
+        <option value="">Selecione</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="md_restricao">Documento restrito</label>
+      <select id="md_restricao" required>
+        <option value="">Selecione</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="md_arquivo">Arquivo</label>
+      <input id="md_arquivo" type="file" required />
+    </div>
+    <div style="display: flex; gap: 0.7rem; justify-content: flex-end">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        id="btn-cancelar-modal-doc"
+      >
+        Cancelar
+      </button>
+      <button type="submit" class="btn">Adicionar</button>
+    </div>
+  </form>
 </dialog>
 
 <script>
-    (function () {
-        const modal = document.getElementById("modal-doc");
-        const btnAbrir = document.getElementById("btn-abrir-modal-doc");
-        const btnCancelar = document.getElementById("btn-cancelar-modal-doc");
-        const formModal = document.getElementById("form-modal-doc");
-        const lista = document.getElementById("documentos-lista");
-        const vazio = document.getElementById("documentos-vazio");
+  (function () {
+    const modal = document.getElementById("modal-doc");
+    const btnAbrir = document.getElementById("btn-abrir-modal-doc");
+    const btnCancelar = document.getElementById("btn-cancelar-modal-doc");
+    const formModal = document.getElementById("form-modal-doc");
+    const lista = document.getElementById("documentos-lista");
+    const vazio = document.getElementById("documentos-vazio");
 
-        const inputTitulo = document.getElementById("md_titulo");
-        const inputTipo = document.getElementById("md_tipo");
-        const inputRestricao = document.getElementById("md_restricao");
-        let inputArquivo = document.getElementById("md_arquivo");
+    const inputTitulo = document.getElementById("md_titulo");
+    const inputTipo = document.getElementById("md_tipo");
+    const inputRestricao = document.getElementById("md_restricao");
+    let inputArquivo = document.getElementById("md_arquivo");
 
-        const tipoChoices = [
-            ["REQUERIMENTO", "Requerimento"],
-            ["PARECER", "Parecer"],
-            ["ATA", "Ata"],
-            ["COMPROVANTE", "Comprovante"],
-            ["OUTRO", "Outro"]
-        ];
-        const restricaoChoices = [
-            ["NAO", "Não"],
-            ["INFORMACAO_PESSOAL", "Informação pessoal (Art. 31 da Lei de Acesso à Informação (Lei nº 12.527/2011))"],
-            ["DOCUMENTO_PREPARATORIO", "Documento preparatório / processo decisório (Art. 7º, §3º da Lei de Acesso à Informação (Lei nº 12.527/2011))"],
-            ["INVESTIGACAO_ADMINISTRATIVA", "Investigação ou apuração administrativa (Art. 150 da Lei nº 8.112/1990)"],
-            ["SIGILO_ACADEMICO", "Sigilo acadêmico (avaliações, pareceres, bancas) (Art. 31 da Lei de Acesso à Informação (Lei nº 12.527/2011))"],
-            ["PROPRIEDADE_INTELECTUAL", "Propriedade intelectual / direito autoral (Art. 24, III da Lei nº 9.610/1998; Art. 2º da Lei nº 9.609/1998)"],
-            ["SEGREDO_INDUSTRIAL", "Segredo industrial ou informação estratégica (Art. 195, XIV da Lei nº 9.279/1996)"],
-            ["SIGILO_LEGAL_ESPECIFICO", "Sigilo legal específico (fiscal, bancário, etc.) (Art. 198 do CTN; LC nº 105/2001)"]
-        ];
+    const tipoChoices = [
+      ["REQUERIMENTO", "Requerimento"],
+      ["PARECER", "Parecer"],
+      ["ATA", "Ata"],
+      ["COMPROVANTE", "Comprovante"],
+      ["OUTRO", "Outro"],
+    ];
+    const restricaoChoices = [
+      ["NAO", "Não"],
+      [
+        "INFORMACAO_PESSOAL",
+        "Informação pessoal (Art. 31 da Lei de Acesso à Informação (Lei nº 12.527/2011))",
+      ],
+      [
+        "DOCUMENTO_PREPARATORIO",
+        "Documento preparatório / processo decisório (Art. 7º, §3º da Lei de Acesso à Informação (Lei nº 12.527/2011))",
+      ],
+      [
+        "INVESTIGACAO_ADMINISTRATIVA",
+        "Investigação ou apuração administrativa (Art. 150 da Lei nº 8.112/1990)",
+      ],
+      [
+        "SIGILO_ACADEMICO",
+        "Sigilo acadêmico (avaliações, pareceres, bancas) (Art. 31 da Lei de Acesso à Informação (Lei nº 12.527/2011))",
+      ],
+      [
+        "PROPRIEDADE_INTELECTUAL",
+        "Propriedade intelectual / direito autoral (Art. 24, III da Lei nº 9.610/1998; Art. 2º da Lei nº 9.609/1998)",
+      ],
+      [
+        "SEGREDO_INDUSTRIAL",
+        "Segredo industrial ou informação estratégica (Art. 195, XIV da Lei nº 9.279/1996)",
+      ],
+      [
+        "SIGILO_LEGAL_ESPECIFICO",
+        "Sigilo legal específico (fiscal, bancário, etc.) (Art. 198 do CTN; LC nº 105/2001)",
+      ],
+    ];
 
-        tipoChoices.forEach(([value, label]) => {
-            const op = document.createElement("option");
-            op.value = value;
-            op.textContent = label;
-            inputTipo.appendChild(op);
-        });
-        restricaoChoices.forEach(([value, label]) => {
-            const op = document.createElement("option");
-            op.value = value;
-            op.textContent = label;
-            inputRestricao.appendChild(op);
-        });
+    tipoChoices.forEach(([value, label]) => {
+      const op = document.createElement("option");
+      op.value = value;
+      op.textContent = label;
+      inputTipo.appendChild(op);
+    });
+    restricaoChoices.forEach(([value, label]) => {
+      const op = document.createElement("option");
+      op.value = value;
+      op.textContent = label;
+      inputRestricao.appendChild(op);
+    });
 
-        let counter = 0;
-        function refreshEmpty() {
-            vazio.style.display = lista.children.length ? "none" : "block";
-        }
-        function resetModal() {
-            inputTitulo.value = "";
-            inputTipo.value = "";
-            inputRestricao.value = "";
-        }
+    let counter = 0;
+    function refreshEmpty() {
+      vazio.style.display = lista.children.length ? "none" : "block";
+    }
+    function resetModal() {
+      inputTitulo.value = "";
+      inputTipo.value = "";
+      inputRestricao.value = "";
+    }
 
-        if (btnAbrir) btnAbrir.addEventListener("click", () => modal.showModal());
-        if (btnCancelar) btnCancelar.addEventListener("click", () => modal.close());
+    if (btnAbrir) btnAbrir.addEventListener("click", () => modal.showModal());
+    if (btnCancelar) btnCancelar.addEventListener("click", () => modal.close());
 
-        formModal.addEventListener("submit", (event) => {
-            event.preventDefault();
-            if (!inputTitulo.value || !inputTipo.value || !inputRestricao.value || !inputArquivo.files.length) {
-                return;
-            }
+    const tipoProcesso = document.getElementById("id_tipo");
+    const camposEstagio = document.getElementById("campos-estagio");
 
-            const idx = counter++;
-            const card = document.createElement("div");
-            card.className = "card";
-            card.style.padding = "0.8rem";
-            card.innerHTML = `
+    tipoProcesso.addEventListener("change", () => {
+      const valor = tipoProcesso.value;
+
+      camposEstagio.style.display = "none";
+
+      if (valor === "ESTAGIO_DOCENCIA") {
+        camposEstagio.style.display = "block";
+      }
+    });
+
+    formModal.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (
+        !inputTitulo.value ||
+        !inputTipo.value ||
+        !inputRestricao.value ||
+        !inputArquivo.files.length
+      ) {
+        return;
+      }
+
+      const idx = counter++;
+      const card = document.createElement("div");
+      card.className = "card";
+      card.style.padding = "0.8rem";
+      card.innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:0.7rem;flex-wrap:wrap;">
                     <div>
                         <strong>${inputTitulo.value}</strong><br>
@@ -146,36 +225,39 @@
                 <input type="hidden" name="doc_${idx}_restricao_tipo" value="">
             `;
 
-            card.querySelector(`input[name="doc_${idx}_titulo"]`).value = inputTitulo.value;
-            card.querySelector(`input[name="doc_${idx}_tipo_documento"]`).value = inputTipo.value;
-            card.querySelector(`input[name="doc_${idx}_restricao_tipo"]`).value = inputRestricao.value;
+      card.querySelector(`input[name="doc_${idx}_titulo"]`).value =
+        inputTitulo.value;
+      card.querySelector(`input[name="doc_${idx}_tipo_documento"]`).value =
+        inputTipo.value;
+      card.querySelector(`input[name="doc_${idx}_restricao_tipo"]`).value =
+        inputRestricao.value;
 
-            const arquivoWrapper = inputArquivo.parentNode;
-            const arquivoSelecionado = inputArquivo;
-            const novoInputArquivo = document.createElement("input");
-            novoInputArquivo.type = "file";
-            novoInputArquivo.id = "md_arquivo";
-            novoInputArquivo.required = true;
-            arquivoWrapper.appendChild(novoInputArquivo);
-            inputArquivo = novoInputArquivo;
+      const arquivoWrapper = inputArquivo.parentNode;
+      const arquivoSelecionado = inputArquivo;
+      const novoInputArquivo = document.createElement("input");
+      novoInputArquivo.type = "file";
+      novoInputArquivo.id = "md_arquivo";
+      novoInputArquivo.required = true;
+      arquivoWrapper.appendChild(novoInputArquivo);
+      inputArquivo = novoInputArquivo;
 
-            arquivoSelecionado.required = false;
-            arquivoSelecionado.id = "";
-            arquivoSelecionado.name = `doc_${idx}_arquivo`;
-            arquivoSelecionado.style.display = "none";
-            card.appendChild(arquivoSelecionado);
+      arquivoSelecionado.required = false;
+      arquivoSelecionado.id = "";
+      arquivoSelecionado.name = `doc_${idx}_arquivo`;
+      arquivoSelecionado.style.display = "none";
+      card.appendChild(arquivoSelecionado);
 
-            const removerBtn = card.querySelector("button");
-            removerBtn.addEventListener("click", () => {
-                card.remove();
-                refreshEmpty();
-            });
+      const removerBtn = card.querySelector("button");
+      removerBtn.addEventListener("click", () => {
+        card.remove();
+        refreshEmpty();
+      });
 
-            lista.appendChild(card);
-            refreshEmpty();
-            modal.close();
-            resetModal();
-        });
-    })();
+      lista.appendChild(card);
+      refreshEmpty();
+      modal.close();
+      resetModal();
+    });
+  })();
 </script>
 {% endblock %}
