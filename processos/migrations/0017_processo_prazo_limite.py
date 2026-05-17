@@ -14,6 +14,7 @@ PRAZOS_DIAS_POR_TIPO = {
     "QUALIFICACAO": 30,
     "DEFESA": 45,
     "RECURSO": 15,
+    "ESTAGIO_DOCENCIA": 30,
     "OUTRO": 30,
 }
 

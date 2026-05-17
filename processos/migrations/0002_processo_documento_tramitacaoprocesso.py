@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
             name='Processo',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('tipo', models.CharField(choices=[('APROVEITAMENTO_CREDITOS', 'Aproveitamento de Creditos'), ('DISPENSA_DISCIPLINA', 'Dispensa de Disciplina'), ('TRANCAMENTO_MATRICULA', 'Trancamento de Matricula'), ('PRORROGACAO_PRAZO', 'Prorrogacao de Prazo'), ('REINGRESSO', 'Reingresso'), ('MUDANCA_ORIENTADOR', 'Mudanca de Orientador'), ('QUALIFICACAO', 'Qualificacao'), ('DEFESA', 'Defesa'), ('RECURSO', 'Recurso'), ('OUTRO', 'Outro')], max_length=40)),
+                ('tipo', models.CharField(choices=[('APROVEITAMENTO_CREDITOS', 'Aproveitamento de Creditos'), ('DISPENSA_DISCIPLINA', 'Dispensa de Disciplina'), ('TRANCAMENTO_MATRICULA', 'Trancamento de Matricula'), ('PRORROGACAO_PRAZO', 'Prorrogacao de Prazo'), ('REINGRESSO', 'Reingresso'), ('MUDANCA_ORIENTADOR', 'Mudanca de Orientador'), ('QUALIFICACAO', 'Qualificacao'), ('DEFESA', 'Defesa'), ('ESTAGIO_DOCENCIA', 'Estagio Docencia'), ('RECURSO', 'Recurso'), ('OUTRO', 'Outro')], max_length=40)),
                 ('assunto', models.CharField(max_length=255)),
                 ('descricao', models.TextField()),
                 ('data_criacao', models.DateTimeField(auto_now_add=True)),
