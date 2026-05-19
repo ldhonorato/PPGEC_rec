@@ -1,4 +1,5 @@
 from celery import shared_task
+from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 import logging
@@ -7,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def _send_email(subject, template_name, contexto, recipient):
+    contexto.setdefault("site_url", getattr(settings, "SITE_URL", "http://localhost:8000"))
     html = render_to_string(template_name, contexto)
     send_mail(
         subject=subject,
