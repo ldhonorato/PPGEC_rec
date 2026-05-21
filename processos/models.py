@@ -226,6 +226,7 @@ class Processo(models.Model):
         "QUALIFICACAO": 30,
         "DEFESA": 45,
         "RECURSO": 15,
+        "ESTAGIO_DOCENCIA": 30,
         "OUTRO": 30,
     }
 
@@ -239,6 +240,7 @@ class Processo(models.Model):
         QUALIFICACAO = "QUALIFICACAO", "Qualificacao"
         DEFESA = "DEFESA", "Defesa"
         RECURSO = "RECURSO", "Recurso"
+        ESTAGIO_DOCENCIA = "ESTAGIO_DOCENCIA", "Estágio Docência"
         OUTRO = "OUTRO", "Outro"
 
     class StatusProcesso(models.TextChoices):
