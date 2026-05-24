@@ -24,6 +24,7 @@ RUN adduser --disabled-password --no-create-home appuser || true
 RUN chown -R appuser:appuser /app
 
 COPY entrypoint.sh /entrypoint.sh
+RUN dos2unix /entrypoint.sh || sed -i 's/\r$//' /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 USER appuser
