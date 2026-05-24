@@ -294,3 +294,73 @@ def send_email_processo_comentado_pleno(self, processo_id: int, comentario_id: i
     except Exception as exc:
         logger.exception("Falha ao enviar e-mail de comentário para o Pleno.")
         raise self.retry(exc=exc)
+    
+#CRIAÇÃO DE PROCESSO (PARA SECRETARIA), TRAMITAÇÃO ENTRE SETORES E MUDANÇA DE STATUS=====
+@shared_task
+def send_email_novo_processo_secretaria(processo_id: int):
+    """Avisa a Secretaria (via e-mail do setor) que um novo processo foi aberto"""
+    from .models import Processo, Setor
+    try:
+        processo = Processo.objects.select_related("usuario_criado_por", "setor_atual").get(pk=processo_id)
+    except Processo.DoesNotExist:
+        return
+
+    setor_secretaria = processo.setor_atual #nasce na Secretaria
+
+    if setor_secretaria and setor_secretaria.email: #segurança: se o setor existe E tem email cadastrado
+        contexto = {
+            "processo": processo,
+            "aluno": processo.usuario_criado_por
+        }
+        _send_email(
+            subject=f"[PPGEC] Novo Processo Aguardando Análise ({processo.numero})",
+            template_name="emails/secretaria/novo_processo_secretaria.html",
+            contexto=contexto,
+            recipient=setor_secretaria.email
+        )
+
+
+@shared_task
+def send_email_mudanca_setor(processo_id: int):
+    """Avisa o NOVO setor que um processo foi tramitado para ele"""
+    from .models import Processo
+    try:
+        processo = Processo.objects.select_related("setor_atual").get(pk=processo_id)
+    except Processo.DoesNotExist:
+        return
+
+    setor_destino = processo.setor_atual
+    
+    if setor_destino and setor_destino.email: #segurança: se o setor existe E tem email cadastrado
+        contexto = {"processo": processo}
+        _send_email(
+            subject=f"[PPGEC] Processo Tramitado para o seu Setor - Nº {processo.numero}",
+            template_name="emails/setor/mudanca_setor.html",
+            contexto=contexto,
+            recipient=setor_destino.email
+        )
+
+
+@shared_task
+def send_email_status_atualizado(processo_id: int, status_anterior: str, status_atual: str):
+    """Avisa o setor atual que o processo sofreu uma alteração de status externa"""
+    from .models import Processo
+    try:
+        processo = Processo.objects.select_related("setor_atual").get(pk=processo_id)
+    except Processo.DoesNotExist:
+        return
+
+    setor_atual = processo.setor_atual
+
+    if setor_atual and setor_atual.email: #segurança: se o setor existe E tem email cadastrado
+        contexto = {
+            "processo": processo,
+            "status_anterior": status_anterior,
+            "status_atual": status_atual
+        }
+        _send_email(
+            subject=f"[PPGEC] Alteração de Status Interno: Processo {processo.numero}",
+            template_name="emails/setor/status_atualizado.html",
+            contexto=contexto,
+            recipient=setor_atual.email
+        )
