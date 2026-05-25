@@ -38,6 +38,7 @@ from .models import (
 )
 
 from .tasks import(
+    send_email_ciencia_efetivada_secretaria,
     send_email_novo_processo_aluno,
     send_email_novo_processo_orientador,
 
@@ -741,7 +742,7 @@ def processo_detalhe_view(request, processo_id):
             acao = (request.POST.get("acao_ciente") or "").strip().lower()
             if manifestar_ciente_form.is_valid():
                 try:
-                    pendente_ciente.registrar_manifestacao(
+                    nova_manifestacao = pendente_ciente.registrar_manifestacao(
                         autor=request.user,
                         aceito=(acao == "ciente"),
                         mensagem=manifestar_ciente_form.cleaned_data["mensagem_manifestacao"],
@@ -750,6 +751,9 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Manifestacao registrada com sucesso.")
+                    if acao == "ciente":
+                        manifestacao_id = getattr(nova_manifestacao, 'id', pendente_ciente.id)
+                        send_email_ciencia_efetivada_secretaria.delay(manifestacao_id)
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_ciente_modal = True
         elif "encaminhar_processo" in request.POST:
