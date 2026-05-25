@@ -9,6 +9,18 @@
     <p>O seu processo <strong>{{processo.numero}}</strong> foi finalizado.</p>
     <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
       <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Número</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.numero}}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Tipo</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.get_tipo_display}}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Assunto</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.assunto}}</td>
+      </tr>
+      <tr>
         <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Resultado</td>
         <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.termo_finalizacao}}</td>
       </tr>

@@ -132,7 +132,7 @@
         {% csrf_token %}
         <input type="hidden" name="encaminhar_processo" value="1">
         {% for field in encaminhamento_form %}
-            <div class="field">
+            <div class="field" {% if field.html_name == "prazo_pleno" %}id="campo-prazo-pleno" style="display:none;"{% endif %}>
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {{ field.errors }}
@@ -440,6 +440,23 @@
         {% if open_finalizar_modal %}
             if (modalFinalizacao) modalFinalizacao.showModal();
         {% endif %}
+
+        const setorDestino = document.getElementById("id_setor_destino");
+        const campoPrazoPleno = document.getElementById("campo-prazo-pleno");
+        const inputPrazoPleno = document.getElementById("id_prazo_pleno");
+
+        function togglePrazoPleno() {
+            if (!setorDestino || !campoPrazoPleno) return;
+            const selectedText = setorDestino.options[setorDestino.selectedIndex]?.text || "";
+            const isPleno = selectedText.toLowerCase().includes("pleno");
+            campoPrazoPleno.style.display = isPleno ? "" : "none";
+            if (inputPrazoPleno) inputPrazoPleno.required = isPleno;
+        }
+
+        if (setorDestino) {
+            setorDestino.addEventListener("change", togglePrazoPleno);
+            togglePrazoPleno();
+        }
     })();
 </script>
 {% endif %}
