@@ -68,6 +68,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'processos.context_processors.processos_atrasados',
+                'processos.context_processors.navegacao_lateral',
             ],
         },
     },

@@ -11,7 +11,7 @@
                         <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
                         <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
                     </div>
-                    <small class="muted">Aluno: {{ processo.usuario_criado_por.nome }} | Status: {{ processo.get_status_display }} | Setor: {{ processo.setor_atual.nome }}</small>
+                    <small class="muted">Aluno: {{ processo.usuario_criado_por.nome }}{% if processo.usuario_criado_por.trajetoria_ativa %} | Nivel: {{ processo.usuario_criado_por.trajetoria_ativa.get_nivel_curso_display }}{% endif %} | Status: {{ processo.get_status_display }} | Setor: {{ processo.setor_atual.nome }}</small>
                 </li>
             {% endfor %}
         </ul>

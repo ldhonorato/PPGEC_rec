@@ -20,6 +20,9 @@ staticfiles/
 .DS_Store
 .vscode/
 .idea/
+*.pyc
+*.pyc*
+__pycache__/
 
 # Logs and env files
 *.log

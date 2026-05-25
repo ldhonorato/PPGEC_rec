@@ -3,31 +3,31 @@
 {% block content %}
 <style>
     .aluno-kv { margin: 0.45rem 0; }
-    .aluno-page-layout {
-        display: grid;
-        grid-template-columns: 280px minmax(0, 1fr);
-        gap: 1rem;
-        align-items: start;
-    }
-    .acao-menu {
-        margin: 0;
+    .info-list {
+        margin: 0.65rem 0 0 0;
         padding: 0;
         list-style: none;
         display: grid;
-        gap: 0.55rem;
+        gap: 0.35rem;
     }
-    .acao-link {
-        width: 100%;
-        text-align: left;
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-sm);
-        background: #ffffff;
-        padding: 0.6rem 0.7rem;
+    .info-list li {
+        display: grid;
+        grid-template-columns: 185px minmax(0, 1fr) auto;
+        gap: 0.7rem;
+        align-items: center;
+    }
+    .info-label {
+        color: var(--color-muted);
         font-weight: 800;
-        cursor: pointer;
-        color: var(--color-text);
     }
-    .acao-link:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.65rem;
+    }
     .modal-backdrop {
         position: fixed;
         inset: 0;
@@ -40,7 +40,9 @@
     }
     .modal-backdrop.open { display: flex; }
     .modal-card {
-        width: min(650px, 96vw);
+        width: min(720px, 96vw);
+        max-height: 92vh;
+        overflow: auto;
         background: #ffffff;
         border: 1px solid var(--color-border);
         border-radius: var(--radius-lg);
@@ -62,75 +64,83 @@
         cursor: pointer;
     }
     @media (max-width: 900px) {
-        .aluno-page-layout { grid-template-columns: 1fr; }
+        .info-list li { grid-template-columns: 1fr; gap: 0.1rem; }
     }
 </style>
 
-<div class="aluno-page-layout">
-    {% if has_gestao_access %}
-    <aside class="card">
-        <h3 class="section-title" style="font-size: 1.05rem;">Atualizacoes cadastrais</h3>
-        <ul class="acao-menu">
-            <li><button type="button" class="acao-link" data-modal-open="modal-status">Alterar status</button></li>
-            <li><button type="button" class="acao-link" data-modal-open="modal-qualificacao">Registrar qualificacao</button></li>
-            <li><button type="button" class="acao-link" data-modal-open="modal-defesa">Registrar defesa</button></li>
-            <li><button type="button" class="acao-link" data-modal-open="modal-deposito">Registrar deposito final</button></li>
-            <li><button type="button" class="acao-link" data-modal-open="modal-prazo-qualificacao">Alterar prazo qualificacao</button></li>
-            <li><button type="button" class="acao-link" data-modal-open="modal-prazo-defesa">Alterar prazo defesa</button></li>
-        </ul>
-    </aside>
-    {% endif %}
-
-    <section>
-        <section class="card" style="margin-bottom: 1rem;">
+<section>
+        <section id="dados-aluno" class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
                 <h1 class="section-title" style="margin-bottom: 0;">{{ aluno.nome }}</h1>
-                <a class="btn btn-secondary" href="{% url 'coordenacao_alunos' %}">Voltar para alunos</a>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-secondary" data-modal-open="modal-dados">Alterar dados</button>
+                    <a class="btn btn-secondary" href="{% url 'coordenacao_alunos' %}">Voltar para alunos</a>
+                </div>
             </div>
             <p class="aluno-kv"><strong>Email:</strong> {{ aluno.email }}</p>
             <p class="aluno-kv"><strong>Matricula:</strong> {{ aluno.matricula|default:"-" }}</p>
-            <p class="aluno-kv"><strong>Ingresso:</strong> {{ aluno.ingresso }}</p>
-            <p class="aluno-kv"><strong>Orientador:</strong> {% if aluno.orientador %}{{ aluno.orientador.nome }}{% else %}-{% endif %}</p>
-            <p class="aluno-kv"><strong>Prazo qualificacao:</strong> {{ aluno.prazo_qualificacao|default:"-" }}</p>
-            <p class="aluno-kv"><strong>Prazo defesa:</strong> {{ aluno.prazo_defesa|default:"-" }}</p>
-            <p class="aluno-kv"><strong>Numero da defesa:</strong> {{ aluno.numero_defesa|default:"-" }}</p>
-            <p class="aluno-kv"><strong>Data da defesa:</strong> {% if aluno.data_defesa %}{{ aluno.data_defesa|date:"d/m/Y" }}{% else %}-{% endif %}</p>
-            <p class="aluno-kv">
-                <strong>Status:</strong>
-                <span class="badge badge-info">{{ aluno.get_status_aluno_display }}</span>
-            </p>
-            <p class="aluno-kv">
-                <strong>Qualificado:</strong>
-                {% if aluno.isQualificado %}
-                    <span class="badge badge-ok">Sim</span>
-                {% else %}
-                    <span class="badge badge-no">Nao</span>
-                {% endif %}
-            </p>
-            <p class="aluno-kv">
-                <strong>Deposito versao final:</strong>
-                {% if aluno.deposito_versao_final %}
-                    <span class="badge badge-ok">Sim</span>
-                {% else %}
-                    <span class="badge badge-no">Nao</span>
-                {% endif %}
-            </p>
+            {% if trajetoria_atual %}
+                <ul class="info-list">
+                    <li><span class="info-label">Status da trajetoria ativa</span><span><span class="badge badge-info">{{ trajetoria_atual.get_status_display }}</span></span></li>
+                    <li><span class="info-label">Trajetoria ativa</span><span>{{ trajetoria_atual.get_nivel_curso_display }}</span></li>
+                    <li><span class="info-label">Ingresso</span><span>{{ trajetoria_atual.ingresso|default:"-" }}</span></li>
+                    <li><span class="info-label">Orientador</span><span>{% if trajetoria_atual.orientador %}{{ trajetoria_atual.orientador.nome }}{% else %}-{% endif %}</span></li>
+                </ul>
+            {% else %}
+                <p class="muted">Este aluno ainda nao possui trajetoria academica ativa.</p>
+            {% endif %}
         </section>
 
-        <section class="card" style="margin-bottom: 1rem;">
-            <h2 class="section-title">Historico de alteracoes do aluno</h2>
-            {% if alteracoes_aluno %}
+        <section id="trajetorias-academicas" class="card" style="margin-bottom: 1rem;">
+            <div class="section-head">
+                <h2 class="section-title" style="margin:0;">Trajetorias academicas</h2>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button type="button" class="btn" data-modal-open="modal-nova-trajetoria">Nova trajetoria</button>
+                </div>
+            </div>
+            {% if trajetoria_cards %}
                 <ul class="list">
-                    {% for alteracao in alteracoes_aluno %}
+                    {% for card in trajetoria_cards %}
+                        {% with trajetoria=card.obj %}
                         <li>
-                            <strong>{{ alteracao.get_tipo_display }}</strong><br>
-                            <small class="muted">
-                                De: {{ alteracao.valor_anterior|default:"-" }} |
-                                Para: {{ alteracao.valor_novo|default:"-" }} |
-                                Por: {{ alteracao.alterado_por.nome }} |
-                                Em: {{ alteracao.criado_em|date:"d/m/Y H:i" }}
-                            </small>
-                            <p style="margin: 0.5rem 0 0 0;">{{ alteracao.comentario }}</p>
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                                <div>
+                                    <strong>{{ trajetoria.get_nivel_curso_display }}</strong>
+                                    <span class="badge badge-info">{{ trajetoria.get_status_display }}</span>
+                                </div>
+                                <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-status-{{ trajetoria.id }}">Editar status</button>
+                            </div>
+                            <ul class="info-list">
+                                <li><span class="info-label">Nivel</span><span>{{ trajetoria.get_nivel_curso_display }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-nivel-{{ trajetoria.id }}">Alterar</button></li>
+                                <li><span class="info-label">Ingresso</span><span>{{ trajetoria.ingresso|default:"-" }}</span><span></span></li>
+                                <li><span class="info-label">Prazo {{ trajetoria.qualificacao_label_lower }}</span><span>{{ trajetoria.prazo_qualificacao|default:"-" }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}">Alterar</button></li>
+                                <li><span class="info-label">Prazo defesa</span><span>{{ trajetoria.prazo_defesa|default:"-" }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}">Alterar</button></li>
+                                <li><span class="info-label">Reingressante</span><span>{% if trajetoria.reingressante %}Sim{% else %}Nao{% endif %}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-reingressante-{{ trajetoria.id }}">Alterar</button></li>
+                                <li><span class="info-label">{{ trajetoria.qualificacao_label }}</span><span>{% if trajetoria.isQualificado %}Sim{% else %}Nao{% endif %}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-qualificacao-{{ trajetoria.id }}">Alterar</button></li>
+                                <li><span class="info-label">Orientador</span><span>{% if trajetoria.orientador %}{{ trajetoria.orientador.nome }}{% else %}-{% endif %}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-orientador-{{ trajetoria.id }}">Alterar</button></li>
+                                <li><span class="info-label">Coorientador</span><span>{{ trajetoria.coorientador_display|default:"-" }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-coorientador-{{ trajetoria.id }}">Alterar</button></li>
+                                <li><span class="info-label">Defesa</span><span>{% if trajetoria.numero_defesa or trajetoria.data_defesa %}{{ trajetoria.numero_defesa|default:"-" }}{% if trajetoria.data_defesa %} - {{ trajetoria.data_defesa|date:"d/m/Y" }}{% endif %}{% else %}-{% endif %}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-defesa-{{ trajetoria.id }}">Alterar</button></li>
+                                <li><span class="info-label">Deposito final</span><span>{% if trajetoria.deposito_versao_final %}Sim{% else %}Nao{% endif %}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-deposito-{{ trajetoria.id }}">Alterar</button></li>
+                            </ul>
+                        </li>
+                        {% endwith %}
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="muted">Sem trajetorias registradas.</p>
+            {% endif %}
+        </section>
+
+        <section id="historico-alteracoes" class="card" style="margin-bottom: 1rem;">
+            <h2 class="section-title">Historico de alteracoes do aluno</h2>
+            {% if alteracoes_display %}
+                <ul class="list">
+                    {% for item in alteracoes_display %}
+                        <li>
+                            <strong>{{ item.trajetoria }}</strong>
+                            <p style="margin: 0.45rem 0 0 0;"><strong>Alteracao:</strong> {{ item.alteracao }}</p>
+                            <p style="margin: 0.35rem 0 0 0;"><strong>Comentario:</strong> {{ item.obj.comentario }}</p>
+                            <small class="muted">Por: {{ item.obj.alterado_por.nome }} | Em: {{ item.obj.criado_em|date:"d/m/Y H:i" }}</small>
                         </li>
                     {% endfor %}
                 </ul>
@@ -139,7 +149,7 @@
             {% endif %}
         </section>
 
-        <section class="card">
+        <section id="processos-aluno" class="card">
             <h2 class="section-title">Processos abertos pelo aluno</h2>
             {% if processos_aluno %}
                 <ul class="list">
@@ -162,98 +172,259 @@
                 <p class="muted">Este aluno ainda nao abriu processos.</p>
             {% endif %}
         </section>
-    </section>
-</div>
+</section>
 
-<div id="modal-status" class="modal-backdrop">
+<div id="modal-dados" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar status</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar dados do aluno</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
-            <input type="hidden" name="acao" value="alterar_status">
-            <label for="id_status_aluno">Status</label>
-            {{ status_form.status_aluno }}
-            <label for="id_comentario_status">Comentario</label>
-            <textarea id="id_comentario_status" name="comentario" rows="3" required></textarea>
+            <input type="hidden" name="acao" value="alterar_dados">
+            <div class="grid-two">
+                <div class="field"><label>Nome</label>{{ dados_form.nome }}</div>
+                <div class="field"><label>Email</label>{{ dados_form.email }}</div>
+                <div class="field"><label>Matricula</label>{{ dados_form.matricula }}</div>
+            </div>
+            <label>Comentario</label>
+            {{ dados_form.comentario }}
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar dados</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-nova-trajetoria" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Nova trajetoria academica</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="nova_trajetoria">
+            <div class="grid-two">
+                <div class="field"><label>Nivel</label>{{ nova_trajetoria_form.nivel_curso }}</div>
+                <div class="field"><label>Status</label>{{ nova_trajetoria_form.status }}</div>
+                <div class="field"><label>Ingresso</label>{{ nova_trajetoria_form.ingresso }}</div>
+                <div class="field"><label>Prazo de qualificacao/projeto</label>{{ nova_trajetoria_form.prazo_qualificacao }}</div>
+                <div class="field"><label>Prazo defesa</label>{{ nova_trajetoria_form.prazo_defesa }}</div>
+                <div class="field"><label>Orientador</label>{{ nova_trajetoria_form.orientador }}</div>
+            </div>
+            <label>{{ nova_trajetoria_form.reingressante }} Reingressante</label>
+            <label>{{ nova_trajetoria_form.isQualificado }} Projeto/qualificacao concluido</label>
+
+            <label>Tipo de coorientador</label>
+            {{ nova_trajetoria_form.tipo_coorientador }}
+            <div data-coorientador-section="CADASTRADO">
+                <label>Coorientador cadastrado</label>
+                {{ nova_trajetoria_form.coorientador }}
+            </div>
+            <div data-coorientador-section="EXTERNO">
+                <label>Nome do coorientador externo</label>
+                {{ nova_trajetoria_form.coorientador_externo_nome }}
+                <label>Email do coorientador externo</label>
+                {{ nova_trajetoria_form.coorientador_externo_email }}
+                <label>Instituicao do coorientador externo</label>
+                {{ nova_trajetoria_form.coorientador_externo_instituicao }}
+            </div>
+
+            <div class="grid-two">
+                <div class="field"><label>Numero da defesa</label>{{ nova_trajetoria_form.numero_defesa }}</div>
+                <div class="field"><label>Data da defesa</label>{{ nova_trajetoria_form.data_defesa }}</div>
+            </div>
+            <label>{{ nova_trajetoria_form.deposito_versao_final }} Deposito da versao final</label>
+
+            <label>Comentario</label>
+            {{ nova_trajetoria_form.comentario }}
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Cadastrar trajetoria</button>
+        </form>
+    </div>
+</div>
+
+{% for card in trajetoria_cards %}
+{% with trajetoria=card.obj form=card.form %}
+<div id="modal-trajetoria-status-{{ trajetoria.id }}" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar status da trajetoria</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="alterar_trajetoria_campo">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <input type="hidden" name="campo" value="status">
+            <label>Status</label>
+            <select name="status" required>
+                <option value="ATIVA" {% if trajetoria.status == "ATIVA" %}selected{% endif %}>Ativo</option>
+                <option value="DESLIGADA" {% if trajetoria.status == "DESLIGADA" %}selected{% endif %}>Desligado</option>
+                <option value="TRANCADA" {% if trajetoria.status == "TRANCADA" %}selected{% endif %}>Trancado</option>
+            </select>
+            <label>Comentario</label>
+            <textarea name="comentario" rows="3" required></textarea>
             <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar status</button>
         </form>
     </div>
 </div>
 
-<div id="modal-qualificacao" class="modal-backdrop">
+<div id="modal-trajetoria-nivel-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Registrar qualificacao</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar nivel</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
-            <input type="hidden" name="acao" value="alterar_qualificacao">
-            <label>{{ qualificacao_form.isQualificado }} Aluno qualificado</label>
-            <label for="id_comentario_qualificacao">Comentario</label>
-            <textarea id="id_comentario_qualificacao" name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar qualificacao</button>
+            <input type="hidden" name="acao" value="alterar_trajetoria_campo">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <input type="hidden" name="campo" value="nivel_curso">
+            <label>Nivel</label>
+            {{ form.nivel_curso }}
+            <label>Comentario</label>
+            <textarea name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar nivel</button>
         </form>
     </div>
 </div>
 
-<div id="modal-defesa" class="modal-backdrop">
+<div id="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Registrar defesa</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar prazo {{ trajetoria.qualificacao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
-            <input type="hidden" name="acao" value="registrar_defesa">
-            <label for="id_numero_defesa">Numero da defesa</label>
-            <input id="id_numero_defesa" name="numero_defesa" value="{{ defesa_form.numero_defesa.value|default:'' }}" required>
-            <label for="id_data_defesa">Data da defesa</label>
-            <input id="id_data_defesa" type="date" name="data_defesa" value="{% if defesa_form.data_defesa.value %}{{ defesa_form.data_defesa.value|date:'Y-m-d' }}{% endif %}">
-            <label for="id_comentario_defesa">Comentario</label>
-            <textarea id="id_comentario_defesa" name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Registrar defesa</button>
+            <input type="hidden" name="acao" value="alterar_trajetoria_campo">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <input type="hidden" name="campo" value="prazo_qualificacao">
+            <label>Prazo {{ trajetoria.qualificacao_label_lower }} (YYYY.1 ou YYYY.2)</label>
+            <input name="prazo_qualificacao" value="{{ trajetoria.prazo_qualificacao }}" placeholder="YYYY.1 ou YYYY.2">
+            <label>Comentario</label>
+            <textarea name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar prazo</button>
         </form>
     </div>
 </div>
 
-<div id="modal-deposito" class="modal-backdrop">
-    <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Registrar deposito final</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
-        <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="acao" value="registrar_deposito_final">
-            <label><input type="checkbox" name="deposito_versao_final" {% if aluno.deposito_versao_final %}checked{% endif %}> Deposito da versao final realizado</label>
-            <label for="id_comentario_deposito">Comentario</label>
-            <textarea id="id_comentario_deposito" name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar deposito final</button>
-        </form>
-    </div>
-</div>
-
-<div id="modal-prazo-qualificacao" class="modal-backdrop">
-    <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar prazo qualificacao</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
-        <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="acao" value="alterar_prazo_qualificacao">
-            <label for="id_prazo_qualificacao">Prazo de qualificacao (YYYY.1/2)</label>
-            <input id="id_prazo_qualificacao" name="valor_semestre" value="{{ prazo_qualificacao_form.valor_semestre.value|default:'' }}" placeholder="YYYY.1 ou YYYY.2" required>
-            <label for="id_comentario_prazo_qualificacao">Comentario</label>
-            <textarea id="id_comentario_prazo_qualificacao" name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar prazo qualificacao</button>
-        </form>
-    </div>
-</div>
-
-<div id="modal-prazo-defesa" class="modal-backdrop">
+<div id="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
         <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar prazo defesa</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
-            <input type="hidden" name="acao" value="alterar_prazo_defesa">
-            <label for="id_prazo_defesa">Prazo de defesa (YYYY.1/2)</label>
-            <input id="id_prazo_defesa" name="valor_semestre" value="{{ prazo_defesa_form.valor_semestre.value|default:'' }}" placeholder="YYYY.1 ou YYYY.2" required>
-            <label for="id_comentario_prazo_defesa">Comentario</label>
-            <textarea id="id_comentario_prazo_defesa" name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar prazo defesa</button>
+            <input type="hidden" name="acao" value="alterar_trajetoria_campo">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <input type="hidden" name="campo" value="prazo_defesa">
+            <label>Prazo defesa (YYYY.1 ou YYYY.2)</label>
+            <input name="prazo_defesa" value="{{ trajetoria.prazo_defesa }}" placeholder="YYYY.1 ou YYYY.2">
+            <label>Comentario</label>
+            <textarea name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar prazo</button>
         </form>
     </div>
 </div>
+
+<div id="modal-trajetoria-reingressante-{{ trajetoria.id }}" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar reingressante</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="alterar_trajetoria_campo">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <input type="hidden" name="campo" value="reingressante">
+            <label><input type="checkbox" name="reingressante" {% if trajetoria.reingressante %}checked{% endif %}> Reingressante</label>
+            <label>Comentario</label>
+            <textarea name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar reingressante</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-trajetoria-qualificacao-{{ trajetoria.id }}" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar {{ trajetoria.qualificacao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="alterar_trajetoria_campo">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <input type="hidden" name="campo" value="isQualificado">
+            <label><input type="checkbox" name="isQualificado" {% if trajetoria.isQualificado %}checked{% endif %}> {{ trajetoria.qualificacao_label }} concluido</label>
+            <label>Comentario</label>
+            <textarea name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-trajetoria-orientador-{{ trajetoria.id }}" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar orientador</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="alterar_trajetoria_campo">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <input type="hidden" name="campo" value="orientador">
+            <label>Orientador</label>
+            {{ form.orientador }}
+            <label>Comentario</label>
+            <textarea name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar orientador</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-trajetoria-coorientador-{{ trajetoria.id }}" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar coorientador</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="alterar_trajetoria_campo">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <input type="hidden" name="campo" value="coorientador">
+            <label>Tipo de coorientador</label>
+            {{ form.tipo_coorientador }}
+            <div data-coorientador-section="CADASTRADO">
+                <label>Coorientador cadastrado</label>
+                {{ form.coorientador }}
+            </div>
+            <div data-coorientador-section="EXTERNO">
+                <label>Nome do coorientador externo</label>
+                {{ form.coorientador_externo_nome }}
+                <label>Email do coorientador externo</label>
+                {{ form.coorientador_externo_email }}
+                <label>Instituicao do coorientador externo</label>
+                {{ form.coorientador_externo_instituicao }}
+            </div>
+            <label>Comentario</label>
+            <textarea name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar coorientador</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-trajetoria-defesa-{{ trajetoria.id }}" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar defesa</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="alterar_trajetoria_campo">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <input type="hidden" name="campo" value="defesa">
+            <div class="grid-two">
+                <div class="field"><label>Numero da defesa</label><input name="numero_defesa" value="{{ trajetoria.numero_defesa }}"></div>
+                <div class="field"><label>Data da defesa</label><input type="date" name="data_defesa" value="{% if trajetoria.data_defesa %}{{ trajetoria.data_defesa|date:'Y-m-d' }}{% endif %}"></div>
+            </div>
+            <label>Comentario</label>
+            <textarea name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar defesa</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-trajetoria-deposito-{{ trajetoria.id }}" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar deposito final</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="alterar_trajetoria_campo">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <input type="hidden" name="campo" value="deposito_versao_final">
+            <label><input type="checkbox" name="deposito_versao_final" {% if trajetoria.deposito_versao_final %}checked{% endif %}> Deposito da versao final</label>
+            <label>Comentario</label>
+            <textarea name="comentario" rows="3" required></textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar deposito</button>
+        </form>
+    </div>
+</div>
+{% endwith %}
+{% endfor %}
 
 <script>
     (function () {
@@ -266,29 +437,33 @@
 
         openButtons.forEach((btn) => {
             btn.addEventListener("click", () => {
-                const modalId = btn.getAttribute("data-modal-open");
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    modal.classList.add("open");
-                }
+                const modal = document.getElementById(btn.getAttribute("data-modal-open"));
+                if (modal) modal.classList.add("open");
             });
         });
 
         closeButtons.forEach((btn) => {
             btn.addEventListener("click", () => {
                 const modal = btn.closest(".modal-backdrop");
-                if (modal) {
-                    closeModal(modal);
-                }
+                if (modal) closeModal(modal);
             });
         });
 
         document.querySelectorAll(".modal-backdrop").forEach((modal) => {
             modal.addEventListener("click", (event) => {
-                if (event.target === modal) {
-                    closeModal(modal);
-                }
+                if (event.target === modal) closeModal(modal);
             });
+        });
+
+        document.querySelectorAll("select[name='tipo_coorientador']").forEach((select) => {
+            function atualizar() {
+                const modal = select.closest(".modal-backdrop");
+                modal.querySelectorAll("[data-coorientador-section]").forEach((section) => {
+                    section.style.display = section.dataset.coorientadorSection === select.value ? "block" : "none";
+                });
+            }
+            select.addEventListener("change", atualizar);
+            atualizar();
         });
     })();
 </script>
