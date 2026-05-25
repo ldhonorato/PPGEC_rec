@@ -46,6 +46,7 @@ from .models import (
 )
 
 from .tasks import(
+    send_email_ciencia_efetivada_secretaria,
     send_email_novo_processo_aluno,
     send_email_novo_processo_orientador,
 
@@ -1458,7 +1459,7 @@ def processo_detalhe_view(request, processo_id):
                 setor_anterior_id = processo.setor_atual_id if processo.setor_atual else None#salva setor
 
                 try:
-                    pendente_ciente.registrar_manifestacao(
+                    nova_manifestacao = pendente_ciente.registrar_manifestacao(
                         autor=request.user,
                         aceito=(acao == "ciente"),
                         mensagem=manifestar_ciente_form.cleaned_data["mensagem_manifestacao"],
@@ -1467,6 +1468,7 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Manifestacao registrada com sucesso.")
+<<<<<<< HEAD
 
                     processo.refresh_from_db()
                     status_atual_texto = processo.get_status_display()
@@ -1479,6 +1481,11 @@ def processo_detalhe_view(request, processo_id):
                             status_atual_texto
                         )
 
+=======
+                    if acao == "ciente":
+                        manifestacao_id = getattr(nova_manifestacao, 'id', pendente_ciente.id)
+                        send_email_ciencia_efetivada_secretaria.delay(manifestacao_id)
+>>>>>>> isabella
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_ciente_modal = True
         elif "encaminhar_processo" in request.POST:

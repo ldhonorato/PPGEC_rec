@@ -116,6 +116,31 @@ def send_email_devolucao_requerente(self, processo_id, observacao):
     except Exception as exc:
         logger.exception("Falha ao enviar e-mail de devolução")
         raise self.retry(exc=exc)
+    
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_email_ciencia_efetivada_secretaria(self, manifestacao_id):
+    from .models import ManifestacaoProcesso
+    try:
+        manifestacao = ManifestacaoProcesso.objects.select_related('processo', 'responsavel').get(id=manifestacao_id)
+        processo = manifestacao.processo
+        orientador = manifestacao.responsavel
+
+        contexto = {
+            "processo": processo,
+            "manifestacao": manifestacao,
+            "aluno": processo.usuario_criado_por,
+            "orientador": orientador,
+        }
+
+        _send_email(
+            subject=f"[PPGEC] Ciência Efetivada pelo Docente - Processo {processo.numero}",
+            template_name="emails/secretaria/ciencia_efetivada.html", 
+            contexto=contexto,
+            recipient="secretaria_ppgec@ecomp.poli.br", 
+        )
+    except Exception as exc:
+        logger.exception("Falha ao enviar e-mail de ciência efetivada para a secretaria")
+        raise self.retry(exc=exc)
 
 #MOVIMENTAÇÃO DE PROCESSO=================================================================
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
