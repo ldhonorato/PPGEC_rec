@@ -32,7 +32,7 @@ def send_email_novo_processo_aluno(self, processo_id: int):
     contexto = {"processo": processo, "aluno": processo.usuario_criado_por, "orientador": processo.obter_orientador_responsavel()}
     try:
         _send_email(
-            subject=f"[PPGEC] Processo {processo.numero} aberto com sucesso",
+            subject=f"[PPGEC] Processo {processo.numero} — {processo.usuario_criado_por.nome} — aberto com sucesso",
             template_name="emails/aluno/novo_processo_aluno.html",
             contexto=contexto,
             recipient=processo.usuario_criado_por.email,
@@ -84,7 +84,7 @@ def send_email_solicitacao_ciencia(self, manifestacao_id):
         }
 
         _send_email(
-            subject=f"[PPGEC] Solicitação de Ciência - Processo {processo.numero}",
+            subject=f"[PPGEC] Solicitação de Ciência — {processo.usuario_criado_por.nome} — Processo {processo.numero}",
             template_name="emails/aluno/solicitacao_ciencia.html",
             contexto=contexto,
             recipient=orientador.email,
@@ -108,7 +108,7 @@ def send_email_devolucao_requerente(self, processo_id, observacao):
         }
 
         _send_email(
-            subject=f"[PPGEC] Ajustes necessários - Processo {processo.numero}",
+            subject=f"[PPGEC] Ajustes necessários — {processo.usuario_criado_por.nome} — Processo {processo.numero}",
             template_name="emails/orientador/devolucao_processo.html",
             contexto=contexto,
             recipient=processo.usuario_criado_por.email,
@@ -136,7 +136,7 @@ def send_email_movimentacao_aluno(self, processo_id: int, mensagem_status: str):
     
     try:
         _send_email(
-            subject=f"[PPGEC] Movimentação no Processo {processo.numero}",
+            subject=f"[PPGEC] Movimentação — {processo.usuario_criado_por.nome} — Processo {processo.numero}",
             template_name="emails/aluno/movimentacao_processo_aluno.html",
             contexto=contexto,
             recipient=processo.usuario_criado_por.email,
@@ -193,7 +193,7 @@ def send_email_conclusao_aluno(self, processo_id: int):
     }
     try:
         _send_email(
-            subject=f"[PPGEC] Processo {processo.numero} finalizado",
+            subject=f"[PPGEC] Processo {processo.numero} — {processo.usuario_criado_por.nome} — finalizado",
             template_name="emails/aluno/conclusao_processo_aluno.html",
             contexto=contexto,
             recipient=processo.usuario_criado_por.email,
@@ -255,7 +255,7 @@ def send_email_movimentacao_pleno(self, processo_id: int):
         for docente in docentes:
             if docente.email:
                 _send_email(
-                    subject=f"[PPGEC] Novo processo em pauta no Pleno ({processo.numero})",
+                    subject=f"[PPGEC] Novo processo em pauta no Pleno — {processo.usuario_criado_por.nome} ({processo.numero})",
                     template_name="emails/pleno/novo_processo_pleno.html",
                     contexto=contexto,
                     recipient=docente.email,
@@ -288,7 +288,7 @@ def send_email_processo_comentado_pleno(self, processo_id: int, comentario_id: i
         for docente in docentes:
             if docente.email:
                 _send_email(
-                    subject=f"[PPGEC] Intervenção no Processo {processo.numero} — Aprovação automática cancelada",
+                    subject=f"[PPGEC] Intervenção — {processo.usuario_criado_por.nome} — Processo {processo.numero} — Aprovação automática cancelada",
                     template_name="emails/pleno/processo_comentado_pleno.html",
                     contexto=contexto,
                     recipient=docente.email,
