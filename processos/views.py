@@ -45,6 +45,26 @@ from .models import (
     User,
 )
 
+from .tasks import(
+    send_email_novo_processo_aluno,
+    send_email_novo_processo_orientador,
+
+    send_email_solicitacao_ciencia,
+    send_email_devolucao_requerente,
+
+    send_email_movimentacao_aluno,
+    send_email_movimentacao_orientador,
+
+    send_email_conclusao_aluno,
+    send_email_conclusao_orientador,
+
+    send_email_movimentacao_pleno,
+    send_email_processo_comentado_pleno,
+
+    send_email_novo_processo_secretaria,
+    send_email_mudanca_setor,
+    send_email_status_atualizado
+)
 
 def _is_docente(user):
     return user.is_authenticated and user.tipo_usuario == User.TipoUsuario.DOCENTE
@@ -1365,10 +1385,14 @@ def processo_detalhe_view(request, processo_id):
             if acao_rapida == "deferir":
                 processo.deferir()
                 messages.success(request, "Processo deferido.")
+                send_email_conclusao_aluno.delay(processo.id)
+                send_email_conclusao_orientador.delay(processo.id)
                 return redirect("processo_detalhe", processo_id=processo.id)
             if acao_rapida == "indeferir":
                 processo.indeferir()
                 messages.success(request, "Processo indeferido.")
+                send_email_conclusao_aluno.delay(processo.id)
+                send_email_conclusao_orientador.delay(processo.id)
                 return redirect("processo_detalhe", processo_id=processo.id)
             if acao_rapida == "arquivar":
                 processo.finalizar(
@@ -1376,6 +1400,8 @@ def processo_detalhe_view(request, processo_id):
                     status_final=Processo.StatusProcesso.FINALIZADO,
                 )
                 messages.success(request, "Processo arquivado.")
+                send_email_conclusao_aluno.delay(processo.id)
+                send_email_conclusao_orientador.delay(processo.id)
                 return redirect("processo_detalhe", processo_id=processo.id)
             if acao_rapida == "solicitar_correcao":
                 processo.status = Processo.StatusProcesso.AGUARDANDO_DOCUMENTO
@@ -1410,7 +1436,7 @@ def processo_detalhe_view(request, processo_id):
             solicitar_ciente_form = SolicitarCienteOrientadorForm(request.POST)
             if solicitar_ciente_form.is_valid():
                 try:
-                    processo.solicitar_ciente_orientador(
+                    manifestacao = processo.solicitar_ciente_orientador(
                         solicitado_por=request.user,
                         mensagem_solicitacao=solicitar_ciente_form.cleaned_data["mensagem_solicitacao"],
                     )
@@ -1418,6 +1444,7 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Solicitacao de ciente do orientador registrada.")
+                    send_email_solicitacao_ciencia.delay(manifestacao.id)
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_ciente_modal = True
         elif "manifestar_ciente_orientador" in request.POST:
@@ -1426,6 +1453,10 @@ def processo_detalhe_view(request, processo_id):
             manifestar_ciente_form = ManifestarCienteOrientadorForm(request.POST)
             acao = (request.POST.get("acao_ciente") or "").strip().lower()
             if manifestar_ciente_form.is_valid():
+
+                status_anterior_texto = processo.get_status_display()#salva status
+                setor_anterior_id = processo.setor_atual_id if processo.setor_atual else None#salva setor
+
                 try:
                     pendente_ciente.registrar_manifestacao(
                         autor=request.user,
@@ -1436,6 +1467,18 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Manifestacao registrada com sucesso.")
+
+                    processo.refresh_from_db()
+                    status_atual_texto = processo.get_status_display()
+                    setor_atual_id = processo.setor_atual_id if processo.setor_atual else None
+
+                    if setor_anterior_id == setor_atual_id and status_anterior_texto != status_atual_texto: #se mudou de status, mas não de setor
+                        send_email_status_atualizado.delay(
+                            processo.id, 
+                            status_anterior_texto, 
+                            status_atual_texto
+                        )
+
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_ciente_modal = True
         elif "encaminhar_processo" in request.POST:
@@ -1465,6 +1508,7 @@ def processo_detalhe_view(request, processo_id):
                     else Processo.StatusProcesso.EM_ANALISE
                 )
                 try:
+                    despacho_texto = encaminhamento_form.cleaned_data["despacho"]
                     processo.encaminhar(
                         setor_destino=setor_destino,
                         encaminhado_por=request.user,
@@ -1475,6 +1519,16 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Processo encaminhado com sucesso.")
+                    
+                    if setor_destino and setor_destino.nome == "Requerente":
+                        send_email_devolucao_requerente.delay(processo.id, despacho_texto)
+                    else:
+                        send_email_movimentacao_aluno.delay(processo.id, f"Encaminhado para o setor: {setor_destino.nome}")
+                        if setor_destino and _is_setor_pleno_nome(setor_destino.nome):
+                            send_email_movimentacao_pleno.delay(processo.id)
+                        send_email_mudanca_setor.delay(processo.id)
+
+                    send_email_movimentacao_orientador.delay(processo.id, f"Encaminhado para o setor: {setor_destino.nome}")
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_encaminhamento_modal = True
         elif "finalizar_processo" in request.POST:
@@ -1499,6 +1553,8 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Processo finalizado com sucesso.")
+                    send_email_conclusao_aluno.delay(processo.id)
+                    send_email_conclusao_orientador.delay(processo.id)
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_finalizar_modal = True
         elif "remover_arquivo_documento" in request.POST:
@@ -1533,12 +1589,16 @@ def processo_detalhe_view(request, processo_id):
                 raise PermissionDenied("Apenas docentes podem comentar processos do Pleno.")
             comentario_form = ComentarioProcessoForm(request.POST)
             if comentario_form.is_valid():
-                ComentarioProcesso.objects.create(
+                comentario_intervencao = ComentarioProcesso.objects.create(
                     processo=processo,
                     autor=request.user,
                     anonimo=comentario_form.cleaned_data["anonimo"],
                     texto=comentario_form.cleaned_data["texto"],
                 )
+
+                if _is_processo_no_pleno(processo):#verificação de segurança
+                    send_email_processo_comentado_pleno.delay(processo.id, comentario_intervencao.id)
+
                 messages.success(request, "Comentario adicionado com sucesso.")
                 return redirect("processo_detalhe", processo_id=processo.id)
         else:
@@ -1662,6 +1722,12 @@ def novo_processo_view(request):
                         restricao_tipo=restricao_tipo,
                         enviado_por=request.user,
                     )
+
+                # dispara task de forma assincrona
+                send_email_novo_processo_aluno.delay(processo.id)
+                send_email_novo_processo_orientador.delay(processo.id)
+                send_email_novo_processo_secretaria.delay(processo.id)
+
                 messages.success(request, f"Processo {processo.numero} aberto com sucesso.")
                 return redirect("home")
     else:

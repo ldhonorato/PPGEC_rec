@@ -296,6 +296,7 @@ class Setor(models.Model):
     nome = models.CharField(max_length=120, unique=True)
     descricao = models.CharField(max_length=255, blank=True)
     ativo = models.BooleanField(default=True)
+    email = models.EmailField(max_length=255, blank=True, null=True, help_text="E-mail institucional do setor")
 
     class Meta:
         ordering = ["nome"]

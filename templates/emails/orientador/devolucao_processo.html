@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; color: #004492; max-width: 600px; margin: 0 auto;">
+  <div style="background:#1a3a5c; padding: 24px; border-radius: 8px 8px 0 0;">
+    <h2 style="color: white; margin: 0;">AcadFlow — Ajustes Necessários</h2>
+  </div>
+  <div style="background: #f9f9f9; padding: 28px; border-radius: 0 0 8px 8px;">
+    <p>Olá, <strong>{{aluno.nome}}</strong>,</p>
+    <p>O seu processo foi devolvido para que você realize ajustes.</p>
+    <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Número</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.numero}}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Tipo</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.get_tipo_display}}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; font-weight:bold;">Assunto</td>
+        <td style="padding: 8px;">{{processo.assunto}}</td>
+      </tr>
+    </table>
+    
+    <div style="background: #fff3cd; border-left: 5px solid #ffc107; padding: 15px; margin: 16px 0; color: #856404;">
+        <strong>Instruções do Setor:</strong><br>
+        {{ observacao }}
+    </div>
+
+    <p>Acesse o sistema, realize as correções solicitadas e encaminhe o processo novamente.</p>
+    <p style="text-align:center; margin-top: 24px;">
+      <a href="{{ site_url }}/coordenacao/processos/{{ processo.id }}/"
+         style="background:#6CC858; color:white; padding:12px 28px; border-radius:6px; text-decoration:none; font-weight:bold;">
+        Ver Detalhes e Ajustar
+      </a>
+    </p>
+    <p style="color:#676767; font-size:12px; margin-top:32px;">
+      Data: {{ data_devolucao|date:"d/m/Y H:i" }}<br>
+      Sistema PPGEC — AcadFlow
+    </p>
+  </div>
+</body>
+</html>
