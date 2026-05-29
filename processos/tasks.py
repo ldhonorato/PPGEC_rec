@@ -2,6 +2,7 @@ from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
+from django.utils import timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -366,3 +367,32 @@ def send_email_status_atualizado(processo_id: int, status_anterior: str, status_
             contexto=contexto,
             recipient=setor_atual.email
         )
+
+# AGENDAMENTOS E VARREDURAS AUTOMÁTICAS (CELERY BEAT)====================================
+@shared_task(name="processos.tasks.verificar_prazos_expirados")
+def verificar_prazos_expirados():
+    from .models import Processo
+    
+    agora = timezone.localdate()
+    
+    # Busca processos abertos que passaram da data limite
+    processos_vencidos = Processo.objects.filter(
+        prazo_limite__lt=agora
+    ).exclude(
+        status=Processo.StatusProcesso.FINALIZADO
+    )
+    
+    total = processos_vencidos.count()
+    logger.info("Iniciando varredura de prazos. Encontrados %s processos expirados.", total)
+    
+    for processo in processos_vencidos:
+        # Registra no log do Docker o alerta do processo atrasado
+        logger.warning("Processo %s está expirado desde %s.", processo.numero, processo.prazo_limite)
+        
+        # status_anterior = processo.get_status_display()
+        # processo.status = Processo.StatusProcesso.ATRASADO  # Certifique-se de que esse status existe
+        # processo.save(update_fields=['status', 'atualizado_em'])
+        # 
+        # send_email_status_atualizado.delay(processo.id, status_anterior, "Atrasado")
+
+    return f"Varredura concluída. {total} processos monitorados."
