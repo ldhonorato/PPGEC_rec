@@ -259,7 +259,20 @@ class TrajetoriaAcademica(models.Model):
             return self.coorientador.nome
         return self.coorientador_externo_nome.strip()
 
-
+class EstagioDocencia(models.Model):
+    
+    aluno = models.ForeignKey(Aluno, on_delete= models.PROTECT , related_name="estagios_docencia")
+    supervisor = models.ForeignKey(Docente, on_delete= models.PROTECT , related_name="estagios_supervisionados") 
+    inicio = models.DateField(null=True, blank=True)
+    termino = models.DateField(null=True, blank=True)
+    dispensado = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ["aluno"]
+    
+    def __str__(self) -> str:
+        return f"{self.aluno} - {self.inicio}"
+    
 class AlteracaoAluno(models.Model):
     class TipoAlteracao(models.TextChoices):
         STATUS = "STATUS", "Status"
