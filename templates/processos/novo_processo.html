@@ -17,6 +17,18 @@
             </div>
         {% endfor %}
 
+        <div id="campos-estagio" style="display: none">
+        <div class="field">
+            <label for="id_professor">Professor Supervisor</label>
+            <input type="text" name="professor" id="id_professor" />
+        </div>
+
+        <div class="field">
+            <input type="checkbox" name="dispensa" id="id_dispensa" />
+            <label for="id_disciplina">Solicitar dispensa</label>
+        </div>
+        </div>
+
         <div class="field">
             <label>Documentos</label>
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
@@ -122,6 +134,19 @@
 
         if (btnAbrir) btnAbrir.addEventListener("click", () => modal.showModal());
         if (btnCancelar) btnCancelar.addEventListener("click", () => modal.close());
+
+        const tipoProcesso = document.getElementById("id_tipo");
+        const camposEstagio = document.getElementById("campos-estagio");
+
+        tipoProcesso.addEventListener("change", () => {
+        const valor = tipoProcesso.value;
+
+        camposEstagio.style.display = "none";
+
+        if (valor === "ESTAGIO_DOCENCIA") {
+            camposEstagio.style.display = "block";
+        }
+        });
 
         formModal.addEventListener("submit", (event) => {
             event.preventDefault();

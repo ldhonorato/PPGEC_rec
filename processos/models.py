@@ -315,6 +315,7 @@ class Processo(models.Model):
         "DEFESA_MESTRADO": 45,
         "DEFESA_DOUTORADO": 45,
         "QUALIFICACAO_DOUTORADO": 45,
+        "ESTAGIO_DOCENCIA": 30,
         "OUTRO": 60,
     }
 
@@ -323,6 +324,7 @@ class Processo(models.Model):
         DEFESA_MESTRADO = "DEFESA_MESTRADO", "Defesa de Mestrado"
         DEFESA_DOUTORADO = "DEFESA_DOUTORADO", "Defesa de Doutorado"
         QUALIFICACAO_DOUTORADO = "QUALIFICACAO_DOUTORADO", "Qualificação de Doutorado"
+        ESTAGIO_DOCENCIA = "ESTAGIO_DOCENCIA", "Estágio docência"
         TRANCAMENTO_MATRICULA = "TRANCAMENTO_MATRICULA", "Trancamento de Matrícula"
         PRORROGACAO_PRAZO = "PRORROGACAO_PRAZO", "Prorrogação de Prazo"
         REINGRESSO = "REINGRESSO", "Reingresso"
