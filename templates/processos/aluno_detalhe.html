@@ -63,6 +63,38 @@
         padding: 0.35rem 0.55rem;
         cursor: pointer;
     }
+    .modal-estagio .modal-card {
+        width: min(1000px, 96vw);
+    }
+
+    .estagio-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .estagio-card {
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        padding: 1rem;
+        background: #ffffff;
+    }
+
+    .estagio-card h4 {
+        margin: 0 0 0.75rem 0;
+        font-size: 1rem;
+    }
+
+    .estagio-card label {
+        display: block;
+        margin-top: 0.5rem;
+    }
+
+    @media (max-width: 768px) {
+        .estagio-grid {
+            grid-template-columns: 1fr;
+        }
+    }
     @media (max-width: 900px) {
         .info-list li { grid-template-columns: 1fr; gap: 0.1rem; }
     }
@@ -113,6 +145,7 @@
                             <ul class="info-list">
                                 <li><span class="info-label">Nivel</span><span>{{ trajetoria.get_nivel_curso_display }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-nivel-{{ trajetoria.id }}">Alterar</button></li>
                                 <li><span class="info-label">Ingresso</span><span>{{ trajetoria.ingresso|default:"-" }}</span><span></span></li>
+                                <li><span class="info-label">Estágio</span><span>{{ trajetoria.estagio.get_status_1_display }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-estagio-{{ trajetoria.id }}">Alterar</button></li>
                                 <li><span class="info-label">Prazo {{ trajetoria.qualificacao_label_lower }}</span><span>{{ trajetoria.prazo_qualificacao|default:"-" }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}">Alterar</button></li>
                                 <li><span class="info-label">Prazo defesa</span><span>{{ trajetoria.prazo_defesa|default:"-" }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}">Alterar</button></li>
                                 <li><span class="info-label">Reingressante</span><span>{% if trajetoria.reingressante %}Sim{% else %}Nao{% endif %}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-reingressante-{{ trajetoria.id }}">Alterar</button></li>
@@ -256,6 +289,110 @@
             <label>Comentario</label>
             <textarea name="comentario" rows="3" required></textarea>
             <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar status</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-trajetoria-estagio-{{ trajetoria.id }}" class="modal-backdrop modal-estagio">
+    <div class="modal-card">
+        <div class="modal-head">
+            <h3 class="section-title" style="margin:0;">Estágio Docente</h3>
+            <button type="button" class="modal-close" data-modal-close>Fechar</button>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="alterar_estagio_docente">
+            <input type="hidden" name="aluno_id" value="{{ aluno.id }}">
+
+            <div class="{% if trajetoria.get_nivel_curso_display == 'Doutorado' %}estagio-grid{% endif %}">
+                <div class="estagio-card">
+                    <h4>1º Estágio</h4>
+
+                    <label>Status</label>
+                    <select name="status_1" required>
+                        <option value="">-- Selecione --</option>
+                        <option value="CONCLUIDO">Concluido</option>
+                        <option value="EM_ANDAMENTO">Em andamento</option>
+                        <option value="PENDENTE">Pendente</option>
+                        <option value="TRANCADO">Trancado</option>
+                    </select>
+
+                    <label>Disciplina</label>
+                    <input
+                        type="text"
+                        name="disciplina_1"
+                        value="{{ estagio.disciplina_1|default:'' }}"
+                        required
+                    >
+
+                    <label>Supervisor</label>
+                    <select name="supervisor_1" required>
+                        <option value="">-- Selecione --</option>
+                        {% for docente in docentes %}
+                            <option value="{{ docente.id }}"
+                                {% if estagio.supervisor_1_id == docente.id %}selected{% endif %}>
+                                {{ docente.nome }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                    <label>Semestre</label>
+                    <input
+                        type="text"
+                        name="semestre_1"
+                        value="{{ estagio.semestre_1|default:'' }}"
+                        placeholder="Ex: 2024.1"
+                        required
+                    >
+                </div>
+
+                {% if trajetoria.get_nivel_curso_display == "Doutorado"%}
+                <div class="estagio-card">
+                    <h4>2º Estágio</h4>
+
+                    <label>Status</label>
+                    <select name="status_2" required>
+                        <option value="">-- Selecione --</option>
+                        <option value="EM_ANDAMENTO">Em andamento</option>
+                        <option value="PENDENTE">Pendente</option>
+                        <option value="TRANCADO">Trancado</option>
+                    </select>
+
+                    <label>Disciplina</label>
+                    <input
+                        type="text"
+                        name="disciplina_2"
+                        value="{{ estagio.disciplina_2|default:'' }}"
+                        required
+                    >
+
+                    <label>Supervisor</label>
+                    <select name="supervisor_2" required>
+                        <option value="">-- Selecione --</option>
+                        {% for docente in docentes %}
+                            <option value="{{ docente.id }}"
+                                {% if estagio.supervisor_2_id == docente.id %}selected{% endif %}>
+                                {{ docente.nome }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                    <label>Semestre</label>
+                    <input
+                        type="text"
+                        name="semestre_2"
+                        value="{{ estagio.semestre_2|default:'' }}"
+                        placeholder="Ex: 2024.2"
+                        required
+                    >
+                </div>
+                {% endif %}
+
+            </div>
+
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">
+                Salvar estágio
+            </button>
         </form>
     </div>
 </div>
