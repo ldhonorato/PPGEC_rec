@@ -117,6 +117,32 @@ def send_email_devolucao_requerente(self, processo_id, observacao):
     except Exception as exc:
         logger.exception("Falha ao enviar e-mail de devolução")
         raise self.retry(exc=exc)
+    
+"""@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_email_ciencia_efetivada_secretaria(self, manifestacao_id):
+    from .models import ManifestacaoProcesso
+    try:
+        manifestacao = ManifestacaoProcesso.objects.select_related('processo', 'responsavel').get(id=manifestacao_id)
+        processo = manifestacao.processo
+        orientador = manifestacao.responsavel
+
+        contexto = {
+            "processo": processo,
+            "manifestacao": manifestacao,
+            "aluno": processo.usuario_criado_por,
+            "orientador": orientador,
+        }
+
+        _send_email(
+            subject=f"[PPGEC] Ciência Efetivada pelo Docente - Processo {processo.numero}",
+            template_name="emails/secretaria/ciencia_efetivada.html", 
+            contexto=contexto,
+            #recipient="secretaria_ppgec@ecomp.poli.br", 
+            recipient="isabellaluizdonascimento@gmail.com",
+        )
+    except Exception as exc:
+        logger.exception("Falha ao enviar e-mail de ciência efetivada para a secretaria")
+        raise self.retry(exc=exc) """
 
 #MOVIMENTAÇÃO DE PROCESSO=================================================================
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
@@ -371,28 +397,40 @@ def send_email_status_atualizado(processo_id: int, status_anterior: str, status_
 # AGENDAMENTOS E VARREDURAS AUTOMÁTICAS (CELERY BEAT)====================================
 @shared_task(name="processos.tasks.verificar_prazos_expirados")
 def verificar_prazos_expirados():
-    from .models import Processo
+    from .models import Processo, Setor
     
     agora = timezone.localdate()
     
-    # Busca processos abertos que passaram da data limite
+    # 1. Busca processos do Pleno que passaram da data limite e não estão finalizados
     processos_vencidos = Processo.objects.filter(
-        prazo_limite__lt=agora
+        prazo_limite__lt=agora,
+        setor_atual__nome__icontains="Pleno"
     ).exclude(
         status=Processo.StatusProcesso.FINALIZADO
     )
     
     total = processos_vencidos.count()
-    logger.info("Iniciando varredura de prazos. Encontrados %s processos expirados.", total)
+    logger.info("Iniciando varredura de prazos. Encontrados %s processos expirados no Pleno.", total)
     
-    for processo in processos_vencidos:
-        # Registra no log do Docker o alerta do processo atrasado
-        logger.warning("Processo %s está expirado desde %s.", processo.numero, processo.prazo_limite)
-        
-        # status_anterior = processo.get_status_display()
-        # processo.status = Processo.StatusProcesso.ATRASADO  # Certifique-se de que esse status existe
-        # processo.save(update_fields=['status', 'atualizado_em'])
-        # 
-        # send_email_status_atualizado.delay(processo.id, status_anterior, "Atrasado")
+    setor_secretaria = Setor.objects.filter(nome="Secretaria PPGEC", ativo=True).first()
+    
+    if not setor_secretaria:
+        logger.error("Varredura abortada: Setor 'Secretaria PPGEC' nao encontrado no banco.")
+        return "Erro: Setor da secretaria nao encontrado."
 
-    return f"Varredura concluída. {total} processos monitorados."
+    for processo in processos_vencidos:
+        logger.warning("Processo %s expirou no Pleno. Movendo de volta para a Secretaria.", processo.numero)
+        
+        status_anterior_texto = processo.get_status_display()
+        
+        processo.setor_atual = setor_secretaria
+        
+        # Atualiza o status (mantendo EM_ANALISE para a secretaria dar andamento ao fluxo)
+        processo.status = Processo.StatusProcesso.EM_ANALISE  
+        
+        processo.save(update_fields=["setor_atual", "status", "atualizado_em"])
+        
+        status_atual_texto = processo.get_status_display()
+        send_email_status_atualizado.delay(processo.id, status_anterior_texto, status_atual_texto)
+
+    return f"Varredura concluida. {total} processos expirados foram movidos para a secretaria."
