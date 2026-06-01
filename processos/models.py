@@ -168,6 +168,7 @@ class TrajetoriaAcademica(models.Model):
         TRANCADA = "TRANCADA", "Trancado"
 
     aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="trajetorias")
+    estagio_docencia = models.ForeignKey(EstagioDocencia, on_delete=models.PROTECT, related_name="estagios_docencia")
     nivel_curso = models.CharField(max_length=10, choices=Aluno.NivelCurso.choices)
     status = models.CharField(max_length=15, choices=Status.choices, default=Status.ATIVA)
     ingresso = models.CharField(max_length=6, validators=[Aluno.semestre_validator])
