@@ -8,6 +8,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 
 from .forms import (
     AlunoComentarioForm,
@@ -37,21 +38,17 @@ from .models import (
     User,
 )
 
-from .tasks import(
+from .tasks import (
     send_email_novo_processo_aluno,
     send_email_novo_processo_orientador,
-
     send_email_solicitacao_ciencia,
     send_email_devolucao_requerente,
-
     send_email_movimentacao_aluno,
     send_email_movimentacao_orientador,
-
     send_email_conclusao_aluno,
     send_email_conclusao_orientador,
-
     send_email_movimentacao_pleno,
-    send_email_processo_comentado_pleno
+    send_email_processo_comentado_pleno,
 )
 
 
@@ -66,7 +63,6 @@ def _is_servidor(user):
 def _is_coordenador(user):
     if not user.is_authenticated or user.tipo_usuario != User.TipoUsuario.DOCENTE:
         return False
-
     try:
         return bool(user.docente.coordenador)
     except Docente.DoesNotExist:
@@ -88,18 +84,14 @@ def _can_view_processos(user):
 def _can_view_processo_detalhe(user, processo):
     if not user.is_authenticated:
         return False
-
     if processo.usuario_criado_por_id == user.id:
         return True
-
     if _can_view_processos(user):
         return True
-
     if _is_docente(user):
         if _is_processo_no_pleno(processo):
             return True
         return Aluno.objects.filter(pk=processo.usuario_criado_por_id, orientador=user).exists()
-
     return False
 
 
@@ -181,6 +173,36 @@ def _menu_lateral_home(user):
             {"label": "Novo processo", "href": "/processos/novo/"},
         ]
     return []
+
+
+from django.http import JsonResponse
+from django.core.mail import send_mail
+
+
+def teste_email(request):
+    send_mail(
+        subject="✅ Teste de envio - AcadFlow PPGEC",
+        message="""
+Olá!
+
+Este é um e-mail de teste enviado pelo sistema AcadFlow PPGEC.
+
+O objetivo deste disparo é validar:
+
+• A identidade visual e funcionamento do envio de e-mails;
+• A entrega correta nos provedores Gmail e Outlook;
+• A verificação de possíveis marcações como Spam.
+
+Se você recebeu esta mensagem corretamente, o sistema está funcionando normalmente.
+
+Atenciosamente,
+Equipe AcadFlow - PPGEC
+        """,
+        from_email="EMAIL@GMAIL.COM",
+        recipient_list=["EMAIL"],
+        fail_silently=False,
+    )
+    return JsonResponse({"status": "success", "message": "E-mail enviado com sucesso!"})
 
 
 @login_required
@@ -377,9 +399,7 @@ def alunos_view(request):
             "filtro_ingresso_inicio": ingresso_inicio_raw,
             "filtro_ingresso_fim": ingresso_fim_raw,
             "filtro_status": status,
-            "status_list": (
-                Aluno.StatusAluno.choices
-            ),
+            "status_list": Aluno.StatusAluno.choices,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -695,6 +715,7 @@ def processo_detalhe_view(request, processo_id):
                 processo.save(update_fields=["status", "atualizado_em"])
                 messages.success(request, "Correção solicitada ao aluno.")
                 return redirect("processo_detalhe", processo_id=processo.id)
+
         elif "adicionar_documento" in request.POST:
             if not can_add_documento:
                 raise PermissionDenied("Voce nao pode adicionar documento neste processo.")
@@ -717,6 +738,7 @@ def processo_detalhe_view(request, processo_id):
                 messages.success(request, "Documento adicionado com sucesso.")
                 return redirect("processo_detalhe", processo_id=processo.id)
             open_documento_modal = True
+
         elif "solicitar_ciente_orientador" in request.POST:
             if not can_solicitar_ciente:
                 raise PermissionDenied("Voce nao pode solicitar ciente do orientador neste processo.")
@@ -734,6 +756,7 @@ def processo_detalhe_view(request, processo_id):
                     send_email_solicitacao_ciencia.delay(manifestacao.id)
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_ciente_modal = True
+
         elif "manifestar_ciente_orientador" in request.POST:
             if not can_manifestar_ciente:
                 raise PermissionDenied("Voce nao pode se manifestar neste ciente.")
@@ -752,6 +775,7 @@ def processo_detalhe_view(request, processo_id):
                     messages.success(request, "Manifestacao registrada com sucesso.")
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_ciente_modal = True
+
         elif "encaminhar_processo" in request.POST:
             if not can_encaminhar_processo:
                 raise PermissionDenied("Voce nao pode encaminhar este processo.")
@@ -790,17 +814,16 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Processo encaminhado com sucesso.")
-                    
                     if setor_destino and setor_destino.nome == "Requerente":
                         send_email_devolucao_requerente.delay(processo.id, despacho_texto)
                     else:
                         send_email_movimentacao_aluno.delay(processo.id, f"Encaminhado para o setor: {setor_destino.nome}")
                         if setor_destino and _is_setor_pleno_nome(setor_destino.nome):
                             send_email_movimentacao_pleno.delay(processo.id)
-
                     send_email_movimentacao_orientador.delay(processo.id, f"Encaminhado para o setor: {setor_destino.nome}")
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_encaminhamento_modal = True
+
         elif "finalizar_processo" in request.POST:
             if not can_finalizar_processo:
                 raise PermissionDenied("Voce nao pode finalizar este processo.")
@@ -827,6 +850,7 @@ def processo_detalhe_view(request, processo_id):
                     send_email_conclusao_orientador.delay(processo.id)
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_finalizar_modal = True
+
         elif "remover_arquivo_documento" in request.POST:
             documento_form = DocumentoCadastroForm()
             if can_manage_in_caixa:
@@ -854,6 +878,7 @@ def processo_detalhe_view(request, processo_id):
                 else:
                     messages.success(request, "Arquivo removido com sucesso.")
                     return redirect("processo_detalhe", processo_id=processo.id)
+
         elif "adicionar_comentario" in request.POST:
             if not can_comment_pleno:
                 raise PermissionDenied("Apenas docentes podem comentar processos do Pleno.")
@@ -865,12 +890,18 @@ def processo_detalhe_view(request, processo_id):
                     anonimo=comentario_form.cleaned_data["anonimo"],
                     texto=comentario_form.cleaned_data["texto"],
                 )
-
-                if _is_processo_no_pleno(processo):#verificação de segurança
+                if _is_processo_no_pleno(processo):
                     send_email_processo_comentado_pleno.delay(processo.id, comentario_intervencao.id)
-
-                messages.success(request, "Comentario adicionado com sucesso.")
+                    # Issue 2.2.2: interrompe aprovação automática e marca como EM_DEBATE
+                    if processo.status not in {
+                        Processo.StatusProcesso.FINALIZADO,
+                        Processo.StatusProcesso.EM_DEBATE,
+                    }:
+                        processo.status = Processo.StatusProcesso.EM_DEBATE
+                        processo.save(update_fields=["status", "atualizado_em"])
+                messages.success(request, "Comentario adicionado. Processo marcado como Em Debate.")
                 return redirect("processo_detalhe", processo_id=processo.id)
+
         else:
             documento_form = DocumentoCadastroForm()
             if can_manage_in_caixa:
@@ -881,6 +912,7 @@ def processo_detalhe_view(request, processo_id):
                     allowed_setor_ids=[setor_solicitante.id] if setor_solicitante else [],
                 )
             finalizar_form = FinalizarProcessoForm()
+
     else:
         documento_form = DocumentoCadastroForm()
         if can_manage_in_caixa:
@@ -891,6 +923,7 @@ def processo_detalhe_view(request, processo_id):
                 allowed_setor_ids=[setor_solicitante.id] if setor_solicitante else [],
             )
         finalizar_form = FinalizarProcessoForm()
+
     if request.method != "POST" or "adicionar_comentario" not in request.POST:
         comentario_form = ComentarioProcessoForm()
 
@@ -993,7 +1026,6 @@ def novo_processo_view(request):
                         enviado_por=request.user,
                     )
 
-                # dispara task de forma assincrona
                 send_email_novo_processo_aluno.delay(processo.id)
                 send_email_novo_processo_orientador.delay(processo.id)
 
