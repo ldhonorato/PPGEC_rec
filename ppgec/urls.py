@@ -19,6 +19,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path
 from django.contrib.auth.views import LoginView, LogoutView
+from processos.views import teste_email
 
 from processos.views import (
     aluno_detalhe_view,
@@ -59,6 +60,7 @@ urlpatterns = [
     path("coordenacao/processos/<int:processo_id>/", processo_detalhe_view, name="processo_detalhe"),
     path("coordenacao/caixa-processos/", caixa_processos_view, name="coordenacao_caixa_processos"),
     path('admin/', admin.site.urls),
+    path("teste-email/", teste_email),
 ]
 
 if settings.DEBUG:
