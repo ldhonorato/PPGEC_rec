@@ -20,16 +20,38 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load environment variables from .env
 load_dotenv(BASE_DIR / '.env')
 
+
+def env_bool(name, default=False):
+    return os.getenv(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name, default=""):
+    return [item.strip() for item in os.getenv(name, default).split(",") if item.strip()]
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-#)!kvripx%^&=ccp1rwgv2fr@9uhxg9_du_di=kql67g($%x72'
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool("DEBUG", False)
 
-ALLOWED_HOSTS = []
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'django-insecure-#)!kvripx%^&=ccp1rwgv2fr@9uhxg9_du_di=kql67g($%x72'
+    else:
+        raise RuntimeError("SECRET_KEY must be set when DEBUG=False")
+
+ALLOWED_HOSTS = env_list(
+    "ALLOWED_HOSTS",
+    "www.acadflow.poli.br,acadflow.poli.br,192.168.37.71,localhost,127.0.0.1",
+)
+
+CSRF_TRUSTED_ORIGINS = env_list(
+    "CSRF_TRUSTED_ORIGINS",
+    "http://192.168.37.71:8001,http://www.acadflow.poli.br,http://acadflow.poli.br,http://www.acadflow.poli.br:8001,http://acadflow.poli.br:8001",
+)
 
 
 # Application definition
@@ -148,7 +170,7 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "")
 
-SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
+SITE_URL = os.getenv("SITE_URL", "http://192.168.37.71:8001")
 
 # celery config
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
