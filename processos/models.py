@@ -168,7 +168,8 @@ class TrajetoriaAcademica(models.Model):
         TRANCADA = "TRANCADA", "Trancado"
 
     aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="trajetorias")
-    estagio_docencia = models.ForeignKey(EstagioDocencia, on_delete=models.PROTECT, related_name="estagios_docencia")
+    #estagio_docencia = models.ForeignKey(EstagioDocencia, on_delete=models.PROTECT, related_name="estagios_docencia") 
+    # AQUIIIII eu estou dizendo que só pode ter um estagio em trajetoria acadmeiaca, o que a gente não quer
     nivel_curso = models.CharField(max_length=10, choices=Aluno.NivelCurso.choices)
     status = models.CharField(max_length=15, choices=Status.choices, default=Status.ATIVA)
     ingresso = models.CharField(max_length=6, validators=[Aluno.semestre_validator])
@@ -260,20 +261,7 @@ class TrajetoriaAcademica(models.Model):
             return self.coorientador.nome
         return self.coorientador_externo_nome.strip()
 
-class EstagioDocencia(models.Model):
-    
-    aluno = models.ForeignKey(Aluno, on_delete= models.PROTECT , related_name="estagios_docencia")
-    supervisor = models.ForeignKey(Docente, on_delete= models.PROTECT , related_name="estagios_supervisionados") 
-    inicio = models.DateField(null=True, blank=True)
-    termino = models.DateField(null=True, blank=True)
-    dispensado = models.BooleanField(default=False)
-    
-    class Meta:
-        ordering = ["aluno"]
-    
-    def __str__(self) -> str:
-        return f"{self.aluno} - {self.inicio}"
-    
+
 class AlteracaoAluno(models.Model):
     class TipoAlteracao(models.TextChoices):
         STATUS = "STATUS", "Status"
@@ -827,3 +815,61 @@ class ComentarioProcesso(models.Model):
 
     def __str__(self) -> str:
         return f"Comentario em {self.processo.numero}"
+
+class EstagioDocencia(models.Model):
+    
+    # --- 1. O CORAÇÃO DO FLUXOGRAMA (Status do Estágio na vida real) ---
+    class Status(models.TextChoices):
+        NAO_INICIADO = "NAO_INICIADO", "Não Iniciado" # A sua correção aqui!
+        AGUARDANDO_APROVACAO = "AGUARDANDO", "Aguardando Aprovação"
+        EM_ANDAMENTO = "ANDAMENTO", "Em Andamento"
+        PENDENTE_RELATORIO = "PENDENTE", "Pendente de Relatório"
+        CONCLUIDO = "CONCLUIDO", "Concluído"
+
+    # --- 2. AS PONTES DE LIGAÇÃO (Chaves Estrangeiras) ---
+    trajetoria = models.ForeignKey(
+        "TrajetoriaAcademica", 
+        on_delete=models.CASCADE, 
+        related_name="estagios_docencia"
+    )
+    
+    supervisor = models.ForeignKey(
+        Docente, 
+        on_delete=models.PROTECT, 
+        related_name="estagios_supervisionados"
+    ) 
+    
+    # AQUI ESTÁ A MÁGICA: Ligando o estágio ao trâmite burocrático!
+    # Usamos o nome da classe 'Processo' direto porque estão no mesmo arquivo.
+    processo_vinculado = models.OneToOneField(
+        Processo, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name="estagio_gerado"
+    )
+
+    # --- 3. DADOS DE CONTROLE ---
+    status = models.CharField(
+        max_length=15, 
+        choices=Status.choices, 
+        default=Status.NAO_INICIADO
+    )
+    
+    orientador_ciente = models.BooleanField(default=False)
+    relatorio_entregue = models.BooleanField(default=False)
+    dispensado = models.BooleanField(default=False)
+    
+    # --- 4. DATAS ---
+    inicio = models.DateField(null=True, blank=True)
+    termino = models.DateField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ["trajetoria"]
+        # Deixa os nomes bonitinhos com acento no painel Admin:
+        verbose_name = "Estágio de Docência"
+        verbose_name_plural = "Estágios de Docência"
+        
+    def __str__(self) -> str:
+        # Puxa o nome navegando pela Trajetória e mostra o Status atual
+        return f"{self.trajetoria.aluno.nome} - Status: {self.get_status_display()}"   
