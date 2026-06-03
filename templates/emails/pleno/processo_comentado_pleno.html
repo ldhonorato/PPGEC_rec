@@ -6,14 +6,31 @@
   </div>
   <div style="background: #f9f9f9; padding: 28px; border-radius: 0 0 8px 8px;">
     <p>Olá, Professor.</p>
-    <p>
-      O processo <strong>{{processo.numero}}</strong> recebeu um comentário, tornando sua aprovação necessariamente manual.<br>
-      Aluno: <strong>{{aluno.nome}}</strong><br>
-      Orientador comentador: <strong>{{autor_comentario.nome}}</strong><br>
-      Acompanhe o histórico e os detalhes no sistema PPGEC.
-    </p>
+    <p>O processo abaixo recebeu um comentário, tornando sua aprovação necessariamente manual.</p>
+    <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Número</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.numero}}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Tipo</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.get_tipo_display}}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Assunto</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.assunto}}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Aluno</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{aluno.nome}}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; font-weight:bold;">Comentado por</td>
+        <td style="padding: 8px;">{{autor_comentario.nome}}</td>
+      </tr>
+    </table>
     <p style="text-align:center; margin-top: 24px;">
-      <a href="http://seu-dominio.com/coordenacao/processos/{{ processo.id }}/"
+      <a href="{{ site_url }}/coordenacao/processos/{{ processo.id }}/"
          style="background:#6CC858; color:white; padding:12px 28px;
                 border-radius:6px; text-decoration:none; font-weight:bold;">
         Revisar Processo

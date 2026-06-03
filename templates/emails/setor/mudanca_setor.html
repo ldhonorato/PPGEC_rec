@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; color: #004492; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+  <div style="background:#1a3a5c; padding: 24px; border-radius: 8px 8px 0 0;">
+    <h2 style="color: white; margin: 0; font-size: 20px;">AcadFlow — Processo Recebido (Nº {{processo.numero}})</h2>
+  </div>
+  <div style="background: #f9f9f9; padding: 28px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
+    <p>Prezada equipe do setor <strong>{{ processo.setor_atual.nome }}</strong>,</p>
+    <p>
+      O processo número <strong>{{ processo.numero }}</strong> foi oficialmente tramitado e agora encontra-se sob a responsabilidade e fila de trabalho do seu setor.
+    </p>
+    
+    <div style="background: #ffffff; padding: 16px; border-left: 4px solid #1a3a5c; margin: 20px 0; border-radius: 4px;">
+      <p style="margin: 4px 0;"><strong>Nº do Processo:</strong> {{ processo.numero }}</p>
+      <p style="margin: 4px 0;"><strong>Assunto:</strong> {{ processo.assunto }}</p>
+      <p style="margin: 4px 0;"><strong>Status Atual:</strong> {{ processo.get_status_display }}</p>
+      <p style="margin: 4px 0;"><strong>Data da Tramitação:</strong> {{ processo.atualizado_em|date:"d/m/Y H:i" }}</p>
+    </div>
+
+    <p style="text-align:center; margin-top: 28px; margin-bottom: 24px;">
+      <a href="http://seu-dominio.com/coordenacao/processos/{{ processo.id }}/"
+         style="background:#6CC858; color:white; padding:12px 28px;
+                border-radius:6px; text-decoration:none; font-weight:bold; display: inline-block;">
+        Verificar Fila do Setor
+      </a>
+    </p>
+    
+    <p style="color:#676767; font-size:12px; margin-top:32px; border-top: 1px solid #e0e0e0; padding-top: 12px;">
+      Atenciosamente,<br>
+      Sistema AcadFlow / PPGEC
+    </p>
+  </div>
+</body>
+</html>

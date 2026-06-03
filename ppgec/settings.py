@@ -68,6 +68,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'processos.context_processors.processos_atrasados',
+                'processos.context_processors.navegacao_lateral',
             ],
         },
     },
@@ -149,6 +150,8 @@ EMAIL_HOST_USER = "EMAIL"
 EMAIL_HOST_PASSWORD = "SENHA DE APP DO EMAIL"
 
 DEFAULT_FROM_EMAIL = "AcadFlow <ellenbaronebea@gmail.com>"
+
+SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
 
 # celery config
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")

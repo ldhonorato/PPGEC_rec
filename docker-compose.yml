@@ -31,6 +31,21 @@ services:
       - redis
     restart: unless-stopped
 
+  celery-beat:
+    build: .
+    container_name: ppgec_celery_beat
+    command: celery -A ppgec beat --loglevel=info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     container_name: ppgec_redis

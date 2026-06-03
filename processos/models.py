@@ -72,6 +72,10 @@ class User(AbstractUser):
 
 
 class Aluno(User):
+    class NivelCurso(models.TextChoices):
+        MESTRADO = "MESTRADO", "Mestrado"
+        DOUTORADO = "DOUTORADO", "Doutorado"
+
     class StatusAluno(models.TextChoices):
         ATIVO = "ATIVO", "Ativo"
         DESLIGADO = "DESLIGADO", "Desligado"
@@ -81,35 +85,10 @@ class Aluno(User):
         regex=r"^\d{4}\.[12]$",
         message="Informe no formato YYYY.1 ou YYYY.2.",
     )
-    ingresso = models.CharField(max_length=6, validators=[semestre_validator])
-    prazo_defesa = models.CharField(
-        max_length=6,
-        null=True,
-        blank=True,
-        validators=[semestre_validator],
-    )
-    prazo_qualificacao = models.CharField(
-        max_length=6,
-        null=True,
-        blank=True,
-        validators=[semestre_validator],
-    )
-    isQualificado = models.BooleanField(default=False)
     status_aluno = models.CharField(
         max_length=12,
         choices=StatusAluno.choices,
         default=StatusAluno.ATIVO,
-    )
-    numero_defesa = models.CharField(max_length=80, blank=True)
-    data_defesa = models.DateField(null=True, blank=True)
-    deposito_versao_final = models.BooleanField(default=False)
-    orientador = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="orientandos",
-        limit_choices_to={"tipo_usuario": User.TipoUsuario.DOCENTE},
     )
     matricula = models.CharField(max_length=50, blank=True)
 
@@ -123,34 +102,40 @@ class Aluno(User):
         if self.tipo_usuario and self.tipo_usuario != User.TipoUsuario.ALUNO:
             errors["tipo_usuario"] = "Aluno deve ter tipo_usuario ALUNO."
 
-        if self.orientador and self.orientador.tipo_usuario != User.TipoUsuario.DOCENTE:
-            errors["orientador"] = "Orientador deve ser um usuario do tipo DOCENTE."
-
-        if self.status_aluno == self.StatusAluno.DEFENDEU:
-            if not (self.numero_defesa or "").strip():
-                errors["numero_defesa"] = "Informe o numero da defesa para aluno com status Defendeu."
-            if not self.data_defesa:
-                errors["data_defesa"] = "Informe a data da defesa para aluno com status Defendeu."
-        else:
-            if self.deposito_versao_final:
-                errors["deposito_versao_final"] = "Deposito da versao final so pode ser marcado apos defesa."
-
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.tipo_usuario = User.TipoUsuario.ALUNO
-        self.numero_defesa = (self.numero_defesa or "").strip()
-        if self.status_aluno != self.StatusAluno.DEFENDEU:
-            self.numero_defesa = ""
-            self.data_defesa = None
-            self.deposito_versao_final = False
         self.is_active = self.status_aluno == self.StatusAluno.ATIVO
         self.full_clean()
         return super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return self.nome or self.email
+
+    def trajetoria_ativa(self):
+        return self.trajetorias.filter(status=TrajetoriaAcademica.Status.ATIVA).order_by("-criado_em").first()
+
+    @property
+    def coorientador_display(self) -> str:
+        trajetoria = self.trajetoria_ativa()
+        return trajetoria.coorientador_display if trajetoria else ""
+
+    @property
+    def qualificacao_label(self) -> str:
+        if self.nivel_curso == self.NivelCurso.MESTRADO:
+            return "Projeto de Dissertação"
+        return "Qualificação"
+
+    @property
+    def qualificacao_label_lower(self) -> str:
+        return self.qualificacao_label.lower()
+
+    @property
+    def qualificacao_label(self) -> str:
+        trajetoria = self.trajetoria_ativa()
+        return trajetoria.qualificacao_label if trajetoria else "QualificaÃ§Ã£o"
 
 
 class Docente(User):
@@ -175,6 +160,106 @@ class Docente(User):
         return self.nome or self.email
 
 
+class TrajetoriaAcademica(models.Model):
+    class Status(models.TextChoices):
+        ATIVA = "ATIVA", "Ativa"
+        CONCLUIDA = "CONCLUIDA", "Concluida"
+        DESLIGADA = "DESLIGADA", "Desligada"
+        TRANCADA = "TRANCADA", "Trancado"
+
+    aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="trajetorias")
+    nivel_curso = models.CharField(max_length=10, choices=Aluno.NivelCurso.choices)
+    status = models.CharField(max_length=15, choices=Status.choices, default=Status.ATIVA)
+    ingresso = models.CharField(max_length=6, validators=[Aluno.semestre_validator])
+    prazo_qualificacao = models.CharField(max_length=6, blank=True, validators=[Aluno.semestre_validator])
+    prazo_defesa = models.CharField(max_length=6, blank=True, validators=[Aluno.semestre_validator])
+    orientador = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="trajetorias_orientadas",
+        limit_choices_to={"tipo_usuario": User.TipoUsuario.DOCENTE},
+    )
+    coorientador = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="trajetorias_coorientadas",
+        limit_choices_to={"tipo_usuario": User.TipoUsuario.DOCENTE},
+    )
+    coorientador_externo_nome = models.CharField(max_length=255, blank=True)
+    coorientador_externo_email = models.EmailField(blank=True)
+    coorientador_externo_instituicao = models.CharField(max_length=255, blank=True)
+    isQualificado = models.BooleanField(default=False)
+    numero_defesa = models.CharField(max_length=80, blank=True)
+    data_defesa = models.DateField(null=True, blank=True)
+    deposito_versao_final = models.BooleanField(default=False)
+    reingressante = models.BooleanField(default=False)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-criado_em"]
+
+    def __str__(self) -> str:
+        return f"{self.aluno.nome} - {self.get_nivel_curso_display()} - {self.get_status_display()}"
+
+    def clean(self):
+        errors = {}
+
+        if self.orientador and self.orientador.tipo_usuario != User.TipoUsuario.DOCENTE:
+            errors["orientador"] = "Orientador deve ser um usuario do tipo DOCENTE."
+        if self.coorientador and self.coorientador.tipo_usuario != User.TipoUsuario.DOCENTE:
+            errors["coorientador"] = "Coorientador deve ser um usuario do tipo DOCENTE."
+        if self.coorientador and self.coorientador_externo_nome.strip():
+            errors["coorientador"] = "Informe coorientador cadastrado ou coorientador externo, nao ambos."
+            errors["coorientador_externo_nome"] = "Informe coorientador cadastrado ou coorientador externo, nao ambos."
+        if self.coorientador and self.orientador_id == self.coorientador_id:
+            errors["coorientador"] = "Coorientador deve ser diferente do orientador."
+
+        if not self.coorientador_externo_nome.strip():
+            self.coorientador_externo_email = ""
+            self.coorientador_externo_instituicao = ""
+
+        if self.status == self.Status.CONCLUIDA:
+            if not (self.numero_defesa or "").strip():
+                errors["numero_defesa"] = "Informe o numero da defesa para trajetoria concluida."
+            if not self.data_defesa:
+                errors["data_defesa"] = "Informe a data da defesa para trajetoria concluida."
+        elif self.deposito_versao_final:
+            errors["deposito_versao_final"] = "Deposito da versao final so pode ser marcado apos conclusao."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.numero_defesa = (self.numero_defesa or "").strip()
+        if self.status != self.Status.CONCLUIDA:
+            self.numero_defesa = ""
+            self.data_defesa = None
+            self.deposito_versao_final = False
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    @property
+    def qualificacao_label(self) -> str:
+        if self.nivel_curso == Aluno.NivelCurso.MESTRADO:
+            return "Projeto de Dissertação"
+        return "Qualificação"
+
+    @property
+    def qualificacao_label_lower(self) -> str:
+        return self.qualificacao_label.lower()
+
+    @property
+    def coorientador_display(self) -> str:
+        if self.coorientador:
+            return self.coorientador.nome
+        return self.coorientador_externo_nome.strip()
+
+
 class AlteracaoAluno(models.Model):
     class TipoAlteracao(models.TextChoices):
         STATUS = "STATUS", "Status"
@@ -183,6 +268,10 @@ class AlteracaoAluno(models.Model):
         DEPOSITO_FINAL = "DEPOSITO_FINAL", "Deposito versao final"
         PRAZO_QUALIFICACAO = "PRAZO_QUALIFICACAO", "Prazo qualificacao"
         PRAZO_DEFESA = "PRAZO_DEFESA", "Prazo defesa"
+        ORIENTADOR = "ORIENTADOR", "Orientador"
+        COORIENTADOR = "COORIENTADOR", "Coorientador"
+        REINGRESSO = "REINGRESSO", "Reingresso"
+        TRAJETORIA = "TRAJETORIA", "Trajetoria academica"
 
     aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="alteracoes")
     tipo = models.CharField(max_length=25, choices=TipoAlteracao.choices)
@@ -207,6 +296,7 @@ class Setor(models.Model):
     nome = models.CharField(max_length=120, unique=True)
     descricao = models.CharField(max_length=255, blank=True)
     ativo = models.BooleanField(default=True)
+    email = models.EmailField(max_length=255, blank=True, null=True, help_text="E-mail institucional do setor")
 
     class Meta:
         ordering = ["nome"]
@@ -217,28 +307,26 @@ class Setor(models.Model):
 
 class Processo(models.Model):
     PRAZOS_DIAS_POR_TIPO = {
-        "APROVEITAMENTO_CREDITOS": 30,
-        "DISPENSA_DISCIPLINA": 30,
+        "APROVEITAMENTO_DISPENSA_CREDITOS": 30,
         "TRANCAMENTO_MATRICULA": 15,
         "PRORROGACAO_PRAZO": 20,
         "REINGRESSO": 30,
         "MUDANCA_ORIENTADOR": 20,
-        "QUALIFICACAO": 30,
-        "DEFESA": 45,
-        "RECURSO": 15,
-        "OUTRO": 30,
+        "DEFESA_MESTRADO": 45,
+        "DEFESA_DOUTORADO": 45,
+        "QUALIFICACAO_DOUTORADO": 45,
+        "OUTRO": 60,
     }
 
     class TipoProcesso(models.TextChoices):
-        APROVEITAMENTO_CREDITOS = "APROVEITAMENTO_CREDITOS", "Aproveitamento de Creditos"
-        DISPENSA_DISCIPLINA = "DISPENSA_DISCIPLINA", "Dispensa de Disciplina"
-        TRANCAMENTO_MATRICULA = "TRANCAMENTO_MATRICULA", "Trancamento de Matricula"
-        PRORROGACAO_PRAZO = "PRORROGACAO_PRAZO", "Prorrogacao de Prazo"
+        APROVEITAMENTO_DISPENSA_CREDITOS = "APROVEITAMENTO_DISPENSA_CREDITOS", "Aproveitamento de Créditos ou Dispensa de Disciplina"
+        DEFESA_MESTRADO = "DEFESA_MESTRADO", "Defesa de Mestrado"
+        DEFESA_DOUTORADO = "DEFESA_DOUTORADO", "Defesa de Doutorado"
+        QUALIFICACAO_DOUTORADO = "QUALIFICACAO_DOUTORADO", "Qualificação de Doutorado"
+        TRANCAMENTO_MATRICULA = "TRANCAMENTO_MATRICULA", "Trancamento de Matrícula"
+        PRORROGACAO_PRAZO = "PRORROGACAO_PRAZO", "Prorrogação de Prazo"
         REINGRESSO = "REINGRESSO", "Reingresso"
-        MUDANCA_ORIENTADOR = "MUDANCA_ORIENTADOR", "Mudanca de Orientador"
-        QUALIFICACAO = "QUALIFICACAO", "Qualificacao"
-        DEFESA = "DEFESA", "Defesa"
-        RECURSO = "RECURSO", "Recurso"
+        MUDANCA_ORIENTADOR = "MUDANCA_ORIENTADOR", "Mudança de Orientador(a)"
         OUTRO = "OUTRO", "Outro"
 
     class StatusProcesso(models.TextChoices):
@@ -247,11 +335,6 @@ class Processo(models.Model):
         AGUARDANDO_CIENCIA = "AGUARDANDO_CIENCIA", "Aguardando ciencia"
         EM_DEBATE = "EM_DEBATE", "Em debate"
         FINALIZADO = "FINALIZADO", "Finalizado"
-
-    class Prioridade(models.TextChoices):
-        BAIXA = "BAIXA", "Baixa"
-        MEDIA = "MEDIA", "Media"
-        ALTA = "ALTA", "Alta"
 
     usuario_criado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -273,12 +356,6 @@ class Processo(models.Model):
         max_length=25,
         choices=StatusProcesso.choices,
         default=StatusProcesso.EM_ANALISE,
-    )
-    prioridade = models.CharField(
-        max_length=10,
-        choices=Prioridade.choices,
-        null=True,
-        blank=True,
     )
     setor_atual = models.ForeignKey(
         Setor,
@@ -378,10 +455,18 @@ class Processo(models.Model):
         )
 
     def obter_orientador_responsavel(self):
-        aluno = Aluno.objects.filter(pk=self.usuario_criado_por_id).select_related("orientador").first()
-        if not aluno:
+        trajetoria = (
+            TrajetoriaAcademica.objects.filter(
+                aluno_id=self.usuario_criado_por_id,
+                status=TrajetoriaAcademica.Status.ATIVA,
+            )
+            .select_related("orientador")
+            .order_by("-criado_em")
+            .first()
+        )
+        if not trajetoria:
             return None
-        return aluno.orientador
+        return trajetoria.orientador
 
     def solicitar_ciente_orientador(self, *, solicitado_por, mensagem_solicitacao: str = ""):
         orientador = self.obter_orientador_responsavel()

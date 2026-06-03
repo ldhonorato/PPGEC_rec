@@ -9,6 +9,18 @@
     <p>O seu processo <strong>{{processo.numero}}</strong> foi finalizado.</p>
     <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
       <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Número</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.numero}}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Tipo</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.get_tipo_display}}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Assunto</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.assunto}}</td>
+      </tr>
+      <tr>
         <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Resultado</td>
         <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.termo_finalizacao}}</td>
       </tr>
@@ -19,7 +31,7 @@
     </table>
     <p>Acesse o sistema para consultar todos os detalhes do resultado.</p>
     <p style="text-align:center; margin-top: 24px;">
-      <a href="http://seu-dominio.com/coordenacao/processos/{{ processo.id }}/"
+      <a href="{{ site_url }}/coordenacao/processos/{{ processo.id }}/"
          style="background:#6CC858; color:white; padding:12px 28px;
                 border-radius:6px; text-decoration:none; font-weight:bold;">
         Ver Resultado
