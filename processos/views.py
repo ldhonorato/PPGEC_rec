@@ -813,6 +813,11 @@ def processo_detalhe_view(request, processo_id):
                 except ValidationError as exc:
                     messages.error(request, str(exc))
                 else:
+                    if setor_destino and _is_setor_pleno_nome(setor_destino.nome):
+                        prazo_pleno = encaminhamento_form.cleaned_data.get("prazo_pleno")
+                        if prazo_pleno:
+                            processo.prazo_limite = prazo_pleno
+                            processo.save(update_fields=["prazo_limite", "atualizado_em"])
                     messages.success(request, "Processo encaminhado com sucesso.")
                     if setor_destino and setor_destino.nome == "Requerente":
                         send_email_devolucao_requerente.delay(processo.id, despacho_texto)
