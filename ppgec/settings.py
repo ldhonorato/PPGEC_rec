@@ -20,16 +20,33 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load environment variables from .env
 load_dotenv(BASE_DIR / '.env')
 
+
+def env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name, default=None):
+    value = os.getenv(name)
+    if not value:
+        return default or []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-#)!kvripx%^&=ccp1rwgv2fr@9uhxg9_du_di=kql67g($%x72'
+SECRET_KEY = os.getenv(
+    "SECRET_KEY",
+    "django-insecure-#)!kvripx%^&=ccp1rwgv2fr@9uhxg9_du_di=kql67g($%x72",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool("DEBUG", True)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", ["localhost", "127.0.0.1", "0.0.0.0"])
 
 
 # Application definition
@@ -80,7 +97,7 @@ WSGI_APPLICATION = 'ppgec.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-if os.getenv("DATABASE_URL") or os.getenv("POSTGRES_DB"):
+if env_bool("USE_POSTGRES", bool(os.getenv("POSTGRES_DB"))):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",

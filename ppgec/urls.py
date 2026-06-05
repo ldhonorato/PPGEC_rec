@@ -19,6 +19,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path
 from django.contrib.auth.views import LoginView, LogoutView
+from django.views.generic import RedirectView
 
 from processos.views import (
     aluno_detalhe_view,
@@ -39,6 +40,7 @@ from processos.views import (
     processos_view,
     reservas_ambientes_view,
     salas_ambientes_view,
+    teste_email,
 )
 
 urlpatterns = [
