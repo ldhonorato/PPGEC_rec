@@ -1507,13 +1507,15 @@ def processo_detalhe_view(request, processo_id):
                     if setor_destino and setor_destino.nome == "Requerente"
                     else Processo.StatusProcesso.EM_ANALISE
                 )
+                prazo_limite = encaminhamento_form.cleaned_data.get("prazo_limite")
                 try:
                     despacho_texto = encaminhamento_form.cleaned_data["despacho"]
                     processo.encaminhar(
                         setor_destino=setor_destino,
                         encaminhado_por=request.user,
-                        observacao=encaminhamento_form.cleaned_data["despacho"],
+                        observacao=despacho_texto,
                         status_resultante=status_resultante,
+                        prazo_limite=prazo_limite,  
                     )
                 except ValidationError as exc:
                     messages.error(request, str(exc))

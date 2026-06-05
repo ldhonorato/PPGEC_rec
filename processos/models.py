@@ -499,6 +499,7 @@ class Processo(models.Model):
         encaminhado_por: User,
         observacao: str = "",
         status_resultante: str | None = None,
+        prazo_limite: models.DateField | None = None,  #Parâmetro para receber a data exata
     ):
         if self.esta_finalizado:
             raise ValidationError("Nao e permitido encaminhar processo finalizado.")
@@ -508,13 +509,28 @@ class Processo(models.Model):
         ).exists():
             raise ValidationError("Nao e permitido encaminhar com ciente do orientador pendente.")
 
+        # Exige data limite se o destino for o Pleno 
+        if setor_destino and "pleno" in (setor_destino.nome or "").lower():
+            if not prazo_limite:
+                raise ValidationError(
+                    {"prazo_limite": "É obrigatório informar uma data limite exata para deliberação do Pleno."}
+                )
+            if prazo_limite < timezone.localdate():
+                raise ValidationError(
+                    {"prazo_limite": "A data limite para o Pleno não pode ser uma data passada."}
+                )
+
         status_novo = status_resultante or self.StatusProcesso.EM_ANALISE
         setor_origem = self.setor_atual
 
         with transaction.atomic():
             self.setor_atual = setor_destino
             self.status = status_novo
-            self.save(update_fields=["setor_atual", "status", "atualizado_em"])
+            
+            if prazo_limite:
+                self.prazo_limite = prazo_limite
+                
+            self.save(update_fields=["setor_atual", "status", "prazo_limite", "atualizado_em"])
 
             return TramitacaoProcesso.objects.create(
                 processo=self,

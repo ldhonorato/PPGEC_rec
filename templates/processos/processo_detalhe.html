@@ -132,7 +132,7 @@
         {% csrf_token %}
         <input type="hidden" name="encaminhar_processo" value="1">
         {% for field in encaminhamento_form %}
-            <div class="field" {% if field.html_name == "prazo_pleno" %}id="campo-prazo-pleno" style="display:none;"{% endif %}>
+            <div class="field" {% if field.html_name == "prazo_limite" %}id="campo-prazo-pleno" style="display:none;"{% endif %}>
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {{ field.errors }}
@@ -443,7 +443,7 @@
 
         const setorDestino = document.getElementById("id_setor_destino");
         const campoPrazoPleno = document.getElementById("campo-prazo-pleno");
-        const inputPrazoPleno = document.getElementById("id_prazo_pleno");
+        const inputPrazoPleno = document.getElementById("id_prazo_limite");
 
         function togglePrazoPleno() {
             if (!setorDestino || !campoPrazoPleno) return;
