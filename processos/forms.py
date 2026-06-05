@@ -41,6 +41,11 @@ class EncaminhamentoForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 3}),
         label="Despacho",
     )
+    prazo_pleno = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Data limite para deliberação",
+    )
 
     # Campo para capturar a data limite exata
     prazo_limite = forms.DateField(
@@ -57,6 +62,13 @@ class EncaminhamentoForm(forms.Form):
         if current_setor_id:
             queryset = queryset.exclude(id=current_setor_id)
         self.fields["setor_destino"].queryset = queryset
+
+    def clean(self):
+        cleaned_data = super().clean()
+        setor = cleaned_data.get("setor_destino")
+        if setor and "pleno" in setor.nome.lower() and not cleaned_data.get("prazo_pleno"):
+            self.add_error("prazo_pleno", "Informe a data limite para deliberação no Pleno.")
+        return cleaned_data
 
 
 class ProcessoAberturaForm(forms.ModelForm):

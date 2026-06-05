@@ -333,6 +333,7 @@ class Processo(models.Model):
         EM_ANALISE = "EM_ANALISE", "Em analise"
         AGUARDANDO_DOCUMENTO = "AGUARDANDO_DOCUMENTO", "Aguardando documento"
         AGUARDANDO_CIENCIA = "AGUARDANDO_CIENCIA", "Aguardando ciencia"
+        EM_DEBATE = "EM_DEBATE", "Em debate"
         FINALIZADO = "FINALIZADO", "Finalizado"
 
     usuario_criado_por = models.ForeignKey(
