@@ -63,7 +63,7 @@
 
                         <p class="sidebar-label">Principal</p>
                         <ul class="side-menu">
-                            {% if can_view_dashboard %}
+                            {% if nav_can_view_dashboard %}
                                 <li>
                                     <a class="{% if request.resolver_match.url_name == 'coordenacao_dashboard' %}is-active{% endif %}" href="{% url 'coordenacao_dashboard' %}">
                                         <span class="side-icon">D</span>
@@ -71,7 +71,7 @@
                                     </a>
                                 </li>
                             {% endif %}
-                            {% if has_gestao_access %}
+                            {% if nav_has_gestao_access %}
                                 <li>
                                     <a class="{% if request.resolver_match.url_name == 'coordenacao_alunos' %}is-active{% endif %}" href="{% url 'coordenacao_alunos' %}">
                                         <span class="side-icon">A</span>
@@ -79,7 +79,7 @@
                                     </a>
                                 </li>
                             {% endif %}
-                            {% if can_view_processos %}
+                            {% if nav_can_view_processos %}
                                 <li>
                                     <a class="{% if request.resolver_match.url_name == 'coordenacao_processos' %}is-active{% endif %}" href="{% url 'coordenacao_processos' %}">
                                         <span class="side-icon">P</span>
@@ -87,7 +87,7 @@
                                     </a>
                                 </li>
                             {% endif %}
-                            {% if can_view_caixa %}
+                            {% if nav_can_view_caixa %}
                                 <li>
                                     <a class="{% if request.resolver_match.url_name == 'coordenacao_caixa_processos' %}is-active{% endif %}" href="{% url 'coordenacao_caixa_processos' %}">
                                         <span class="side-icon">C</span>
@@ -95,8 +95,8 @@
                                     </a>
                                 </li>
                             {% endif %}
-                            {% if side_menu_items %}
-                                {% for item in side_menu_items %}
+                            {% if nav_side_menu_items %}
+                                {% for item in nav_side_menu_items %}
                                     <li>
                                         <a class="{% if request.path == item.href %}is-active{% endif %}" href="{{ item.href }}">
                                             <span class="side-icon">{{ item.label|slice:":1" }}</span>

@@ -1,7 +1,19 @@
+from datetime import datetime
+
 from django import forms
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
-from .models import Aluno, Documento, Processo, Setor, TrajetoriaAcademica
+from .models import (
+    Aluno,
+    DisponibilidadeSala,
+    Documento,
+    Processo,
+    ReservaAmbiente,
+    Sala,
+    Setor,
+    TrajetoriaAcademica,
+)
 
 
 User = get_user_model()
@@ -11,6 +23,116 @@ class UserProfileForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ["nome", "email"]
+
+
+class SalaForm(forms.ModelForm):
+    class Meta:
+        model = Sala
+        fields = ["nome", "capacidade", "ativa"]
+
+
+class DisponibilidadeSalaForm(forms.ModelForm):
+    class Meta:
+        model = DisponibilidadeSala
+        fields = ["sala", "dia_semana", "hora_inicio", "hora_fim"]
+        widgets = {
+            "hora_inicio": forms.TimeInput(attrs={"type": "time"}),
+            "hora_fim": forms.TimeInput(attrs={"type": "time"}),
+        }
+
+    def __init__(self, *args, polo=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        queryset = Sala.objects.filter(ativa=True).order_by("nome")
+        if polo:
+            queryset = queryset.filter(polo=polo)
+        self.fields["sala"].queryset = queryset
+
+
+class ReservaAmbienteForm(forms.Form):
+    RECORRENCIA_NENHUMA = "NENHUMA"
+    RECORRENCIA_DIARIA = "DIARIA"
+    RECORRENCIA_SEMANAL = "SEMANAL"
+    RECORRENCIA_MENSAL = "MENSAL"
+
+    sala = forms.ModelChoiceField(queryset=Sala.objects.none(), label="Sala")
+    docente = forms.ModelChoiceField(
+        queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE, is_active=True).order_by("nome"),
+        required=False,
+        label="Docente",
+    )
+    tipo = forms.ChoiceField(choices=ReservaAmbiente.TipoReserva.choices, label="Tipo de reserva")
+    titulo = forms.CharField(max_length=255, required=False, label="Titulo")
+    data_inicio = forms.DateField(
+        label="Data de inicio",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    hora_inicio = forms.TimeField(
+        label="Hora de inicio",
+        widget=forms.TimeInput(attrs={"type": "time"}),
+    )
+    hora_fim = forms.TimeField(
+        label="Hora de fim",
+        widget=forms.TimeInput(attrs={"type": "time"}),
+    )
+    recorrencia = forms.ChoiceField(
+        choices=(
+            (RECORRENCIA_NENHUMA, "Nao repetir"),
+            (RECORRENCIA_DIARIA, "Diaria"),
+            (RECORRENCIA_SEMANAL, "Semanal"),
+            (RECORRENCIA_MENSAL, "Mensal"),
+        ),
+        label="Recorrencia",
+    )
+    duracao_recorrencia_meses = forms.IntegerField(
+        required=False,
+        min_value=1,
+        max_value=6,
+        label="Duracao da recorrencia em meses",
+        widget=forms.NumberInput(attrs={"min": "1", "max": "6"}),
+    )
+
+    def __init__(self, *args, user=None, polo=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        queryset = Sala.objects.filter(ativa=True, polo__ativo=True).select_related("polo").order_by("polo__nome", "nome")
+        if polo:
+            queryset = queryset.filter(polo=polo)
+        self.fields["sala"].queryset = queryset
+        if user and user.tipo_usuario == User.TipoUsuario.DOCENTE:
+            self.fields["docente"].required = False
+            self.fields["docente"].widget = forms.HiddenInput()
+        else:
+            self.fields["docente"].required = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        data_inicio = cleaned_data.get("data_inicio")
+        hora_inicio = cleaned_data.get("hora_inicio")
+        hora_fim = cleaned_data.get("hora_fim")
+        recorrencia = cleaned_data.get("recorrencia")
+        duracao_recorrencia_meses = cleaned_data.get("duracao_recorrencia_meses")
+
+        inicio = None
+        if data_inicio and hora_inicio:
+            inicio = datetime.combine(data_inicio, hora_inicio)
+            if timezone.is_naive(inicio):
+                inicio = timezone.make_aware(inicio)
+            cleaned_data["inicio"] = inicio
+
+        if data_inicio and hora_fim:
+            fim = datetime.combine(data_inicio, hora_fim)
+            if timezone.is_naive(fim):
+                fim = timezone.make_aware(fim)
+            cleaned_data["fim"] = fim
+
+        if hora_inicio and hora_fim and hora_fim <= hora_inicio:
+            self.add_error("hora_fim", "A hora de fim deve ser posterior a hora de inicio no mesmo dia.")
+        if recorrencia != self.RECORRENCIA_NENHUMA:
+            if not duracao_recorrencia_meses:
+                self.add_error("duracao_recorrencia_meses", "Informe por quantos meses repetir.")
+        else:
+            cleaned_data["duracao_recorrencia_meses"] = None
+        return cleaned_data
 
 
 class DocumentoCadastroForm(forms.Form):

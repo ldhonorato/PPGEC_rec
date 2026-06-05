@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Salas do polo | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Salas do polo</h1>
+            {% if polo %}
+                <p class="muted">Cadastro de salas e horarios gerais de disponibilidade do polo {{ polo.nome }}.</p>
+            {% else %}
+                <p class="muted">Seu usuario servidor ainda nao possui polo de atuacao definido.</p>
+            {% endif %}
+        </div>
+        <a class="btn btn-secondary" href="{% url 'reservas_ambientes' %}">Ver reservas</a>
+    </div>
+</section>
+
+{% if polo %}
+<section class="grid-two panel">
+    <article class="card">
+        <h2 class="section-title">Nova sala</h2>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="criar_sala">
+            {% for field in sala_form %}
+                <div class="field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+            {% endfor %}
+            <button class="btn" type="submit">Cadastrar sala</button>
+        </form>
+    </article>
+
+    <article class="card">
+        <h2 class="section-title">Disponibilidade</h2>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="adicionar_disponibilidade">
+            {% for field in disponibilidade_form %}
+                <div class="field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+            {% endfor %}
+            <button class="btn" type="submit">Adicionar horario</button>
+        </form>
+    </article>
+</section>
+{% endif %}
+
+<section class="card">
+    <h2 class="section-title">Salas cadastradas</h2>
+    {% if salas %}
+        <ul class="list">
+            {% for sala in salas %}
+                <li>
+                    <div class="item-row">
+                        <strong>{{ sala.nome }}</strong>
+                        {% if sala.ativa %}
+                            <span class="badge badge-ok">Ativa</span>
+                        {% else %}
+                            <span class="badge badge-no">Inativa</span>
+                        {% endif %}
+                    </div>
+                    <small class="muted">
+                        Capacidade: {{ sala.capacidade|default:"-" }}
+                    </small>
+                    {% if sala.disponibilidades.all %}
+                        <ul>
+                            {% for disponibilidade in sala.disponibilidades.all %}
+                                <li>
+                                    {{ disponibilidade.get_dia_semana_display }}:
+                                    {{ disponibilidade.hora_inicio|time:"H:i" }} - {{ disponibilidade.hora_fim|time:"H:i" }}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="muted">Sem horarios gerais cadastrados.</p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhuma sala cadastrada para este polo.</p>
+    {% endif %}
+</section>
+{% endblock %}

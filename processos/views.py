@@ -25,21 +25,27 @@ from .forms import (
     TrajetoriaStatusForm,
     ManifestarCienteOrientadorForm,
     ComentarioProcessoForm,
+    DisponibilidadeSalaForm,
     DocumentoCadastroForm,
     EncaminhamentoForm,
     FinalizarProcessoForm,
     ProcessoAberturaForm,
+    ReservaAmbienteForm,
+    SalaForm,
     SolicitarCienteOrientadorForm,
     UserProfileForm,
 )
 from .models import (
     AlteracaoAluno,
     Aluno,
+    DisponibilidadeSala,
     ComentarioProcesso,
     Docente,
     Documento,
     ManifestacaoProcesso,
     Processo,
+    ReservaAmbiente,
+    Sala,
     Setor,
     TrajetoriaAcademica,
     User,
@@ -1743,6 +1749,97 @@ def novo_processo_view(request):
             "can_view_dashboard": _can_view_dashboard(request.user),
             "can_view_processos": _can_view_processos(request.user),
             "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
+def _can_use_reservas(user):
+    return user.is_authenticated and user.tipo_usuario in {
+        User.TipoUsuario.DOCENTE,
+        User.TipoUsuario.SERVIDOR,
+    }
+
+
+@login_required
+def reservas_ambientes_view(request):
+    if not _can_use_reservas(request.user):
+        raise PermissionDenied("Acesso restrito a docentes e servidores.")
+
+    polo_servidor = request.user.polo_atuacao if request.user.tipo_usuario == User.TipoUsuario.SERVIDOR else None
+    form = ReservaAmbienteForm(request.POST or None, user=request.user)
+    if request.method == "POST":
+        if form.is_valid():
+            docente = request.user if request.user.tipo_usuario == User.TipoUsuario.DOCENTE else form.cleaned_data["docente"]
+            try:
+                reservas_criadas = ReservaAmbiente.criar_reservas(
+                    sala=form.cleaned_data["sala"],
+                    docente=docente,
+                    criado_por=request.user,
+                    tipo=form.cleaned_data["tipo"],
+                    titulo=form.cleaned_data["titulo"],
+                    inicio=form.cleaned_data["inicio"],
+                    fim=form.cleaned_data["fim"],
+                    recorrencia=form.cleaned_data["recorrencia"],
+                    duracao_recorrencia_meses=form.cleaned_data["duracao_recorrencia_meses"],
+                )
+            except ValidationError as exc:
+                for erro in exc.messages:
+                    form.add_error(None, erro)
+            else:
+                messages.success(request, f"{len(reservas_criadas)} reserva(s) criada(s) com sucesso.")
+                return redirect("reservas_ambientes")
+
+    reservas = ReservaAmbiente.objects.select_related("sala", "sala__polo", "docente", "criado_por")
+    if request.user.tipo_usuario == User.TipoUsuario.DOCENTE:
+        reservas = reservas.filter(docente=request.user)
+    reservas = reservas.order_by("inicio")
+
+    return render(
+        request,
+        "processos/reservas_ambientes.html",
+        {
+            "form": form,
+            "reservas": reservas,
+            "polo_servidor": polo_servidor,
+        },
+    )
+
+
+@login_required
+def salas_ambientes_view(request):
+    if request.user.tipo_usuario != User.TipoUsuario.SERVIDOR:
+        raise PermissionDenied("Acesso restrito a servidores.")
+
+    polo = request.user.polo_atuacao
+    sala_form = SalaForm(prefix="sala")
+    disponibilidade_form = DisponibilidadeSalaForm(prefix="disp", polo=polo)
+
+    if request.method == "POST" and polo:
+        acao = request.POST.get("acao")
+        if acao == "criar_sala":
+            sala_form = SalaForm(request.POST, prefix="sala")
+            if sala_form.is_valid():
+                sala = sala_form.save(commit=False)
+                sala.polo = polo
+                sala.save()
+                messages.success(request, "Sala cadastrada com sucesso.")
+                return redirect("salas_ambientes")
+        elif acao == "adicionar_disponibilidade":
+            disponibilidade_form = DisponibilidadeSalaForm(request.POST, prefix="disp", polo=polo)
+            if disponibilidade_form.is_valid():
+                disponibilidade_form.save()
+                messages.success(request, "Disponibilidade cadastrada com sucesso.")
+                return redirect("salas_ambientes")
+
+    salas = Sala.objects.filter(polo=polo).prefetch_related("disponibilidades") if polo else Sala.objects.none()
+    return render(
+        request,
+        "processos/salas_ambientes.html",
+        {
+            "polo": polo,
+            "salas": salas,
+            "sala_form": sala_form,
+            "disponibilidade_form": disponibilidade_form,
         },
     )
 

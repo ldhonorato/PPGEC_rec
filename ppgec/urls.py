@@ -19,6 +19,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path
 from django.contrib.auth.views import LoginView, LogoutView
+from django.views.generic.base import RedirectView
 
 from processos.views import (
     aluno_detalhe_view,
@@ -37,10 +38,13 @@ from processos.views import (
     novo_processo_view,
     processo_detalhe_view,
     processos_view,
+    reservas_ambientes_view,
+    salas_ambientes_view,
 )
 
 urlpatterns = [
     path("", home_view, name="home"),
+    path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}img/acadflow-logo.png", permanent=True)),
     path("login/", LoginView.as_view(template_name="registration/login.html"), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("me/", me_view, name="me"),
@@ -52,6 +56,8 @@ urlpatterns = [
     path("aluno/documento-vinculo/", aluno_documento_vinculo_view, name="aluno_documento_vinculo"),
     path("aluno/documento-historico/", aluno_documento_historico_view, name="aluno_documento_historico"),
     path("processos/novo/", novo_processo_view, name="novo_processo"),
+    path("ambientes/reservas/", reservas_ambientes_view, name="reservas_ambientes"),
+    path("ambientes/salas/", salas_ambientes_view, name="salas_ambientes"),
     path("coordenacao/dashboard/", coordenacao_dashboard_view, name="coordenacao_dashboard"),
     path("coordenacao/alunos/", alunos_view, name="coordenacao_alunos"),
     path("coordenacao/alunos/<int:aluno_id>/", aluno_detalhe_view, name="aluno_detalhe"),

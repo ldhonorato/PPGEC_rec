@@ -5,9 +5,13 @@ from django.contrib.auth.hashers import identify_hasher
 from .models import (
     AlteracaoAluno,
     Aluno,
+    DisponibilidadeSala,
     Docente,
     Documento,
+    Polo,
     Processo,
+    ReservaAmbiente,
+    Sala,
     Setor,
     TrajetoriaAcademica,
     TramitacaoProcesso,
@@ -34,13 +38,13 @@ class EnsurePasswordHashedAdminMixin:
 @admin.register(User)
 class UserAdmin(EnsurePasswordHashedAdminMixin, BaseUserAdmin):
     ordering = ("email",)
-    list_display = ("email", "nome", "tipo_usuario", "is_staff", "is_active")
-    list_filter = ("tipo_usuario", "is_staff", "is_superuser", "is_active")
+    list_display = ("email", "nome", "tipo_usuario", "polo_atuacao", "is_staff", "is_active")
+    list_filter = ("tipo_usuario", "polo_atuacao", "is_staff", "is_superuser", "is_active")
     search_fields = ("email", "nome")
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("Informacoes pessoais", {"fields": ("nome", "tipo_usuario")}),
+        ("Informacoes pessoais", {"fields": ("nome", "tipo_usuario", "polo_atuacao")}),
         (
             "Permissoes",
             {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")},
@@ -52,7 +56,7 @@ class UserAdmin(EnsurePasswordHashedAdminMixin, BaseUserAdmin):
             None,
             {
                 "classes": ("wide",),
-                "fields": ("email", "nome", "tipo_usuario", "password1", "password2"),
+                "fields": ("email", "nome", "tipo_usuario", "polo_atuacao", "password1", "password2"),
             },
         ),
     )
@@ -63,11 +67,13 @@ class AlunoAdmin(EnsurePasswordHashedAdminMixin, admin.ModelAdmin):
     list_display = (
         "email",
         "nome",
+        "polo_atuacao",
         "status_aluno",
         "matricula",
         "is_active",
     )
     list_filter = (
+        "polo_atuacao",
         "status_aluno",
         "is_active",
     )
@@ -76,8 +82,8 @@ class AlunoAdmin(EnsurePasswordHashedAdminMixin, admin.ModelAdmin):
 
 @admin.register(Docente)
 class DocenteAdmin(EnsurePasswordHashedAdminMixin, admin.ModelAdmin):
-    list_display = ("email", "nome", "externo", "permanente", "coordenador", "is_active")
-    list_filter = ("externo", "permanente", "coordenador", "is_active")
+    list_display = ("email", "nome", "polo_atuacao", "externo", "permanente", "coordenador", "is_active")
+    list_filter = ("polo_atuacao", "externo", "permanente", "coordenador", "is_active")
     search_fields = ("email", "nome")
 
 
@@ -136,6 +142,36 @@ class AlteracaoAlunoAdmin(admin.ModelAdmin):
     list_filter = ("tipo", "criado_em")
     search_fields = ("aluno__nome", "aluno__email", "comentario", "valor_anterior", "valor_novo")
     autocomplete_fields = ("aluno", "alterado_por")
+    readonly_fields = ("criado_em",)
+
+
+@admin.register(Polo)
+class PoloAdmin(admin.ModelAdmin):
+    list_display = ("nome", "ativo")
+    list_filter = ("ativo",)
+    search_fields = ("nome", "descricao")
+
+
+@admin.register(Sala)
+class SalaAdmin(admin.ModelAdmin):
+    list_display = ("nome", "polo", "capacidade", "ativa")
+    list_filter = ("polo", "ativa")
+    search_fields = ("nome", "polo__nome")
+
+
+@admin.register(DisponibilidadeSala)
+class DisponibilidadeSalaAdmin(admin.ModelAdmin):
+    list_display = ("sala", "dia_semana", "hora_inicio", "hora_fim")
+    list_filter = ("sala__polo", "dia_semana")
+    search_fields = ("sala__nome", "sala__polo__nome")
+
+
+@admin.register(ReservaAmbiente)
+class ReservaAmbienteAdmin(admin.ModelAdmin):
+    list_display = ("sala", "docente", "tipo", "inicio", "fim", "recorrente")
+    list_filter = ("tipo", "sala__polo", "recorrente")
+    search_fields = ("sala__nome", "docente__nome", "titulo")
+    autocomplete_fields = ("sala", "docente", "criado_por")
     readonly_fields = ("criado_em",)
 
 

@@ -1,11 +1,24 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 from django.test import TestCase
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from .models import AlteracaoAluno, Aluno, Docente, ManifestacaoProcesso, Processo, Setor, TrajetoriaAcademica, User
+from .models import (
+    AlteracaoAluno,
+    Aluno,
+    DisponibilidadeSala,
+    Docente,
+    ManifestacaoProcesso,
+    Polo,
+    Processo,
+    ReservaAmbiente,
+    Sala,
+    Setor,
+    TrajetoriaAcademica,
+    User,
+)
 
 
 def criar_trajetoria(aluno, **kwargs):
@@ -555,6 +568,25 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "Consultar processos")
         self.assertContains(response, "Programa de Pos-Graduacao")
 
+    def test_home_servidor_exibe_menu_completo_de_reservas(self):
+        servidor = User.objects.create_user(
+            email="servidor.frontend@example.com",
+            password="senha-segura-123",
+            nome="Servidor Frontend",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+
+        self.client.force_login(servidor)
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dashboard")
+        self.assertContains(response, "Alunos")
+        self.assertContains(response, "Processos")
+        self.assertContains(response, "Caixa de processos")
+        self.assertContains(response, "Reservas de ambientes")
+        self.assertContains(response, "Salas do polo")
+
     def test_dashboard_coordenador_mantem_menu_lateral_da_home(self):
         coordenador = Docente.objects.create(
             email="coordenador.frontend@example.com",
@@ -694,3 +726,256 @@ class ProcessoPrazoTests(TestCase):
         self.assertContains(response, atrasado.assunto)
         self.assertNotContains(response, finalizado.assunto)
         self.assertContains(response, "Atrasado")
+
+
+class ReservaAmbienteTests(TestCase):
+    def setUp(self):
+        self.polo = Polo.objects.create(nome="Polo Centro")
+        self.outro_polo = Polo.objects.create(nome="Polo Norte")
+        self.sala = Sala.objects.create(polo=self.polo, nome="Sala 101", capacidade=30)
+        self.outra_sala = Sala.objects.create(polo=self.outro_polo, nome="Sala 201", capacidade=20)
+        DisponibilidadeSala.objects.create(
+            sala=self.sala,
+            dia_semana=0,
+            hora_inicio=time(8, 0),
+            hora_fim=time(12, 0),
+        )
+        DisponibilidadeSala.objects.create(
+            sala=self.outra_sala,
+            dia_semana=0,
+            hora_inicio=time(8, 0),
+            hora_fim=time(12, 0),
+        )
+        self.docente = Docente.objects.create(
+            email="docente.reserva@example.com",
+            password="senha-segura-123",
+            nome="Docente Reserva",
+        )
+        self.servidor = User.objects.create_user(
+            email="servidor.reserva@example.com",
+            password="senha-segura-123",
+            nome="Servidor Reserva",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+            polo_atuacao=self.polo,
+        )
+
+    def _dt(self, dia, hora, minuto=0):
+        return timezone.make_aware(datetime(2026, 6, dia, hora, minuto))
+
+    def test_docente_cria_reserva_em_horario_disponivel(self):
+        self.client.force_login(self.docente)
+        response = self.client.post(
+            reverse("reservas_ambientes"),
+            {
+                "sala": self.sala.id,
+                "tipo": ReservaAmbiente.TipoReserva.AULA,
+                "titulo": "Aula de pos-graduacao",
+                "data_inicio": "2026-06-08",
+                "hora_inicio": "09:00",
+                "hora_fim": "10:00",
+                "recorrencia": "NENHUMA",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        reserva = ReservaAmbiente.objects.get()
+        self.assertEqual(reserva.docente_id, self.docente.id)
+        self.assertEqual(reserva.tipo, ReservaAmbiente.TipoReserva.AULA)
+
+    def test_nao_permite_reserva_simultanea_mesma_sala(self):
+        ReservaAmbiente.objects.create(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.REUNIAO_PESQUISA,
+            inicio=self._dt(8, 9),
+            fim=self._dt(8, 10),
+        )
+
+        with self.assertRaises(ValidationError):
+            ReservaAmbiente.objects.create(
+                sala=self.sala,
+                docente=self.docente,
+                criado_por=self.docente,
+                tipo=ReservaAmbiente.TipoReserva.DEFESA,
+                inicio=self._dt(8, 9, 30),
+                fim=self._dt(8, 10, 30),
+            )
+
+    def test_nao_permite_reserva_fora_disponibilidade(self):
+        with self.assertRaises(ValidationError):
+            ReservaAmbiente.objects.create(
+                sala=self.sala,
+                docente=self.docente,
+                criado_por=self.docente,
+                tipo=ReservaAmbiente.TipoReserva.AULA,
+                inicio=self._dt(8, 13),
+                fim=self._dt(8, 14),
+            )
+
+    def test_recorrencia_nao_pode_superar_seis_meses(self):
+        with self.assertRaises(ValidationError):
+            ReservaAmbiente.criar_reservas(
+                sala=self.sala,
+                docente=self.docente,
+                criado_por=self.docente,
+                tipo=ReservaAmbiente.TipoReserva.AULA,
+                titulo="Aula recorrente",
+                inicio=self._dt(8, 9),
+                fim=self._dt(8, 10),
+                recorrencia="SEMANAL",
+                duracao_recorrencia_meses=7,
+            )
+
+    def test_cria_recorrencia_diaria_semanal_e_mensal(self):
+        for dia_semana in range(7):
+            DisponibilidadeSala.objects.get_or_create(
+                sala=self.sala,
+                dia_semana=dia_semana,
+                defaults={"hora_inicio": time(8, 0), "hora_fim": time(12, 0)},
+            )
+
+        diaria = ReservaAmbiente.criar_reservas(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            titulo="Aula diaria",
+            inicio=self._dt(8, 8),
+            fim=self._dt(8, 9),
+            recorrencia="DIARIA",
+            duracao_recorrencia_meses=1,
+        )
+        semanal = ReservaAmbiente.criar_reservas(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            titulo="Aula semanal",
+            inicio=self._dt(8, 9),
+            fim=self._dt(8, 10),
+            recorrencia="SEMANAL",
+            duracao_recorrencia_meses=1,
+        )
+        mensal = ReservaAmbiente.criar_reservas(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            titulo="Aula mensal",
+            inicio=self._dt(8, 10),
+            fim=self._dt(8, 11),
+            recorrencia="MENSAL",
+            duracao_recorrencia_meses=2,
+        )
+
+        self.assertEqual(len(diaria), 31)
+        self.assertEqual(len(semanal), 5)
+        self.assertEqual(len(mensal), 3)
+
+    def test_servidor_enxerga_salas_de_todos_os_polos(self):
+        self.client.force_login(self.servidor)
+        response = self.client.get(reverse("reservas_ambientes"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sala 101")
+        self.assertContains(response, "Sala 201")
+
+    def test_servidor_reserva_para_docente(self):
+        self.client.force_login(self.servidor)
+        response = self.client.post(
+            reverse("reservas_ambientes"),
+            {
+                "sala": self.outra_sala.id,
+                "docente": self.docente.id,
+                "tipo": ReservaAmbiente.TipoReserva.DEFESA,
+                "titulo": "Defesa de mestrado",
+                "data_inicio": "2026-06-08",
+                "hora_inicio": "10:00",
+                "hora_fim": "11:00",
+                "recorrencia": "NENHUMA",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        reserva = ReservaAmbiente.objects.get()
+        self.assertEqual(reserva.docente_id, self.docente.id)
+        self.assertEqual(reserva.criado_por_id, self.servidor.id)
+        self.assertEqual(reserva.sala_id, self.outra_sala.id)
+
+    def test_formulario_informa_choque_e_nao_cria_reserva(self):
+        ReservaAmbiente.objects.create(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            inicio=self._dt(8, 9),
+            fim=self._dt(8, 10),
+        )
+
+        self.client.force_login(self.docente)
+        response = self.client.post(
+            reverse("reservas_ambientes"),
+            {
+                "sala": self.sala.id,
+                "tipo": ReservaAmbiente.TipoReserva.DEFESA,
+                "titulo": "Defesa conflitante",
+                "data_inicio": "2026-06-08",
+                "hora_inicio": "09:30",
+                "hora_fim": "10:30",
+                "recorrencia": "NENHUMA",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Choque com reserva existente")
+        self.assertContains(response, "08/06/2026")
+        self.assertEqual(ReservaAmbiente.objects.count(), 1)
+
+    def test_formulario_exige_inicio_e_fim_no_mesmo_dia(self):
+        self.client.force_login(self.docente)
+        response = self.client.post(
+            reverse("reservas_ambientes"),
+            {
+                "sala": self.sala.id,
+                "tipo": ReservaAmbiente.TipoReserva.AULA,
+                "titulo": "Horario invalido",
+                "data_inicio": "2026-06-08",
+                "hora_inicio": "10:00",
+                "hora_fim": "10:00",
+                "recorrencia": "NENHUMA",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "A hora de fim deve ser posterior")
+        self.assertEqual(ReservaAmbiente.objects.count(), 0)
+
+    def test_docente_enxerga_salas_de_todos_os_polos(self):
+        self.client.force_login(self.docente)
+        response = self.client.get(reverse("reservas_ambientes"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sala 101")
+        self.assertContains(response, "Sala 201")
+
+    def test_docente_pode_reservar_salas_distintas_no_mesmo_horario(self):
+        ReservaAmbiente.objects.create(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            inicio=self._dt(8, 9),
+            fim=self._dt(8, 10),
+        )
+
+        ReservaAmbiente.objects.create(
+            sala=self.outra_sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            inicio=self._dt(8, 9),
+            fim=self._dt(8, 10),
+        )
+
+        self.assertEqual(ReservaAmbiente.objects.count(), 2)

@@ -41,6 +41,7 @@ def _can_view_processos(user):
 def _menu_lateral_items(user):
     if user.tipo_usuario == User.TipoUsuario.DOCENTE:
         return [
+            {"label": "Reservas de ambientes", "href": "/ambientes/reservas/"},
             {"label": "Meus Processos", "href": "/menu/meus-processos/"},
             {"label": "Processos no Pleno", "href": "/menu/processos-pleno/"},
             {"label": "Processos dos orientandos", "href": "/menu/processos-orientandos/"},
@@ -53,6 +54,11 @@ def _menu_lateral_items(user):
             {"label": "Documento de histÃ³rico", "href": "/aluno/documento-historico/"},
             {"label": "Meus Processos", "href": "/menu/meus-processos/"},
             {"label": "Novo processo", "href": "/processos/novo/"},
+        ]
+    if user.tipo_usuario == User.TipoUsuario.SERVIDOR:
+        return [
+            {"label": "Reservas de ambientes", "href": "/ambientes/reservas/"},
+            {"label": "Salas do polo", "href": "/ambientes/salas/"},
         ]
     return []
 
@@ -69,5 +75,9 @@ def navegacao_lateral(request):
         "can_view_dashboard": has_gestao_access,
         "can_view_processos": can_view_processos,
         "can_view_caixa": _is_docente(request.user) or _is_servidor(request.user),
-        "side_menu_items": _menu_lateral_items(request.user),
+        "nav_has_gestao_access": has_gestao_access,
+        "nav_can_view_dashboard": has_gestao_access,
+        "nav_can_view_processos": can_view_processos,
+        "nav_can_view_caixa": _is_docente(request.user) or _is_servidor(request.user),
+        "nav_side_menu_items": _menu_lateral_items(request.user),
     }

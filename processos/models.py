@@ -1,4 +1,6 @@
+import calendar
 from datetime import timedelta
+import uuid
 
 from django.conf import settings
 from django.contrib.auth.base_user import BaseUserManager
@@ -53,6 +55,13 @@ class User(AbstractUser):
 
     nome = models.CharField(max_length=255)
     email = models.EmailField(unique=True)
+    polo_atuacao = models.ForeignKey(
+        "Polo",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="servidores",
+    )
     tipo_usuario = models.CharField(
         max_length=20,
         choices=TipoUsuario.choices,
@@ -811,3 +820,215 @@ class ComentarioProcesso(models.Model):
 
     def __str__(self) -> str:
         return f"Comentario em {self.processo.numero}"
+
+
+class Polo(models.Model):
+    nome = models.CharField(max_length=120, unique=True)
+    descricao = models.CharField(max_length=255, blank=True)
+    ativo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self) -> str:
+        return self.nome
+
+
+class Sala(models.Model):
+    polo = models.ForeignKey(Polo, on_delete=models.PROTECT, related_name="salas")
+    nome = models.CharField(max_length=120)
+    capacidade = models.PositiveIntegerField(null=True, blank=True)
+    ativa = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["polo__nome", "nome"]
+        constraints = [
+            models.UniqueConstraint(fields=["polo", "nome"], name="unique_sala_por_polo"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.nome} - {self.polo.nome}"
+
+
+class DisponibilidadeSala(models.Model):
+    class DiaSemana(models.IntegerChoices):
+        SEGUNDA = 0, "Segunda-feira"
+        TERCA = 1, "Terca-feira"
+        QUARTA = 2, "Quarta-feira"
+        QUINTA = 3, "Quinta-feira"
+        SEXTA = 4, "Sexta-feira"
+        SABADO = 5, "Sabado"
+        DOMINGO = 6, "Domingo"
+
+    sala = models.ForeignKey(Sala, on_delete=models.CASCADE, related_name="disponibilidades")
+    dia_semana = models.PositiveSmallIntegerField(choices=DiaSemana.choices)
+    hora_inicio = models.TimeField()
+    hora_fim = models.TimeField()
+
+    class Meta:
+        ordering = ["sala", "dia_semana", "hora_inicio"]
+
+    def __str__(self) -> str:
+        return f"{self.sala} - {self.get_dia_semana_display()} {self.hora_inicio:%H:%M}-{self.hora_fim:%H:%M}"
+
+    def clean(self):
+        if self.hora_fim <= self.hora_inicio:
+            raise ValidationError({"hora_fim": "O horario final deve ser posterior ao horario inicial."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class ReservaAmbiente(models.Model):
+    class TipoReserva(models.TextChoices):
+        AULA = "AULA", "Aula"
+        DEFESA = "DEFESA", "Defesa"
+        REUNIAO_PESQUISA = "REUNIAO_PESQUISA", "Reuniao de pesquisa"
+
+    sala = models.ForeignKey(Sala, on_delete=models.PROTECT, related_name="reservas")
+    docente = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="reservas_docente",
+        limit_choices_to={"tipo_usuario": User.TipoUsuario.DOCENTE},
+    )
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="reservas_criadas",
+    )
+    tipo = models.CharField(max_length=20, choices=TipoReserva.choices)
+    titulo = models.CharField(max_length=255, blank=True)
+    inicio = models.DateTimeField()
+    fim = models.DateTimeField()
+    recorrente = models.BooleanField(default=False)
+    grupo_recorrencia = models.UUIDField(null=True, blank=True, db_index=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["inicio", "sala__nome"]
+
+    def __str__(self) -> str:
+        return f"{self.sala} - {self.inicio:%d/%m/%Y %H:%M}"
+
+    def horario_disponivel_na_sala(self) -> bool:
+        if self.inicio.date() != self.fim.date():
+            return False
+        dia_semana = self.inicio.weekday()
+        inicio_hora = timezone.localtime(self.inicio).time() if timezone.is_aware(self.inicio) else self.inicio.time()
+        fim_hora = timezone.localtime(self.fim).time() if timezone.is_aware(self.fim) else self.fim.time()
+        return self.sala.disponibilidades.filter(
+            dia_semana=dia_semana,
+            hora_inicio__lte=inicio_hora,
+            hora_fim__gte=fim_hora,
+        ).exists()
+
+    def reserva_conflitante(self):
+        queryset = ReservaAmbiente.objects.filter(
+            sala=self.sala,
+            inicio__lt=self.fim,
+            fim__gt=self.inicio,
+        ).select_related("sala", "sala__polo", "docente").order_by("inicio")
+        if self.pk:
+            queryset = queryset.exclude(pk=self.pk)
+        return queryset.first()
+
+    def tem_conflito(self):
+        return self.reserva_conflitante() is not None
+
+    @staticmethod
+    def _local_datetime(valor):
+        return timezone.localtime(valor) if timezone.is_aware(valor) else valor
+
+    @classmethod
+    def mensagem_conflito(cls, reserva):
+        inicio = cls._local_datetime(reserva.inicio)
+        fim = cls._local_datetime(reserva.fim)
+        return (
+            "Choque com reserva existente: "
+            f"{reserva.sala.nome} - {reserva.sala.polo.nome}, "
+            f"{inicio:%d/%m/%Y} das {inicio:%H:%M} as {fim:%H:%M}, "
+            f"{reserva.docente.nome}, {reserva.get_tipo_display()}."
+        )
+
+    def clean(self):
+        errors = {}
+        if self.docente and self.docente.tipo_usuario != User.TipoUsuario.DOCENTE:
+            errors["docente"] = "A reserva deve estar vinculada a um docente."
+        if self.fim <= self.inicio:
+            errors["fim"] = "O termino deve ser posterior ao inicio."
+        elif self.inicio.date() != self.fim.date():
+            errors["fim"] = "A reserva deve comecar e terminar no mesmo dia."
+        if self.sala_id and self.inicio and self.fim:
+            if not self.horario_disponivel_na_sala():
+                errors["inicio"] = "A sala nao esta disponivel neste horario."
+            conflito = self.reserva_conflitante()
+            if conflito:
+                errors["inicio"] = self.mensagem_conflito(conflito)
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    @classmethod
+    def criar_reservas(cls, *, sala, docente, criado_por, tipo, titulo, inicio, fim, recorrencia, duracao_recorrencia_meses):
+        datas = [(inicio, fim)]
+        if recorrencia != "NENHUMA":
+            if not duracao_recorrencia_meses:
+                raise ValidationError("Informe por quantos meses repetir.")
+            if duracao_recorrencia_meses > 6:
+                raise ValidationError("A recorrencia nao pode ser superior a 6 meses.")
+            if duracao_recorrencia_meses < 1:
+                raise ValidationError("A duracao da recorrencia deve ser de pelo menos 1 mes.")
+            recorrencia_ate = cls._somar_meses(inicio, duracao_recorrencia_meses).date()
+            atual_inicio, atual_fim = cls._proxima_ocorrencia(inicio, fim, recorrencia)
+            while atual_inicio.date() <= recorrencia_ate:
+                datas.append((atual_inicio, atual_fim))
+                atual_inicio, atual_fim = cls._proxima_ocorrencia(atual_inicio, atual_fim, recorrencia)
+
+        grupo = uuid.uuid4() if len(datas) > 1 else None
+        reservas = [
+            cls(
+                sala=sala,
+                docente=docente,
+                criado_por=criado_por,
+                tipo=tipo,
+                titulo=titulo,
+                inicio=item_inicio,
+                fim=item_fim,
+                recorrente=len(datas) > 1,
+                grupo_recorrencia=grupo,
+            )
+            for item_inicio, item_fim in datas
+        ]
+        for reserva in reservas:
+            reserva.full_clean()
+        with transaction.atomic():
+            return [reserva.save() or reserva for reserva in reservas]
+
+    @classmethod
+    def _proxima_ocorrencia(cls, inicio, fim, recorrencia):
+        if recorrencia == "DIARIA":
+            return inicio + timedelta(days=1), fim + timedelta(days=1)
+        if recorrencia == "SEMANAL":
+            return inicio + timedelta(days=7), fim + timedelta(days=7)
+        if recorrencia == "MENSAL":
+            return cls._somar_um_mes(inicio), cls._somar_um_mes(fim)
+        raise ValidationError("Recorrencia invalida.")
+
+    @staticmethod
+    def _somar_um_mes(valor):
+        ano = valor.year + (valor.month // 12)
+        mes = (valor.month % 12) + 1
+        dia = min(valor.day, calendar.monthrange(ano, mes)[1])
+        return valor.replace(year=ano, month=mes, day=dia)
+
+    @classmethod
+    def _somar_meses(cls, valor, quantidade):
+        resultado = valor
+        for _ in range(quantidade):
+            resultado = cls._somar_um_mes(resultado)
+        return resultado
