@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Criar Comissão | Coordenação{% endblock %}
+{% block content %}
+<section class="card">
+    <h1 class="section-title">Criar Comissão</h1>
+    {% url 'setores_comissoes' as setores_url %}
+    {% include "processos/includes/setor_comissao_form.html" with submit_label="Criar comissão" cancel_url=setores_url %}
+</section>
+{% endblock %}

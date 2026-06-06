@@ -29,6 +29,7 @@ from .forms import (
     ReservaAmbienteForm,
     SalaForm,
     SolicitarCienteOrientadorForm,
+    SetorComissaoForm,
     TrajetoriaAcademicaForm,
     UserProfileForm,
 )
@@ -44,6 +45,7 @@ from .models import (
     ReservaAmbiente,
     Sala,
     Setor,
+    SetorMembro,
     TrajetoriaAcademica,
     User,
 )
@@ -98,8 +100,10 @@ def _can_view_processo_detalhe(user, processo):
         return True
     if _can_view_processos(user):
         return True
+    if processo.setor_atual_id in {setor.id for setor in _setores_caixa(user)}:
+        return True
     if _is_docente(user):
-        if _is_processo_no_pleno(processo):
+        if _is_processo_no_pleno(processo) and _is_membro_setor_nome(user, "Colegiando PPGEC (Pleno)"):
             return True
         return Aluno.objects.filter(
             pk=processo.usuario_criado_por_id,
@@ -114,8 +118,32 @@ def _is_requerente_do_processo(user, processo):
     return user.is_authenticated and processo.usuario_criado_por_id == user.id
 
 
+def _setores_membro_queryset(user):
+    if not user.is_authenticated:
+        return Setor.objects.none()
+    return Setor.objects.filter(membros__usuario=user, membros__data_saida__isnull=True, ativo=True).distinct()
+
+
+def _is_membro_setor_nome(user, nome):
+    return _setores_membro_queryset(user).filter(nome=nome).exists()
+
+
+def _setores_caixa(user):
+    setores = []
+    if _is_servidor(user):
+        setores.extend(Setor.objects.filter(nome="Secretaria PPGEC", ativo=True))
+    if _is_coordenador(user):
+        setores.extend(Setor.objects.filter(nome="Coordenação PPG", ativo=True))
+    setores.extend(_setores_membro_queryset(user))
+
+    unique = {}
+    for setor in setores:
+        unique[setor.id] = setor
+    return list(unique.values())
+
+
 def _can_view_caixa(user):
-    return _is_docente(user) or _is_servidor(user)
+    return bool(_setores_caixa(user))
 
 
 def _can_manage_restricted_docs(user):
@@ -123,13 +151,7 @@ def _can_manage_restricted_docs(user):
 
 
 def _nomes_setores_caixa(user):
-    if _is_servidor(user):
-        return ["Secretaria PPGEC"]
-    if _is_coordenador(user):
-        return ["Coordenação PPG", "Colegiando PPGEC (Pleno)"]
-    if _is_docente(user):
-        return ["Colegiando PPGEC (Pleno)"]
-    return []
+    return [setor.nome for setor in _setores_caixa(user)]
 
 
 def _is_setor_pleno_nome(nome: str) -> bool:
@@ -164,22 +186,26 @@ def _is_processo_no_pleno(processo: Processo) -> bool:
 
 
 def _can_manage_caixa_actions(user, processo: Processo) -> bool:
+    if processo.setor_atual_id in {setor.id for setor in _setores_caixa(user)}:
+        return True
     if _is_servidor(user):
         return processo.setor_atual.nome == "Secretaria PPGEC"
     if _is_coordenador(user):
-        return processo.setor_atual.nome == "Coordenação PPG" or _is_processo_no_pleno(processo)
+        return processo.setor_atual.nome == "Coordenação PPG"
     return False
 
 
 def _menu_lateral_home(user):
     if user.tipo_usuario == User.TipoUsuario.DOCENTE:
-        return [
+        items = [
             {"label": "Meus Processos", "href": "/menu/meus-processos/"},
-            {"label": "Processos no Pleno", "href": "/menu/processos-pleno/"},
             {"label": "Processos dos orientandos", "href": "/menu/processos-orientandos/"},
             {"label": "Ciencias manifestadas", "href": "/menu/ciencias-manifestadas/"},
             {"label": "Meus Orientandos", "href": "/menu/meus-orientandos/"},
         ]
+        if _is_membro_setor_nome(user, "Colegiando PPGEC (Pleno)"):
+            items.insert(1, {"label": "Processos no Pleno", "href": "/menu/processos-pleno/"})
+        return items
     if user.tipo_usuario == User.TipoUsuario.ALUNO:
         return [
             {"label": "Documento de vínculo (TODO)", "href": "/aluno/documento-vinculo/"},
@@ -297,12 +323,166 @@ def me_view(request):
         profile_form = UserProfileForm(instance=request.user)
         password_form = PasswordChangeForm(user=request.user)
 
+    participacoes_ativas = (
+        request.user.participacoes_setor.select_related("setor", "designado_por")
+        .filter(data_saida__isnull=True)
+        .order_by("setor__nome")
+    )
+    historico_participacoes = (
+        request.user.participacoes_setor.select_related("setor", "designado_por")
+        .exclude(data_saida__isnull=True)
+        .order_by("-data_saida", "setor__nome")
+    )
+
     return render(
         request,
         "processos/me.html",
         {
             "profile_form": profile_form,
             "password_form": password_form,
+            "participacoes_ativas": participacoes_ativas,
+            "historico_participacoes": historico_participacoes,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
+@login_required
+def setores_comissoes_view(request):
+    can_edit_setores = _is_coordenador(request.user)
+    if not (can_edit_setores or _is_servidor(request.user)):
+        raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
+
+    setor_editado = None
+    setor_id = request.GET.get("editar") if can_edit_setores else None
+    if request.method == "POST":
+        if not can_edit_setores:
+            raise PermissionDenied("Apenas coordenadores podem alterar setores e comissoes.")
+        setor_id = request.POST.get("setor_id")
+    if setor_id:
+        setor_editado = get_object_or_404(Setor, pk=setor_id)
+
+    if request.method == "POST" and can_edit_setores:
+        if "encerrar_membro" in request.POST:
+            membro = get_object_or_404(
+                SetorMembro,
+                pk=request.POST.get("membro_id"),
+                data_saida__isnull=True,
+            )
+            membro.encerrar()
+            messages.success(request, "Participacao encerrada.")
+            return redirect("setores_comissoes")
+
+        form = SetorComissaoForm(request.POST, instance=setor_editado)
+        if not setor_editado:
+            raise PermissionDenied("Use a pagina Criar Comissao para cadastrar novas comissoes.")
+        if form.is_valid():
+            setor = form.save(commit=False)
+            setor.save()
+
+            membros_selecionados = set()
+            for campo in ["docentes", "servidores", "alunos"]:
+                membros_selecionados.update(form.cleaned_data[campo].values_list("id", flat=True))
+            membros_ativos = SetorMembro.objects.filter(setor=setor, data_saida__isnull=True)
+            for membro in membros_ativos.exclude(usuario_id__in=membros_selecionados):
+                membro.encerrar()
+            usuarios_ativos = set(membros_ativos.values_list("usuario_id", flat=True))
+            for usuario_id in membros_selecionados - usuarios_ativos:
+                SetorMembro.objects.create(
+                    setor=setor,
+                    usuario_id=usuario_id,
+                    designado_por=request.user,
+                )
+
+            messages.success(request, "Setor/comissao salvo com sucesso.")
+            return redirect("setores_comissoes")
+        messages.error(request, "Nao foi possivel salvar o setor/comissao.")
+    else:
+        initial = {}
+        if setor_editado:
+            membros_ativos = setor_editado.membros.filter(data_saida__isnull=True).select_related("usuario")
+            initial["docentes"] = [
+                membro.usuario_id
+                for membro in membros_ativos
+                if membro.usuario.tipo_usuario == User.TipoUsuario.DOCENTE
+            ]
+            initial["servidores"] = [
+                membro.usuario_id
+                for membro in membros_ativos
+                if membro.usuario.tipo_usuario == User.TipoUsuario.SERVIDOR
+            ]
+            initial["alunos"] = [
+                membro.usuario_id
+                for membro in membros_ativos
+                if membro.usuario.tipo_usuario == User.TipoUsuario.ALUNO
+            ]
+        form = SetorComissaoForm(instance=setor_editado, initial=initial)
+
+    setores = (
+        Setor.objects.prefetch_related(
+            Prefetch(
+                "membros",
+                queryset=SetorMembro.objects.select_related("usuario", "designado_por").order_by("usuario__nome"),
+                to_attr="participacoes_prefetch",
+            )
+        )
+        .exclude(nome="Requerente")
+        .order_by("tipo", "nome")
+    )
+    return render(
+        request,
+        "processos/setores_comissoes.html",
+        {
+            "form": form,
+            "setor_editado": setor_editado,
+            "can_edit_setores": can_edit_setores,
+            "setores": setores,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
+@login_required
+def criar_comissao_view(request):
+    if not _is_coordenador(request.user):
+        raise PermissionDenied("Acesso restrito a coordenadores.")
+
+    if request.method == "POST":
+        form = SetorComissaoForm(request.POST)
+        if form.is_valid():
+            setor = form.save(commit=False)
+            setor.tipo = Setor.TipoSetor.COMISSAO
+            setor.save()
+
+            membros_selecionados = set()
+            for campo in ["docentes", "servidores", "alunos"]:
+                membros_selecionados.update(form.cleaned_data[campo].values_list("id", flat=True))
+            for usuario_id in membros_selecionados:
+                SetorMembro.objects.create(
+                    setor=setor,
+                    usuario_id=usuario_id,
+                    designado_por=request.user,
+                )
+
+            messages.success(request, "Comissao criada com sucesso.")
+            return redirect("setores_comissoes")
+        messages.error(request, "Nao foi possivel criar a comissao.")
+    else:
+        form = SetorComissaoForm()
+
+    return render(
+        request,
+        "processos/criar_comissao.html",
+        {
+            "form": form,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -992,29 +1172,27 @@ def caixa_processos_view(request):
     if not _can_view_caixa(request.user):
         raise PermissionDenied("Acesso restrito a docentes e servidores.")
 
-    nomes_setores = _nomes_setores_caixa(request.user)
-    selected_caixa = request.GET.get("caixa", "").strip().upper()
+    setores_caixa = _setores_caixa(request.user)
+    selected_caixa = request.GET.get("caixa", "").strip()
     status_caixa = request.GET.get("status_caixa", "").strip().upper()
     if status_caixa not in {"AGUARDANDO_CIENCIA", "EM_ANALISE"}:
         status_caixa = "EM_ANALISE"
 
-    opcoes_caixa = []
-    if _is_coordenador(request.user):
-        opcoes_caixa = [
-            {"value": "COORDENACAO", "label": "Coordenação", "setor_nome": "Coordenação PPG"},
-            {"value": "PLENO", "label": "Pleno", "setor_nome": "Colegiando PPGEC (Pleno)"},
-        ]
-        if selected_caixa == "COORDENACAO":
-            nomes_setores = ["Coordenação PPG"]
-        elif selected_caixa == "PLENO":
-            nomes_setores = ["Colegiando PPGEC (Pleno)"]
+    opcoes_caixa = [{"value": str(setor.id), "label": setor.nome} for setor in setores_caixa]
+    selected_setor_ids = [setor.id for setor in setores_caixa]
+    if selected_caixa:
+        try:
+            selected_id = int(selected_caixa)
+        except ValueError:
+            selected_id = None
+        if selected_id in selected_setor_ids:
+            selected_setor_ids = [selected_id]
         else:
-            selected_caixa = "COORDENACAO"
-            nomes_setores = ["Coordenação PPG"]
+            selected_caixa = ""
 
     processos_caixa = (
         Processo.objects.select_related("usuario_criado_por", "setor_atual")
-        .filter(setor_atual__nome__in=nomes_setores)
+        .filter(setor_atual_id__in=selected_setor_ids)
         .filter(
             status__in=[
                 Processo.StatusProcesso.EM_ANALISE,
@@ -1029,8 +1207,10 @@ def caixa_processos_view(request):
         "processos/caixa_processos.html",
         {
             "processos": processos_caixa,
-            "nomes_setores_caixa": nomes_setores,
-            "nomes_setores_caixa_texto": ", ".join(nomes_setores),
+            "nomes_setores_caixa": [setor.nome for setor in setores_caixa],
+            "nomes_setores_caixa_texto": ", ".join(
+                setor.nome for setor in setores_caixa if setor.id in selected_setor_ids
+            ),
             "opcoes_caixa": opcoes_caixa,
             "selected_caixa": selected_caixa,
             "status_caixa": status_caixa,
@@ -1736,8 +1916,8 @@ def menu_meus_orientandos_view(request):
 
 @login_required
 def menu_processos_pleno_view(request):
-    if request.user.tipo_usuario != User.TipoUsuario.DOCENTE:
-        raise PermissionDenied("Acesso restrito a docentes.")
+    if not _is_membro_setor_nome(request.user, "Colegiando PPGEC (Pleno)"):
+        raise PermissionDenied("Acesso restrito a membros do Colegiado PPGEC (Pleno).")
 
     processos_pleno = (
         Processo.objects.select_related("usuario_criado_por", "setor_atual")

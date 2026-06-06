@@ -28,6 +28,7 @@ from processos.views import (
     aluno_documento_vinculo_view,
     caixa_processos_view,
     coordenacao_dashboard_view,
+    criar_comissao_view,
     home_view,
     menu_processos_pleno_view,
     menu_meus_orientandos_view,
@@ -40,6 +41,7 @@ from processos.views import (
     processos_view,
     reservas_ambientes_view,
     salas_ambientes_view,
+    setores_comissoes_view,
     teste_email,
 )
 
@@ -65,6 +67,8 @@ urlpatterns = [
     path("coordenacao/processos/", processos_view, name="coordenacao_processos"),
     path("coordenacao/processos/<int:processo_id>/", processo_detalhe_view, name="processo_detalhe"),
     path("coordenacao/caixa-processos/", caixa_processos_view, name="coordenacao_caixa_processos"),
+    path("coordenacao/setores/", setores_comissoes_view, name="setores_comissoes"),
+    path("coordenacao/setores/criar/", criar_comissao_view, name="criar_comissao"),
     path('admin/', admin.site.urls),
     path("teste-email/", teste_email),
 ]

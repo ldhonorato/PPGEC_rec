@@ -13,6 +13,7 @@ from .models import (
     ReservaAmbiente,
     Sala,
     Setor,
+    SetorMembro,
     TrajetoriaAcademica,
     TramitacaoProcesso,
     User,
@@ -97,9 +98,17 @@ class TrajetoriaAcademicaAdmin(admin.ModelAdmin):
 
 @admin.register(Setor)
 class SetorAdmin(admin.ModelAdmin):
-    list_display = ("nome", "ativo")
-    list_filter = ("ativo",)
+    list_display = ("nome", "tipo", "ativo")
+    list_filter = ("tipo", "ativo")
     search_fields = ("nome", "descricao")
+
+
+@admin.register(SetorMembro)
+class SetorMembroAdmin(admin.ModelAdmin):
+    list_display = ("setor", "usuario", "data_entrada", "data_saida", "designado_por")
+    list_filter = ("setor", "data_saida")
+    search_fields = ("setor__nome", "usuario__nome", "usuario__email")
+    autocomplete_fields = ("setor", "usuario", "designado_por")
 
 
 @admin.register(Processo)

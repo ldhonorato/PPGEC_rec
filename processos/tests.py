@@ -16,6 +16,7 @@ from .models import (
     ReservaAmbiente,
     Sala,
     Setor,
+    SetorMembro,
     TrajetoriaAcademica,
     User,
 )
@@ -81,6 +82,144 @@ class AlunosViewTests(TestCase):
         response = self.client.get(reverse("coordenacao_alunos"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.aluno.nome)
+
+    def test_coordenador_cria_comissao_com_docente_e_aluno(self):
+        self.client.force_login(self.coordenador)
+        response = self.client.post(
+            reverse("criar_comissao"),
+            {
+                "nome": "Comissao de Bolsas",
+                "descricao": "Analise de bolsas",
+                "email": "bolsas@example.com",
+                "ativo": "on",
+                "docentes": [self.docente.id],
+                "alunos": [self.aluno.id],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        setor = Setor.objects.get(nome="Comissao de Bolsas")
+        self.assertEqual(setor.tipo, Setor.TipoSetor.COMISSAO)
+        self.assertTrue(SetorMembro.objects.filter(setor=setor, usuario=self.docente, data_saida__isnull=True).exists())
+        self.assertTrue(SetorMembro.objects.filter(setor=setor, usuario=self.aluno, data_saida__isnull=True).exists())
+
+    def test_coordenador_renderiza_gestao_de_setores(self):
+        self.client.force_login(self.coordenador)
+        response = self.client.get(reverse("setores_comissoes"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Setores e comissões cadastrados")
+        self.assertNotContains(response, "Membros alunos")
+
+    def test_coordenador_renderiza_criacao_de_comissao(self):
+        self.client.force_login(self.coordenador)
+        response = self.client.get(reverse("criar_comissao"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Criar Comissão")
+        self.assertContains(response, "Membros docentes")
+        self.assertContains(response, "Membros servidores")
+        self.assertContains(response, "Membros alunos")
+        self.assertContains(response, "Alunos selecionados")
+        self.assertContains(response, "resultados-alunos-comissao")
+
+    def test_coordenador_edita_comissao_em_setores(self):
+        setor = Setor.objects.create(nome="Comissao Editavel", tipo=Setor.TipoSetor.COMISSAO)
+        SetorMembro.objects.create(setor=setor, usuario=self.docente, designado_por=self.coordenador)
+
+        self.client.force_login(self.coordenador)
+        get_response = self.client.get(reverse("setores_comissoes"), {"editar": setor.id})
+        self.assertEqual(get_response.status_code, 200)
+        self.assertContains(get_response, "Editar setor/comissão")
+
+        post_response = self.client.post(
+            reverse("setores_comissoes"),
+            {
+                "setor_id": setor.id,
+                "nome": "Comissao Editada",
+                "descricao": "Atualizada",
+                "email": "",
+                "ativo": "on",
+                "docentes": [self.docente.id],
+                "servidores": [self.servidor.id],
+            },
+        )
+        self.assertEqual(post_response.status_code, 302)
+        setor.refresh_from_db()
+        self.assertEqual(setor.nome, "Comissao Editada")
+        self.assertTrue(SetorMembro.objects.filter(setor=setor, usuario=self.servidor, data_saida__isnull=True).exists())
+
+    def test_servidor_visualiza_setores_sem_acoes_de_edicao(self):
+        setor = Setor.objects.create(nome="Comissao Visivel", tipo=Setor.TipoSetor.COMISSAO)
+        SetorMembro.objects.create(setor=setor, usuario=self.docente, designado_por=self.coordenador)
+
+        self.client.force_login(self.servidor)
+        response = self.client.get(reverse("setores_comissoes"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Comissao Visivel")
+        self.assertNotContains(response, "Membros alunos")
+        self.assertNotContains(response, "Editar</a>", html=False)
+        self.assertNotContains(response, "Encerrar</button>", html=False)
+
+    def test_servidor_nao_altera_setores(self):
+        self.client.force_login(self.servidor)
+        response = self.client.post(
+            reverse("setores_comissoes"),
+            {
+                "nome": "Comissao Indevida",
+                "ativo": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Setor.objects.filter(nome="Comissao Indevida").exists())
+
+    def test_servidor_nao_acessa_criacao_de_comissao(self):
+        self.client.force_login(self.servidor)
+        response = self.client.get(reverse("criar_comissao"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_membro_de_setor_acessa_caixa_e_detalhe_do_setor(self):
+        setor = Setor.objects.create(nome="Comissao de Recursos", tipo=Setor.TipoSetor.COMISSAO)
+        SetorMembro.objects.create(setor=setor, usuario=self.aluno, designado_por=self.coordenador)
+        processo = Processo.objects.create(
+            usuario_criado_por=self.docente,
+            tipo=Processo.TipoProcesso.OUTRO,
+            assunto="Processo da comissao",
+            descricao="Analise pela comissao",
+            setor_atual=setor,
+        )
+
+        self.client.force_login(self.aluno)
+        caixa = self.client.get(reverse("coordenacao_caixa_processos"))
+        self.assertEqual(caixa.status_code, 200)
+        self.assertContains(caixa, processo.assunto)
+
+        detalhe = self.client.get(reverse("processo_detalhe", args=[processo.id]))
+        self.assertEqual(detalhe.status_code, 200)
+        self.assertContains(detalhe, processo.assunto)
+
+    def test_perfil_exibe_participacoes_ativas_e_historico(self):
+        setor_ativo = Setor.objects.create(nome="Comissao Ativa", tipo=Setor.TipoSetor.COMISSAO)
+        setor_encerrado = Setor.objects.create(nome="Comissao Encerrada", tipo=Setor.TipoSetor.COMISSAO)
+        SetorMembro.objects.create(setor=setor_ativo, usuario=self.docente, designado_por=self.coordenador)
+        SetorMembro.objects.create(
+            setor=setor_encerrado,
+            usuario=self.docente,
+            designado_por=self.coordenador,
+            data_saida=timezone.localdate(),
+        )
+
+        self.client.force_login(self.docente)
+        response = self.client.get(reverse("me"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Setores e comissões atuais")
+        self.assertContains(response, "Comissao Ativa")
+        self.assertContains(response, "Histórico de participação")
+        self.assertContains(response, "Comissao Encerrada")
 
     def test_filtros_por_nome_ingresso_e_status(self):
         aluno_inativo = Aluno.objects.create(
@@ -554,10 +693,28 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, 'class="overdue-link"')
         self.assertContains(response, 'class="user-menu"')
         self.assertContains(response, "Meus Processos")
-        self.assertContains(response, "Processos no Pleno")
+        self.assertNotContains(response, "Processos no Pleno")
         self.assertNotContains(response, 'class="nav"')
         self.assertContains(response, "Perfil")
         self.assertContains(response, "Sair")
+
+    def test_membro_do_pleno_ve_menu_e_rota_de_processos_do_pleno(self):
+        pleno = Setor.objects.get(nome="Colegiando PPGEC (Pleno)")
+        SetorMembro.objects.create(setor=pleno, usuario=self.docente)
+
+        self.client.force_login(self.docente)
+        home = self.client.get(reverse("home"))
+        response = self.client.get(reverse("menu_processos_pleno"))
+
+        self.assertContains(home, "Processos no Pleno")
+        self.assertContains(home, "Caixa de Processos")
+        self.assertEqual(response.status_code, 200)
+
+    def test_docente_fora_do_pleno_nao_acessa_processos_do_pleno(self):
+        self.client.force_login(self.docente)
+        response = self.client.get(reverse("menu_processos_pleno"))
+
+        self.assertEqual(response.status_code, 403)
 
     def test_home_aluno_mantem_acesso_rapido_para_novo_processo(self):
         self.client.force_login(self.aluno)
@@ -583,9 +740,9 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "Dashboard")
         self.assertContains(response, "Alunos")
         self.assertContains(response, "Processos")
-        self.assertContains(response, "Caixa de processos")
-        self.assertContains(response, "Reservas de ambientes")
-        self.assertContains(response, "Salas do polo")
+        self.assertContains(response, "Caixa de Processos")
+        self.assertContains(response, "Reserva de Ambientes")
+        self.assertContains(response, "Cadastro de Salas")
 
     def test_dashboard_coordenador_mantem_menu_lateral_da_home(self):
         coordenador = Docente.objects.create(
@@ -602,11 +759,11 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "Dashboard")
         self.assertContains(response, "Alunos")
         self.assertContains(response, "Processos")
-        self.assertContains(response, "Caixa de processos")
+        self.assertContains(response, "Caixa de Processos")
         self.assertContains(response, "Meus Processos")
-        self.assertContains(response, "Processos no Pleno")
-        self.assertContains(response, "Processos dos orientandos")
-        self.assertContains(response, "Ciencias")
+        self.assertNotContains(response, "Processos no Pleno")
+        self.assertContains(response, "Processos dos Orientandos")
+        self.assertContains(response, "Ciências")
         self.assertNotContains(response, "Ciencias manifestadas")
         self.assertContains(response, "Meus Orientandos")
 

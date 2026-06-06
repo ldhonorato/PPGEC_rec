@@ -61,51 +61,19 @@
                             <span class="sidebar-rule"></span>
                         </div>
 
-                        <p class="sidebar-label">Principal</p>
-                        <ul class="side-menu">
-                            {% if nav_can_view_dashboard %}
-                                <li>
-                                    <a class="{% if request.resolver_match.url_name == 'coordenacao_dashboard' %}is-active{% endif %}" href="{% url 'coordenacao_dashboard' %}">
-                                        <span class="side-icon">D</span>
-                                        Dashboard
-                                    </a>
-                                </li>
-                            {% endif %}
-                            {% if nav_has_gestao_access %}
-                                <li>
-                                    <a class="{% if request.resolver_match.url_name == 'coordenacao_alunos' %}is-active{% endif %}" href="{% url 'coordenacao_alunos' %}">
-                                        <span class="side-icon">A</span>
-                                        Alunos
-                                    </a>
-                                </li>
-                            {% endif %}
-                            {% if nav_can_view_processos %}
-                                <li>
-                                    <a class="{% if request.resolver_match.url_name == 'coordenacao_processos' %}is-active{% endif %}" href="{% url 'coordenacao_processos' %}">
-                                        <span class="side-icon">P</span>
-                                        Processos
-                                    </a>
-                                </li>
-                            {% endif %}
-                            {% if nav_can_view_caixa %}
-                                <li>
-                                    <a class="{% if request.resolver_match.url_name == 'coordenacao_caixa_processos' %}is-active{% endif %}" href="{% url 'coordenacao_caixa_processos' %}">
-                                        <span class="side-icon">C</span>
-                                        Caixa de processos
-                                    </a>
-                                </li>
-                            {% endif %}
-                            {% if nav_side_menu_items %}
-                                {% for item in nav_side_menu_items %}
+                        {% for section in nav_menu_sections %}
+                            <p class="sidebar-label">{{ section.label }}</p>
+                            <ul class="side-menu">
+                                {% for item in section.items %}
                                     <li>
-                                        <a class="{% if request.path == item.href %}is-active{% endif %}" href="{{ item.href }}">
-                                            <span class="side-icon">{{ item.label|slice:":1" }}</span>
+                                        <a class="{% if request.resolver_match.url_name in item.url_names %}is-active{% endif %}" href="{{ item.href }}">
+                                            <span class="side-icon">{{ item.icon }}</span>
                                             {{ item.label }}
                                         </a>
                                     </li>
                                 {% endfor %}
-                            {% endif %}
-                        </ul>
+                            </ul>
+                        {% endfor %}
 
                         <div class="sidebar-footer">
                             <p class="sidebar-label">Conta</p>

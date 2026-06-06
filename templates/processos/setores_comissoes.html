@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Setores e Comissões | Coordenação{% endblock %}
+{% block content %}
+{% if can_edit_setores and setor_editado %}
+    <section class="card" style="margin-bottom: 1rem;">
+        <h1 class="section-title">Editar setor/comissão</h1>
+        {% url 'setores_comissoes' as setores_url %}
+        {% include "processos/includes/setor_comissao_form.html" with submit_label="Salvar alterações" cancel_url=setores_url %}
+    </section>
+{% endif %}
+
+<section class="card">
+        <h2 class="section-title">Setores e comissões cadastrados</h2>
+        {% if setores %}
+            <ul class="list">
+                {% for setor in setores %}
+                    <li>
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                            <strong>{{ setor.nome }}</strong>
+                            {% if can_edit_setores %}
+                                <a class="btn btn-secondary" href="?editar={{ setor.id }}">Editar</a>
+                            {% endif %}
+                        </div>
+                        <small class="muted">
+                            Tipo: {{ setor.get_tipo_display }} |
+                            Status: {% if setor.ativo %}Ativo{% else %}Inativo{% endif %}
+                            {% if setor.email %} | Email: {{ setor.email }}{% endif %}
+                        </small>
+                        {% if setor.descricao %}
+                            <p class="muted" style="margin: 0.35rem 0 0 0;">{{ setor.descricao }}</p>
+                        {% endif %}
+                        <details style="margin-top: 0.8rem;">
+                            <summary class="text-link">Membros atuais</summary>
+                            {% with membros_ativos=setor.participacoes_prefetch %}
+                                {% if membros_ativos %}
+                                    <ul style="margin-top: 0.5rem;">
+                                        {% for membro in membros_ativos %}
+                                            {% if membro.ativo %}
+                                                <li>
+                                                    {{ membro.usuario.nome }} <span class="muted">({{ membro.usuario.get_tipo_usuario_display }})</span>
+                                                    {% if can_edit_setores %}
+                                                        <form method="post" style="display: inline;">
+                                                            {% csrf_token %}
+                                                            <input type="hidden" name="encerrar_membro" value="1">
+                                                            <input type="hidden" name="membro_id" value="{{ membro.id }}">
+                                                            <button class="text-link" type="submit">Encerrar</button>
+                                                        </form>
+                                                    {% endif %}
+                                                </li>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <p class="muted">Nenhum membro ativo.</p>
+                                {% endif %}
+                            {% endwith %}
+                        </details>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="muted">Nenhum setor/comissão cadastrado.</p>
+        {% endif %}
+</section>
+{% endblock %}

@@ -302,16 +302,57 @@ class AlteracaoAluno(models.Model):
 
 
 class Setor(models.Model):
+    class TipoSetor(models.TextChoices):
+        SETOR = "SETOR", "Setor"
+        COMISSAO = "COMISSAO", "Comissao"
+
     nome = models.CharField(max_length=120, unique=True)
     descricao = models.CharField(max_length=255, blank=True)
     ativo = models.BooleanField(default=True)
     email = models.EmailField(max_length=255, blank=True, null=True, help_text="E-mail institucional do setor")
+    tipo = models.CharField(max_length=20, choices=TipoSetor.choices, default=TipoSetor.SETOR)
 
     class Meta:
         ordering = ["nome"]
 
     def __str__(self) -> str:
         return self.nome
+
+
+class SetorMembro(models.Model):
+    setor = models.ForeignKey(Setor, on_delete=models.CASCADE, related_name="membros")
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="participacoes_setor")
+    data_entrada = models.DateField(default=timezone.localdate)
+    data_saida = models.DateField(null=True, blank=True)
+    designado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="designacoes_setor",
+    )
+
+    class Meta:
+        ordering = ["setor__nome", "usuario__nome", "-data_entrada"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["setor", "usuario"],
+                condition=models.Q(data_saida__isnull=True),
+                name="unique_membro_ativo_por_setor",
+            )
+        ]
+
+    @property
+    def ativo(self) -> bool:
+        return self.data_saida is None
+
+    def encerrar(self, data_saida=None):
+        self.data_saida = data_saida or timezone.localdate()
+        self.save(update_fields=["data_saida"])
+
+    def __str__(self) -> str:
+        status = "ativo" if self.ativo else f"ate {self.data_saida:%Y-%m-%d}"
+        return f"{self.usuario} em {self.setor} ({status})"
 
 
 class Processo(models.Model):

@@ -25,6 +25,31 @@ class UserProfileForm(forms.ModelForm):
         fields = ["nome", "email"]
 
 
+class SetorComissaoForm(forms.ModelForm):
+    docentes = forms.ModelMultipleChoiceField(
+        queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE, is_active=True).order_by("nome", "email"),
+        required=False,
+        label="Docentes",
+        widget=forms.CheckboxSelectMultiple,
+    )
+    servidores = forms.ModelMultipleChoiceField(
+        queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.SERVIDOR, is_active=True).order_by("nome", "email"),
+        required=False,
+        label="Servidores",
+        widget=forms.CheckboxSelectMultiple,
+    )
+    alunos = forms.ModelMultipleChoiceField(
+        queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.ALUNO).order_by("nome", "email"),
+        required=False,
+        label="Alunos",
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    class Meta:
+        model = Setor
+        fields = ["nome", "descricao", "email", "ativo", "docentes", "servidores", "alunos"]
+
+
 class SalaForm(forms.ModelForm):
     class Meta:
         model = Sala
