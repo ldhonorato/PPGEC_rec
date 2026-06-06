@@ -20,8 +20,11 @@ RUN pip install --upgrade pip \
 
 COPY . .
 
-RUN adduser --disabled-password --no-create-home appuser || true
-RUN chown -R appuser:appuser /app
+RUN adduser --disabled-password --gecos "" appuser || true
+RUN mkdir -p /home/appuser \
+	&& chown -R appuser:appuser /app /home/appuser
+
+ENV HOME=/home/appuser
 
 COPY entrypoint.sh /entrypoint.sh
 RUN dos2unix /entrypoint.sh || sed -i 's/\r$//' /entrypoint.sh
@@ -34,4 +37,3 @@ EXPOSE 8001
 ENTRYPOINT ["/entrypoint.sh"]
 
 CMD ["gunicorn", "ppgec.wsgi:application", "--bind", "0.0.0.0:8001", "--workers", "3"]
-
