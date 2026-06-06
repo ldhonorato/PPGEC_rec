@@ -41,6 +41,7 @@ from .models import (
     ReservaAmbiente,
     Sala,
     Setor,
+    TrajetoriaAcademica,
     User,
 )
 
@@ -97,7 +98,11 @@ def _can_view_processo_detalhe(user, processo):
     if _is_docente(user):
         if _is_processo_no_pleno(processo):
             return True
-        return Aluno.objects.filter(pk=processo.usuario_criado_por_id, orientador=user).exists()
+        return Aluno.objects.filter(
+            pk=processo.usuario_criado_por_id,
+            trajetorias__orientador=user,
+            trajetorias__status=TrajetoriaAcademica.Status.ATIVA,
+        ).exists()
     return False
 
 
@@ -234,7 +239,14 @@ def home_view(request):
     }
 
     if request.user.tipo_usuario == User.TipoUsuario.DOCENTE:
-        orientandos = Aluno.objects.filter(orientador=request.user).order_by("nome")
+        orientandos = (
+            Aluno.objects.filter(
+                trajetorias__orientador=request.user,
+                trajetorias__status=TrajetoriaAcademica.Status.ATIVA,
+            )
+            .distinct()
+            .order_by("nome")
+        )
         processos_orientandos = (
             Processo.objects.select_related("usuario_criado_por", "setor_atual")
             .filter(usuario_criado_por__in=orientandos.values("id"))
@@ -376,7 +388,7 @@ def alunos_view(request):
     if not _has_gestao_access(request.user):
         raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
 
-    queryset = Aluno.objects.select_related("orientador").order_by("nome")
+    queryset = Aluno.objects.prefetch_related("trajetorias__orientador").order_by("nome")
     nome = request.GET.get("nome", "").strip()
     ingresso_inicio_raw = request.GET.get("ingresso_inicio", "").strip()
     ingresso_fim_raw = request.GET.get("ingresso_fim", "").strip()
@@ -389,12 +401,14 @@ def alunos_view(request):
     ingresso_fim = ingresso_fim_raw if _semestre_valido(ingresso_fim_raw) else ""
 
     if ingresso_inicio:
-        queryset = queryset.filter(ingresso__gte=ingresso_inicio)
+        queryset = queryset.filter(trajetorias__ingresso__gte=ingresso_inicio)
     if ingresso_fim:
-        queryset = queryset.filter(ingresso__lte=ingresso_fim)
+        queryset = queryset.filter(trajetorias__ingresso__lte=ingresso_fim)
 
     if status:
         queryset = queryset.filter(status_aluno=status)
+
+    queryset = queryset.distinct()
 
     return render(
         request,
@@ -420,7 +434,7 @@ def aluno_detalhe_view(request, aluno_id):
     if not _has_gestao_access(request.user):
         raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
 
-    aluno = get_object_or_404(Aluno.objects.select_related("orientador"), pk=aluno_id)
+    aluno = get_object_or_404(Aluno.objects.prefetch_related("trajetorias__orientador"), pk=aluno_id)
 
     if request.method == "POST":
         acao = request.POST.get("acao", "").strip()
@@ -1264,7 +1278,10 @@ def menu_processos_orientandos_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.DOCENTE:
         raise PermissionDenied("Acesso restrito a docentes.")
 
-    orientandos = Aluno.objects.filter(orientador=request.user)
+    orientandos = Aluno.objects.filter(
+        trajetorias__orientador=request.user,
+        trajetorias__status=TrajetoriaAcademica.Status.ATIVA,
+    ).distinct()
     processos_orientandos = (
         Processo.objects.select_related("usuario_criado_por", "setor_atual")
         .filter(usuario_criado_por__in=orientandos.values("id"))
@@ -1292,7 +1309,14 @@ def menu_meus_orientandos_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.DOCENTE:
         raise PermissionDenied("Acesso restrito a docentes.")
 
-    orientandos = Aluno.objects.filter(orientador=request.user).order_by("nome")
+    orientandos = (
+        Aluno.objects.filter(
+            trajetorias__orientador=request.user,
+            trajetorias__status=TrajetoriaAcademica.Status.ATIVA,
+        )
+        .distinct()
+        .order_by("nome")
+    )
     return render(
         request,
         "processos/menu_meus_orientandos.html",
