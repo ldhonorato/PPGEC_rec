@@ -5,7 +5,7 @@ from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -313,9 +313,34 @@ def coordenacao_dashboard_view(request):
     if not _can_view_dashboard(request.user):
         raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
 
+    trajetorias_ativas = TrajetoriaAcademica.objects.filter(
+        status=TrajetoriaAcademica.Status.ATIVA,
+    ).select_related("aluno")
     docentes = (
-        Docente.objects.prefetch_related("orientandos")
-        .annotate(total_orientandos=Count("orientandos"))
+        Docente.objects.prefetch_related(
+            Prefetch(
+                "trajetorias_orientadas",
+                queryset=trajetorias_ativas,
+                to_attr="trajetorias_orientadas_ativas",
+            ),
+            Prefetch(
+                "trajetorias_coorientadas",
+                queryset=trajetorias_ativas,
+                to_attr="trajetorias_coorientadas_ativas",
+            ),
+        )
+        .annotate(
+            total_orientandos=Count(
+                "trajetorias_orientadas__aluno",
+                filter=Q(trajetorias_orientadas__status=TrajetoriaAcademica.Status.ATIVA),
+                distinct=True,
+            ),
+            total_coorientandos=Count(
+                "trajetorias_coorientadas__aluno",
+                filter=Q(trajetorias_coorientadas__status=TrajetoriaAcademica.Status.ATIVA),
+                distinct=True,
+            ),
+        )
         .order_by("-total_orientandos", "nome")
     )
     return render(
