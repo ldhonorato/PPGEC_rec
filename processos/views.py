@@ -1585,7 +1585,38 @@ def novo_processo_view(request):
 
     if request.method == "POST":
         form = ProcessoAberturaForm(request.POST, request.FILES)
-        if form.is_valid():
+        doc_indices = set()
+        for key in request.POST.keys():
+            match = re.match(r"^doc_(\d+)_titulo$", key)
+            if match:
+                doc_indices.add(int(match.group(1)))
+
+        documentos_forms = []
+        for idx in sorted(doc_indices):
+            titulo = (request.POST.get(f"doc_{idx}_titulo") or "").strip()
+            tipo_documento = (request.POST.get(f"doc_{idx}_tipo_documento") or "").strip()
+            restricao_tipo = (request.POST.get(f"doc_{idx}_restricao_tipo") or "").strip()
+            arquivo = request.FILES.get(f"doc_{idx}_arquivo")
+
+            if not (titulo and tipo_documento and restricao_tipo and arquivo):
+                continue
+
+            documento_form = DocumentoCadastroForm(
+                {
+                    "titulo": titulo,
+                    "tipo_documento": tipo_documento,
+                    "restricao_tipo": restricao_tipo,
+                },
+                {"arquivo": arquivo},
+            )
+            documentos_forms.append(documento_form)
+
+        documentos_validos = True
+        for documento_form in documentos_forms:
+            if not documento_form.is_valid():
+                documentos_validos = False
+
+        if form.is_valid() and documentos_validos:
             setor_secretaria = Setor.objects.filter(nome="Secretaria PPGEC", ativo=True).first()
             if not setor_secretaria:
                 messages.error(
@@ -1599,26 +1630,12 @@ def novo_processo_view(request):
                 processo.status = Processo.StatusProcesso.EM_ANALISE
                 processo.save()
 
-                doc_indices = set()
-                for key in request.POST.keys():
-                    match = re.match(r"^doc_(\d+)_titulo$", key)
-                    if match:
-                        doc_indices.add(int(match.group(1)))
-
-                for idx in sorted(doc_indices):
-                    titulo = (request.POST.get(f"doc_{idx}_titulo") or "").strip()
-                    tipo_documento = (request.POST.get(f"doc_{idx}_tipo_documento") or "").strip()
-                    restricao_tipo = (request.POST.get(f"doc_{idx}_restricao_tipo") or "").strip()
-                    arquivo = request.FILES.get(f"doc_{idx}_arquivo")
-
-                    if not (titulo and tipo_documento and restricao_tipo and arquivo):
-                        continue
-
+                for documento_form in documentos_forms:
                     processo.adicionar_documento(
-                        titulo=titulo,
-                        arquivo=arquivo,
-                        tipo_documento=tipo_documento,
-                        restricao_tipo=restricao_tipo,
+                        titulo=documento_form.cleaned_data["titulo"],
+                        arquivo=documento_form.cleaned_data["arquivo"],
+                        tipo_documento=documento_form.cleaned_data["tipo_documento"],
+                        restricao_tipo=documento_form.cleaned_data["restricao_tipo"],
                         enviado_por=request.user,
                     )
 
@@ -1627,6 +1644,11 @@ def novo_processo_view(request):
 
                 messages.success(request, f"Processo {processo.numero} aberto com sucesso.")
                 return redirect("home")
+        elif not documentos_validos:
+            for documento_form in documentos_forms:
+                for errors in documento_form.errors.values():
+                    for error in errors:
+                        messages.error(request, f"Documento invalido: {error}")
     else:
         form = ProcessoAberturaForm()
 

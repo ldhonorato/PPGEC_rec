@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 
 from django import forms
 from django.contrib.auth import get_user_model
@@ -17,6 +18,27 @@ from .models import (
 
 
 User = get_user_model()
+
+
+MAX_DOCUMENTO_UPLOAD_SIZE = 5 * 1024 * 1024
+ALLOWED_DOCUMENTO_EXTENSIONS = {
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".ppt",
+    ".pptx",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".bmp",
+    ".tif",
+    ".tiff",
+}
+DOCUMENTO_UPLOAD_ACCEPT = ",".join(sorted(ALLOWED_DOCUMENTO_EXTENSIONS))
 
 
 class UserProfileForm(forms.ModelForm):
@@ -170,12 +192,27 @@ class DocumentoCadastroForm(forms.Form):
     arquivo = forms.FileField(
         required=True,
         label="Arquivo do documento",
+        help_text="PDF, Office ou imagem. Tamanho maximo: 5 MB.",
+        widget=forms.ClearableFileInput(attrs={"accept": DOCUMENTO_UPLOAD_ACCEPT}),
     )
     restricao_tipo = forms.ChoiceField(
         choices=Documento.RestricaoAcesso.choices,
         required=True,
         label="Documento restrito",
     )
+
+    def clean_arquivo(self):
+        arquivo = self.cleaned_data["arquivo"]
+        if arquivo.size > MAX_DOCUMENTO_UPLOAD_SIZE:
+            raise forms.ValidationError("O arquivo deve ter no maximo 5 MB.")
+
+        extensao = Path(arquivo.name).suffix.lower()
+        if extensao not in ALLOWED_DOCUMENTO_EXTENSIONS:
+            raise forms.ValidationError(
+                "Formato nao permitido. Envie PDF, arquivos Office ou imagens."
+            )
+
+        return arquivo
 
 
 class EncaminhamentoForm(forms.Form):
