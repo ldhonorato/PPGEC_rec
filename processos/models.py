@@ -816,33 +816,34 @@ class ComentarioProcesso(models.Model):
     def __str__(self) -> str:
         return f"Comentario em {self.processo.numero}"
 
+
 class EstagioDocencia(models.Model):
     
-    # --- 1. O CORAÇÃO DO FLUXOGRAMA (Status do Estágio na vida real) ---
     class Status(models.TextChoices):
-        NAO_INICIADO = "NAO_INICIADO", "Não Iniciado" # A sua correção aqui!
-        AGUARDANDO_APROVACAO = "AGUARDANDO", "Aguardando Aprovação"
-        EM_ANDAMENTO = "ANDAMENTO", "Em Andamento"
-        PENDENTE_RELATORIO = "PENDENTE", "Pendente de Relatório"
+        NAO_INICIADO = "NAO_INICIADO", "Não Iniciado"
+        AGUARD_CIENCIA = "AGUARD_CIENCIA", "Aguardando Ciente do Orientador"
+        AGUARD_ASSINATURA = "AGUARD_ASSINATURA", "Aguardando Aprovação da Coordenação"
+        ANALISE_DISP = "ANALISE_DISP", "Em Análise de Dispensa"
+        DISPENSADO = "DISPENSADO", "Dispensado"
+        EM_ANDAMENTO = "EM_ANDAMENTO", "Em Andamento"
+        AGUARD_RELAT = "AGUARD_RELAT", "Aguardando Relatório"
         CONCLUIDO = "CONCLUIDO", "Concluído"
 
-    # --- 2. AS PONTES DE LIGAÇÃO (Chaves Estrangeiras) ---
+    # --- 2. AS PONTES DE LIGAÇÃO E DADOS ---
     trajetoria = models.ForeignKey(
         "TrajetoriaAcademica", 
         on_delete=models.CASCADE, 
         related_name="estagios_docencia"
     )
     
-    supervisor = models.ForeignKey(
-        Docente, 
-        on_delete=models.PROTECT, 
-        related_name="estagios_supervisionados"
+    supervisor = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Nome do Supervisor"
     ) 
     
-    # AQUI ESTÁ A MÁGICA: Ligando o estágio ao trâmite burocrático!
-    # Usamos o nome da classe 'Processo' direto porque estão no mesmo arquivo.
     processo_vinculado = models.OneToOneField(
-        Processo, 
+        "Processo", 
         on_delete=models.SET_NULL, 
         null=True, 
         blank=True,
@@ -851,14 +852,10 @@ class EstagioDocencia(models.Model):
 
     # --- 3. DADOS DE CONTROLE ---
     status = models.CharField(
-        max_length=15, 
+        max_length=25, # Aumentado para 25 para acomodar perfeitamente o AGUARD_ASSINATURA
         choices=Status.choices, 
         default=Status.NAO_INICIADO
     )
-    
-    orientador_ciente = models.BooleanField(default=False)
-    relatorio_entregue = models.BooleanField(default=False)
-    dispensado = models.BooleanField(default=False)
     
     # --- 4. DATAS ---
     inicio = models.DateField(null=True, blank=True)
@@ -866,10 +863,23 @@ class EstagioDocencia(models.Model):
     
     class Meta:
         ordering = ["trajetoria"]
-        # Deixa os nomes bonitinhos com acento no painel Admin:
         verbose_name = "Estágio de Docência"
         verbose_name_plural = "Estágios de Docência"
         
     def __str__(self) -> str:
-        # Puxa o nome navegando pela Trajetória e mostra o Status atual
-        return f"{self.trajetoria.aluno.nome} - Status: {self.get_status_display()}"   
+        # Traz o nome do aluno puxando a ponte da Trajetória e exibe o status legível
+        return f"{self.trajetoria.aluno.nome} - Status: {self.get_status_display()}"
+    
+    @property
+    def relatorio_pendente_ou_proximo(self) -> bool:
+        """
+        Retorna True se o estágio está em andamento e 
+        falta 15 dias (ou menos) para a data de término (ou se já passou).
+        """
+        if self.status == self.Status.EM_ANDAMENTO and self.termino:
+            hoje = timezone.localdate()
+            # Calcula a diferença de dias entre o término e hoje
+            dias_restantes = (self.termino - hoje).days
+            return dias_restantes <= 30
+            
+        return False

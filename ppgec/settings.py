@@ -139,8 +139,12 @@ LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'login'
 
 # email config
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"#ENVIAR PARA SMTP
-#EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'#TESTAR NO CONSOLE
+#ADICIONADO PARA RODAR SEM PRECISAR MANDAR PARA UM EMAIL REAL (RETIRAR DPS DE FAZER AS DEVIDAS MUDANÇAS)
+
+#EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"#(deixar essa linha sem ser comentario) 
+#ENVIAR PARA SMTP
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'#(colocar essa linha como comentario)
+# #TESTAR NO CONSOLE
 EMAIL_HOST = "smtp.gmail.com"          # ou o SMTP do teu provedor
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
@@ -150,11 +154,22 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "")
 
 SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
 
+
+
 # celery config
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
+# CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0") (tirar comentario dessa linha)
+
+# MUDANÇA AQUI: Trocado de redis para "django-db" para salvar os resultados no seu SQLite local
+CELERY_RESULT_BACKEND = "django-db"
+
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 
-# django-celery-results
+
+
+#ADICIONADO PARA RODAR SEM DOCKER (RETIRAR DPS DE FAZER AS DEVIDAS MUDANÇAS)
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_STORE_EAGER_RESULT = True
+
 INSTALLED_APPS += ["django_celery_results"]

@@ -144,38 +144,22 @@ class AlteracaoAlunoAdmin(admin.ModelAdmin):
 
 @admin.register(EstagioDocencia)
 class EstagioDocenciaAdmin(admin.ModelAdmin):
-    # 1. list_display: Colocamos as novidades! A secretaria bate o olho e já vê 
-    # o status, o número do processo e se o relatório já foi entregue.
     list_display = (
         "trajetoria", 
         "supervisor", 
         "status", 
         "processo_vinculado", 
-        "orientador_ciente", 
-        "relatorio_entregue", 
-        "dispensado"
+        "inicio",
+        "termino",
+        "relatorio_pendente_ou_proximo"
     )
     
-    # 2. list_filter: Agora a barra lateral direita é uma arma poderosa!
-    # A secretaria pode clicar em "Status: PENDENTE_RELATORIO" e ver todo mundo que tá devendo.
-    list_filter = (
-        "status", 
-        "dispensado", 
-        "orientador_ciente", 
-        "relatorio_entregue", 
-        "inicio"
-    )
+    list_filter = ("status", "inicio")
     
-    # 3. search_fields: Olha a mágica dos "__" (duplo underline) de novo!
-    # Adicionamos "processo_vinculado__numero". Isso significa que se a coordenação mandar
-    # um e-mail dizendo "Veja o estágio do processo 202606-000005", você joga na barra e acha!
     search_fields = (
         "trajetoria__aluno__nome", 
-        "supervisor__nome", 
+        "supervisor", 
         "processo_vinculado__numero"
     )
     
-    # 4. autocomplete_fields: Adicionamos o "processo_vinculado" aqui também.
-    # Como a universidade vai ter milhares de processos gerados no ano, isso cria uma
-    # barrinha de pesquisa super leve na hora de vincular, em vez de travar o site.
-    autocomplete_fields = ("trajetoria", "supervisor", "processo_vinculado")
+    autocomplete_fields = ("trajetoria", "processo_vinculado")
