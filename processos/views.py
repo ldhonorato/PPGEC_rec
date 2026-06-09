@@ -35,6 +35,7 @@ from .models import (
     ManifestacaoProcesso,
     Processo,
     Setor,
+    TrajetoriaAcademica,
     User,
 )
 
@@ -91,7 +92,11 @@ def _can_view_processo_detalhe(user, processo):
     if _is_docente(user):
         if _is_processo_no_pleno(processo):
             return True
-        return Aluno.objects.filter(pk=processo.usuario_criado_por_id, orientador=user).exists()
+        return TrajetoriaAcademica.objects.filter(
+            aluno_id=processo.usuario_criado_por_id,
+            orientador=user,
+            status=TrajetoriaAcademica.Status.ATIVA,
+        ).exists()
     return False
 
 
@@ -228,7 +233,10 @@ def home_view(request):
     }
 
     if request.user.tipo_usuario == User.TipoUsuario.DOCENTE:
-        orientandos = Aluno.objects.filter(orientador=request.user).order_by("nome")
+        orientandos = Aluno.objects.filter(
+            trajetorias__orientador=request.user,
+            trajetorias__status=TrajetoriaAcademica.Status.ATIVA,
+        ).distinct().order_by("nome")
         processos_orientandos = (
             Processo.objects.select_related("usuario_criado_por", "setor_atual")
             .filter(usuario_criado_por__in=orientandos.values("id"))
@@ -370,7 +378,7 @@ def alunos_view(request):
     if not _has_gestao_access(request.user):
         raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
 
-    queryset = Aluno.objects.select_related("orientador").order_by("nome")
+    queryset = Aluno.objects.order_by("nome")
     nome = request.GET.get("nome", "").strip()
     ingresso_inicio_raw = request.GET.get("ingresso_inicio", "").strip()
     ingresso_fim_raw = request.GET.get("ingresso_fim", "").strip()
@@ -414,7 +422,7 @@ def aluno_detalhe_view(request, aluno_id):
     if not _has_gestao_access(request.user):
         raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
 
-    aluno = get_object_or_404(Aluno.objects.select_related("orientador"), pk=aluno_id)
+    aluno = get_object_or_404(Aluno, pk=aluno_id)
 
     if request.method == "POST":
         acao = request.POST.get("acao", "").strip()
@@ -1169,7 +1177,10 @@ def menu_processos_orientandos_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.DOCENTE:
         raise PermissionDenied("Acesso restrito a docentes.")
 
-    orientandos = Aluno.objects.filter(orientador=request.user)
+    orientandos = Aluno.objects.filter(
+        trajetorias__orientador=request.user,
+        trajetorias__status=TrajetoriaAcademica.Status.ATIVA,
+    ).distinct()
     processos_orientandos = (
         Processo.objects.select_related("usuario_criado_por", "setor_atual")
         .filter(usuario_criado_por__in=orientandos.values("id"))
@@ -1197,7 +1208,10 @@ def menu_meus_orientandos_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.DOCENTE:
         raise PermissionDenied("Acesso restrito a docentes.")
 
-    orientandos = Aluno.objects.filter(orientador=request.user).order_by("nome")
+    orientandos = Aluno.objects.filter(
+        trajetorias__orientador=request.user,
+        trajetorias__status=TrajetoriaAcademica.Status.ATIVA,
+    ).distinct().order_by("nome")
     return render(
         request,
         "processos/menu_meus_orientandos.html",
