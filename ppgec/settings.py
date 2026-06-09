@@ -74,6 +74,10 @@ X_FRAME_OPTIONS = os.getenv("X_FRAME_OPTIONS", "DENY")
 if env_bool("USE_X_FORWARDED_PROTO", not DEBUG):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+APP_VERSION = os.getenv("APP_VERSION", "local")
+APP_REVISION = os.getenv("APP_REVISION", "unknown")
+APP_BUILD_RUN_ID = os.getenv("APP_BUILD_RUN_ID", "local")
+
 
 # Application definition
 

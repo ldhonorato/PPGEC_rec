@@ -1,6 +1,6 @@
 from datetime import datetime, time, timedelta
 
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -20,6 +20,27 @@ from .models import (
     TrajetoriaAcademica,
     User,
 )
+
+
+class VersionViewTests(SimpleTestCase):
+    @override_settings(
+        APP_VERSION="main",
+        APP_REVISION="abc123",
+        APP_BUILD_RUN_ID="456",
+        SECURE_SSL_REDIRECT=False,
+    )
+    def test_version_view_returns_build_metadata(self):
+        response = self.client.get(reverse("version"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "version": "main",
+                "revision": "abc123",
+                "build_run_id": "456",
+            },
+        )
 
 
 def criar_trajetoria(aluno, **kwargs):

@@ -2,9 +2,16 @@
 # o container é baseado na imagem oficial do docker que usa uma versao leve do python e eh baseado em debian
 FROM python:3.11-slim
 
+ARG APP_VERSION=local
+ARG APP_REVISION=unknown
+ARG APP_BUILD_RUN_ID=local
+
 # variaveis p que o python n gere cache e escreva os logs no console imediatamente
 ENV PYTHONDONTWRITEBYTECODE=1 \
-	PYTHONUNBUFFERED=1
+	PYTHONUNBUFFERED=1 \
+	APP_VERSION=${APP_VERSION} \
+	APP_REVISION=${APP_REVISION} \
+	APP_BUILD_RUN_ID=${APP_BUILD_RUN_ID}
 
 # atualiza o sistema e instala as dependencias/compiladores necessarios, alem de limpar o cache do apt
 RUN apt-get update \

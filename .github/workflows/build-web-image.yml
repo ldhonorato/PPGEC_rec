@@ -55,5 +55,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ github.ref_name }}
+            APP_REVISION=${{ github.sha }}
+            APP_BUILD_RUN_ID=${{ github.run_id }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
