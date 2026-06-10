@@ -2,7 +2,7 @@ from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
-from django.utils import timezone
+#from django.utils import timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -394,43 +394,43 @@ def send_email_status_atualizado(processo_id: int, status_anterior: str, status_
             recipient=setor_atual.email
         )
 
-# AGENDAMENTOS E VARREDURAS AUTOMÁTICAS (CELERY BEAT)====================================
-@shared_task(name="processos.tasks.verificar_prazos_expirados")
-def verificar_prazos_expirados():
-    from .models import Processo, Setor
+# # AGENDAMENTOS E VARREDURAS AUTOMÁTICAS (CELERY BEAT)====================================
+# @shared_task(name="processos.tasks.verificar_prazos_expirados")
+# def verificar_prazos_expirados():
+#     from .models import Processo, Setor
     
-    agora = timezone.localdate()
+#     agora = timezone.localdate()
     
-    # 1. Busca processos do Pleno que passaram da data limite e não estão finalizados
-    processos_vencidos = Processo.objects.filter(
-        prazo_limite__lt=agora,
-        setor_atual__nome__icontains="Pleno"
-    ).exclude(
-        status=Processo.StatusProcesso.FINALIZADO
-    )
+#     # 1. Busca processos do Pleno que passaram da data limite e não estão finalizados
+#     processos_vencidos = Processo.objects.filter(
+#         prazo_limite__lt=agora,
+#         setor_atual__nome__icontains="Pleno"
+#     ).exclude(
+#         status=Processo.StatusProcesso.FINALIZADO
+#     )
     
-    total = processos_vencidos.count()
-    logger.info("Iniciando varredura de prazos. Encontrados %s processos expirados no Pleno.", total)
+#     total = processos_vencidos.count()
+#     logger.info("Iniciando varredura de prazos. Encontrados %s processos expirados no Pleno.", total)
     
-    setor_secretaria = Setor.objects.filter(nome="Secretaria PPGEC", ativo=True).first()
+#     setor_secretaria = Setor.objects.filter(nome="Secretaria PPGEC", ativo=True).first()
     
-    if not setor_secretaria:
-        logger.error("Varredura abortada: Setor 'Secretaria PPGEC' nao encontrado no banco.")
-        return "Erro: Setor da secretaria nao encontrado."
+#     if not setor_secretaria:
+#         logger.error("Varredura abortada: Setor 'Secretaria PPGEC' nao encontrado no banco.")
+#         return "Erro: Setor da secretaria nao encontrado."
 
-    for processo in processos_vencidos:
-        logger.warning("Processo %s expirou no Pleno. Movendo de volta para a Secretaria.", processo.numero)
+#     for processo in processos_vencidos:
+#         logger.warning("Processo %s expirou no Pleno. Movendo de volta para a Secretaria.", processo.numero)
         
-        status_anterior_texto = processo.get_status_display()
+#         status_anterior_texto = processo.get_status_display()
         
-        processo.setor_atual = setor_secretaria
+#         processo.setor_atual = setor_secretaria
         
-        # Atualiza o status (mantendo EM_ANALISE para a secretaria dar andamento ao fluxo)
-        processo.status = Processo.StatusProcesso.EM_ANALISE  
+#         # Atualiza o status (mantendo EM_ANALISE para a secretaria dar andamento ao fluxo)
+#         processo.status = Processo.StatusProcesso.EM_ANALISE  
         
-        processo.save(update_fields=["setor_atual", "status", "atualizado_em"])
+#         processo.save(update_fields=["setor_atual", "status", "atualizado_em"])
         
-        status_atual_texto = processo.get_status_display()
-        send_email_status_atualizado.delay(processo.id, status_anterior_texto, status_atual_texto)
+#         status_atual_texto = processo.get_status_display()
+#         send_email_status_atualizado.delay(processo.id, status_anterior_texto, status_atual_texto)
 
-    return f"Varredura concluida. {total} processos expirados foram movidos para a secretaria."
+#     return f"Varredura concluida. {total} processos expirados foram movidos para a secretaria."

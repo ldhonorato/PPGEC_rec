@@ -50,6 +50,9 @@ from .tasks import (
     send_email_conclusao_orientador,
     send_email_movimentacao_pleno,
     send_email_processo_comentado_pleno,
+    send_email_novo_processo_secretaria,
+    send_email_mudanca_setor,
+    send_email_status_atualizado
 )
 
 
@@ -378,7 +381,7 @@ def alunos_view(request):
     if not _has_gestao_access(request.user):
         raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
 
-    queryset = Aluno.objects.order_by("nome")
+    queryset = Aluno.objects.prefetch_related("trajetorias__orientador").order_by("nome")
     nome = request.GET.get("nome", "").strip()
     ingresso_inicio_raw = request.GET.get("ingresso_inicio", "").strip()
     ingresso_fim_raw = request.GET.get("ingresso_fim", "").strip()
@@ -422,7 +425,7 @@ def aluno_detalhe_view(request, aluno_id):
     if not _has_gestao_access(request.user):
         raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
 
-    aluno = get_object_or_404(Aluno, pk=aluno_id)
+    aluno = get_object_or_404(Aluno.objects.prefetch_related("trajetorias__orientador"), pk=aluno_id)
 
     if request.method == "POST":
         acao = request.POST.get("acao", "").strip()
@@ -771,6 +774,8 @@ def processo_detalhe_view(request, processo_id):
             manifestar_ciente_form = ManifestarCienteOrientadorForm(request.POST)
             acao = (request.POST.get("acao_ciente") or "").strip().lower()
             if manifestar_ciente_form.is_valid():
+                status_anterior_texto = processo.get_status_display()#salva status
+                setor_anterior_id = processo.setor_atual_id if processo.setor_atual else None#salva setor
                 try:
                     pendente_ciente.registrar_manifestacao(
                         autor=request.user,
@@ -781,6 +786,18 @@ def processo_detalhe_view(request, processo_id):
                     messages.error(request, str(exc))
                 else:
                     messages.success(request, "Manifestacao registrada com sucesso.")
+
+                    processo.refresh_from_db()
+                    status_atual_texto = processo.get_status_display()
+                    setor_atual_id = processo.setor_atual_id if processo.setor_atual else None
+
+                    if setor_anterior_id == setor_atual_id and status_anterior_texto != status_atual_texto: #se mudou de status, mas não de setor
+                        send_email_status_atualizado.delay(
+                            processo.id, 
+                            status_anterior_texto, 
+                            status_atual_texto
+                        )
+
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_ciente_modal = True
 
@@ -835,6 +852,8 @@ def processo_detalhe_view(request, processo_id):
                         send_email_movimentacao_aluno.delay(processo.id, f"Encaminhado para o setor: {setor_destino.nome}")
                         if setor_destino and _is_setor_pleno_nome(setor_destino.nome):
                             send_email_movimentacao_pleno.delay(processo.id)
+                        send_email_mudanca_setor.delay(processo.id)
+
                     send_email_movimentacao_orientador.delay(processo.id, f"Encaminhado para o setor: {setor_destino.nome}")
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_encaminhamento_modal = True
@@ -1043,6 +1062,7 @@ def novo_processo_view(request):
 
                 send_email_novo_processo_aluno.delay(processo.id)
                 send_email_novo_processo_orientador.delay(processo.id)
+                send_email_novo_processo_secretaria.delay(processo.id)
 
                 messages.success(request, f"Processo {processo.numero} aberto com sucesso.")
                 return redirect("home")
