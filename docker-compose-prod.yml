@@ -1,7 +1,14 @@
+x-watchtower-enabled: &watchtower-enabled
+  com.centurylinklabs.watchtower.enable: "true"
+
+x-watchtower-disabled: &watchtower-disabled
+  com.centurylinklabs.watchtower.enable: "false"
+
 services:
   db:
     image: postgres:16-alpine
     container_name: ppgec_db
+    labels: *watchtower-disabled
     env_file:
       - .env
     environment:
@@ -20,6 +27,7 @@ services:
   pgadmin:
     image: dpage/pgadmin4:8
     container_name: ppgec_pgadmin
+    labels: *watchtower-disabled
     env_file:
       - .env
     environment:
@@ -38,8 +46,7 @@ services:
     image: ghcr.io/ldhonorato/ppgec_rec:latest
     container_name: ppgec_web
     command: gunicorn ppgec.wsgi:application --bind 0.0.0.0:8001 --workers 3
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+    labels: *watchtower-enabled
     ports:
       - "${WEB_PORT:-8001}:8001"
     env_file:
@@ -55,8 +62,7 @@ services:
     image: ghcr.io/ldhonorato/ppgec_rec:latest
     container_name: ppgec_celery
     command: celery -A ppgec worker --loglevel=info
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+    labels: *watchtower-enabled
     env_file:
       - .env
     depends_on:
@@ -70,8 +76,7 @@ services:
     image: ghcr.io/ldhonorato/ppgec_rec:latest
     container_name: ppgec_celery_beat
     command: celery -A ppgec beat --loglevel=info
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+    labels: *watchtower-enabled
     env_file:
       - .env
     depends_on:
@@ -84,13 +89,15 @@ services:
   redis:
     image: redis:7-alpine
     container_name: ppgec_redis
+    labels: *watchtower-disabled
     volumes:
       - redis_data:/data
     restart: unless-stopped
 
   watchtower:
-    image: containrrr/watchtower:latest
+    image: containrrr/watchtower:1.7.1
     container_name: ppgec_watchtower
+    labels: *watchtower-disabled
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
