@@ -912,7 +912,7 @@ def processo_detalhe_view(request, processo_id):
                 else:
                     messages.success(request, "Arquivo removido com sucesso.")
                     return redirect("processo_detalhe", processo_id=processo.id)
-
+# Implementada a transição de estado de "Em Análise" para "Em Debate"
         elif "adicionar_comentario" in request.POST:
             if not can_comment_pleno:
                 raise PermissionDenied("Apenas docentes podem comentar processos do Pleno.")
