@@ -1058,6 +1058,8 @@ class ReservaAmbienteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Sala 101")
         self.assertContains(response, "Sala 201")
+        self.assertContains(response, "Reservas feitas")
+        self.assertContains(response, "Visualizar reservas")
 
     def test_servidor_reserva_para_docente(self):
         self.client.force_login(self.servidor)
@@ -1080,6 +1082,90 @@ class ReservaAmbienteTests(TestCase):
         self.assertEqual(reserva.docente_id, self.docente.id)
         self.assertEqual(reserva.criado_por_id, self.servidor.id)
         self.assertEqual(reserva.sala_id, self.outra_sala.id)
+
+    def test_visualiza_reservas_feitas_com_filtros(self):
+        ReservaAmbiente.objects.create(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            titulo="Aula de algoritmos",
+            inicio=self._dt(8, 9),
+            fim=self._dt(8, 10),
+        )
+        ReservaAmbiente.objects.create(
+            sala=self.outra_sala,
+            docente=self.docente,
+            criado_por=self.servidor,
+            tipo=ReservaAmbiente.TipoReserva.DEFESA,
+            titulo="Defesa no polo norte",
+            inicio=self._dt(8, 10),
+            fim=self._dt(8, 11),
+        )
+
+        self.client.force_login(self.servidor)
+        response = self.client.get(reverse("reservas_ambientes"), {"tipo": ReservaAmbiente.TipoReserva.DEFESA})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Defesa no polo norte")
+        self.assertNotContains(response, "Aula de algoritmos")
+
+    def test_docente_visualiza_apenas_suas_reservas(self):
+        outro_docente = Docente.objects.create(
+            email="outro.docente.reserva@example.com",
+            password="senha-segura-123",
+            nome="Outro Docente",
+        )
+        ReservaAmbiente.objects.create(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            titulo="Minha reserva",
+            inicio=self._dt(8, 9),
+            fim=self._dt(8, 10),
+        )
+        ReservaAmbiente.objects.create(
+            sala=self.outra_sala,
+            docente=outro_docente,
+            criado_por=outro_docente,
+            tipo=ReservaAmbiente.TipoReserva.DEFESA,
+            titulo="Reserva de outro docente",
+            inicio=self._dt(8, 10),
+            fim=self._dt(8, 11),
+        )
+
+        self.client.force_login(self.docente)
+        response = self.client.get(reverse("reservas_ambientes"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Minha reserva")
+        self.assertNotContains(response, "Reserva de outro docente")
+
+    def test_docente_visualiza_disponibilidade_semanal_com_reservas_de_outros(self):
+        outro_docente = Docente.objects.create(
+            email="outro.docente.calendario@example.com",
+            password="senha-segura-123",
+            nome="Outro Docente Calendario",
+        )
+        ReservaAmbiente.objects.create(
+            sala=self.outra_sala,
+            docente=outro_docente,
+            criado_por=outro_docente,
+            tipo=ReservaAmbiente.TipoReserva.DEFESA,
+            titulo="Reserva privada de outro docente",
+            inicio=self._dt(8, 10),
+            fim=self._dt(8, 11),
+        )
+
+        self.client.force_login(self.docente)
+        response = self.client.get(reverse("reservas_ambientes"), {"semana": "2026-06-08"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Disponibilidade semanal")
+        self.assertContains(response, "Livre 08:00-12:00")
+        self.assertContains(response, "Ocupado 10:00-11:00 | Defesa")
+        self.assertNotContains(response, "Reserva privada de outro docente")
 
     def test_formulario_informa_choque_e_nao_cria_reserva(self):
         ReservaAmbiente.objects.create(

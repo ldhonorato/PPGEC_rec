@@ -1,4 +1,5 @@
 import re
+from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
@@ -41,6 +42,7 @@ from .models import (
     Docente,
     Documento,
     ManifestacaoProcesso,
+    Polo,
     Processo,
     ReservaAmbiente,
     Sala,
@@ -1705,7 +1707,99 @@ def reservas_ambientes_view(request):
     reservas = ReservaAmbiente.objects.select_related("sala", "sala__polo", "docente", "criado_por")
     if request.user.tipo_usuario == User.TipoUsuario.DOCENTE:
         reservas = reservas.filter(docente=request.user)
+
+    filtro_q = request.GET.get("q", "").strip()
+    filtro_polo = request.GET.get("polo", "").strip()
+    filtro_sala = request.GET.get("sala", "").strip()
+    filtro_tipo = request.GET.get("tipo", "").strip()
+    filtro_docente = request.GET.get("docente", "").strip()
+    filtro_data_inicio = request.GET.get("data_inicio", "").strip()
+    filtro_data_fim = request.GET.get("data_fim", "").strip()
+    calendario_semana = request.GET.get("semana", "").strip()
+    calendario_polo = request.GET.get("cal_polo", "").strip()
+    calendario_sala = request.GET.get("cal_sala", "").strip()
+
+    if filtro_q:
+        reservas = reservas.filter(
+            Q(titulo__icontains=filtro_q)
+            | Q(sala__nome__icontains=filtro_q)
+            | Q(sala__polo__nome__icontains=filtro_q)
+            | Q(docente__nome__icontains=filtro_q)
+            | Q(docente__email__icontains=filtro_q)
+        )
+    if filtro_polo:
+        reservas = reservas.filter(sala__polo_id=filtro_polo)
+    if filtro_sala:
+        reservas = reservas.filter(sala_id=filtro_sala)
+    if filtro_tipo:
+        reservas = reservas.filter(tipo=filtro_tipo)
+    if filtro_docente and request.user.tipo_usuario == User.TipoUsuario.SERVIDOR:
+        reservas = reservas.filter(docente_id=filtro_docente)
+
+    data_inicio = parse_date(filtro_data_inicio) if filtro_data_inicio else None
+    data_fim = parse_date(filtro_data_fim) if filtro_data_fim else None
+    if data_inicio:
+        reservas = reservas.filter(inicio__date__gte=data_inicio)
+    if data_fim:
+        reservas = reservas.filter(inicio__date__lte=data_fim)
+
     reservas = reservas.order_by("inicio")
+    salas_queryset = Sala.objects.filter(ativa=True, polo__ativo=True).select_related("polo").order_by("polo__nome", "nome")
+    polos_queryset = Polo.objects.filter(ativo=True).order_by("nome")
+    calendario_data_base = parse_date(calendario_semana) if calendario_semana else timezone.localdate()
+    if not calendario_data_base:
+        calendario_data_base = timezone.localdate()
+    calendario_inicio = calendario_data_base - timedelta(days=calendario_data_base.weekday())
+    calendario_fim = calendario_inicio + timedelta(days=6)
+    calendario_salas = salas_queryset.prefetch_related("disponibilidades")
+    if calendario_polo:
+        calendario_salas = calendario_salas.filter(polo_id=calendario_polo)
+    if calendario_sala:
+        calendario_salas = calendario_salas.filter(id=calendario_sala)
+    calendario_salas = list(calendario_salas)
+    calendario_reservas = (
+        ReservaAmbiente.objects.select_related("sala")
+        .filter(
+            sala__in=calendario_salas,
+            inicio__date__gte=calendario_inicio,
+            inicio__date__lte=calendario_fim,
+        )
+        .order_by("inicio")
+    )
+    reservas_por_sala_dia = {}
+    for reserva in calendario_reservas:
+        inicio_local = timezone.localtime(reserva.inicio) if timezone.is_aware(reserva.inicio) else reserva.inicio
+        fim_local = timezone.localtime(reserva.fim) if timezone.is_aware(reserva.fim) else reserva.fim
+        reservas_por_sala_dia.setdefault((reserva.sala_id, inicio_local.date()), []).append(
+            {
+                "inicio": inicio_local,
+                "fim": fim_local,
+                "tipo": reserva.get_tipo_display(),
+            }
+        )
+
+    calendario_dias = [
+        {
+            "data": calendario_inicio + timedelta(days=indice),
+            "label": (calendario_inicio + timedelta(days=indice)).strftime("%d/%m"),
+            "weekday": (calendario_inicio + timedelta(days=indice)).weekday(),
+        }
+        for indice in range(7)
+    ]
+    calendario_linhas = []
+    for sala in calendario_salas:
+        celulas = []
+        disponibilidades = list(sala.disponibilidades.all())
+        for dia in calendario_dias:
+            disponibilidades_dia = [item for item in disponibilidades if item.dia_semana == dia["weekday"]]
+            celulas.append(
+                {
+                    "data": dia["data"],
+                    "disponibilidades": disponibilidades_dia,
+                    "reservas": reservas_por_sala_dia.get((sala.id, dia["data"]), []),
+                }
+            )
+        calendario_linhas.append({"sala": sala, "celulas": celulas})
 
     return render(
         request,
@@ -1714,6 +1808,30 @@ def reservas_ambientes_view(request):
             "form": form,
             "reservas": reservas,
             "polo_servidor": polo_servidor,
+            "polos": polos_queryset,
+            "salas": salas_queryset,
+            "docentes": User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE, is_active=True).order_by("nome"),
+            "tipos_reserva": ReservaAmbiente.TipoReserva.choices,
+            "filtros_reservas": {
+                "q": filtro_q,
+                "polo": filtro_polo,
+                "sala": filtro_sala,
+                "tipo": filtro_tipo,
+                "docente": filtro_docente,
+                "data_inicio": filtro_data_inicio,
+                "data_fim": filtro_data_fim,
+            },
+            "calendario_dias": calendario_dias,
+            "calendario_linhas": calendario_linhas,
+            "calendario_inicio": calendario_inicio,
+            "calendario_fim": calendario_fim,
+            "calendario_semana_anterior": calendario_inicio - timedelta(days=7),
+            "calendario_semana_proxima": calendario_inicio + timedelta(days=7),
+            "filtros_calendario": {
+                "semana": calendario_semana,
+                "polo": calendario_polo,
+                "sala": calendario_sala,
+            },
         },
     )
 

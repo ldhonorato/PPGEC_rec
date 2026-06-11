@@ -460,6 +460,12 @@ input[type="checkbox"] {
     flex-wrap: wrap;
 }
 
+.calendar-nav {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
 .stack {
     display: grid;
     gap: 1rem;
@@ -496,6 +502,84 @@ label {
 
 .field {
     margin-bottom: 0.9rem;
+}
+
+.calendar-shell {
+    margin-top: 1rem;
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: #ffffff;
+}
+
+.week-calendar {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: collapse;
+}
+
+.week-calendar th,
+.week-calendar td {
+    width: 12.5%;
+    min-width: 118px;
+    padding: 0.72rem;
+    vertical-align: top;
+    border-bottom: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+}
+
+.week-calendar th:first-child,
+.week-calendar td:first-child {
+    width: 180px;
+}
+
+.week-calendar thead th {
+    color: var(--color-muted);
+    background: #f7fbff;
+    font-size: 0.82rem;
+    text-align: left;
+}
+
+.week-calendar tbody th {
+    color: var(--color-text);
+    background: #fbfdff;
+    text-align: left;
+}
+
+.week-calendar tbody th span {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--color-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.calendar-slot {
+    display: block;
+    margin-bottom: 0.42rem;
+    padding: 0.38rem 0.46rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.calendar-slot-free {
+    color: #14643d;
+    background: #eaf8f0;
+    border: 1px solid #bfe8ce;
+}
+
+.calendar-slot-busy {
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+    border: 1px solid #c9dcf5;
+}
+
+.calendar-slot-closed {
+    color: var(--color-muted);
+    background: #f2f5f8;
+    border: 1px solid var(--color-border);
 }
 
 .errorlist {
