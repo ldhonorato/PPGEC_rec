@@ -344,7 +344,8 @@ input[type="checkbox"] {
     list-style: none;
 }
 
-.side-menu a {
+.side-menu a,
+.side-submenu summary {
     display: flex;
     align-items: center;
     gap: 14px;
@@ -355,6 +356,39 @@ input[type="checkbox"] {
     text-decoration: none;
     border-radius: var(--radius-sm);
     border-left: 4px solid transparent;
+}
+
+.side-submenu summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.side-submenu summary::-webkit-details-marker {
+    display: none;
+}
+
+.side-submenu summary::after {
+    content: "v";
+    margin-left: auto;
+    font-size: 0.72rem;
+}
+
+.side-submenu[open] summary::after {
+    content: "^";
+}
+
+.side-submenu ul {
+    display: grid;
+    gap: 8px;
+    margin: 8px 0 0;
+    padding: 0 0 0 20px;
+    list-style: none;
+}
+
+.side-submenu ul a {
+    min-height: 44px;
+    padding: 0.62rem 0.84rem;
+    font-size: 0.92rem;
 }
 
 .side-form {
@@ -380,6 +414,8 @@ input[type="checkbox"] {
 
 .side-menu a:hover,
 .side-menu a.is-active,
+.side-submenu summary:hover,
+.side-submenu summary.is-active,
 .side-form button:hover,
 .side-form button:focus-visible {
     color: var(--color-primary);

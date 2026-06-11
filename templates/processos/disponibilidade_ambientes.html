@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Disponibilidade semanal | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Disponibilidade semanal</h1>
+            <p class="muted">Visualize a semana inteira para encontrar salas livres antes de reservar.</p>
+        </div>
+        <div class="calendar-nav">
+            <a class="btn btn-secondary" href="{% url 'disponibilidade_ambientes' %}?semana={{ calendario_semana_anterior|date:'Y-m-d' }}{% if filtros_calendario.polo %}&cal_polo={{ filtros_calendario.polo }}{% endif %}{% if filtros_calendario.sala %}&cal_sala={{ filtros_calendario.sala }}{% endif %}">Semana anterior</a>
+            <a class="btn btn-secondary" href="{% url 'disponibilidade_ambientes' %}?semana={{ calendario_semana_proxima|date:'Y-m-d' }}{% if filtros_calendario.polo %}&cal_polo={{ filtros_calendario.polo }}{% endif %}{% if filtros_calendario.sala %}&cal_sala={{ filtros_calendario.sala }}{% endif %}">Proxima semana</a>
+            <a class="btn btn-secondary" href="{% url 'reservas_ambientes' %}">Nova reserva</a>
+        </div>
+    </div>
+
+    <form method="get" class="stack">
+        <div class="grid-two">
+            <div class="field">
+                <label for="cal-semana">Semana</label>
+                <input id="cal-semana" type="date" name="semana" value="{{ calendario_inicio|date:'Y-m-d' }}">
+            </div>
+            <div class="field">
+                <label for="cal-polo">Polo</label>
+                <select id="cal-polo" name="cal_polo">
+                    <option value="">Todos</option>
+                    {% for polo in polos %}
+                        <option value="{{ polo.id }}" {% if filtros_calendario.polo == polo.id|stringformat:"s" %}selected{% endif %}>{{ polo.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="cal-sala">Sala</label>
+                <select id="cal-sala" name="cal_sala">
+                    <option value="">Todas</option>
+                    {% for sala in salas %}
+                        <option value="{{ sala.id }}" {% if filtros_calendario.sala == sala.id|stringformat:"s" %}selected{% endif %}>{{ sala.polo.nome }} - {{ sala.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">Atualizar calendario</button>
+        </div>
+    </form>
+
+    <div class="calendar-shell" aria-label="Calendario semanal de disponibilidade">
+        <table class="week-calendar">
+            <thead>
+                <tr>
+                    <th>Ambiente</th>
+                    {% for dia in calendario_dias %}
+                        <th>{{ dia.data|date:"D d/m" }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in calendario_linhas %}
+                    <tr>
+                        <th scope="row">
+                            <strong>{{ linha.sala.nome }}</strong>
+                            <span>{{ linha.sala.polo.nome }}</span>
+                        </th>
+                        {% for celula in linha.celulas %}
+                            <td>
+                                {% if celula.disponibilidades %}
+                                    {% for disponibilidade in celula.disponibilidades %}
+                                        <span class="calendar-slot calendar-slot-free">
+                                            Livre {{ disponibilidade.hora_inicio|time:"H:i" }}-{{ disponibilidade.hora_fim|time:"H:i" }}
+                                        </span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="calendar-slot calendar-slot-closed">Indisponivel</span>
+                                {% endif %}
+                                {% for reserva in celula.reservas %}
+                                    <span class="calendar-slot calendar-slot-busy">
+                                        Ocupado {{ reserva.inicio|date:"H:i" }}-{{ reserva.fim|date:"H:i" }} | {{ reserva.tipo }}
+                                    </span>
+                                {% endfor %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8">Nenhuma sala encontrada para os filtros selecionados.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

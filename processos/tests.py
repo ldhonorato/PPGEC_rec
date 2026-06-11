@@ -762,7 +762,10 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "Alunos")
         self.assertContains(response, "Processos")
         self.assertContains(response, "Caixa de Processos")
-        self.assertContains(response, "Reserva de Ambientes")
+        self.assertContains(response, "Reserva de Ambiente")
+        self.assertContains(response, "Nova reserva de ambiente")
+        self.assertContains(response, "Disponibilidade semanal")
+        self.assertContains(response, "Reservas feitas")
         self.assertContains(response, "Cadastro de Salas")
 
     def test_dashboard_coordenador_mantem_menu_lateral_da_home(self):
@@ -787,6 +790,7 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "Ciências")
         self.assertNotContains(response, "Ciencias manifestadas")
         self.assertContains(response, "Meus Orientandos")
+        self.assertContains(response, "Cadastro de Salas")
 
     def test_menu_ciencias_exibe_pendencias_e_manifestadas(self):
         servidor = User.objects.create_user(
@@ -1059,7 +1063,7 @@ class ReservaAmbienteTests(TestCase):
         self.assertContains(response, "Sala 101")
         self.assertContains(response, "Sala 201")
         self.assertContains(response, "Reservas feitas")
-        self.assertContains(response, "Visualizar reservas")
+        self.assertContains(response, "Ver disponibilidade")
 
     def test_servidor_reserva_para_docente(self):
         self.client.force_login(self.servidor)
@@ -1104,7 +1108,10 @@ class ReservaAmbienteTests(TestCase):
         )
 
         self.client.force_login(self.servidor)
-        response = self.client.get(reverse("reservas_ambientes"), {"tipo": ReservaAmbiente.TipoReserva.DEFESA})
+        response = self.client.get(
+            reverse("reservas_ambientes_feitas"),
+            {"tipo": ReservaAmbiente.TipoReserva.DEFESA},
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Defesa no polo norte")
@@ -1136,7 +1143,7 @@ class ReservaAmbienteTests(TestCase):
         )
 
         self.client.force_login(self.docente)
-        response = self.client.get(reverse("reservas_ambientes"))
+        response = self.client.get(reverse("reservas_ambientes_feitas"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Minha reserva")
@@ -1159,7 +1166,7 @@ class ReservaAmbienteTests(TestCase):
         )
 
         self.client.force_login(self.docente)
-        response = self.client.get(reverse("reservas_ambientes"), {"semana": "2026-06-08"})
+        response = self.client.get(reverse("disponibilidade_ambientes"), {"semana": "2026-06-08"})
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Disponibilidade semanal")
@@ -1220,6 +1227,22 @@ class ReservaAmbienteTests(TestCase):
         response = self.client.get(reverse("reservas_ambientes"))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sala 101")
+        self.assertContains(response, "Sala 201")
+
+    def test_coordenador_acessa_cadastro_de_salas(self):
+        coordenador = Docente.objects.create(
+            email="coordenador.salas@example.com",
+            password="senha-segura-123",
+            nome="Coordenador Salas",
+            coordenador=True,
+        )
+
+        self.client.force_login(coordenador)
+        response = self.client.get(reverse("salas_ambientes"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cadastro de Salas")
         self.assertContains(response, "Sala 101")
         self.assertContains(response, "Sala 201")
 

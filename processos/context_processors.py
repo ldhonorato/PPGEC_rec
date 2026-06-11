@@ -58,12 +58,13 @@ def _is_membro_setor_nome(user, nome):
     ).exists()
 
 
-def _menu_item(label, href, url_names, icon):
+def _menu_item(label, href, url_names, icon, children=None):
     return {
         "label": label,
         "href": href,
         "url_names": url_names,
         "icon": icon,
+        "children": children or [],
     }
 
 
@@ -84,7 +85,27 @@ def _menu_lateral_sections(user):
         )
     if user.tipo_usuario in {User.TipoUsuario.DOCENTE, User.TipoUsuario.SERVIDOR}:
         principal_items.append(
-            _menu_item("Reserva de Ambientes", "/ambientes/reservas/", ["reservas_ambientes"], "R")
+            _menu_item(
+                "Reserva de Ambiente",
+                "/ambientes/reservas/",
+                ["reservas_ambientes", "disponibilidade_ambientes", "reservas_ambientes_feitas"],
+                "R",
+                children=[
+                    _menu_item("Nova reserva de ambiente", "/ambientes/reservas/", ["reservas_ambientes"], "N"),
+                    _menu_item(
+                        "Disponibilidade semanal",
+                        "/ambientes/disponibilidade/",
+                        ["disponibilidade_ambientes"],
+                        "D",
+                    ),
+                    _menu_item(
+                        "Reservas feitas",
+                        "/ambientes/reservas/feitas/",
+                        ["reservas_ambientes_feitas"],
+                        "F",
+                    ),
+                ],
+            )
         )
     has_setor_membership = _has_setor_membership(user)
     if has_setor_membership:
@@ -137,7 +158,7 @@ def _menu_lateral_sections(user):
             coordenacao_items.append(
                 _menu_item("Criar Comissão", "/coordenacao/setores/criar/", ["criar_comissao"], "C")
             )
-        if user.tipo_usuario == User.TipoUsuario.SERVIDOR:
+        if _has_gestao_access(user):
             coordenacao_items.append(
                 _menu_item("Cadastro de Salas", "/ambientes/salas/", ["salas_ambientes"], "S")
             )

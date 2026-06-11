@@ -9,6 +9,7 @@ from .models import (
     Aluno,
     DisponibilidadeSala,
     Documento,
+    Polo,
     Processo,
     ReservaAmbiente,
     Sala,
@@ -75,7 +76,13 @@ class SetorComissaoForm(forms.ModelForm):
 class SalaForm(forms.ModelForm):
     class Meta:
         model = Sala
-        fields = ["nome", "capacidade", "ativa"]
+        fields = ["polo", "nome", "capacidade", "ativa"]
+
+    def __init__(self, *args, can_choose_polo=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["polo"].queryset = Polo.objects.filter(ativo=True).order_by("nome")
+        if not can_choose_polo:
+            self.fields.pop("polo")
 
 
 class DisponibilidadeSalaForm(forms.ModelForm):

@@ -7,15 +7,17 @@
             <h1 class="section-title">Cadastro de Salas</h1>
             {% if polo %}
                 <p class="muted">Cadastro de salas e horarios gerais de disponibilidade do polo {{ polo.nome }}.</p>
+            {% elif can_choose_polo %}
+                <p class="muted">Cadastro de salas e horarios gerais de disponibilidade dos polos.</p>
             {% else %}
-                <p class="muted">Seu usuario servidor ainda nao possui polo de atuacao definido.</p>
+                <p class="muted">Seu usuario ainda nao possui polo de atuacao definido.</p>
             {% endif %}
         </div>
-        <a class="btn btn-secondary" href="{% url 'reservas_ambientes' %}">Ver reservas</a>
+        <a class="btn btn-secondary" href="{% url 'reservas_ambientes_feitas' %}">Ver reservas</a>
     </div>
 </section>
 
-{% if polo %}
+{% if polo or can_choose_polo %}
 <section class="grid-two panel">
     <article class="card">
         <h2 class="section-title">Nova sala</h2>

@@ -1675,35 +1675,16 @@ def _can_use_reservas(user):
     }
 
 
-@login_required
-def reservas_ambientes_view(request):
-    if not _can_use_reservas(request.user):
-        raise PermissionDenied("Acesso restrito a docentes e servidores.")
+def _reservas_base_context():
+    return {
+        "polos": Polo.objects.filter(ativo=True).order_by("nome"),
+        "salas": Sala.objects.filter(ativa=True, polo__ativo=True).select_related("polo").order_by("polo__nome", "nome"),
+        "docentes": User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE, is_active=True).order_by("nome"),
+        "tipos_reserva": ReservaAmbiente.TipoReserva.choices,
+    }
 
-    polo_servidor = request.user.polo_atuacao if request.user.tipo_usuario == User.TipoUsuario.SERVIDOR else None
-    form = ReservaAmbienteForm(request.POST or None, user=request.user)
-    if request.method == "POST":
-        if form.is_valid():
-            docente = request.user if request.user.tipo_usuario == User.TipoUsuario.DOCENTE else form.cleaned_data["docente"]
-            try:
-                reservas_criadas = ReservaAmbiente.criar_reservas(
-                    sala=form.cleaned_data["sala"],
-                    docente=docente,
-                    criado_por=request.user,
-                    tipo=form.cleaned_data["tipo"],
-                    titulo=form.cleaned_data["titulo"],
-                    inicio=form.cleaned_data["inicio"],
-                    fim=form.cleaned_data["fim"],
-                    recorrencia=form.cleaned_data["recorrencia"],
-                    duracao_recorrencia_meses=form.cleaned_data["duracao_recorrencia_meses"],
-                )
-            except ValidationError as exc:
-                for erro in exc.messages:
-                    form.add_error(None, erro)
-            else:
-                messages.success(request, f"{len(reservas_criadas)} reserva(s) criada(s) com sucesso.")
-                return redirect("reservas_ambientes")
 
+def _reservas_filtradas(request):
     reservas = ReservaAmbiente.objects.select_related("sala", "sala__polo", "docente", "criado_por")
     if request.user.tipo_usuario == User.TipoUsuario.DOCENTE:
         reservas = reservas.filter(docente=request.user)
@@ -1715,9 +1696,6 @@ def reservas_ambientes_view(request):
     filtro_docente = request.GET.get("docente", "").strip()
     filtro_data_inicio = request.GET.get("data_inicio", "").strip()
     filtro_data_fim = request.GET.get("data_fim", "").strip()
-    calendario_semana = request.GET.get("semana", "").strip()
-    calendario_polo = request.GET.get("cal_polo", "").strip()
-    calendario_sala = request.GET.get("cal_sala", "").strip()
 
     if filtro_q:
         reservas = reservas.filter(
@@ -1743,9 +1721,23 @@ def reservas_ambientes_view(request):
     if data_fim:
         reservas = reservas.filter(inicio__date__lte=data_fim)
 
-    reservas = reservas.order_by("inicio")
+    return reservas.order_by("inicio"), {
+        "q": filtro_q,
+        "polo": filtro_polo,
+        "sala": filtro_sala,
+        "tipo": filtro_tipo,
+        "docente": filtro_docente,
+        "data_inicio": filtro_data_inicio,
+        "data_fim": filtro_data_fim,
+    }
+
+
+def _calendario_reservas_context(request):
     salas_queryset = Sala.objects.filter(ativa=True, polo__ativo=True).select_related("polo").order_by("polo__nome", "nome")
-    polos_queryset = Polo.objects.filter(ativo=True).order_by("nome")
+    calendario_semana = request.GET.get("semana", "").strip()
+    calendario_polo = request.GET.get("cal_polo", "").strip()
+    calendario_sala = request.GET.get("cal_sala", "").strip()
+
     calendario_data_base = parse_date(calendario_semana) if calendario_semana else timezone.localdate()
     if not calendario_data_base:
         calendario_data_base = timezone.localdate()
@@ -1801,57 +1793,94 @@ def reservas_ambientes_view(request):
             )
         calendario_linhas.append({"sala": sala, "celulas": celulas})
 
-    return render(
-        request,
-        "processos/reservas_ambientes.html",
-        {
-            "form": form,
-            "reservas": reservas,
-            "polo_servidor": polo_servidor,
-            "polos": polos_queryset,
-            "salas": salas_queryset,
-            "docentes": User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE, is_active=True).order_by("nome"),
-            "tipos_reserva": ReservaAmbiente.TipoReserva.choices,
-            "filtros_reservas": {
-                "q": filtro_q,
-                "polo": filtro_polo,
-                "sala": filtro_sala,
-                "tipo": filtro_tipo,
-                "docente": filtro_docente,
-                "data_inicio": filtro_data_inicio,
-                "data_fim": filtro_data_fim,
-            },
-            "calendario_dias": calendario_dias,
-            "calendario_linhas": calendario_linhas,
-            "calendario_inicio": calendario_inicio,
-            "calendario_fim": calendario_fim,
-            "calendario_semana_anterior": calendario_inicio - timedelta(days=7),
-            "calendario_semana_proxima": calendario_inicio + timedelta(days=7),
-            "filtros_calendario": {
-                "semana": calendario_semana,
-                "polo": calendario_polo,
-                "sala": calendario_sala,
-            },
+    return {
+        "calendario_dias": calendario_dias,
+        "calendario_linhas": calendario_linhas,
+        "calendario_inicio": calendario_inicio,
+        "calendario_fim": calendario_fim,
+        "calendario_semana_anterior": calendario_inicio - timedelta(days=7),
+        "calendario_semana_proxima": calendario_inicio + timedelta(days=7),
+        "filtros_calendario": {
+            "semana": calendario_semana,
+            "polo": calendario_polo,
+            "sala": calendario_sala,
         },
-    )
+    }
+
+
+@login_required
+def reservas_ambientes_view(request):
+    if not _can_use_reservas(request.user):
+        raise PermissionDenied("Acesso restrito a docentes e servidores.")
+
+    polo_servidor = request.user.polo_atuacao if request.user.tipo_usuario == User.TipoUsuario.SERVIDOR else None
+    form = ReservaAmbienteForm(request.POST or None, user=request.user)
+    if request.method == "POST":
+        if form.is_valid():
+            docente = request.user if request.user.tipo_usuario == User.TipoUsuario.DOCENTE else form.cleaned_data["docente"]
+            try:
+                reservas_criadas = ReservaAmbiente.criar_reservas(
+                    sala=form.cleaned_data["sala"],
+                    docente=docente,
+                    criado_por=request.user,
+                    tipo=form.cleaned_data["tipo"],
+                    titulo=form.cleaned_data["titulo"],
+                    inicio=form.cleaned_data["inicio"],
+                    fim=form.cleaned_data["fim"],
+                    recorrencia=form.cleaned_data["recorrencia"],
+                    duracao_recorrencia_meses=form.cleaned_data["duracao_recorrencia_meses"],
+                )
+            except ValidationError as exc:
+                for erro in exc.messages:
+                    form.add_error(None, erro)
+            else:
+                messages.success(request, f"{len(reservas_criadas)} reserva(s) criada(s) com sucesso.")
+                return redirect("reservas_ambientes")
+
+    context = _reservas_base_context()
+    context.update({"form": form, "polo_servidor": polo_servidor})
+    return render(request, "processos/reservas_ambientes.html", context)
+
+
+@login_required
+def disponibilidade_ambientes_view(request):
+    if not _can_use_reservas(request.user):
+        raise PermissionDenied("Acesso restrito a docentes e servidores.")
+
+    context = _reservas_base_context()
+    context.update(_calendario_reservas_context(request))
+    return render(request, "processos/disponibilidade_ambientes.html", context)
+
+
+@login_required
+def reservas_ambientes_feitas_view(request):
+    if not _can_use_reservas(request.user):
+        raise PermissionDenied("Acesso restrito a docentes e servidores.")
+
+    reservas, filtros_reservas = _reservas_filtradas(request)
+    context = _reservas_base_context()
+    context.update({"reservas": reservas, "filtros_reservas": filtros_reservas})
+    return render(request, "processos/reservas_ambientes_feitas.html", context)
 
 
 @login_required
 def salas_ambientes_view(request):
-    if request.user.tipo_usuario != User.TipoUsuario.SERVIDOR:
-        raise PermissionDenied("Acesso restrito a servidores.")
+    if not _has_gestao_access(request.user):
+        raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
 
     polo = request.user.polo_atuacao
-    sala_form = SalaForm(prefix="sala")
+    can_choose_polo = _is_coordenador(request.user) and not polo
+    sala_form = SalaForm(prefix="sala", can_choose_polo=can_choose_polo)
     disponibilidade_form = DisponibilidadeSalaForm(prefix="disp", polo=polo)
 
-    if request.method == "POST" and polo:
+    if request.method == "POST" and (polo or can_choose_polo):
         acao = request.POST.get("acao")
         if acao == "criar_sala":
-            sala_form = SalaForm(request.POST, prefix="sala")
+            sala_form = SalaForm(request.POST, prefix="sala", can_choose_polo=can_choose_polo)
             if sala_form.is_valid():
                 sala = sala_form.save(commit=False)
-                sala.polo = polo
+                if polo:
+                    sala.polo = polo
                 sala.save()
                 messages.success(request, "Sala cadastrada com sucesso.")
                 return redirect("salas_ambientes")
@@ -1862,7 +1891,13 @@ def salas_ambientes_view(request):
                 messages.success(request, "Disponibilidade cadastrada com sucesso.")
                 return redirect("salas_ambientes")
 
-    salas = Sala.objects.filter(polo=polo).prefetch_related("disponibilidades") if polo else Sala.objects.none()
+    if polo:
+        salas = Sala.objects.filter(polo=polo)
+    elif can_choose_polo:
+        salas = Sala.objects.all()
+    else:
+        salas = Sala.objects.none()
+    salas = salas.select_related("polo").prefetch_related("disponibilidades").order_by("polo__nome", "nome")
     return render(
         request,
         "processos/salas_ambientes.html",
@@ -1871,6 +1906,7 @@ def salas_ambientes_view(request):
             "salas": salas,
             "sala_form": sala_form,
             "disponibilidade_form": disponibilidade_form,
+            "can_choose_polo": can_choose_polo,
         },
     )
 
