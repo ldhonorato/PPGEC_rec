@@ -19,7 +19,8 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path
 from django.contrib.auth.views import LoginView, LogoutView
-from processos.views import teste_email
+from django.views.generic import RedirectView
+from ppgec.views import version_view
 
 from processos.views import (
     aluno_detalhe_view,
@@ -28,6 +29,8 @@ from processos.views import (
     aluno_documento_vinculo_view,
     caixa_processos_view,
     coordenacao_dashboard_view,
+    criar_comissao_view,
+    disponibilidade_ambientes_view,
     home_view,
     menu_processos_pleno_view,
     menu_meus_orientandos_view,
@@ -38,10 +41,20 @@ from processos.views import (
     novo_processo_view,
     processo_detalhe_view,
     processos_view,
+    reservas_ambientes_feitas_view,
+    reservas_ambientes_view,
+    salas_ambientes_view,
+    solicitacao_banca_detalhe_view,
+    solicitacao_banca_nova_view,
+    solicitacoes_banca_view,
+    setores_comissoes_view,
+    teste_email,
 )
 
 urlpatterns = [
     path("", home_view, name="home"),
+    path("version/", version_view, name="version"),
+    path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}img/acadflow-logo.png", permanent=True)),
     path("login/", LoginView.as_view(template_name="registration/login.html"), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("me/", me_view, name="me"),
@@ -53,12 +66,21 @@ urlpatterns = [
     path("aluno/documento-vinculo/", aluno_documento_vinculo_view, name="aluno_documento_vinculo"),
     path("aluno/documento-historico/", aluno_documento_historico_view, name="aluno_documento_historico"),
     path("processos/novo/", novo_processo_view, name="novo_processo"),
+    path("ambientes/reservas/", reservas_ambientes_view, name="reservas_ambientes"),
+    path("ambientes/disponibilidade/", disponibilidade_ambientes_view, name="disponibilidade_ambientes"),
+    path("ambientes/reservas/feitas/", reservas_ambientes_feitas_view, name="reservas_ambientes_feitas"),
+    path("ambientes/salas/", salas_ambientes_view, name="salas_ambientes"),
+    path("bancas/", solicitacoes_banca_view, name="solicitacoes_banca"),
+    path("bancas/nova/", solicitacao_banca_nova_view, name="solicitacao_banca_nova"),
+    path("bancas/<int:solicitacao_id>/", solicitacao_banca_detalhe_view, name="solicitacao_banca_detalhe"),
     path("coordenacao/dashboard/", coordenacao_dashboard_view, name="coordenacao_dashboard"),
     path("coordenacao/alunos/", alunos_view, name="coordenacao_alunos"),
     path("coordenacao/alunos/<int:aluno_id>/", aluno_detalhe_view, name="aluno_detalhe"),
     path("coordenacao/processos/", processos_view, name="coordenacao_processos"),
     path("coordenacao/processos/<int:processo_id>/", processo_detalhe_view, name="processo_detalhe"),
     path("coordenacao/caixa-processos/", caixa_processos_view, name="coordenacao_caixa_processos"),
+    path("coordenacao/setores/", setores_comissoes_view, name="setores_comissoes"),
+    path("coordenacao/setores/criar/", criar_comissao_view, name="criar_comissao"),
     path('admin/', admin.site.urls),
     path("teste-email/", teste_email),
 ]

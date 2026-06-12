@@ -1,0 +1,242 @@
+<form method="post">
+    {% csrf_token %}
+    {% if setor_editado %}
+        <input type="hidden" name="setor_id" value="{{ setor_editado.id }}">
+    {% endif %}
+    {% for field in form.visible_fields %}
+        {% if field.name != "docentes" and field.name != "servidores" and field.name != "alunos" %}
+            <div class="field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {{ field.errors }}
+            </div>
+        {% endif %}
+    {% endfor %}
+
+    <h2 class="section-title" style="font-size: 1rem; margin-top: 1rem;">Membros docentes</h2>
+    <div class="field">
+        {{ form.docentes.errors }}
+        <div class="checkbox-list">
+            {{ form.docentes }}
+        </div>
+    </div>
+
+    <h2 class="section-title" style="font-size: 1rem; margin-top: 1rem;">Membros servidores</h2>
+    <div class="field">
+        {{ form.servidores.errors }}
+        <div class="checkbox-list">
+            {{ form.servidores }}
+        </div>
+    </div>
+
+    <h2 class="section-title" style="font-size: 1rem; margin-top: 1rem;">Membros alunos</h2>
+    <div class="field">
+        <label for="busca-alunos-comissao">Buscar aluno por nome ou email</label>
+        <input id="busca-alunos-comissao" type="search" placeholder="Digite para filtrar alunos">
+        {{ form.alunos.errors }}
+        <div id="resultados-alunos-comissao" class="search-results" aria-live="polite"></div>
+        <div>
+            <strong>Alunos selecionados</strong>
+            <ul id="alunos-selecionados-comissao" class="selected-list"></ul>
+            <p id="alunos-selecionados-vazio" class="muted">Nenhum aluno selecionado.</p>
+        </div>
+        <div id="lista-alunos-comissao" class="sr-only">
+            {{ form.alunos }}
+        </div>
+    </div>
+
+    {% for field in form.hidden_fields %}
+        <div class="field">
+            {{ field }}
+            {{ field.errors }}
+        </div>
+    {% endfor %}
+    <button class="btn" type="submit">{{ submit_label|default:"Salvar" }}</button>
+    {% if cancel_url %}
+        <a class="btn btn-secondary" href="{{ cancel_url }}">Cancelar</a>
+    {% endif %}
+</form>
+
+<style>
+    .checkbox-list ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 0.35rem;
+    }
+
+    .checkbox-list label {
+        display: flex;
+        gap: 0.45rem;
+        align-items: flex-start;
+        font-weight: 600;
+    }
+
+    .checkbox-list-scroll {
+        max-height: 260px;
+        overflow: auto;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        padding: 0.65rem;
+        margin-top: 0.45rem;
+    }
+
+    .search-results {
+        display: none;
+        margin-top: 0.45rem;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        max-height: 260px;
+        overflow-y: auto;
+        background: #ffffff;
+    }
+
+    .search-results.is-open {
+        display: block;
+    }
+
+    .search-result-button {
+        width: 100%;
+        border: 0;
+        border-bottom: 1px solid var(--color-border);
+        background: #ffffff;
+        color: var(--color-text);
+        cursor: pointer;
+        padding: 0.65rem 0.75rem;
+        text-align: left;
+        font: inherit;
+    }
+
+    .search-result-button:hover {
+        background: var(--color-surface);
+    }
+
+    .search-result-button:last-child {
+        border-bottom: 0;
+    }
+
+    .selected-list {
+        list-style: none;
+        padding: 0;
+        margin: 0.5rem 0 0 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+    }
+
+    .selected-list li {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        padding: 0.35rem 0.45rem;
+        background: #ffffff;
+    }
+
+    .selected-list button {
+        border: 0;
+        background: transparent;
+        color: var(--color-muted);
+        cursor: pointer;
+        font-weight: 800;
+        padding: 0 0.2rem;
+    }
+
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+</style>
+<script>
+    (function () {
+        const input = document.getElementById("busca-alunos-comissao");
+        const lista = document.getElementById("lista-alunos-comissao");
+        const resultados = document.getElementById("resultados-alunos-comissao");
+        const selecionados = document.getElementById("alunos-selecionados-comissao");
+        const vazio = document.getElementById("alunos-selecionados-vazio");
+        if (!input || !lista || !resultados || !selecionados || !vazio) return;
+
+        const itens = Array.from(lista.querySelectorAll("input[type='checkbox']")).map((checkbox) => {
+            const labelElement = checkbox.closest("label") || lista.querySelector(`label[for="${checkbox.id}"]`);
+            const label = labelElement ? labelElement.textContent.trim() : "";
+            return { checkbox, label };
+        }).filter((entry) => entry.label);
+
+        function atualizarSelecionados() {
+            selecionados.innerHTML = "";
+            const marcados = itens.filter((entry) => entry.checkbox.checked);
+            vazio.style.display = marcados.length ? "none" : "";
+
+            marcados.forEach((entry) => {
+                const li = document.createElement("li");
+                li.textContent = entry.label;
+
+                const remover = document.createElement("button");
+                remover.type = "button";
+                remover.textContent = "x";
+                remover.setAttribute("aria-label", "Remover " + entry.label);
+                remover.addEventListener("click", () => {
+                    entry.checkbox.checked = false;
+                    atualizarSelecionados();
+                    atualizarResultados();
+                });
+
+                li.appendChild(remover);
+                selecionados.appendChild(li);
+            });
+        }
+
+        function atualizarResultados() {
+            const termo = input.value.trim().toLowerCase();
+            resultados.innerHTML = "";
+            if (!termo) {
+                resultados.classList.remove("is-open");
+                return;
+            }
+
+            const compatíveis = itens
+                .filter((entry) => !entry.checkbox.checked)
+                .filter((entry) => entry.label.toLowerCase().includes(termo))
+                .slice(0, 20);
+
+            compatíveis.forEach((entry) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "search-result-button";
+                button.textContent = entry.label;
+                button.addEventListener("click", () => {
+                    entry.checkbox.checked = true;
+                    input.value = "";
+                    atualizarResultados();
+                    atualizarSelecionados();
+                    input.focus();
+                });
+                resultados.appendChild(button);
+            });
+
+            if (!compatíveis.length) {
+                const empty = document.createElement("div");
+                empty.className = "muted";
+                empty.style.padding = "0.65rem 0.75rem";
+                empty.textContent = "Nenhum aluno encontrado.";
+                resultados.appendChild(empty);
+            }
+
+            resultados.classList.add("is-open");
+        }
+
+        input.addEventListener("input", atualizarResultados);
+        itens.forEach((entry) => entry.checkbox.addEventListener("change", atualizarSelecionados));
+        atualizarSelecionados();
+    })();
+</script>

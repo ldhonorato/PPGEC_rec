@@ -10,12 +10,24 @@
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {% for field in form %}
-            <div class="field">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {{ field.errors }}
-            </div>
+            {% if field.name != "formularios_banca" %}
+                <div class="field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+            {% endif %}
         {% endfor %}
+
+        {% if form.formularios_banca %}
+            <div class="field">
+                <label for="formularios-busca">{{ form.formularios_banca.label }}</label>
+                <p class="muted" style="margin: 0.2rem 0 0.55rem;">Anexe ao processo apenas formulários salvos por você. Use Ctrl/Cmd para selecionar mais de um.</p>
+                <input id="formularios-busca" type="search" placeholder="Buscar pelo nome do formulário" data-formularios-search>
+                {{ form.formularios_banca }}
+                {{ form.formularios_banca.errors }}
+            </div>
+        {% endif %}
 
         <div class="field">
             <label>Documentos</label>
@@ -56,7 +68,8 @@
         </div>
         <div class="field">
             <label for="md_arquivo">Arquivo</label>
-            <input id="md_arquivo" type="file" required>
+            <input id="md_arquivo" type="file" accept=".bmp,.doc,.docx,.gif,.jpeg,.jpg,.pdf,.png,.ppt,.pptx,.tif,.tiff,.webp,.xls,.xlsx" required>
+            <small class="muted">PDF, Office ou imagem. Tamanho maximo: 5 MB.</small>
         </div>
         <div style="display: flex; gap: 0.7rem; justify-content: flex-end;">
             <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-doc">Cancelar</button>
@@ -73,11 +86,18 @@
         const formModal = document.getElementById("form-modal-doc");
         const lista = document.getElementById("documentos-lista");
         const vazio = document.getElementById("documentos-vazio");
+        const formulariosBusca = document.querySelector("[data-formularios-search]");
+        const formulariosSelect = document.querySelector("[data-formularios-select]");
 
         const inputTitulo = document.getElementById("md_titulo");
         const inputTipo = document.getElementById("md_tipo");
         const inputRestricao = document.getElementById("md_restricao");
         let inputArquivo = document.getElementById("md_arquivo");
+        const maxFileSize = 5 * 1024 * 1024;
+        const allowedExtensions = new Set([
+            ".bmp", ".doc", ".docx", ".gif", ".jpeg", ".jpg", ".pdf", ".png",
+            ".ppt", ".pptx", ".tif", ".tiff", ".webp", ".xls", ".xlsx"
+        ]);
 
         const tipoChoices = [
             ["REQUERIMENTO", "Requerimento"],
@@ -110,6 +130,16 @@
             inputRestricao.appendChild(op);
         });
 
+        if (formulariosBusca && formulariosSelect) {
+            const options = Array.from(formulariosSelect.options);
+            formulariosBusca.addEventListener("input", () => {
+                const query = formulariosBusca.value.trim().toLowerCase();
+                options.forEach((option) => {
+                    option.hidden = query && !option.textContent.toLowerCase().includes(query);
+                });
+            });
+        }
+
         let counter = 0;
         function refreshEmpty() {
             vazio.style.display = lista.children.length ? "none" : "block";
@@ -128,33 +158,71 @@
             if (!inputTitulo.value || !inputTipo.value || !inputRestricao.value || !inputArquivo.files.length) {
                 return;
             }
+            const arquivoAtual = inputArquivo.files[0];
+            const nomeArquivo = arquivoAtual.name || "";
+            const extensao = nomeArquivo.includes(".") ? nomeArquivo.slice(nomeArquivo.lastIndexOf(".")).toLowerCase() : "";
+            if (!allowedExtensions.has(extensao)) {
+                alert("Formato nao permitido. Envie PDF, arquivos Office ou imagens.");
+                return;
+            }
+            if (arquivoAtual.size > maxFileSize) {
+                alert("O arquivo deve ter no maximo 5 MB.");
+                return;
+            }
 
             const idx = counter++;
             const card = document.createElement("div");
             card.className = "card";
             card.style.padding = "0.8rem";
-            card.innerHTML = `
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:0.7rem;flex-wrap:wrap;">
-                    <div>
-                        <strong>${inputTitulo.value}</strong><br>
-                        <small class="muted">Tipo: ${inputTipo.options[inputTipo.selectedIndex].text} | Restricao: ${inputRestricao.options[inputRestricao.selectedIndex].text} | Arquivo: ${inputArquivo.files[0].name}</small>
-                    </div>
-                    <button type="button" class="btn btn-secondary">Remover</button>
-                </div>
-                <input type="hidden" name="doc_${idx}_titulo" value="">
-                <input type="hidden" name="doc_${idx}_tipo_documento" value="">
-                <input type="hidden" name="doc_${idx}_restricao_tipo" value="">
-            `;
 
-            card.querySelector(`input[name="doc_${idx}_titulo"]`).value = inputTitulo.value;
-            card.querySelector(`input[name="doc_${idx}_tipo_documento"]`).value = inputTipo.value;
-            card.querySelector(`input[name="doc_${idx}_restricao_tipo"]`).value = inputRestricao.value;
+            const row = document.createElement("div");
+            row.style.display = "flex";
+            row.style.alignItems = "center";
+            row.style.justifyContent = "space-between";
+            row.style.gap = "0.7rem";
+            row.style.flexWrap = "wrap";
+
+            const info = document.createElement("div");
+            const titulo = document.createElement("strong");
+            titulo.textContent = inputTitulo.value;
+            const detalhes = document.createElement("small");
+            detalhes.className = "muted";
+            detalhes.textContent = `Tipo: ${inputTipo.options[inputTipo.selectedIndex].text} | Restricao: ${inputRestricao.options[inputRestricao.selectedIndex].text} | Arquivo: ${arquivoAtual.name}`;
+            info.appendChild(titulo);
+            info.appendChild(document.createElement("br"));
+            info.appendChild(detalhes);
+
+            const removerBtn = document.createElement("button");
+            removerBtn.type = "button";
+            removerBtn.className = "btn btn-secondary";
+            removerBtn.textContent = "Remover";
+
+            row.appendChild(info);
+            row.appendChild(removerBtn);
+            card.appendChild(row);
+
+            const hiddenTitulo = document.createElement("input");
+            hiddenTitulo.type = "hidden";
+            hiddenTitulo.name = `doc_${idx}_titulo`;
+            hiddenTitulo.value = inputTitulo.value;
+            const hiddenTipo = document.createElement("input");
+            hiddenTipo.type = "hidden";
+            hiddenTipo.name = `doc_${idx}_tipo_documento`;
+            hiddenTipo.value = inputTipo.value;
+            const hiddenRestricao = document.createElement("input");
+            hiddenRestricao.type = "hidden";
+            hiddenRestricao.name = `doc_${idx}_restricao_tipo`;
+            hiddenRestricao.value = inputRestricao.value;
+            card.appendChild(hiddenTitulo);
+            card.appendChild(hiddenTipo);
+            card.appendChild(hiddenRestricao);
 
             const arquivoWrapper = inputArquivo.parentNode;
             const arquivoSelecionado = inputArquivo;
             const novoInputArquivo = document.createElement("input");
             novoInputArquivo.type = "file";
             novoInputArquivo.id = "md_arquivo";
+            novoInputArquivo.accept = ".bmp,.doc,.docx,.gif,.jpeg,.jpg,.pdf,.png,.ppt,.pptx,.tif,.tiff,.webp,.xls,.xlsx";
             novoInputArquivo.required = true;
             arquivoWrapper.appendChild(novoInputArquivo);
             inputArquivo = novoInputArquivo;
@@ -165,7 +233,6 @@
             arquivoSelecionado.style.display = "none";
             card.appendChild(arquivoSelecionado);
 
-            const removerBtn = card.querySelector("button");
             removerBtn.addEventListener("click", () => {
                 card.remove();
                 refreshEmpty();

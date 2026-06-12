@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Solicitação de Banca | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Solicitação de Banca</h1>
+            <p class="muted">Preencha os dados da defesa ou qualificação do discente.</p>
+        </div>
+        <a class="btn btn-secondary" href="{% url 'solicitacoes_banca' %}">Minhas solicitações</a>
+    </div>
+</section>
+
+<form method="post" class="stack banca-form" data-banca-form>
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <section class="card">
+        <h2 class="section-title">Discente e trajetória</h2>
+        <div class="field">
+            <label for="{{ form.aluno.id_for_label }}">{{ form.aluno.label }}</label>
+            {{ form.aluno }}
+            {{ form.aluno.errors }}
+        </div>
+
+        <div class="field hidden-field">
+            <label for="{{ form.trajetoria.id_for_label }}">{{ form.trajetoria.label }}</label>
+            {{ form.trajetoria }}
+            {{ form.trajetoria.errors }}
+        </div>
+
+        <div class="trajectory-panel" data-trajetoria-panel>
+            {% for trajetoria in trajetorias_orientadas %}
+                <label class="trajectory-card" data-trajetoria-card data-aluno-id="{{ trajetoria.aluno_id }}" data-trajetoria-id="{{ trajetoria.id }}" hidden>
+                    <input type="radio" name="trajetoria_visual" value="{{ trajetoria.id }}">
+                    <span>
+                        <strong>{{ trajetoria.aluno.nome }}</strong>
+                        <small class="muted">
+                            {{ trajetoria.aluno.email }}
+                            {% if trajetoria.aluno.matricula %} - Matrícula: {{ trajetoria.aluno.matricula }}{% endif %}
+                        </small>
+                    </span>
+                    <span>
+                        <strong>{{ trajetoria.get_nivel_curso_display }}</strong>
+                        <small class="muted">
+                            Ingresso: {{ trajetoria.ingresso }}
+                            {% if trajetoria.prazo_qualificacao %} - Qualificação/projeto: {{ trajetoria.prazo_qualificacao }}{% endif %}
+                            {% if trajetoria.prazo_defesa %} - Defesa: {{ trajetoria.prazo_defesa }}{% endif %}
+                        </small>
+                    </span>
+                    <span>
+                        <strong>Orientação</strong>
+                        <small class="muted">
+                            Orientador: {{ trajetoria.orientador.nome|default:"-" }}
+                            {% if trajetoria.coorientador_display %} - Coorientador: {{ trajetoria.coorientador_display }}{% endif %}
+                        </small>
+                    </span>
+                </label>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="card">
+        <h2 class="section-title">Dados gerais</h2>
+        <div class="grid-two">
+            <div class="field">
+                <label for="{{ form.tipo_defesa.id_for_label }}">{{ form.tipo_defesa.label }}</label>
+                {{ form.tipo_defesa }}
+                {{ form.tipo_defesa.errors }}
+            </div>
+            <div class="field">
+                <label for="{{ form.titulo.id_for_label }}">Título da dissertação/tese/projeto</label>
+                {{ form.titulo }}
+                {{ form.titulo.errors }}
+            </div>
+            <div class="field">
+                <label for="{{ form.data_prevista.id_for_label }}">Data prevista</label>
+                {{ form.data_prevista }}
+                {{ form.data_prevista.errors }}
+            </div>
+            <div class="field">
+                <label for="{{ form.horario_previsto.id_for_label }}">Horário previsto</label>
+                {{ form.horario_previsto }}
+                {{ form.horario_previsto.errors }}
+            </div>
+        </div>
+        <div class="field">
+            <label for="{{ form.resumo.id_for_label }}">Resumo</label>
+            {{ form.resumo }}
+            {{ form.resumo.errors }}
+        </div>
+        <div class="grid-two">
+            <div class="field">
+                <label for="{{ form.palavras_chave.id_for_label }}">Palavras-chave</label>
+                {{ form.palavras_chave }}
+                {{ form.palavras_chave.errors }}
+            </div>
+            <div class="field">
+                <label for="{{ form.modalidade_local_link.id_for_label }}">Modalidade/local/link da defesa</label>
+                {{ form.modalidade_local_link }}
+                {{ form.modalidade_local_link.errors }}
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2 class="section-title">Requisitos e ciência</h2>
+        <label class="checkbox-field banca-check">
+            {{ form.requisitos_cumpridos }}
+            <span>O discente cumpre os requisitos para a defesa ou qualificação.</span>
+        </label>
+        {{ form.requisitos_cumpridos.errors }}
+
+        <div class="field">
+            <label for="{{ form.justificativa_excepcionalidade.id_for_label }}">Justificativa para excepcionalidades</label>
+            {{ form.justificativa_excepcionalidade }}
+            {{ form.justificativa_excepcionalidade.errors }}
+        </div>
+
+        <label class="checkbox-field banca-check">
+            {{ form.ciencia_recomendacao_mpf }}
+            <span>Declaro estar ciente da Recomendação nº 1/2023 do Ministério Público Federal, que trata dos requisitos exigidos para os membros de comissões julgadoras, bancas examinadoras de teses e dissertações acadêmicas, bem como comissões avaliativas para admissão de pessoal, inclusive docente. Ademais, estou ciente de que qualquer manifestação do colegiado em relação à banca deve ser devidamente sanada juntamente com a coordenação do programa para que a mesma possa ocorrer.</span>
+        </label>
+        {{ form.ciencia_recomendacao_mpf.errors }}
+    </section>
+
+    <section class="card">
+        <h2 class="section-title">Composição da banca</h2>
+        {% for grupo in papeis_por_tipo %}
+            <div class="banca-members" data-banca-members="{{ grupo.valor }}" hidden>
+                <h3>{{ grupo.label }}</h3>
+                {% for papel in grupo.papeis %}
+                    <article class="banca-member-card">
+                        <h4>{{ papel.label }}{% if papel.opcional %} <span class="muted">(opcional)</span>{% endif %}</h4>
+                        <div class="grid-two">
+                            <div class="field">
+                                <label for="{{ papel.nome_field.id_for_label }}">Nome</label>
+                                {{ papel.nome_field }}
+                                {{ papel.nome_field.errors }}
+                            </div>
+                            <div class="field {% if not papel.exige_instituicao %}optional-banca-field{% endif %}">
+                                <label for="{{ papel.instituicao_field.id_for_label }}">Instituição/IES</label>
+                                {{ papel.instituicao_field }}
+                                {{ papel.instituicao_field.errors }}
+                            </div>
+                            <div class="field {% if not papel.exige_cpf %}optional-banca-field{% endif %}">
+                                <label for="{{ papel.cpf_field.id_for_label }}">CPF</label>
+                                {{ papel.cpf_field }}
+                                {{ papel.cpf_field.errors }}
+                            </div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </section>
+
+    <div class="form-actions">
+        <button class="btn btn-secondary" type="submit" name="acao" value="rascunho">Salvar rascunho</button>
+        <button class="btn" type="submit" name="acao" value="finalizar">Finalizar solicitação</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const form = document.querySelector("[data-banca-form]");
+const alunoSelect = document.getElementById("{{ form.aluno.id_for_label }}");
+const trajetoriaSelect = document.getElementById("{{ form.trajetoria.id_for_label }}");
+const tipoSelect = document.getElementById("{{ form.tipo_defesa.id_for_label }}");
+const cards = Array.from(document.querySelectorAll("[data-trajetoria-card]"));
+
+function updateTrajectoryCards() {
+    const alunoId = alunoSelect.value;
+    let visibleCards = [];
+    cards.forEach((card) => {
+        const visible = alunoId && card.dataset.alunoId === alunoId;
+        card.hidden = !visible;
+        if (visible) {
+            visibleCards.push(card);
+        }
+    });
+
+    if (visibleCards.length === 1) {
+        visibleCards[0].querySelector("input").checked = true;
+        trajetoriaSelect.value = visibleCards[0].dataset.trajetoriaId;
+    }
+}
+
+function updateBancaFields() {
+    document.querySelectorAll("[data-banca-members]").forEach((section) => {
+        const active = section.dataset.bancaMembers === tipoSelect.value;
+        section.hidden = !active;
+        section.querySelectorAll("input, select, textarea").forEach((field) => {
+            field.disabled = !active;
+        });
+    });
+}
+
+alunoSelect?.addEventListener("change", () => {
+    trajetoriaSelect.value = "";
+    cards.forEach((card) => card.querySelector("input").checked = false);
+    updateTrajectoryCards();
+});
+cards.forEach((card) => {
+    card.addEventListener("click", () => {
+        trajetoriaSelect.value = card.dataset.trajetoriaId;
+    });
+});
+tipoSelect?.addEventListener("change", updateBancaFields);
+
+if (trajetoriaSelect.value) {
+    const selectedCard = cards.find((card) => card.dataset.trajetoriaId === trajetoriaSelect.value);
+    if (selectedCard) {
+        selectedCard.querySelector("input").checked = true;
+        alunoSelect.value = selectedCard.dataset.alunoId;
+    }
+}
+updateTrajectoryCards();
+updateBancaFields();
+</script>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Nova reserva de ambiente | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Nova reserva de ambiente</h1>
+            <p class="muted">Reserve salas disponiveis para aula, defesa ou reuniao de pesquisa.</p>
+        </div>
+        <div class="actions-row">
+            <a class="btn btn-secondary" href="{% url 'disponibilidade_ambientes' %}">Ver disponibilidade</a>
+            <a class="btn btn-secondary" href="{% url 'reservas_ambientes_feitas' %}">Reservas feitas</a>
+            {% if has_gestao_access %}
+                <a class="btn btn-secondary" href="{% url 'salas_ambientes' %}">Gerenciar salas</a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if form %}
+        <form method="post" class="stack">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <ul class="errorlist">{{ form.non_field_errors }}</ul>
+            {% endif %}
+            <div class="grid-two">
+                <div class="field">
+                    <label for="{{ form.sala.id_for_label }}">{{ form.sala.label }}</label>
+                    {{ form.sala }}
+                    {{ form.sala.errors }}
+                </div>
+                {% if user.tipo_usuario == "SERVIDOR" %}
+                    <div class="field">
+                        <label for="{{ form.docente.id_for_label }}">{{ form.docente.label }}</label>
+                        {{ form.docente }}
+                        {{ form.docente.errors }}
+                    </div>
+                {% else %}
+                    {{ form.docente }}
+                {% endif %}
+                <div class="field">
+                    <label for="{{ form.tipo.id_for_label }}">{{ form.tipo.label }}</label>
+                    {{ form.tipo }}
+                    {{ form.tipo.errors }}
+                </div>
+                <div class="field">
+                    <label for="{{ form.titulo.id_for_label }}">{{ form.titulo.label }}</label>
+                    {{ form.titulo }}
+                    {{ form.titulo.errors }}
+                </div>
+                <div class="field">
+                    <label for="{{ form.data_inicio.id_for_label }}">{{ form.data_inicio.label }}</label>
+                    {{ form.data_inicio }}
+                    {{ form.data_inicio.errors }}
+                </div>
+                <div class="field">
+                    <label for="{{ form.hora_inicio.id_for_label }}">{{ form.hora_inicio.label }}</label>
+                    {{ form.hora_inicio }}
+                    {{ form.hora_inicio.errors }}
+                </div>
+                <div class="field">
+                    <label for="{{ form.hora_fim.id_for_label }}">{{ form.hora_fim.label }}</label>
+                    {{ form.hora_fim }}
+                    {{ form.hora_fim.errors }}
+                    <small class="muted">A reserva deve comecar e terminar no mesmo dia.</small>
+                </div>
+                <div class="field">
+                    <label for="{{ form.recorrencia.id_for_label }}">{{ form.recorrencia.label }}</label>
+                    {{ form.recorrencia }}
+                    {{ form.recorrencia.errors }}
+                </div>
+                <div class="field">
+                    <label for="{{ form.duracao_recorrencia_meses.id_for_label }}">{{ form.duracao_recorrencia_meses.label }}</label>
+                    {{ form.duracao_recorrencia_meses }}
+                    {{ form.duracao_recorrencia_meses.errors }}
+                    <small class="muted">Preencha apenas para recorrencias diarias, semanais ou mensais. Limite de 6 meses.</small>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn" type="submit">Reservar ambiente</button>
+            </div>
+        </form>
+    {% endif %}
+</section>
+{% endblock %}
