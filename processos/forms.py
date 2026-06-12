@@ -484,6 +484,13 @@ class EncaminhamentoForm(forms.Form):
         label="Data limite para deliberação",
     )
 
+    # Campo para capturar a data limite exata
+    prazo_limite = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Data Limite",
+    )
+
     def __init__(self, *args, current_setor_id=None, allowed_setor_ids=None, **kwargs):
         super().__init__(*args, **kwargs)
         queryset = Setor.objects.filter(ativo=True).order_by("nome")
