@@ -1229,9 +1229,15 @@ class SolicitacaoBancaTests(TestCase):
         self.assertContains(response, str(propria))
         self.assertNotContains(response, str(outra))
 
+    @patch("processos.views.send_email_novo_processo_secretaria.delay")
     @patch("processos.views.send_email_novo_processo_orientador.delay")
     @patch("processos.views.send_email_novo_processo_aluno.delay")
-    def test_docente_anexa_solicitacao_de_banca_ao_criar_processo(self, _email_aluno, _email_orientador):
+    def test_docente_anexa_solicitacao_de_banca_ao_criar_processo(
+        self,
+        _email_aluno,
+        _email_orientador,
+        _email_secretaria,
+    ):
         Setor.objects.get_or_create(nome="Secretaria PPGEC", defaults={"ativo": True})
         solicitacao = SolicitacaoBanca.objects.create(
             docente=self.docente,
