@@ -10,12 +10,24 @@
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {% for field in form %}
-            <div class="field">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {{ field.errors }}
-            </div>
+            {% if field.name != "formularios_banca" %}
+                <div class="field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+            {% endif %}
         {% endfor %}
+
+        {% if form.formularios_banca %}
+            <div class="field">
+                <label for="formularios-busca">{{ form.formularios_banca.label }}</label>
+                <p class="muted" style="margin: 0.2rem 0 0.55rem;">Anexe ao processo apenas formulários salvos por você. Use Ctrl/Cmd para selecionar mais de um.</p>
+                <input id="formularios-busca" type="search" placeholder="Buscar pelo nome do formulário" data-formularios-search>
+                {{ form.formularios_banca }}
+                {{ form.formularios_banca.errors }}
+            </div>
+        {% endif %}
 
         <div class="field">
             <label>Documentos</label>
@@ -74,6 +86,8 @@
         const formModal = document.getElementById("form-modal-doc");
         const lista = document.getElementById("documentos-lista");
         const vazio = document.getElementById("documentos-vazio");
+        const formulariosBusca = document.querySelector("[data-formularios-search]");
+        const formulariosSelect = document.querySelector("[data-formularios-select]");
 
         const inputTitulo = document.getElementById("md_titulo");
         const inputTipo = document.getElementById("md_tipo");
@@ -115,6 +129,16 @@
             op.textContent = label;
             inputRestricao.appendChild(op);
         });
+
+        if (formulariosBusca && formulariosSelect) {
+            const options = Array.from(formulariosSelect.options);
+            formulariosBusca.addEventListener("input", () => {
+                const query = formulariosBusca.value.trim().toLowerCase();
+                options.forEach((option) => {
+                    option.hidden = query && !option.textContent.toLowerCase().includes(query);
+                });
+            });
+        }
 
         let counter = 0;
         function refreshEmpty() {

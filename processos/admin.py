@@ -6,14 +6,18 @@ from .models import (
     AlteracaoAluno,
     Aluno,
     DisponibilidadeSala,
+    DisciplinaTrajetoria,
     Docente,
     Documento,
     Polo,
+    PublicacaoTrajetoria,
+    MembroBanca,
     Processo,
     ReservaAmbiente,
     Sala,
     Setor,
     SetorMembro,
+    SolicitacaoBanca,
     TrajetoriaAcademica,
     TramitacaoProcesso,
     User,
@@ -96,6 +100,22 @@ class TrajetoriaAcademicaAdmin(admin.ModelAdmin):
     autocomplete_fields = ("aluno", "orientador", "coorientador")
 
 
+@admin.register(PublicacaoTrajetoria)
+class PublicacaoTrajetoriaAdmin(admin.ModelAdmin):
+    list_display = ("titulo", "trajetoria", "tipo", "ano", "criado_por")
+    list_filter = ("tipo", "ano")
+    search_fields = ("titulo", "autores", "veiculo", "trajetoria__aluno__nome")
+    autocomplete_fields = ("trajetoria", "criado_por")
+
+
+@admin.register(DisciplinaTrajetoria)
+class DisciplinaTrajetoriaAdmin(admin.ModelAdmin):
+    list_display = ("nome", "trajetoria", "semestre", "conceito", "situacao")
+    list_filter = ("situacao", "semestre")
+    search_fields = ("nome", "codigo", "trajetoria__aluno__nome")
+    autocomplete_fields = ("trajetoria",)
+
+
 @admin.register(Setor)
 class SetorAdmin(admin.ModelAdmin):
     list_display = ("nome", "tipo", "ativo")
@@ -154,6 +174,21 @@ class AlteracaoAlunoAdmin(admin.ModelAdmin):
     readonly_fields = ("criado_em",)
 
 
+class MembroBancaInline(admin.TabularInline):
+    model = MembroBanca
+    extra = 0
+
+
+@admin.register(SolicitacaoBanca)
+class SolicitacaoBancaAdmin(admin.ModelAdmin):
+    list_display = ("aluno", "docente", "tipo_defesa", "status", "data_prevista", "finalizado_em")
+    list_filter = ("tipo_defesa", "status", "data_prevista")
+    search_fields = ("aluno__nome", "docente__nome", "titulo")
+    autocomplete_fields = ("docente", "aluno", "trajetoria", "finalizado_por")
+    readonly_fields = ("criado_em", "atualizado_em", "finalizado_em")
+    inlines = [MembroBancaInline]
+
+
 @admin.register(Polo)
 class PoloAdmin(admin.ModelAdmin):
     list_display = ("nome", "ativo")
@@ -177,11 +212,11 @@ class DisponibilidadeSalaAdmin(admin.ModelAdmin):
 
 @admin.register(ReservaAmbiente)
 class ReservaAmbienteAdmin(admin.ModelAdmin):
-    list_display = ("sala", "docente", "tipo", "inicio", "fim", "recorrente")
-    list_filter = ("tipo", "sala__polo", "recorrente")
-    search_fields = ("sala__nome", "docente__nome", "titulo")
-    autocomplete_fields = ("sala", "docente", "criado_por")
-    readonly_fields = ("criado_em",)
+    list_display = ("sala", "docente", "tipo", "status", "inicio", "fim", "recorrente")
+    list_filter = ("tipo", "status", "sala__polo", "recorrente")
+    search_fields = ("sala__nome", "docente__nome", "titulo", "justificativa_exclusao")
+    autocomplete_fields = ("sala", "docente", "criado_por", "excluida_por")
+    readonly_fields = ("criado_em", "excluida_em")
 
 
 #commit de teste 1

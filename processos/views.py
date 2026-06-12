@@ -22,13 +22,17 @@ from .forms import (
     AlunoStatusForm,
     ManifestarCienteOrientadorForm,
     ComentarioProcessoForm,
-    DisponibilidadeSalaForm,
+    DisciplinaTrajetoriaForm,
+    DisponibilidadeSalaLoteForm,
     DocumentoCadastroForm,
     EncaminhamentoForm,
     FinalizarProcessoForm,
     ProcessoAberturaForm,
+    PublicacaoTrajetoriaForm,
+    ReservaAmbienteExclusaoForm,
     ReservaAmbienteForm,
     SalaForm,
+    SolicitacaoBancaForm,
     SolicitarCienteOrientadorForm,
     SetorComissaoForm,
     TrajetoriaAcademicaForm,
@@ -37,17 +41,21 @@ from .forms import (
 from .models import (
     AlteracaoAluno,
     Aluno,
+    DisciplinaTrajetoria,
     DisponibilidadeSala,
     ComentarioProcesso,
     Docente,
     Documento,
     ManifestacaoProcesso,
+    MembroBanca,
     Polo,
     Processo,
+    PublicacaoTrajetoria,
     ReservaAmbiente,
     Sala,
     Setor,
     SetorMembro,
+    SolicitacaoBanca,
     TrajetoriaAcademica,
     User,
 )
@@ -651,11 +659,22 @@ def alunos_view(request):
 
 @login_required
 def aluno_detalhe_view(request, aluno_id):
-    if not _has_gestao_access(request.user):
-        raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
+    can_manage_aluno = _has_gestao_access(request.user)
+    is_self_aluno = request.user.tipo_usuario == User.TipoUsuario.ALUNO and request.user.id == aluno_id
+    if not (can_manage_aluno or is_self_aluno):
+        raise PermissionDenied("Acesso restrito ao aluno, coordenadores e servidores.")
 
-    aluno = get_object_or_404(Aluno.objects.prefetch_related("trajetorias__orientador"), pk=aluno_id)
+    aluno = get_object_or_404(
+        Aluno.objects.prefetch_related(
+            "trajetorias__orientador",
+            "trajetorias__publicacoes",
+            "trajetorias__disciplinas",
+        ),
+        pk=aluno_id,
+    )
     trajetoria_atual = aluno.trajetoria_ativa()
+    can_edit_publicacoes = can_manage_aluno or is_self_aluno
+    can_edit_disciplinas = can_manage_aluno
 
     def _trajetoria_required():
         if not trajetoria_atual:
@@ -701,6 +720,8 @@ def aluno_detalhe_view(request, aluno_id):
 
     if request.method == "POST":
         acao = request.POST.get("acao", "").strip()
+        if not can_manage_aluno and acao not in {"salvar_publicacao"}:
+            raise PermissionDenied("Apenas publicacoes podem ser alteradas pelo aluno.")
 
         if acao == "alterar_dados":
             form = AlunoDadosForm(request.POST, aluno=aluno)
@@ -1093,6 +1114,42 @@ def aluno_detalhe_view(request, aluno_id):
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
             messages.error(request, "Nao foi possivel atualizar o deposito da versao final.")
 
+        elif acao == "salvar_publicacao":
+            if not can_edit_publicacoes:
+                raise PermissionDenied("Voce nao pode alterar publicacoes desta trajetoria.")
+            trajetoria = get_object_or_404(TrajetoriaAcademica, pk=request.POST.get("trajetoria_id"), aluno=aluno)
+            publicacao_id = request.POST.get("publicacao_id")
+            publicacao = None
+            if publicacao_id:
+                publicacao = get_object_or_404(PublicacaoTrajetoria, pk=publicacao_id, trajetoria=trajetoria)
+            form = PublicacaoTrajetoriaForm(request.POST, instance=publicacao)
+            if form.is_valid():
+                publicacao = form.save(commit=False)
+                publicacao.trajetoria = trajetoria
+                if not publicacao.pk:
+                    publicacao.criado_por = request.user
+                publicacao.save()
+                messages.success(request, "Publicacao salva.")
+                return redirect("aluno_detalhe", aluno_id=aluno.id)
+            messages.error(request, "Nao foi possivel salvar a publicacao.")
+
+        elif acao == "salvar_disciplina":
+            if not can_edit_disciplinas:
+                raise PermissionDenied("Apenas coordenacao e secretaria podem alterar disciplinas.")
+            trajetoria = get_object_or_404(TrajetoriaAcademica, pk=request.POST.get("trajetoria_id"), aluno=aluno)
+            disciplina_id = request.POST.get("disciplina_id")
+            disciplina = None
+            if disciplina_id:
+                disciplina = get_object_or_404(DisciplinaTrajetoria, pk=disciplina_id, trajetoria=trajetoria)
+            form = DisciplinaTrajetoriaForm(request.POST, instance=disciplina)
+            if form.is_valid():
+                disciplina = form.save(commit=False)
+                disciplina.trajetoria = trajetoria
+                disciplina.save()
+                messages.success(request, "Disciplina salva.")
+                return redirect("aluno_detalhe", aluno_id=aluno.id)
+            messages.error(request, "Nao foi possivel salvar a disciplina.")
+
     processos_aluno = (
         Processo.objects.select_related("setor_atual")
         .filter(usuario_criado_por=aluno)
@@ -1160,6 +1217,11 @@ def aluno_detalhe_view(request, aluno_id):
             "deposito_final_form": AlunoDepositoFinalForm(
                 initial={"deposito_versao_final": trajetoria_atual.deposito_versao_final if trajetoria_atual else False}
             ),
+            "publicacao_form": PublicacaoTrajetoriaForm(),
+            "disciplina_form": DisciplinaTrajetoriaForm(),
+            "can_manage_aluno": can_manage_aluno,
+            "can_edit_publicacoes": can_edit_publicacoes,
+            "can_edit_disciplinas": can_edit_disciplinas,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -1230,6 +1292,11 @@ def processo_detalhe_view(request, processo_id):
     processo = get_object_or_404(
         Processo.objects.select_related("usuario_criado_por", "setor_atual")
         .prefetch_related(
+            "solicitacoes_banca_anexadas__aluno",
+            "solicitacoes_banca_anexadas__trajetoria",
+            "solicitacoes_banca_anexadas__docente",
+            "solicitacoes_banca_anexadas__finalizado_por",
+            "solicitacoes_banca_anexadas__membros",
             "documentos__enviado_por",
             "comentarios__autor",
             "manifestacoes__responsavel",
@@ -1586,7 +1653,7 @@ def novo_processo_view(request):
         raise PermissionDenied("Perfil SERVIDOR nao pode abrir processo.")
 
     if request.method == "POST":
-        form = ProcessoAberturaForm(request.POST, request.FILES)
+        form = ProcessoAberturaForm(request.POST, request.FILES, user=request.user)
         doc_indices = set()
         for key in request.POST.keys():
             match = re.match(r"^doc_(\d+)_titulo$", key)
@@ -1631,6 +1698,8 @@ def novo_processo_view(request):
                 processo.setor_atual = setor_secretaria
                 processo.status = Processo.StatusProcesso.EM_ANALISE
                 processo.save()
+                if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
+                    form.cleaned_data.get("formularios_banca", SolicitacaoBanca.objects.none()).update(processo=processo)
 
                 for documento_form in documentos_forms:
                     processo.adicionar_documento(
@@ -1652,7 +1721,7 @@ def novo_processo_view(request):
                     for error in errors:
                         messages.error(request, f"Documento invalido: {error}")
     else:
-        form = ProcessoAberturaForm()
+        form = ProcessoAberturaForm(user=request.user)
 
     return render(
         request,
@@ -1681,18 +1750,20 @@ def _reservas_base_context():
         "salas": Sala.objects.filter(ativa=True, polo__ativo=True).select_related("polo").order_by("polo__nome", "nome"),
         "docentes": User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE, is_active=True).order_by("nome"),
         "tipos_reserva": ReservaAmbiente.TipoReserva.choices,
+        "status_reserva": ReservaAmbiente.StatusReserva.choices,
     }
 
 
 def _reservas_filtradas(request):
-    reservas = ReservaAmbiente.objects.select_related("sala", "sala__polo", "docente", "criado_por")
-    if request.user.tipo_usuario == User.TipoUsuario.DOCENTE:
+    reservas = ReservaAmbiente.objects.select_related("sala", "sala__polo", "docente", "criado_por", "excluida_por")
+    if request.user.tipo_usuario == User.TipoUsuario.DOCENTE and not _is_coordenador(request.user):
         reservas = reservas.filter(docente=request.user)
 
     filtro_q = request.GET.get("q", "").strip()
     filtro_polo = request.GET.get("polo", "").strip()
     filtro_sala = request.GET.get("sala", "").strip()
     filtro_tipo = request.GET.get("tipo", "").strip()
+    filtro_status = request.GET.get("status", "").strip()
     filtro_docente = request.GET.get("docente", "").strip()
     filtro_data_inicio = request.GET.get("data_inicio", "").strip()
     filtro_data_fim = request.GET.get("data_fim", "").strip()
@@ -1711,7 +1782,9 @@ def _reservas_filtradas(request):
         reservas = reservas.filter(sala_id=filtro_sala)
     if filtro_tipo:
         reservas = reservas.filter(tipo=filtro_tipo)
-    if filtro_docente and request.user.tipo_usuario == User.TipoUsuario.SERVIDOR:
+    if filtro_status:
+        reservas = reservas.filter(status=filtro_status)
+    if filtro_docente and _has_gestao_access(request.user):
         reservas = reservas.filter(docente_id=filtro_docente)
 
     data_inicio = parse_date(filtro_data_inicio) if filtro_data_inicio else None
@@ -1726,10 +1799,25 @@ def _reservas_filtradas(request):
         "polo": filtro_polo,
         "sala": filtro_sala,
         "tipo": filtro_tipo,
+        "status": filtro_status,
         "docente": filtro_docente,
         "data_inicio": filtro_data_inicio,
         "data_fim": filtro_data_fim,
     }
+
+
+def _can_excluir_reserva_ambiente(user, reserva):
+    return _is_coordenador(user) or reserva.docente_id == user.id
+
+
+def _reservas_para_exclusao(reserva):
+    reservas = ReservaAmbiente.objects.filter(pk=reserva.pk)
+    if reserva.grupo_recorrencia:
+        reservas = ReservaAmbiente.objects.filter(
+            grupo_recorrencia=reserva.grupo_recorrencia,
+            inicio__date__gte=timezone.localdate(),
+        )
+    return reservas.filter(status=ReservaAmbiente.StatusReserva.ATIVA).order_by("inicio")
 
 
 def _calendario_reservas_context(request):
@@ -1755,6 +1843,7 @@ def _calendario_reservas_context(request):
             sala__in=calendario_salas,
             inicio__date__gte=calendario_inicio,
             inicio__date__lte=calendario_fim,
+            status=ReservaAmbiente.StatusReserva.ATIVA,
         )
         .order_by("inicio")
     )
@@ -1857,9 +1946,37 @@ def reservas_ambientes_feitas_view(request):
     if not _can_use_reservas(request.user):
         raise PermissionDenied("Acesso restrito a docentes e servidores.")
 
+    exclusao_form = ReservaAmbienteExclusaoForm()
+    if request.method == "POST":
+        if request.POST.get("acao") != "excluir_reserva":
+            raise PermissionDenied("Acao invalida.")
+        reserva = get_object_or_404(ReservaAmbiente, pk=request.POST.get("reserva_id"))
+        if not _can_excluir_reserva_ambiente(request.user, reserva):
+            raise PermissionDenied("Apenas a coordenacao ou o docente da reserva pode exclui-la.")
+        exclusao_form = ReservaAmbienteExclusaoForm(request.POST)
+        if exclusao_form.is_valid():
+            reservas_excluidas = list(_reservas_para_exclusao(reserva))
+            for reserva_excluida in reservas_excluidas:
+                reserva_excluida.excluir(usuario=request.user, justificativa=exclusao_form.cleaned_data["justificativa"])
+            if len(reservas_excluidas) == 1:
+                messages.success(request, "Reserva marcada como excluida.")
+            else:
+                messages.success(request, f"{len(reservas_excluidas)} reservas marcadas como excluidas.")
+            return redirect("reservas_ambientes_feitas")
+        messages.error(request, "Informe a justificativa para excluir a reserva.")
+
     reservas, filtros_reservas = _reservas_filtradas(request)
+    reservas = list(reservas)
+    for reserva in reservas:
+        reserva.can_excluir = _can_excluir_reserva_ambiente(request.user, reserva)
     context = _reservas_base_context()
-    context.update({"reservas": reservas, "filtros_reservas": filtros_reservas})
+    context.update(
+        {
+            "reservas": reservas,
+            "filtros_reservas": filtros_reservas,
+            "exclusao_form": exclusao_form,
+        }
+    )
     return render(request, "processos/reservas_ambientes_feitas.html", context)
 
 
@@ -1870,13 +1987,22 @@ def salas_ambientes_view(request):
 
     polo = request.user.polo_atuacao
     can_choose_polo = _is_coordenador(request.user) and not polo
-    sala_form = SalaForm(prefix="sala", can_choose_polo=can_choose_polo)
-    disponibilidade_form = DisponibilidadeSalaForm(prefix="disp", polo=polo)
+    sala_form = SalaForm(prefix="sala", can_choose_polo=can_choose_polo, include_ativa=False)
+    disponibilidade_form = DisponibilidadeSalaLoteForm(prefix="disp")
+    sala_edit_form = None
+    modal_aberto = ""
+
+    if polo:
+        salas_base = Sala.objects.filter(polo=polo)
+    elif can_choose_polo:
+        salas_base = Sala.objects.all()
+    else:
+        salas_base = Sala.objects.none()
 
     if request.method == "POST" and (polo or can_choose_polo):
         acao = request.POST.get("acao")
         if acao == "criar_sala":
-            sala_form = SalaForm(request.POST, prefix="sala", can_choose_polo=can_choose_polo)
+            sala_form = SalaForm(request.POST, prefix="sala", can_choose_polo=can_choose_polo, include_ativa=False)
             if sala_form.is_valid():
                 sala = sala_form.save(commit=False)
                 if polo:
@@ -1884,20 +2010,40 @@ def salas_ambientes_view(request):
                 sala.save()
                 messages.success(request, "Sala cadastrada com sucesso.")
                 return redirect("salas_ambientes")
-        elif acao == "adicionar_disponibilidade":
-            disponibilidade_form = DisponibilidadeSalaForm(request.POST, prefix="disp", polo=polo)
-            if disponibilidade_form.is_valid():
-                disponibilidade_form.save()
-                messages.success(request, "Disponibilidade cadastrada com sucesso.")
+            modal_aberto = "nova-sala"
+        elif acao == "editar_sala":
+            sala = get_object_or_404(salas_base, pk=request.POST.get("sala_id"))
+            sala_edit_form = SalaForm(request.POST, prefix="sala_edit", instance=sala, can_choose_polo=can_choose_polo)
+            if sala_edit_form.is_valid():
+                sala_edit = sala_edit_form.save(commit=False)
+                if polo:
+                    sala_edit.polo = polo
+                sala_edit.save()
+                messages.success(request, "Sala atualizada com sucesso.")
                 return redirect("salas_ambientes")
+            modal_aberto = f"editar-sala-{sala.pk}"
+        elif acao == "adicionar_disponibilidade":
+            sala = get_object_or_404(salas_base, pk=request.POST.get("sala_id"))
+            disponibilidade_form = DisponibilidadeSalaLoteForm(request.POST, prefix="disp")
+            if disponibilidade_form.is_valid():
+                disponibilidades = disponibilidade_form.save(sala)
+                if len(disponibilidades) == 1:
+                    messages.success(request, "Disponibilidade cadastrada com sucesso.")
+                else:
+                    messages.success(request, f"{len(disponibilidades)} disponibilidades cadastradas com sucesso.")
+                return redirect("salas_ambientes")
+            modal_aberto = f"editar-sala-{sala.pk}"
+        elif acao == "excluir_disponibilidade":
+            disponibilidade = get_object_or_404(
+                DisponibilidadeSala.objects.select_related("sala"),
+                pk=request.POST.get("disponibilidade_id"),
+                sala__in=salas_base,
+            )
+            disponibilidade.delete()
+            messages.success(request, "Horario removido com sucesso.")
+            return redirect("salas_ambientes")
 
-    if polo:
-        salas = Sala.objects.filter(polo=polo)
-    elif can_choose_polo:
-        salas = Sala.objects.all()
-    else:
-        salas = Sala.objects.none()
-    salas = salas.select_related("polo").prefetch_related("disponibilidades").order_by("polo__nome", "nome")
+    salas = salas_base.select_related("polo").prefetch_related("disponibilidades").order_by("polo__nome", "nome")
     return render(
         request,
         "processos/salas_ambientes.html",
@@ -1906,8 +2052,139 @@ def salas_ambientes_view(request):
             "salas": salas,
             "sala_form": sala_form,
             "disponibilidade_form": disponibilidade_form,
+            "sala_edit_form": sala_edit_form,
+            "modal_aberto": modal_aberto,
             "can_choose_polo": can_choose_polo,
         },
+    )
+
+
+def _solicitacao_banca_context(form, request, solicitacao=None):
+    trajetorias = form.fields["trajetoria"].queryset
+    alunos = form.fields["aluno"].queryset
+    papeis_por_tipo = []
+    for tipo, label in SolicitacaoBanca.TipoDefesa.choices:
+        papeis = []
+        for papel in MembroBanca.papeis_para_tipo(tipo):
+            papeis.append(
+                {
+                    "valor": papel,
+                    "label": MembroBanca.Papel(papel).label,
+                    "opcional": MembroBanca.papel_opcional(tipo, papel),
+                    "exige_instituicao": MembroBanca.exige_instituicao(papel),
+                    "exige_cpf": MembroBanca.exige_cpf(tipo, papel),
+                    "nome_field": form[f"membro_{papel}_nome"],
+                    "instituicao_field": form[f"membro_{papel}_instituicao"],
+                    "cpf_field": form[f"membro_{papel}_cpf"],
+                }
+            )
+        papeis_por_tipo.append({"valor": tipo, "label": label, "papeis": papeis})
+
+    return {
+        "form": form,
+        "solicitacao": solicitacao,
+        "alunos_orientados": alunos,
+        "trajetorias_orientadas": trajetorias,
+        "papeis_por_tipo": papeis_por_tipo,
+        "is_coordenador": _is_coordenador(request.user),
+        "has_gestao_access": _has_gestao_access(request.user),
+        "can_view_dashboard": _can_view_dashboard(request.user),
+        "can_view_processos": _can_view_processos(request.user),
+        "can_view_caixa": _can_view_caixa(request.user),
+    }
+
+
+@login_required
+def solicitacoes_banca_view(request):
+    if request.user.tipo_usuario != User.TipoUsuario.DOCENTE:
+        raise PermissionDenied("Acesso restrito a docentes.")
+
+    solicitacoes = (
+        SolicitacaoBanca.objects.select_related("aluno", "trajetoria")
+        .filter(docente=request.user)
+        .order_by("-atualizado_em")
+    )
+    return render(
+        request,
+        "processos/solicitacoes_banca.html",
+        {
+            "solicitacoes": solicitacoes,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
+@login_required
+def solicitacao_banca_nova_view(request):
+    if request.user.tipo_usuario != User.TipoUsuario.DOCENTE:
+        raise PermissionDenied("Acesso restrito a docentes.")
+
+    finalizar = request.POST.get("acao") == "finalizar"
+    form = SolicitacaoBancaForm(request.POST or None, docente=request.user, finalizar=finalizar)
+    if request.method == "POST" and form.is_valid():
+        status = SolicitacaoBanca.Status.FINALIZADA if finalizar else SolicitacaoBanca.Status.RASCUNHO
+        solicitacao = form.save(commit=False, docente=request.user, status=status)
+        if finalizar:
+            solicitacao.finalizado_por = request.user
+            solicitacao.finalizado_em = timezone.now()
+        solicitacao.save()
+        form.save_membros(solicitacao)
+        messages.success(request, "Solicitacao de banca finalizada." if finalizar else "Rascunho salvo.")
+        return redirect("solicitacao_banca_detalhe", solicitacao_id=solicitacao.id)
+
+    return render(request, "processos/solicitacao_banca_form.html", _solicitacao_banca_context(form, request))
+
+
+@login_required
+def solicitacao_banca_detalhe_view(request, solicitacao_id):
+    if request.user.tipo_usuario != User.TipoUsuario.DOCENTE:
+        raise PermissionDenied("Acesso restrito a docentes.")
+
+    solicitacao = get_object_or_404(
+        SolicitacaoBanca.objects.select_related("aluno", "trajetoria", "finalizado_por").prefetch_related("membros"),
+        pk=solicitacao_id,
+        docente=request.user,
+    )
+    if not solicitacao.is_rascunho:
+        return render(
+            request,
+            "processos/solicitacao_banca_detalhe.html",
+            {
+                "solicitacao": solicitacao,
+                "is_coordenador": _is_coordenador(request.user),
+                "has_gestao_access": _has_gestao_access(request.user),
+                "can_view_dashboard": _can_view_dashboard(request.user),
+                "can_view_processos": _can_view_processos(request.user),
+                "can_view_caixa": _can_view_caixa(request.user),
+            },
+        )
+
+    finalizar = request.POST.get("acao") == "finalizar"
+    form = SolicitacaoBancaForm(
+        request.POST or None,
+        instance=solicitacao,
+        docente=request.user,
+        finalizar=finalizar,
+    )
+    if request.method == "POST" and form.is_valid():
+        status = SolicitacaoBanca.Status.FINALIZADA if finalizar else SolicitacaoBanca.Status.RASCUNHO
+        solicitacao = form.save(commit=False, docente=request.user, status=status)
+        if finalizar:
+            solicitacao.finalizado_por = request.user
+            solicitacao.finalizado_em = timezone.now()
+        solicitacao.save()
+        form.save_membros(solicitacao)
+        messages.success(request, "Solicitacao de banca finalizada." if finalizar else "Rascunho salvo.")
+        return redirect("solicitacao_banca_detalhe", solicitacao_id=solicitacao.id)
+
+    return render(
+        request,
+        "processos/solicitacao_banca_form.html",
+        _solicitacao_banca_context(form, request, solicitacao=solicitacao),
     )
 
 

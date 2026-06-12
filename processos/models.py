@@ -269,6 +269,74 @@ class TrajetoriaAcademica(models.Model):
         return self.coorientador_externo_nome.strip()
 
 
+class PublicacaoTrajetoria(models.Model):
+    class TipoPublicacao(models.TextChoices):
+        ARTIGO_PERIODICO = "ARTIGO_PERIODICO", "Artigo em periodico"
+        ARTIGO_EVENTO = "ARTIGO_EVENTO", "Artigo em evento"
+        LIVRO_CAPITULO = "LIVRO_CAPITULO", "Livro/capitulo"
+        OUTRO = "OUTRO", "Outro"
+
+    trajetoria = models.ForeignKey(TrajetoriaAcademica, on_delete=models.CASCADE, related_name="publicacoes")
+    titulo = models.CharField(max_length=255)
+    tipo = models.CharField(max_length=25, choices=TipoPublicacao.choices, default=TipoPublicacao.ARTIGO_PERIODICO)
+    autores = models.TextField(blank=True)
+    veiculo = models.CharField(max_length=255, blank=True)
+    ano = models.PositiveIntegerField(null=True, blank=True)
+    doi_url = models.CharField(max_length=255, blank=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="publicacoes_trajetoria_criadas",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-ano", "titulo"]
+
+    def __str__(self) -> str:
+        return self.titulo
+
+    def save(self, *args, **kwargs):
+        self.titulo = (self.titulo or "").strip()
+        self.veiculo = (self.veiculo or "").strip()
+        self.doi_url = (self.doi_url or "").strip()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class DisciplinaTrajetoria(models.Model):
+    class Situacao(models.TextChoices):
+        CURSANDO = "CURSANDO", "Cursando"
+        APROVADA = "APROVADA", "Aprovada"
+        REPROVADA = "REPROVADA", "Reprovada"
+        TRANCADA = "TRANCADA", "Trancada"
+
+    trajetoria = models.ForeignKey(TrajetoriaAcademica, on_delete=models.CASCADE, related_name="disciplinas")
+    codigo = models.CharField(max_length=40, blank=True)
+    nome = models.CharField(max_length=255)
+    semestre = models.CharField(max_length=6, blank=True, validators=[Aluno.semestre_validator])
+    conceito = models.CharField(max_length=20, blank=True)
+    creditos = models.PositiveSmallIntegerField(null=True, blank=True)
+    carga_horaria = models.PositiveSmallIntegerField(null=True, blank=True)
+    situacao = models.CharField(max_length=15, choices=Situacao.choices, default=Situacao.CURSANDO)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["semestre", "nome"]
+
+    def __str__(self) -> str:
+        return self.nome
+
+    def save(self, *args, **kwargs):
+        self.codigo = (self.codigo or "").strip()
+        self.nome = (self.nome or "").strip()
+        self.conceito = (self.conceito or "").strip()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
 class AlteracaoAluno(models.Model):
     class TipoAlteracao(models.TextChoices):
         STATUS = "STATUS", "Status"
@@ -299,6 +367,243 @@ class AlteracaoAluno(models.Model):
 
     def __str__(self) -> str:
         return f"{self.aluno.nome} - {self.get_tipo_display()} - {self.criado_em:%Y-%m-%d %H:%M}"
+
+
+def validar_cpf_brasileiro(cpf: str) -> bool:
+    digitos = "".join(char for char in (cpf or "") if char.isdigit())
+    if len(digitos) != 11 or digitos == digitos[0] * 11:
+        return False
+
+    for posicao in (9, 10):
+        soma = sum(int(digitos[indice]) * (posicao + 1 - indice) for indice in range(posicao))
+        verificador = (soma * 10) % 11
+        if verificador == 10:
+            verificador = 0
+        if verificador != int(digitos[posicao]):
+            return False
+    return True
+
+
+class SolicitacaoBanca(models.Model):
+    class TipoDefesa(models.TextChoices):
+        DEFESA_MESTRADO = "DEFESA_MESTRADO", "Defesa de Mestrado"
+        QUALIFICACAO_DOUTORADO = "QUALIFICACAO_DOUTORADO", "Qualificação de Doutorado"
+        DEFESA_DOUTORADO = "DEFESA_DOUTORADO", "Defesa de Doutorado"
+
+    class Status(models.TextChoices):
+        RASCUNHO = "RASCUNHO", "Rascunho"
+        FINALIZADA = "FINALIZADA", "Finalizada"
+
+    docente = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="solicitacoes_banca_docente",
+        limit_choices_to={"tipo_usuario": User.TipoUsuario.DOCENTE},
+    )
+    aluno = models.ForeignKey(Aluno, on_delete=models.PROTECT, related_name="solicitacoes_banca")
+    trajetoria = models.ForeignKey(
+        TrajetoriaAcademica,
+        on_delete=models.PROTECT,
+        related_name="solicitacoes_banca",
+    )
+    tipo_defesa = models.CharField(max_length=30, choices=TipoDefesa.choices)
+    titulo = models.CharField(max_length=255, blank=True)
+    resumo = models.TextField(blank=True)
+    palavras_chave = models.CharField(max_length=255, blank=True)
+    data_prevista = models.DateField(null=True, blank=True)
+    horario_previsto = models.TimeField(null=True, blank=True)
+    modalidade_local_link = models.TextField(blank=True)
+    requisitos_cumpridos = models.BooleanField(default=False)
+    justificativa_excepcionalidade = models.TextField(blank=True)
+    ciencia_recomendacao_mpf = models.BooleanField(default=False)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.RASCUNHO)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    finalizado_em = models.DateTimeField(null=True, blank=True)
+    finalizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="solicitacoes_banca_finalizadas",
+    )
+    processo = models.ForeignKey(
+        "Processo",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="solicitacoes_banca_anexadas",
+    )
+
+    class Meta:
+        ordering = ["-atualizado_em"]
+
+    def __str__(self) -> str:
+        return f"{self.get_tipo_defesa_display()} - {self.aluno.nome}"
+
+    @property
+    def is_rascunho(self) -> bool:
+        return self.status == self.Status.RASCUNHO
+
+    def clean(self):
+        errors = {}
+        if self.docente and self.docente.tipo_usuario != User.TipoUsuario.DOCENTE:
+            errors["docente"] = "Solicitacao de banca deve ser criada por docente."
+        if self.trajetoria_id and self.aluno_id and self.trajetoria.aluno_id != self.aluno_id:
+            errors["trajetoria"] = "A trajetoria selecionada nao pertence ao aluno informado."
+        if self.trajetoria_id and self.docente_id:
+            docente_vinculado = self.trajetoria.orientador_id == self.docente_id or self.trajetoria.coorientador_id == self.docente_id
+            if not docente_vinculado:
+                errors["trajetoria"] = "A trajetoria deve estar vinculada ao docente por orientacao ou coorientacao."
+        if self.trajetoria_id and self.trajetoria.status != TrajetoriaAcademica.Status.ATIVA:
+            errors["trajetoria"] = "A trajetoria deve estar ativa."
+
+        if self.status == self.Status.FINALIZADA:
+            campos_obrigatorios = {
+                "titulo": self.titulo,
+                "resumo": self.resumo,
+                "palavras_chave": self.palavras_chave,
+                "modalidade_local_link": self.modalidade_local_link,
+            }
+            for campo, valor in campos_obrigatorios.items():
+                if not (valor or "").strip():
+                    errors[campo] = "Campo obrigatorio para finalizar a solicitacao."
+            if not self.data_prevista:
+                errors["data_prevista"] = "Campo obrigatorio para finalizar a solicitacao."
+            if not self.horario_previsto:
+                errors["horario_previsto"] = "Campo obrigatorio para finalizar a solicitacao."
+            if not self.requisitos_cumpridos:
+                errors["requisitos_cumpridos"] = "Confirme que o discente cumpre os requisitos."
+            if not self.ciencia_recomendacao_mpf:
+                errors["ciencia_recomendacao_mpf"] = "Confirme a ciencia da recomendacao."
+            if not self.finalizado_por_id:
+                errors["finalizado_por"] = "Informe o usuario responsavel pela finalizacao."
+            if not self.finalizado_em:
+                errors["finalizado_em"] = "Informe a data de finalizacao."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.titulo = (self.titulo or "").strip()
+        self.palavras_chave = (self.palavras_chave or "").strip()
+        if self.status == self.Status.RASCUNHO:
+            self.finalizado_em = None
+            self.finalizado_por = None
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class MembroBanca(models.Model):
+    class Papel(models.TextChoices):
+        EXAMINADOR_EXTERNO = "EXAMINADOR_EXTERNO", "Examinador externo"
+        EXAMINADOR_EXTERNO_1 = "EXAMINADOR_EXTERNO_1", "Examinador externo 1"
+        EXAMINADOR_EXTERNO_2 = "EXAMINADOR_EXTERNO_2", "Examinador externo 2"
+        EXAMINADOR_INTERNO = "EXAMINADOR_INTERNO", "Examinador interno"
+        TERCEIRO_EXAMINADOR = "TERCEIRO_EXAMINADOR", "Terceiro examinador"
+        QUARTO_EXAMINADOR = "QUARTO_EXAMINADOR", "Quarto examinador"
+        SUPLENTE = "SUPLENTE", "Suplente"
+        SUPLENTE_EXTERNO = "SUPLENTE_EXTERNO", "Suplente externo"
+        SUPLENTE_INTERNO = "SUPLENTE_INTERNO", "Suplente interno"
+
+    PAPEIS_POR_TIPO = {
+        SolicitacaoBanca.TipoDefesa.DEFESA_MESTRADO: [
+            Papel.EXAMINADOR_EXTERNO,
+            Papel.EXAMINADOR_INTERNO,
+            Papel.SUPLENTE_EXTERNO,
+            Papel.SUPLENTE_INTERNO,
+        ],
+        SolicitacaoBanca.TipoDefesa.QUALIFICACAO_DOUTORADO: [
+            Papel.EXAMINADOR_EXTERNO,
+            Papel.EXAMINADOR_INTERNO,
+            Papel.TERCEIRO_EXAMINADOR,
+            Papel.SUPLENTE,
+        ],
+        SolicitacaoBanca.TipoDefesa.DEFESA_DOUTORADO: [
+            Papel.EXAMINADOR_EXTERNO_1,
+            Papel.EXAMINADOR_EXTERNO_2,
+            Papel.EXAMINADOR_INTERNO,
+            Papel.QUARTO_EXAMINADOR,
+            Papel.SUPLENTE_EXTERNO,
+            Papel.SUPLENTE_INTERNO,
+        ],
+    }
+
+    PAPEIS_COM_INSTITUICAO = {
+        Papel.EXAMINADOR_EXTERNO,
+        Papel.EXAMINADOR_EXTERNO_1,
+        Papel.EXAMINADOR_EXTERNO_2,
+        Papel.TERCEIRO_EXAMINADOR,
+        Papel.QUARTO_EXAMINADOR,
+        Papel.SUPLENTE,
+        Papel.SUPLENTE_EXTERNO,
+    }
+
+    PAPEIS_COM_CPF = {
+        Papel.EXAMINADOR_EXTERNO,
+        Papel.EXAMINADOR_EXTERNO_1,
+        Papel.EXAMINADOR_EXTERNO_2,
+        Papel.EXAMINADOR_INTERNO,
+        Papel.TERCEIRO_EXAMINADOR,
+        Papel.QUARTO_EXAMINADOR,
+        Papel.SUPLENTE,
+        Papel.SUPLENTE_EXTERNO,
+    }
+
+    PAPEIS_OPCIONAIS_POR_TIPO = {
+        SolicitacaoBanca.TipoDefesa.DEFESA_DOUTORADO: {Papel.QUARTO_EXAMINADOR},
+    }
+
+    solicitacao = models.ForeignKey(SolicitacaoBanca, on_delete=models.CASCADE, related_name="membros")
+    papel = models.CharField(max_length=30, choices=Papel.choices)
+    nome = models.CharField(max_length=255, blank=True)
+    instituicao = models.CharField(max_length=255, blank=True)
+    cpf = models.CharField(max_length=14, blank=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(fields=["solicitacao", "papel"], name="unique_membro_por_papel_solicitacao"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.get_papel_display()} - {self.nome}"
+
+    @classmethod
+    def papeis_para_tipo(cls, tipo_defesa):
+        return cls.PAPEIS_POR_TIPO.get(tipo_defesa, [])
+
+    @classmethod
+    def papel_opcional(cls, tipo_defesa, papel):
+        return papel in cls.PAPEIS_OPCIONAIS_POR_TIPO.get(tipo_defesa, set())
+
+    @classmethod
+    def exige_instituicao(cls, papel):
+        return papel in cls.PAPEIS_COM_INSTITUICAO
+
+    @classmethod
+    def exige_cpf(cls, tipo_defesa, papel):
+        if papel == cls.Papel.SUPLENTE_INTERNO:
+            return tipo_defesa == SolicitacaoBanca.TipoDefesa.DEFESA_MESTRADO
+        return papel in cls.PAPEIS_COM_CPF
+
+    def clean(self):
+        errors = {}
+        if self.papel and self.solicitacao_id:
+            papeis_validos = self.papeis_para_tipo(self.solicitacao.tipo_defesa)
+            if self.papel not in papeis_validos:
+                errors["papel"] = "Papel de banca incompativel com o tipo de defesa."
+        if self.cpf and not validar_cpf_brasileiro(self.cpf):
+            errors["cpf"] = "Informe um CPF valido."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.nome = (self.nome or "").strip()
+        self.instituicao = (self.instituicao or "").strip()
+        self.cpf = (self.cpf or "").strip()
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class Setor(models.Model):
@@ -928,6 +1233,10 @@ class ReservaAmbiente(models.Model):
         DEFESA = "DEFESA", "Defesa"
         REUNIAO_PESQUISA = "REUNIAO_PESQUISA", "Reuniao de pesquisa"
 
+    class StatusReserva(models.TextChoices):
+        ATIVA = "ATIVA", "Ativa"
+        EXCLUIDA = "EXCLUIDA", "Excluida"
+
     sala = models.ForeignKey(Sala, on_delete=models.PROTECT, related_name="reservas")
     docente = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -946,6 +1255,16 @@ class ReservaAmbiente(models.Model):
     fim = models.DateTimeField()
     recorrente = models.BooleanField(default=False)
     grupo_recorrencia = models.UUIDField(null=True, blank=True, db_index=True)
+    status = models.CharField(max_length=12, choices=StatusReserva.choices, default=StatusReserva.ATIVA)
+    excluida_em = models.DateTimeField(null=True, blank=True)
+    excluida_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reservas_ambiente_excluidas",
+    )
+    justificativa_exclusao = models.TextField(blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -971,6 +1290,7 @@ class ReservaAmbiente(models.Model):
             sala=self.sala,
             inicio__lt=self.fim,
             fim__gt=self.inicio,
+            status=self.StatusReserva.ATIVA,
         ).select_related("sala", "sala__polo", "docente").order_by("inicio")
         if self.pk:
             queryset = queryset.exclude(pk=self.pk)
@@ -1003,17 +1323,26 @@ class ReservaAmbiente(models.Model):
         elif self.inicio.date() != self.fim.date():
             errors["fim"] = "A reserva deve comecar e terminar no mesmo dia."
         if self.sala_id and self.inicio and self.fim:
-            if not self.horario_disponivel_na_sala():
+            if self.status == self.StatusReserva.ATIVA and not self.horario_disponivel_na_sala():
                 errors["inicio"] = "A sala nao esta disponivel neste horario."
-            conflito = self.reserva_conflitante()
+            conflito = self.reserva_conflitante() if self.status == self.StatusReserva.ATIVA else None
             if conflito:
                 errors["inicio"] = self.mensagem_conflito(conflito)
+        if self.status == self.StatusReserva.EXCLUIDA and not (self.justificativa_exclusao or "").strip():
+            errors["justificativa_exclusao"] = "Informe a justificativa da exclusao."
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+    def excluir(self, *, usuario, justificativa):
+        self.status = self.StatusReserva.EXCLUIDA
+        self.excluida_por = usuario
+        self.excluida_em = timezone.now()
+        self.justificativa_exclusao = (justificativa or "").strip()
+        self.save()
 
     @classmethod
     def criar_reservas(cls, *, sala, docente, criado_por, tipo, titulo, inicio, fim, recorrencia, duracao_recorrencia_meses):

@@ -40,6 +40,10 @@ body {
         var(--color-bg);
 }
 
+[hidden] {
+    display: none !important;
+}
+
 a {
     color: inherit;
 }
@@ -480,6 +484,51 @@ input[type="checkbox"] {
     background: #ffffff;
 }
 
+.room-list > li {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.room-heading {
+    align-items: flex-start;
+}
+
+.room-title {
+    justify-content: flex-start;
+    margin-bottom: 0.25rem;
+}
+
+.availability-list {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.availability-list li {
+    display: inline-flex;
+    gap: 0.35rem;
+    align-items: center;
+    padding: 0.42rem 0.55rem;
+    border-radius: var(--radius-sm);
+    background: #f5f8fc;
+}
+
+.inline-delete-form {
+    margin: 0;
+}
+
+.btn-compact {
+    padding: 0.28rem 0.45rem;
+    font-size: 0.82rem;
+}
+
+.availability-edit-list {
+    margin-top: 0.9rem;
+}
+
 .grid-two {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -538,6 +587,129 @@ label {
 
 .field {
     margin-bottom: 0.9rem;
+}
+
+.checkbox-field {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.checkbox-field input {
+    width: auto;
+    margin: 0;
+}
+
+.room-edit-grid {
+    align-items: start;
+}
+
+.room-modal-card {
+    box-shadow: none;
+}
+
+.weekday-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+    margin-top: 0.45rem;
+}
+
+.check-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 42px;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: #ffffff;
+    font-weight: 700;
+}
+
+.check-chip input {
+    width: auto;
+    margin: 0;
+}
+
+.time-grid {
+    gap: 0.75rem;
+}
+
+.hidden-field {
+    display: none;
+}
+
+.trajectory-panel {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.trajectory-card {
+    display: grid;
+    grid-template-columns: auto repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+    align-items: start;
+    padding: 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: #ffffff;
+}
+
+.trajectory-card input {
+    width: auto;
+    margin-top: 0.15rem;
+}
+
+.trajectory-card small,
+.trajectory-card strong {
+    display: block;
+}
+
+.banca-check {
+    align-items: flex-start;
+    margin-bottom: 0.9rem;
+}
+
+.banca-members {
+    display: grid;
+    gap: 0.8rem;
+}
+
+.banca-member-card {
+    padding: 0.9rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: #ffffff;
+}
+
+.banca-member-card h4 {
+    margin: 0 0 0.65rem;
+}
+
+.optional-banca-field {
+    opacity: 0.72;
+}
+
+.info-list {
+    display: grid;
+    gap: 0.55rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.info-list li {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 0.75rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.info-label {
+    color: var(--color-muted);
+    font-weight: 800;
 }
 
 .calendar-shell {
@@ -637,7 +809,7 @@ dialog::backdrop {
 }
 
 .modal-dialog {
-    width: min(680px, 92vw);
+    width: min(900px, 92vw);
 }
 
 .modal-body {
@@ -960,6 +1132,11 @@ dialog::backdrop {
         grid-template-columns: 1fr;
     }
 
+    .trajectory-card,
+    .info-list li {
+        grid-template-columns: 1fr;
+    }
+
     .hero-mark {
         margin: 0;
     }
@@ -1000,5 +1177,9 @@ dialog::backdrop {
     .activity-list time,
     .quick-list span:last-child {
         grid-column: 2;
+    }
+
+    .weekday-grid {
+        grid-template-columns: 1fr;
     }
 }

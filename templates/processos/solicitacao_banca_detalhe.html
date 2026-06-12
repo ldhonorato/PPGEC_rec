@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Solicitação de Banca | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">{{ solicitacao.get_tipo_defesa_display }}</h1>
+            <p class="muted">{{ solicitacao.aluno.nome }} - {{ solicitacao.trajetoria.get_nivel_curso_display }}</p>
+        </div>
+        <div class="calendar-nav">
+            <span class="badge badge-ok">{{ solicitacao.get_status_display }}</span>
+            <a class="btn btn-secondary" href="{% url 'solicitacoes_banca' %}">Minhas solicitações</a>
+        </div>
+    </div>
+</section>
+
+<section class="card panel">
+    <h2 class="section-title">Discente e trajetória</h2>
+    <ul class="info-list">
+        <li><span class="info-label">Aluno</span><span>{{ solicitacao.aluno.nome }}{% if solicitacao.aluno.matricula %} - {{ solicitacao.aluno.matricula }}{% endif %}</span></li>
+        <li><span class="info-label">E-mail</span><span>{{ solicitacao.aluno.email }}</span></li>
+        <li><span class="info-label">Nível</span><span>{{ solicitacao.trajetoria.get_nivel_curso_display }}</span></li>
+        <li><span class="info-label">Ingresso</span><span>{{ solicitacao.trajetoria.ingresso }}</span></li>
+        <li><span class="info-label">Orientador</span><span>{{ solicitacao.trajetoria.orientador.nome|default:"-" }}</span></li>
+        <li><span class="info-label">Coorientador</span><span>{{ solicitacao.trajetoria.coorientador_display|default:"-" }}</span></li>
+    </ul>
+</section>
+
+<section class="card panel">
+    <h2 class="section-title">Dados gerais</h2>
+    <ul class="info-list">
+        <li><span class="info-label">Título</span><span>{{ solicitacao.titulo }}</span></li>
+        <li><span class="info-label">Data e horário</span><span>{{ solicitacao.data_prevista|date:"d/m/Y" }} às {{ solicitacao.horario_previsto|time:"H:i" }}</span></li>
+        <li><span class="info-label">Local/modalidade/link</span><span>{{ solicitacao.modalidade_local_link|linebreaksbr }}</span></li>
+        <li><span class="info-label">Palavras-chave</span><span>{{ solicitacao.palavras_chave }}</span></li>
+        <li><span class="info-label">Finalização</span><span>{{ solicitacao.finalizado_em|date:"d/m/Y H:i" }} por {{ solicitacao.finalizado_por.nome }}</span></li>
+    </ul>
+    <h3>Resumo</h3>
+    <p>{{ solicitacao.resumo|linebreaksbr }}</p>
+    {% if solicitacao.justificativa_excepcionalidade %}
+        <h3>Justificativa para excepcionalidades</h3>
+        <p>{{ solicitacao.justificativa_excepcionalidade|linebreaksbr }}</p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2 class="section-title">Composição da banca</h2>
+    {% if solicitacao.membros.all %}
+        <ul class="list">
+            {% for membro in solicitacao.membros.all %}
+                <li>
+                    <strong>{{ membro.get_papel_display }}: {{ membro.nome }}</strong><br>
+                    <small class="muted">
+                        {% if membro.instituicao %}Instituição/IES: {{ membro.instituicao }}{% endif %}
+                        {% if membro.cpf %}{% if membro.instituicao %} | {% endif %}CPF: {{ membro.cpf }}{% endif %}
+                    </small>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhum membro informado.</p>
+    {% endif %}
+</section>
+{% endblock %}

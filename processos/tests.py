@@ -1,4 +1,5 @@
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
+from unittest.mock import patch
 
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
@@ -8,15 +9,19 @@ from django.utils import timezone
 from .models import (
     AlteracaoAluno,
     Aluno,
+    DisciplinaTrajetoria,
     DisponibilidadeSala,
     Docente,
     ManifestacaoProcesso,
+    MembroBanca,
     Polo,
+    PublicacaoTrajetoria,
     Processo,
     ReservaAmbiente,
     Sala,
     Setor,
     SetorMembro,
+    SolicitacaoBanca,
     TrajetoriaAcademica,
     User,
 )
@@ -303,6 +308,97 @@ class AlunosViewTests(TestCase):
         self.assertContains(response, "Doutorado")
         self.assertContains(response, "Qualifica")
         self.assertNotContains(response, "Projeto de")
+
+    def test_aluno_acessa_propria_trajetoria_e_cadastra_publicacao(self):
+        trajetoria = self.aluno.trajetorias.get(status=TrajetoriaAcademica.Status.ATIVA)
+        self.client.force_login(self.aluno)
+        response = self.client.post(
+            reverse("aluno_detalhe", args=[self.aluno.id]),
+            {
+                "acao": "salvar_publicacao",
+                "trajetoria_id": trajetoria.id,
+                "titulo": "Artigo do discente",
+                "tipo": PublicacaoTrajetoria.TipoPublicacao.ARTIGO_EVENTO,
+                "autores": "Aluno Teste; Orientador",
+                "veiculo": "Conferencia PPGEC",
+                "ano": "2026",
+                "doi_url": "https://example.com/artigo",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        publicacao = PublicacaoTrajetoria.objects.get()
+        self.assertEqual(publicacao.trajetoria_id, trajetoria.id)
+        self.assertEqual(publicacao.criado_por_id, self.aluno.id)
+
+    def test_aluno_nao_altera_disciplina(self):
+        trajetoria = self.aluno.trajetorias.get(status=TrajetoriaAcademica.Status.ATIVA)
+        self.client.force_login(self.aluno)
+        response = self.client.post(
+            reverse("aluno_detalhe", args=[self.aluno.id]),
+            {
+                "acao": "salvar_disciplina",
+                "trajetoria_id": trajetoria.id,
+                "nome": "Topicos Especiais",
+                "situacao": DisciplinaTrajetoria.Situacao.CURSANDO,
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(DisciplinaTrajetoria.objects.count(), 0)
+
+    def test_servidor_cadastra_disciplina_na_trajetoria(self):
+        trajetoria = self.aluno.trajetorias.get(status=TrajetoriaAcademica.Status.ATIVA)
+        self.client.force_login(self.servidor)
+        response = self.client.post(
+            reverse("aluno_detalhe", args=[self.aluno.id]),
+            {
+                "acao": "salvar_disciplina",
+                "trajetoria_id": trajetoria.id,
+                "codigo": "PPG001",
+                "nome": "Metodologia Cientifica",
+                "semestre": "2026.1",
+                "conceito": "A",
+                "creditos": "4",
+                "carga_horaria": "60",
+                "situacao": DisciplinaTrajetoria.Situacao.APROVADA,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        disciplina = DisciplinaTrajetoria.objects.get()
+        self.assertEqual(disciplina.trajetoria_id, trajetoria.id)
+        self.assertEqual(disciplina.nome, "Metodologia Cientifica")
+
+    def test_servidor_edita_publicacao_na_trajetoria(self):
+        trajetoria = self.aluno.trajetorias.get(status=TrajetoriaAcademica.Status.ATIVA)
+        publicacao = PublicacaoTrajetoria.objects.create(
+            trajetoria=trajetoria,
+            titulo="Titulo antigo",
+            tipo=PublicacaoTrajetoria.TipoPublicacao.OUTRO,
+            criado_por=self.aluno,
+        )
+
+        self.client.force_login(self.servidor)
+        response = self.client.post(
+            reverse("aluno_detalhe", args=[self.aluno.id]),
+            {
+                "acao": "salvar_publicacao",
+                "trajetoria_id": trajetoria.id,
+                "publicacao_id": publicacao.id,
+                "titulo": "Titulo atualizado",
+                "tipo": PublicacaoTrajetoria.TipoPublicacao.ARTIGO_PERIODICO,
+                "autores": "Aluno Teste",
+                "veiculo": "Revista PPGEC",
+                "ano": "2026",
+                "doi_url": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        publicacao.refresh_from_db()
+        self.assertEqual(publicacao.titulo, "Titulo atualizado")
+        self.assertEqual(publicacao.criado_por_id, self.aluno.id)
 
     def test_lista_alunos_filtra_por_nivel(self):
         aluno_doutorado_filtro = Aluno.objects.create(
@@ -910,6 +1006,265 @@ class ProcessoPrazoTests(TestCase):
         self.assertContains(response, "Atrasado")
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
+class SolicitacaoBancaTests(TestCase):
+    def setUp(self):
+        self.docente = Docente.objects.create(
+            email="orientador.banca@example.com",
+            password="senha-segura-123",
+            nome="Orientador Banca",
+        )
+        self.coorientador = Docente.objects.create(
+            email="coorientador.banca@example.com",
+            password="senha-segura-123",
+            nome="Coorientador Banca",
+        )
+        self.outro_docente = Docente.objects.create(
+            email="outro.banca@example.com",
+            password="senha-segura-123",
+            nome="Outro Docente",
+        )
+        self.servidor = User.objects.create_user(
+            email="servidor.banca@example.com",
+            password="senha-segura-123",
+            nome="Servidor Banca",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.aluno_mestrado = Aluno.objects.create(
+            email="mestrando.banca@example.com",
+            password="senha-segura-123",
+            nome="Mestrando Banca",
+            matricula="M123",
+        )
+        self.trajetoria_mestrado = TrajetoriaAcademica.objects.create(
+            aluno=self.aluno_mestrado,
+            nivel_curso=Aluno.NivelCurso.MESTRADO,
+            status=TrajetoriaAcademica.Status.ATIVA,
+            ingresso="2025.1",
+            prazo_qualificacao="2025.2",
+            prazo_defesa="2027.1",
+            orientador=self.docente,
+        )
+        self.aluno_doutorado = Aluno.objects.create(
+            email="doutorando.banca@example.com",
+            password="senha-segura-123",
+            nome="Doutorando Banca",
+            matricula="D123",
+        )
+        self.trajetoria_doutorado = TrajetoriaAcademica.objects.create(
+            aluno=self.aluno_doutorado,
+            nivel_curso=Aluno.NivelCurso.DOUTORADO,
+            status=TrajetoriaAcademica.Status.ATIVA,
+            ingresso="2024.1",
+            prazo_qualificacao="2025.2",
+            prazo_defesa="2028.1",
+            orientador=self.outro_docente,
+            coorientador=self.docente,
+        )
+
+    def _dados_defesa_mestrado(self, **overrides):
+        data = {
+            "aluno": self.aluno_mestrado.id,
+            "trajetoria": self.trajetoria_mestrado.id,
+            "tipo_defesa": SolicitacaoBanca.TipoDefesa.DEFESA_MESTRADO,
+            "titulo": "Arquitetura de sistemas distribuidos",
+            "resumo": "Resumo da dissertacao.",
+            "palavras_chave": "sistemas, distribuidos",
+            "data_prevista": "2026-08-20",
+            "horario_previsto": "14:00",
+            "modalidade_local_link": "Sala 1",
+            "requisitos_cumpridos": "on",
+            "ciencia_recomendacao_mpf": "on",
+            "membro_EXAMINADOR_EXTERNO_nome": "Externo Um",
+            "membro_EXAMINADOR_EXTERNO_instituicao": "IES Externa",
+            "membro_EXAMINADOR_EXTERNO_cpf": "529.982.247-25",
+            "membro_EXAMINADOR_INTERNO_nome": "Interno Um",
+            "membro_EXAMINADOR_INTERNO_cpf": "111.444.777-35",
+            "membro_SUPLENTE_EXTERNO_nome": "Suplente Externo",
+            "membro_SUPLENTE_EXTERNO_instituicao": "Outra IES",
+            "membro_SUPLENTE_EXTERNO_cpf": "123.456.789-09",
+            "membro_SUPLENTE_INTERNO_nome": "Suplente Interno",
+            "membro_SUPLENTE_INTERNO_cpf": "935.411.347-80",
+        }
+        data.update(overrides)
+        return data
+
+    def _dados_defesa_doutorado(self, **overrides):
+        data = {
+            "aluno": self.aluno_doutorado.id,
+            "trajetoria": self.trajetoria_doutorado.id,
+            "tipo_defesa": SolicitacaoBanca.TipoDefesa.DEFESA_DOUTORADO,
+            "titulo": "Tese em sistemas distribuidos",
+            "resumo": "Resumo da tese.",
+            "palavras_chave": "sistemas, tese",
+            "data_prevista": "2026-09-20",
+            "horario_previsto": "09:00",
+            "modalidade_local_link": "Sala virtual",
+            "requisitos_cumpridos": "on",
+            "ciencia_recomendacao_mpf": "on",
+            "membro_EXAMINADOR_EXTERNO_1_nome": "Externo Um",
+            "membro_EXAMINADOR_EXTERNO_1_instituicao": "IES Um",
+            "membro_EXAMINADOR_EXTERNO_1_cpf": "529.982.247-25",
+            "membro_EXAMINADOR_EXTERNO_2_nome": "Externo Dois",
+            "membro_EXAMINADOR_EXTERNO_2_instituicao": "IES Dois",
+            "membro_EXAMINADOR_EXTERNO_2_cpf": "111.444.777-35",
+            "membro_EXAMINADOR_INTERNO_nome": "Interno Um",
+            "membro_EXAMINADOR_INTERNO_cpf": "123.456.789-09",
+            "membro_SUPLENTE_EXTERNO_nome": "Suplente Externo",
+            "membro_SUPLENTE_EXTERNO_instituicao": "IES Suplente",
+            "membro_SUPLENTE_EXTERNO_cpf": "935.411.347-80",
+            "membro_SUPLENTE_INTERNO_nome": "Suplente Interno",
+        }
+        data.update(overrides)
+        return data
+
+    def test_apenas_docente_acessa_solicitacoes_banca(self):
+        self.client.force_login(self.servidor)
+        response = self.client.get(reverse("solicitacoes_banca"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_docente_visualiza_apenas_alunos_orientados_ou_coorientados(self):
+        aluno_sem_vinculo = Aluno.objects.create(
+            email="sem.vinculo@example.com",
+            password="senha-segura-123",
+            nome="Aluno Sem Vinculo",
+        )
+        TrajetoriaAcademica.objects.create(
+            aluno=aluno_sem_vinculo,
+            nivel_curso=Aluno.NivelCurso.MESTRADO,
+            status=TrajetoriaAcademica.Status.ATIVA,
+            ingresso="2025.1",
+            orientador=self.outro_docente,
+        )
+
+        self.client.force_login(self.docente)
+        response = self.client.get(reverse("solicitacao_banca_nova"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Mestrando Banca")
+        self.assertContains(response, "Doutorando Banca")
+        self.assertNotContains(response, "Aluno Sem Vinculo")
+
+    def test_docente_salva_rascunho_de_solicitacao(self):
+        self.client.force_login(self.docente)
+        response = self.client.post(
+            reverse("solicitacao_banca_nova"),
+            {
+                "acao": "rascunho",
+                "aluno": self.aluno_mestrado.id,
+                "trajetoria": self.trajetoria_mestrado.id,
+                "tipo_defesa": SolicitacaoBanca.TipoDefesa.DEFESA_MESTRADO,
+                "titulo": "Rascunho de dissertacao",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitacao = SolicitacaoBanca.objects.get()
+        self.assertEqual(solicitacao.status, SolicitacaoBanca.Status.RASCUNHO)
+        self.assertEqual(solicitacao.docente_id, self.docente.id)
+
+    def test_docente_finaliza_solicitacao_com_membros_obrigatorios(self):
+        self.client.force_login(self.docente)
+        response = self.client.post(
+            reverse("solicitacao_banca_nova"),
+            {"acao": "finalizar", **self._dados_defesa_mestrado()},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitacao = SolicitacaoBanca.objects.get()
+        self.assertEqual(solicitacao.status, SolicitacaoBanca.Status.FINALIZADA)
+        self.assertEqual(solicitacao.finalizado_por_id, self.docente.id)
+        self.assertIsNotNone(solicitacao.finalizado_em)
+        self.assertEqual(solicitacao.membros.count(), 4)
+
+    def test_defesa_doutorado_finaliza_sem_quarto_examinador(self):
+        self.client.force_login(self.docente)
+        response = self.client.post(
+            reverse("solicitacao_banca_nova"),
+            {"acao": "finalizar", **self._dados_defesa_doutorado()},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitacao = SolicitacaoBanca.objects.get()
+        self.assertEqual(solicitacao.status, SolicitacaoBanca.Status.FINALIZADA)
+        self.assertFalse(solicitacao.membros.filter(papel=MembroBanca.Papel.QUARTO_EXAMINADOR).exists())
+        self.assertEqual(solicitacao.membros.count(), 5)
+
+    def test_finalizacao_valida_cpf_brasileiro(self):
+        self.client.force_login(self.docente)
+        response = self.client.post(
+            reverse("solicitacao_banca_nova"),
+            {
+                "acao": "finalizar",
+                **self._dados_defesa_mestrado(membro_EXAMINADOR_EXTERNO_cpf="123.456.789-00"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Informe um CPF valido.")
+        self.assertEqual(SolicitacaoBanca.objects.count(), 0)
+
+    def test_novo_processo_docente_lista_apenas_formularios_proprios(self):
+        propria = SolicitacaoBanca.objects.create(
+            docente=self.docente,
+            aluno=self.aluno_mestrado,
+            trajetoria=self.trajetoria_mestrado,
+            tipo_defesa=SolicitacaoBanca.TipoDefesa.DEFESA_MESTRADO,
+            titulo="Solicitacao propria",
+        )
+        outra = SolicitacaoBanca.objects.create(
+            docente=self.outro_docente,
+            aluno=self.aluno_doutorado,
+            trajetoria=self.trajetoria_doutorado,
+            tipo_defesa=SolicitacaoBanca.TipoDefesa.QUALIFICACAO_DOUTORADO,
+            titulo="Solicitacao de outro docente",
+        )
+
+        self.client.force_login(self.docente)
+        response = self.client.get(reverse("novo_processo"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Formularios salvos")
+        self.assertContains(response, str(propria))
+        self.assertNotContains(response, str(outra))
+
+    @patch("processos.views.send_email_novo_processo_orientador.delay")
+    @patch("processos.views.send_email_novo_processo_aluno.delay")
+    def test_docente_anexa_solicitacao_de_banca_ao_criar_processo(self, _email_aluno, _email_orientador):
+        Setor.objects.get_or_create(nome="Secretaria PPGEC", defaults={"ativo": True})
+        solicitacao = SolicitacaoBanca.objects.create(
+            docente=self.docente,
+            aluno=self.aluno_mestrado,
+            trajetoria=self.trajetoria_mestrado,
+            tipo_defesa=SolicitacaoBanca.TipoDefesa.DEFESA_MESTRADO,
+            titulo="Formulario para anexar",
+        )
+
+        self.client.force_login(self.docente)
+        response = self.client.post(
+            reverse("novo_processo"),
+            {
+                "tipo": Processo.TipoProcesso.DEFESA_MESTRADO,
+                "assunto": "Solicitacao de banca",
+                "descricao": "Processo aberto com formulario salvo.",
+                "formularios_banca": [solicitacao.id],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitacao.refresh_from_db()
+        self.assertIsNotNone(solicitacao.processo_id)
+        self.assertEqual(solicitacao.processo.usuario_criado_por_id, self.docente.id)
+
+        detalhe = self.client.get(reverse("processo_detalhe", args=[solicitacao.processo_id]))
+        self.assertEqual(detalhe.status_code, 200)
+        self.assertContains(detalhe, "Ver formulário")
+        self.assertContains(detalhe, f'modal-banca-{solicitacao.id}')
+        self.assertContains(detalhe, "Discente e trajetória")
+        self.assertContains(detalhe, "Composição da banca")
+
+
 class ReservaAmbienteTests(TestCase):
     def setUp(self):
         self.polo = Polo.objects.create(nome="Polo Centro")
@@ -1149,6 +1504,205 @@ class ReservaAmbienteTests(TestCase):
         self.assertContains(response, "Minha reserva")
         self.assertNotContains(response, "Reserva de outro docente")
 
+    def test_coordenador_visualiza_reservas_de_todos_os_docentes(self):
+        coordenador = Docente.objects.create(
+            email="coordenador.reservas@example.com",
+            password="senha-segura-123",
+            nome="Coordenador Reservas",
+            coordenador=True,
+        )
+        outro_docente = Docente.objects.create(
+            email="outro.docente.todas.reservas@example.com",
+            password="senha-segura-123",
+            nome="Outro Docente Reservas",
+        )
+        ReservaAmbiente.objects.create(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            titulo="Reserva do docente",
+            inicio=self._dt(8, 9),
+            fim=self._dt(8, 10),
+        )
+        ReservaAmbiente.objects.create(
+            sala=self.outra_sala,
+            docente=outro_docente,
+            criado_por=outro_docente,
+            tipo=ReservaAmbiente.TipoReserva.DEFESA,
+            titulo="Reserva de outro docente",
+            inicio=self._dt(8, 10),
+            fim=self._dt(8, 11),
+        )
+
+        self.client.force_login(coordenador)
+        response = self.client.get(reverse("reservas_ambientes_feitas"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Reserva do docente")
+        self.assertContains(response, "Reserva de outro docente")
+        self.assertContains(response, "Marcar como excluída")
+
+    def test_coordenador_exclui_reserva_com_justificativa(self):
+        coordenador = Docente.objects.create(
+            email="coordenador.excluir.reserva@example.com",
+            password="senha-segura-123",
+            nome="Coordenador Excluir Reserva",
+            coordenador=True,
+        )
+        reserva = ReservaAmbiente.objects.create(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            titulo="Reserva a excluir",
+            inicio=self._dt(8, 9),
+            fim=self._dt(8, 10),
+        )
+
+        self.client.force_login(coordenador)
+        response = self.client.post(
+            reverse("reservas_ambientes_feitas"),
+            {
+                "acao": "excluir_reserva",
+                "reserva_id": reserva.id,
+                "justificativa": "Reserva cancelada pela coordenacao.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        reserva.refresh_from_db()
+        self.assertEqual(reserva.status, ReservaAmbiente.StatusReserva.EXCLUIDA)
+        self.assertEqual(reserva.excluida_por_id, coordenador.id)
+        self.assertIsNotNone(reserva.excluida_em)
+        self.assertEqual(reserva.justificativa_exclusao, "Reserva cancelada pela coordenacao.")
+
+    def test_docente_da_reserva_pode_exclui_la(self):
+        reserva = ReservaAmbiente.objects.create(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.servidor,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            titulo="Reserva do docente",
+            inicio=self._dt(8, 9),
+            fim=self._dt(8, 10),
+        )
+
+        self.client.force_login(self.docente)
+        response = self.client.post(
+            reverse("reservas_ambientes_feitas"),
+            {
+                "acao": "excluir_reserva",
+                "reserva_id": reserva.id,
+                "justificativa": "Cancelamento solicitado pelo docente.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        reserva.refresh_from_db()
+        self.assertEqual(reserva.status, ReservaAmbiente.StatusReserva.EXCLUIDA)
+        self.assertEqual(reserva.excluida_por_id, self.docente.id)
+        self.assertEqual(reserva.justificativa_exclusao, "Cancelamento solicitado pelo docente.")
+
+    def test_servidor_nao_exclui_reserva(self):
+        reserva = ReservaAmbiente.objects.create(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            titulo="Reserva protegida",
+            inicio=self._dt(8, 9),
+            fim=self._dt(8, 10),
+        )
+
+        self.client.force_login(self.servidor)
+        response = self.client.post(
+            reverse("reservas_ambientes_feitas"),
+            {
+                "acao": "excluir_reserva",
+                "reserva_id": reserva.id,
+                "justificativa": "Tentativa pela secretaria.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        reserva.refresh_from_db()
+        self.assertEqual(reserva.status, ReservaAmbiente.StatusReserva.ATIVA)
+
+    def test_reserva_excluida_nao_bloqueia_nova_reserva(self):
+        coordenador = Docente.objects.create(
+            email="coordenador.libera.reserva@example.com",
+            password="senha-segura-123",
+            nome="Coordenador Libera Reserva",
+            coordenador=True,
+        )
+        reserva = ReservaAmbiente.objects.create(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            titulo="Reserva original",
+            inicio=self._dt(8, 9),
+            fim=self._dt(8, 10),
+        )
+        reserva.excluir(usuario=coordenador, justificativa="Cancelamento aprovado.")
+
+        nova_reserva = ReservaAmbiente.objects.create(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.DEFESA,
+            titulo="Nova reserva no mesmo horario",
+            inicio=self._dt(8, 9, 30),
+            fim=self._dt(8, 10, 30),
+        )
+
+        self.assertEqual(nova_reserva.status, ReservaAmbiente.StatusReserva.ATIVA)
+
+    def test_exclusao_de_recorrencia_afeta_apenas_reservas_a_partir_do_dia(self):
+        for dia_semana in range(7):
+            DisponibilidadeSala.objects.get_or_create(
+                sala=self.sala,
+                dia_semana=dia_semana,
+                defaults={"hora_inicio": time(8, 0), "hora_fim": time(12, 0)},
+            )
+        reservas = ReservaAmbiente.criar_reservas(
+            sala=self.sala,
+            docente=self.docente,
+            criado_por=self.docente,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            titulo="Aula diaria recorrente",
+            inicio=self._dt(8, 9),
+            fim=self._dt(8, 10),
+            recorrencia="DIARIA",
+            duracao_recorrencia_meses=1,
+        )
+
+        self.client.force_login(self.docente)
+        with patch("processos.views.timezone.localdate", return_value=date(2026, 6, 12)):
+            response = self.client.post(
+                reverse("reservas_ambientes_feitas"),
+                {
+                    "acao": "excluir_reserva",
+                    "reserva_id": reservas[0].id,
+                    "justificativa": "Cancelamento da recorrencia.",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        reservas_antes = ReservaAmbiente.objects.filter(
+            grupo_recorrencia=reservas[0].grupo_recorrencia,
+            inicio__date__lt=date(2026, 6, 12),
+        )
+        reservas_a_partir = ReservaAmbiente.objects.filter(
+            grupo_recorrencia=reservas[0].grupo_recorrencia,
+            inicio__date__gte=date(2026, 6, 12),
+        )
+        self.assertTrue(reservas_antes.exists())
+        self.assertTrue(reservas_a_partir.exists())
+        self.assertFalse(reservas_antes.exclude(status=ReservaAmbiente.StatusReserva.ATIVA).exists())
+        self.assertFalse(reservas_a_partir.exclude(status=ReservaAmbiente.StatusReserva.EXCLUIDA).exists())
+
     def test_docente_visualiza_disponibilidade_semanal_com_reservas_de_outros(self):
         outro_docente = Docente.objects.create(
             email="outro.docente.calendario@example.com",
@@ -1243,8 +1797,65 @@ class ReservaAmbienteTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Cadastro de Salas")
+        self.assertNotContains(response, "Reservas de Salas")
         self.assertContains(response, "Sala 101")
         self.assertContains(response, "Sala 201")
+
+    def test_servidor_edita_sala_do_proprio_polo(self):
+        self.client.force_login(self.servidor)
+        response = self.client.post(
+            reverse("salas_ambientes"),
+            {
+                "acao": "editar_sala",
+                "sala_id": self.sala.id,
+                "sala_edit-nome": "Laboratorio 101",
+                "sala_edit-capacidade": "35",
+                "sala_edit-ativa": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.sala.refresh_from_db()
+        self.assertEqual(self.sala.nome, "Laboratorio 101")
+        self.assertEqual(self.sala.capacidade, 35)
+        self.assertTrue(self.sala.ativa)
+
+    def test_servidor_adiciona_mesmo_horario_em_varios_dias(self):
+        self.client.force_login(self.servidor)
+        response = self.client.post(
+            reverse("salas_ambientes"),
+            {
+                "acao": "adicionar_disponibilidade",
+                "sala_id": self.sala.id,
+                "disp-dias_semana": ["1", "2", "3"],
+                "disp-hora_inicio": "14:00",
+                "disp-hora_fim": "16:00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        disponibilidades = DisponibilidadeSala.objects.filter(
+            sala=self.sala,
+            hora_inicio=time(14, 0),
+            hora_fim=time(16, 0),
+        ).order_by("dia_semana")
+        self.assertEqual(list(disponibilidades.values_list("dia_semana", flat=True)), [1, 2, 3])
+
+    def test_servidor_exclui_horario_disponivel_da_sala(self):
+        disponibilidade = DisponibilidadeSala.objects.get(sala=self.sala, dia_semana=0)
+
+        self.client.force_login(self.servidor)
+        response = self.client.post(
+            reverse("salas_ambientes"),
+            {
+                "acao": "excluir_disponibilidade",
+                "disponibilidade_id": disponibilidade.id,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(DisponibilidadeSala.objects.filter(pk=disponibilidade.id).exists())
+        self.assertTrue(DisponibilidadeSala.objects.filter(sala=self.outra_sala).exists())
 
     def test_docente_pode_reservar_salas_distintas_no_mesmo_horario(self):
         ReservaAmbiente.objects.create(

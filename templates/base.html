@@ -65,31 +65,33 @@
                             <p class="sidebar-label">{{ section.label }}</p>
                             <ul class="side-menu">
                                 {% for item in section.items %}
-                                    <li>
-                                        {% if item.children %}
-                                            <details class="side-submenu" {% if request.resolver_match.url_name in item.url_names %}open{% endif %}>
-                                                <summary class="{% if request.resolver_match.url_name in item.url_names %}is-active{% endif %}">
+                                    {% if item.label != "Reservas de Salas" %}
+                                        <li>
+                                            {% if item.children %}
+                                                <details class="side-submenu" {% if request.resolver_match.url_name in item.url_names %}open{% endif %}>
+                                                    <summary class="{% if request.resolver_match.url_name in item.url_names %}is-active{% endif %}">
+                                                        <span class="side-icon">{{ item.icon }}</span>
+                                                        {{ item.label }}
+                                                    </summary>
+                                                    <ul>
+                                                        {% for child in item.children %}
+                                                            <li>
+                                                                <a class="{% if request.resolver_match.url_name in child.url_names %}is-active{% endif %}" href="{{ child.href }}">
+                                                                    <span class="side-icon">{{ child.icon }}</span>
+                                                                    {{ child.label }}
+                                                                </a>
+                                                            </li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </details>
+                                            {% else %}
+                                                <a class="{% if request.resolver_match.url_name in item.url_names %}is-active{% endif %}" href="{{ item.href }}">
                                                     <span class="side-icon">{{ item.icon }}</span>
                                                     {{ item.label }}
-                                                </summary>
-                                                <ul>
-                                                    {% for child in item.children %}
-                                                        <li>
-                                                            <a class="{% if request.resolver_match.url_name in child.url_names %}is-active{% endif %}" href="{{ child.href }}">
-                                                                <span class="side-icon">{{ child.icon }}</span>
-                                                                {{ child.label }}
-                                                            </a>
-                                                        </li>
-                                                    {% endfor %}
-                                                </ul>
-                                            </details>
-                                        {% else %}
-                                            <a class="{% if request.resolver_match.url_name in item.url_names %}is-active{% endif %}" href="{{ item.href }}">
-                                                <span class="side-icon">{{ item.icon }}</span>
-                                                {{ item.label }}
-                                            </a>
-                                        {% endif %}
-                                    </li>
+                                                </a>
+                                            {% endif %}
+                                        </li>
+                                    {% endif %}
                                 {% endfor %}
                             </ul>
                         {% endfor %}

@@ -6,7 +6,7 @@
         <div>
             <h1 class="section-title">Reservas feitas</h1>
             <p class="muted">
-                {% if user.tipo_usuario == "DOCENTE" %}
+                {% if user.tipo_usuario == "DOCENTE" and not has_gestao_access %}
                     Consulte suas reservas cadastradas.
                 {% else %}
                     Consulte as reservas cadastradas em todos os polos.
@@ -52,7 +52,16 @@
                     {% endfor %}
                 </select>
             </div>
-            {% if user.tipo_usuario == "SERVIDOR" %}
+            <div class="field">
+                <label for="reserva-status">Status</label>
+                <select id="reserva-status" name="status">
+                    <option value="">Todos</option>
+                    {% for valor, label in status_reserva %}
+                        <option value="{{ valor }}" {% if filtros_reservas.status == valor %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if has_gestao_access %}
                 <div class="field">
                     <label for="reserva-docente">Docente</label>
                     <select id="reserva-docente" name="docente">
@@ -82,8 +91,20 @@
             {% for reserva in reservas %}
                 <li>
                     <div class="item-row">
-                        <strong>{{ reserva.sala.nome }} - {{ reserva.sala.polo.nome }}</strong>
-                        <span class="badge badge-info">{{ reserva.get_tipo_display }}</span>
+                        <div>
+                            <strong>{{ reserva.sala.nome }} - {{ reserva.sala.polo.nome }}</strong>
+                            <div class="actions-row" style="justify-content:flex-start; margin-top:0.4rem;">
+                                <span class="badge badge-info">{{ reserva.get_tipo_display }}</span>
+                                {% if reserva.status == "EXCLUIDA" %}
+                                    <span class="badge badge-no">{{ reserva.get_status_display }}</span>
+                                {% else %}
+                                    <span class="badge badge-ok">{{ reserva.get_status_display }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if reserva.can_excluir and reserva.status != "EXCLUIDA" %}
+                            <button class="btn btn-secondary" type="button" data-open-dialog="excluir-reserva-{{ reserva.id }}">Marcar como excluída</button>
+                        {% endif %}
                     </div>
                     <small class="muted">
                         Docente: {{ reserva.docente.nome }} |
@@ -94,6 +115,16 @@
                     {% if reserva.titulo %}
                         <p>{{ reserva.titulo }}</p>
                     {% endif %}
+                    {% if reserva.status == "EXCLUIDA" %}
+                        <div class="alert alert-danger" style="margin-top:0.8rem;">
+                            <strong>Reserva excluída</strong>
+                            <p class="muted" style="margin:0.35rem 0 0;">
+                                {% if reserva.excluida_por %}Por {{ reserva.excluida_por.nome }}{% endif %}
+                                {% if reserva.excluida_em %} em {{ reserva.excluida_em|date:"d/m/Y H:i" }}{% endif %}
+                            </p>
+                            <p style="margin:0.35rem 0 0;">{{ reserva.justificativa_exclusao }}</p>
+                        </div>
+                    {% endif %}
                 </li>
             {% endfor %}
         </ul>
@@ -101,4 +132,51 @@
         <p class="muted">Nenhuma reserva encontrada.</p>
     {% endif %}
 </section>
+
+{% for reserva in reservas %}
+    {% if reserva.can_excluir and reserva.status != "EXCLUIDA" %}
+        <dialog id="excluir-reserva-{{ reserva.id }}" class="modal-dialog">
+            <div class="modal-body">
+                <div class="actions-row">
+                    <div>
+                        <h2 class="section-title">Excluir reserva</h2>
+                        <p class="muted">{{ reserva.sala.nome }} - {{ reserva.inicio|date:"d/m/Y H:i" }} a {{ reserva.fim|date:"H:i" }}</p>
+                        {% if reserva.grupo_recorrencia %}
+                            <p class="muted">Reservas recorrentes serão excluídas a partir de hoje.</p>
+                        {% endif %}
+                    </div>
+                    <button class="btn btn-secondary" type="button" data-close-dialog>Fechar</button>
+                </div>
+                <form method="post" class="stack">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="excluir_reserva">
+                    <input type="hidden" name="reserva_id" value="{{ reserva.id }}">
+                    <div class="field">
+                        <label for="justificativa-exclusao-{{ reserva.id }}">Justificativa</label>
+                        <textarea id="justificativa-exclusao-{{ reserva.id }}" name="justificativa" rows="4" required></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-secondary" type="button" data-close-dialog>Cancelar</button>
+                        <button class="btn" type="submit">Confirmar exclusão</button>
+                    </div>
+                </form>
+            </div>
+        </dialog>
+    {% endif %}
+{% endfor %}
+
+<script>
+document.querySelectorAll("[data-open-dialog]").forEach((button) => {
+    button.addEventListener("click", () => {
+        const dialog = document.getElementById(button.dataset.openDialog);
+        if (dialog && !dialog.open) {
+            dialog.showModal();
+        }
+    });
+});
+
+document.querySelectorAll("[data-close-dialog]").forEach((button) => {
+    button.addEventListener("click", () => button.closest("dialog").close());
+});
+</script>
 {% endblock %}

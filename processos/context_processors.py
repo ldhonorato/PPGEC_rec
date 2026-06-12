@@ -83,6 +83,9 @@ def _menu_lateral_sections(user):
         principal_items.append(
             _menu_item("Documento de Vínculo", "/aluno/documento-vinculo/", ["aluno_documento_vinculo"], "D")
         )
+        principal_items.append(
+            _menu_item("Minha Trajetória", f"/coordenacao/alunos/{user.id}/", ["aluno_detalhe"], "T")
+        )
     if user.tipo_usuario in {User.TipoUsuario.DOCENTE, User.TipoUsuario.SERVIDOR}:
         principal_items.append(
             _menu_item(
@@ -125,6 +128,12 @@ def _menu_lateral_sections(user):
             _menu_item("Ciências", "/menu/ciencias-manifestadas/", ["menu_ciencias_manifestadas"], "C"),
             _menu_item("Meus Orientandos", "/menu/meus-orientandos/", ["menu_meus_orientandos"], "O"),
             _menu_item(
+                "Solicitação de Banca",
+                "/bancas/",
+                ["solicitacoes_banca", "solicitacao_banca_nova", "solicitacao_banca_detalhe"],
+                "B",
+            ),
+            _menu_item(
                 "Processos dos Orientandos",
                 "/menu/processos-orientandos/",
                 ["menu_processos_orientandos"],
@@ -159,8 +168,11 @@ def _menu_lateral_sections(user):
                 _menu_item("Criar Comissão", "/coordenacao/setores/criar/", ["criar_comissao"], "C")
             )
         if _has_gestao_access(user):
-            coordenacao_items.append(
-                _menu_item("Cadastro de Salas", "/ambientes/salas/", ["salas_ambientes"], "S")
+            coordenacao_items.extend(
+                [
+                    _menu_item("Cadastro de Salas", "/ambientes/salas/", ["salas_ambientes"], "S"),
+                    _menu_item("Reservas de Salas", "/ambientes/reservas/feitas/", ["reservas_ambientes_feitas"], "R"),
+                ]
             )
         sections.append({"label": "Coordenação", "items": coordenacao_items})
 

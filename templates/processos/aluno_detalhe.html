@@ -73,8 +73,10 @@
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
                 <h1 class="section-title" style="margin-bottom: 0;">{{ aluno.nome }}</h1>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    <button type="button" class="btn btn-secondary" data-modal-open="modal-dados">Alterar dados</button>
-                    <a class="btn btn-secondary" href="{% url 'coordenacao_alunos' %}">Voltar para alunos</a>
+                    {% if can_manage_aluno %}
+                        <button type="button" class="btn btn-secondary" data-modal-open="modal-dados">Alterar dados</button>
+                        <a class="btn btn-secondary" href="{% url 'coordenacao_alunos' %}">Voltar para alunos</a>
+                    {% endif %}
                 </div>
             </div>
             <p class="aluno-kv"><strong>Email:</strong> {{ aluno.email }}</p>
@@ -95,7 +97,9 @@
             <div class="section-head">
                 <h2 class="section-title" style="margin:0;">Trajetorias academicas</h2>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    <button type="button" class="btn" data-modal-open="modal-nova-trajetoria">Nova trajetoria</button>
+                    {% if can_manage_aluno %}
+                        <button type="button" class="btn" data-modal-open="modal-nova-trajetoria">Nova trajetoria</button>
+                    {% endif %}
                 </div>
             </div>
             {% if trajetoria_cards %}
@@ -108,20 +112,85 @@
                                     <strong>{{ trajetoria.get_nivel_curso_display }}</strong>
                                     <span class="badge badge-info">{{ trajetoria.get_status_display }}</span>
                                 </div>
-                                <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-status-{{ trajetoria.id }}">Editar status</button>
+                                {% if can_manage_aluno %}
+                                    <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-status-{{ trajetoria.id }}">Editar status</button>
+                                {% endif %}
                             </div>
                             <ul class="info-list">
-                                <li><span class="info-label">Nivel</span><span>{{ trajetoria.get_nivel_curso_display }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-nivel-{{ trajetoria.id }}">Alterar</button></li>
+                                <li><span class="info-label">Nivel</span><span>{{ trajetoria.get_nivel_curso_display }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-nivel-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
                                 <li><span class="info-label">Ingresso</span><span>{{ trajetoria.ingresso|default:"-" }}</span><span></span></li>
-                                <li><span class="info-label">Prazo {{ trajetoria.qualificacao_label_lower }}</span><span>{{ trajetoria.prazo_qualificacao|default:"-" }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}">Alterar</button></li>
-                                <li><span class="info-label">Prazo defesa</span><span>{{ trajetoria.prazo_defesa|default:"-" }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}">Alterar</button></li>
-                                <li><span class="info-label">Reingressante</span><span>{% if trajetoria.reingressante %}Sim{% else %}Nao{% endif %}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-reingressante-{{ trajetoria.id }}">Alterar</button></li>
-                                <li><span class="info-label">{{ trajetoria.qualificacao_label }}</span><span>{% if trajetoria.isQualificado %}Sim{% else %}Nao{% endif %}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-qualificacao-{{ trajetoria.id }}">Alterar</button></li>
-                                <li><span class="info-label">Orientador</span><span>{% if trajetoria.orientador %}{{ trajetoria.orientador.nome }}{% else %}-{% endif %}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-orientador-{{ trajetoria.id }}">Alterar</button></li>
-                                <li><span class="info-label">Coorientador</span><span>{{ trajetoria.coorientador_display|default:"-" }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-coorientador-{{ trajetoria.id }}">Alterar</button></li>
-                                <li><span class="info-label">Defesa</span><span>{% if trajetoria.numero_defesa or trajetoria.data_defesa %}{{ trajetoria.numero_defesa|default:"-" }}{% if trajetoria.data_defesa %} - {{ trajetoria.data_defesa|date:"d/m/Y" }}{% endif %}{% else %}-{% endif %}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-defesa-{{ trajetoria.id }}">Alterar</button></li>
-                                <li><span class="info-label">Deposito final</span><span>{% if trajetoria.deposito_versao_final %}Sim{% else %}Nao{% endif %}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-deposito-{{ trajetoria.id }}">Alterar</button></li>
+                                <li><span class="info-label">Prazo {{ trajetoria.qualificacao_label_lower }}</span><span>{{ trajetoria.prazo_qualificacao|default:"-" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                <li><span class="info-label">Prazo defesa</span><span>{{ trajetoria.prazo_defesa|default:"-" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                <li><span class="info-label">Reingressante</span><span>{% if trajetoria.reingressante %}Sim{% else %}Nao{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-reingressante-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                <li><span class="info-label">{{ trajetoria.qualificacao_label }}</span><span>{% if trajetoria.isQualificado %}Sim{% else %}Nao{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-qualificacao-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                <li><span class="info-label">Orientador</span><span>{% if trajetoria.orientador %}{{ trajetoria.orientador.nome }}{% else %}-{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-orientador-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                <li><span class="info-label">Coorientador</span><span>{{ trajetoria.coorientador_display|default:"-" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-coorientador-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                <li><span class="info-label">Defesa</span><span>{% if trajetoria.numero_defesa or trajetoria.data_defesa %}{{ trajetoria.numero_defesa|default:"-" }}{% if trajetoria.data_defesa %} - {{ trajetoria.data_defesa|date:"d/m/Y" }}{% endif %}{% else %}-{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-defesa-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                <li><span class="info-label">Deposito final</span><span>{% if trajetoria.deposito_versao_final %}Sim{% else %}Nao{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-deposito-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
                             </ul>
+                            <div class="section-head" style="margin-top: 1rem;">
+                                <h3 class="section-title" style="margin:0;">Publicacoes</h3>
+                                {% if can_edit_publicacoes %}
+                                    <button type="button" class="btn btn-secondary" data-modal-open="modal-publicacao-nova-{{ trajetoria.id }}">Adicionar publicacao</button>
+                                {% endif %}
+                            </div>
+                            {% if trajetoria.publicacoes.all %}
+                                <ul class="list">
+                                    {% for publicacao in trajetoria.publicacoes.all %}
+                                        <li>
+                                            <div class="item-row">
+                                                <div>
+                                                    <strong>{{ publicacao.titulo }}</strong><br>
+                                                    <small class="muted">
+                                                        {{ publicacao.get_tipo_display }}
+                                                        {% if publicacao.ano %} | Ano: {{ publicacao.ano }}{% endif %}
+                                                        {% if publicacao.veiculo %} | {{ publicacao.veiculo }}{% endif %}
+                                                        {% if publicacao.doi_url %} | {{ publicacao.doi_url }}{% endif %}
+                                                    </small>
+                                                    {% if publicacao.autores %}<p style="margin: 0.35rem 0 0 0;">{{ publicacao.autores }}</p>{% endif %}
+                                                </div>
+                                                {% if can_edit_publicacoes %}
+                                                    <button type="button" class="btn btn-secondary" data-modal-open="modal-publicacao-{{ publicacao.id }}">Editar</button>
+                                                {% endif %}
+                                            </div>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p class="muted">Nenhuma publicacao registrada.</p>
+                            {% endif %}
+
+                            <div class="section-head" style="margin-top: 1rem;">
+                                <h3 class="section-title" style="margin:0;">Disciplinas</h3>
+                                {% if can_edit_disciplinas %}
+                                    <button type="button" class="btn btn-secondary" data-modal-open="modal-disciplina-nova-{{ trajetoria.id }}">Adicionar disciplina</button>
+                                {% endif %}
+                            </div>
+                            {% if trajetoria.disciplinas.all %}
+                                <ul class="list">
+                                    {% for disciplina in trajetoria.disciplinas.all %}
+                                        <li>
+                                            <div class="item-row">
+                                                <div>
+                                                    <strong>{% if disciplina.codigo %}{{ disciplina.codigo }} - {% endif %}{{ disciplina.nome }}</strong><br>
+                                                    <small class="muted">
+                                                        {{ disciplina.get_situacao_display }}
+                                                        {% if disciplina.semestre %} | Semestre: {{ disciplina.semestre }}{% endif %}
+                                                        {% if disciplina.conceito %} | Conceito: {{ disciplina.conceito }}{% endif %}
+                                                        {% if disciplina.creditos %} | Creditos: {{ disciplina.creditos }}{% endif %}
+                                                        {% if disciplina.carga_horaria %} | Carga horaria: {{ disciplina.carga_horaria }}h{% endif %}
+                                                    </small>
+                                                </div>
+                                                {% if can_edit_disciplinas %}
+                                                    <button type="button" class="btn btn-secondary" data-modal-open="modal-disciplina-{{ disciplina.id }}">Editar</button>
+                                                {% endif %}
+                                            </div>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p class="muted">Nenhuma disciplina registrada.</p>
+                            {% endif %}
                         </li>
                         {% endwith %}
                     {% endfor %}
@@ -423,6 +492,116 @@
         </form>
     </div>
 </div>
+
+{% if can_edit_publicacoes %}
+<div id="modal-publicacao-nova-{{ trajetoria.id }}" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Adicionar publicacao</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="salvar_publicacao">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <div class="grid-two">
+                <div class="field"><label>Titulo</label>{{ publicacao_form.titulo }}</div>
+                <div class="field"><label>Tipo</label>{{ publicacao_form.tipo }}</div>
+                <div class="field"><label>Veiculo</label>{{ publicacao_form.veiculo }}</div>
+                <div class="field"><label>Ano</label>{{ publicacao_form.ano }}</div>
+                <div class="field"><label>DOI/URL</label>{{ publicacao_form.doi_url }}</div>
+            </div>
+            <label>Autores</label>
+            {{ publicacao_form.autores }}
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar publicacao</button>
+        </form>
+    </div>
+</div>
+
+{% for publicacao in trajetoria.publicacoes.all %}
+<div id="modal-publicacao-{{ publicacao.id }}" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Editar publicacao</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="salvar_publicacao">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <input type="hidden" name="publicacao_id" value="{{ publicacao.id }}">
+            <div class="grid-two">
+                <div class="field"><label>Titulo</label><input name="titulo" value="{{ publicacao.titulo }}" maxlength="255" required></div>
+                <div class="field">
+                    <label>Tipo</label>
+                    <select name="tipo" required>
+                        <option value="ARTIGO_PERIODICO" {% if publicacao.tipo == "ARTIGO_PERIODICO" %}selected{% endif %}>Artigo em periodico</option>
+                        <option value="ARTIGO_EVENTO" {% if publicacao.tipo == "ARTIGO_EVENTO" %}selected{% endif %}>Artigo em evento</option>
+                        <option value="LIVRO_CAPITULO" {% if publicacao.tipo == "LIVRO_CAPITULO" %}selected{% endif %}>Livro/capitulo</option>
+                        <option value="OUTRO" {% if publicacao.tipo == "OUTRO" %}selected{% endif %}>Outro</option>
+                    </select>
+                </div>
+                <div class="field"><label>Veiculo</label><input name="veiculo" value="{{ publicacao.veiculo }}" maxlength="255"></div>
+                <div class="field"><label>Ano</label><input type="number" name="ano" value="{{ publicacao.ano|default_if_none:'' }}" min="1900" max="2100"></div>
+                <div class="field"><label>DOI/URL</label><input name="doi_url" value="{{ publicacao.doi_url }}" maxlength="255"></div>
+            </div>
+            <label>Autores</label>
+            <textarea name="autores" rows="3">{{ publicacao.autores }}</textarea>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar publicacao</button>
+        </form>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if can_edit_disciplinas %}
+<div id="modal-disciplina-nova-{{ trajetoria.id }}" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Adicionar disciplina</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="salvar_disciplina">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <div class="grid-two">
+                <div class="field"><label>Codigo</label>{{ disciplina_form.codigo }}</div>
+                <div class="field"><label>Nome</label>{{ disciplina_form.nome }}</div>
+                <div class="field"><label>Semestre</label>{{ disciplina_form.semestre }}</div>
+                <div class="field"><label>Conceito</label>{{ disciplina_form.conceito }}</div>
+                <div class="field"><label>Creditos</label>{{ disciplina_form.creditos }}</div>
+                <div class="field"><label>Carga horaria</label>{{ disciplina_form.carga_horaria }}</div>
+                <div class="field"><label>Situacao</label>{{ disciplina_form.situacao }}</div>
+            </div>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar disciplina</button>
+        </form>
+    </div>
+</div>
+
+{% for disciplina in trajetoria.disciplinas.all %}
+<div id="modal-disciplina-{{ disciplina.id }}" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Editar disciplina</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="salvar_disciplina">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <input type="hidden" name="disciplina_id" value="{{ disciplina.id }}">
+            <div class="grid-two">
+                <div class="field"><label>Codigo</label><input name="codigo" value="{{ disciplina.codigo }}" maxlength="40"></div>
+                <div class="field"><label>Nome</label><input name="nome" value="{{ disciplina.nome }}" maxlength="255" required></div>
+                <div class="field"><label>Semestre</label><input name="semestre" value="{{ disciplina.semestre }}" maxlength="6" placeholder="YYYY.1 ou YYYY.2"></div>
+                <div class="field"><label>Conceito</label><input name="conceito" value="{{ disciplina.conceito }}" maxlength="20"></div>
+                <div class="field"><label>Creditos</label><input type="number" name="creditos" value="{{ disciplina.creditos|default_if_none:'' }}" min="0"></div>
+                <div class="field"><label>Carga horaria</label><input type="number" name="carga_horaria" value="{{ disciplina.carga_horaria|default_if_none:'' }}" min="0"></div>
+                <div class="field">
+                    <label>Situacao</label>
+                    <select name="situacao" required>
+                        <option value="CURSANDO" {% if disciplina.situacao == "CURSANDO" %}selected{% endif %}>Cursando</option>
+                        <option value="APROVADA" {% if disciplina.situacao == "APROVADA" %}selected{% endif %}>Aprovada</option>
+                        <option value="REPROVADA" {% if disciplina.situacao == "REPROVADA" %}selected{% endif %}>Reprovada</option>
+                        <option value="TRANCADA" {% if disciplina.situacao == "TRANCADA" %}selected{% endif %}>Trancada</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar disciplina</button>
+        </form>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
 {% endwith %}
 {% endfor %}
 
