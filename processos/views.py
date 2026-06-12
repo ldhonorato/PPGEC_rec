@@ -54,6 +54,9 @@ from .models import (
     ReservaAmbiente,
     Sala,
     Setor,
+    SetorMembro,
+    SolicitacaoBanca,
+    TrajetoriaAcademica,
     User,
 )
 
@@ -115,7 +118,10 @@ def _can_view_processo_detalhe(user, processo):
     if _is_docente(user):
         if _is_processo_no_pleno(processo) and _is_membro_setor_nome(user, "Colegiando PPGEC (Pleno)"):
             return True
-        return Aluno.objects.filter(pk=processo.usuario_criado_por_id, orientador=user).exists()
+        return Aluno.objects.filter(
+            Q(trajetorias__orientador=user) | Q(trajetorias__coorientador=user),
+            pk=processo.usuario_criado_por_id,
+        ).exists()
     return False
 
 
@@ -167,6 +173,35 @@ def _semestre_valido(valor: str) -> bool:
     return bool(re.fullmatch(r"\d{4}\.[12]", (valor or "").strip()))
 
 
+def _trajetoria_form_initial(trajetoria):
+    if trajetoria.coorientador_id:
+        tipo_coorientador = TrajetoriaAcademicaForm.TipoCoorientador.CADASTRADO
+    elif trajetoria.coorientador_externo_nome:
+        tipo_coorientador = TrajetoriaAcademicaForm.TipoCoorientador.EXTERNO
+    else:
+        tipo_coorientador = TrajetoriaAcademicaForm.TipoCoorientador.NENHUM
+
+    return {
+        "trajetoria_id": trajetoria.id,
+        "nivel_curso": trajetoria.nivel_curso,
+        "status": trajetoria.status,
+        "ingresso": trajetoria.ingresso,
+        "prazo_qualificacao": trajetoria.prazo_qualificacao,
+        "prazo_defesa": trajetoria.prazo_defesa,
+        "reingressante": trajetoria.reingressante,
+        "isQualificado": trajetoria.isQualificado,
+        "orientador": trajetoria.orientador_id,
+        "tipo_coorientador": tipo_coorientador,
+        "coorientador": trajetoria.coorientador_id,
+        "coorientador_externo_nome": trajetoria.coorientador_externo_nome,
+        "coorientador_externo_email": trajetoria.coorientador_externo_email,
+        "coorientador_externo_instituicao": trajetoria.coorientador_externo_instituicao,
+        "numero_defesa": trajetoria.numero_defesa,
+        "data_defesa": trajetoria.data_defesa,
+        "deposito_versao_final": trajetoria.deposito_versao_final,
+    }
+
+
 def _registrar_alteracao_aluno(
     *,
     aluno: Aluno,
@@ -182,6 +217,24 @@ def _registrar_alteracao_aluno(
         valor_anterior=valor_anterior,
         valor_novo=valor_novo,
         comentario=comentario.strip(),
+        alterado_por=alterado_por,
+    )
+
+
+def _registrar_alteracao_trajetoria(
+    trajetoria,
+    tipo: str,
+    valor_anterior: str,
+    valor_novo: str,
+    comentario: str,
+    alterado_por: User,
+):
+    _registrar_alteracao_aluno(
+        aluno=trajetoria.aluno,
+        tipo=tipo,
+        valor_anterior=valor_anterior,
+        valor_novo=valor_novo,
+        comentario=comentario,
         alterado_por=alterado_por,
     )
 
@@ -274,7 +327,14 @@ def home_view(request):
     }
 
     if request.user.tipo_usuario == User.TipoUsuario.DOCENTE:
-        orientandos = Aluno.objects.filter(orientador=request.user).order_by("nome")
+        orientandos = (
+            Aluno.objects.filter(
+                trajetorias__orientador=request.user,
+                trajetorias__status=TrajetoriaAcademica.Status.ATIVA,
+            )
+            .distinct()
+            .order_by("nome")
+        )
         processos_orientandos = (
             Processo.objects.select_related("usuario_criado_por", "setor_atual")
             .filter(usuario_criado_por__in=orientandos.values("id"))
@@ -652,7 +712,9 @@ def aluno_detalhe_view(request, aluno_id):
     if not (can_manage_aluno or is_self_aluno):
         raise PermissionDenied("Acesso restrito ao aluno, coordenadores e servidores.")
 
-    aluno = get_object_or_404(Aluno.objects.select_related("orientador"), pk=aluno_id)
+    aluno = get_object_or_404(Aluno, pk=aluno_id)
+    can_edit_publicacoes = can_manage_aluno or is_self_aluno
+    can_edit_disciplinas = can_manage_aluno
 
     if request.method == "POST":
         acao = request.POST.get("acao", "").strip()
@@ -715,6 +777,7 @@ def aluno_detalhe_view(request, aluno_id):
                     "-",
                     f"Criada trajetoria {trajetoria.get_nivel_curso_display()}",
                     dados["comentario"],
+                    request.user,
                 )
                 messages.success(request, "Trajetoria academica cadastrada.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
@@ -780,6 +843,7 @@ def aluno_detalhe_view(request, aluno_id):
                     anterior,
                     novo,
                     dados["comentario"],
+                    request.user,
                 )
                 messages.success(request, "Trajetoria academica atualizada.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
@@ -812,6 +876,7 @@ def aluno_detalhe_view(request, aluno_id):
                         "Mestrado ativo",
                         "Doutorado ativo",
                         form.cleaned_data["comentario"],
+                        request.user,
                     )
                     messages.success(request, "Doutorado iniciado.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
@@ -921,7 +986,7 @@ def aluno_detalhe_view(request, aluno_id):
                 messages.error(request, "; ".join(exc.messages))
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
 
-            _registrar_alteracao_trajetoria(trajetoria, tipo, anterior, novo, comentario)
+            _registrar_alteracao_trajetoria(trajetoria, tipo, anterior, novo, comentario, request.user)
             messages.success(request, "Trajetoria academica atualizada.")
             return redirect("aluno_detalhe", aluno_id=aluno.id)
 
@@ -2257,7 +2322,13 @@ def menu_processos_orientandos_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.DOCENTE:
         raise PermissionDenied("Acesso restrito a docentes.")
 
-    orientandos = Aluno.objects.filter(orientador=request.user)
+    orientandos = (
+        Aluno.objects.filter(
+            trajetorias__orientador=request.user,
+            trajetorias__status=TrajetoriaAcademica.Status.ATIVA,
+        )
+        .distinct()
+    )
     processos_orientandos = (
         Processo.objects.select_related("usuario_criado_por", "setor_atual")
         .filter(usuario_criado_por__in=orientandos.values("id"))
@@ -2285,7 +2356,21 @@ def menu_meus_orientandos_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.DOCENTE:
         raise PermissionDenied("Acesso restrito a docentes.")
 
-    orientandos = Aluno.objects.filter(orientador=request.user).order_by("nome")
+    trajetorias_docente = TrajetoriaAcademica.objects.select_related("aluno", "orientador", "coorientador").order_by(
+        "aluno__nome",
+        "-criado_em",
+    )
+    orientacoes_ativas = trajetorias_docente.filter(
+        orientador=request.user,
+        status=TrajetoriaAcademica.Status.ATIVA,
+    )
+    coorientacoes_ativas = trajetorias_docente.filter(
+        coorientador=request.user,
+        status=TrajetoriaAcademica.Status.ATIVA,
+    )
+    vinculos_concluidos = trajetorias_docente.filter(
+        Q(orientador=request.user) | Q(coorientador=request.user),
+    ).exclude(status=TrajetoriaAcademica.Status.ATIVA)
     return render(
         request,
         "processos/menu_meus_orientandos.html",
