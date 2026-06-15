@@ -23,6 +23,7 @@ staticfiles/
 *.pyc
 *.pyc*
 __pycache__/
+processos/__pycache__/
 
 # Logs and env files
 *.log
@@ -30,3 +31,4 @@ __pycache__/
 .env.*
 
 celerybeat-schedule
+!.env.example

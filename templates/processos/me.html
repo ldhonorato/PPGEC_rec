@@ -34,4 +34,46 @@
         </form>
     </article>
 </section>
+
+<section class="grid-two" style="margin-top: 1rem;">
+    <article class="card">
+        <h2 class="section-title">Setores e comissões atuais</h2>
+        {% if participacoes_ativas %}
+            <ul class="list">
+                {% for participacao in participacoes_ativas %}
+                    <li>
+                        <strong>{{ participacao.setor.nome }}</strong>
+                        <br>
+                        <small class="muted">
+                            Desde {{ participacao.data_entrada|date:"d/m/Y" }}
+                            {% if participacao.designado_por %} | Designado por {{ participacao.designado_por.nome }}{% endif %}
+                        </small>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="muted">Você não participa de nenhum setor/comissão no momento.</p>
+        {% endif %}
+    </article>
+
+    <article class="card">
+        <h2 class="section-title">Histórico de participação</h2>
+        {% if historico_participacoes %}
+            <ul class="list">
+                {% for participacao in historico_participacoes %}
+                    <li>
+                        <strong>{{ participacao.setor.nome }}</strong>
+                        <br>
+                        <small class="muted">
+                            {{ participacao.data_entrada|date:"d/m/Y" }} a {{ participacao.data_saida|date:"d/m/Y" }}
+                            {% if participacao.designado_por %} | Designado por {{ participacao.designado_por.nome }}{% endif %}
+                        </small>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="muted">Nenhum histórico de participação encerrada.</p>
+        {% endif %}
+    </article>
+</section>
 {% endblock %}

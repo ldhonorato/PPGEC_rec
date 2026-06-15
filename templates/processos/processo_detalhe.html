@@ -29,6 +29,96 @@
     </div>
 </section>
 
+{% if processo.solicitacoes_banca_anexadas.all %}
+<section class="card" style="margin-bottom: 1rem;">
+    <h2 class="section-title">Formulários anexados</h2>
+    <ul class="list">
+        {% for solicitacao in processo.solicitacoes_banca_anexadas.all %}
+            <li>
+                <div class="item-row">
+                    <div>
+                        <strong>{{ solicitacao.get_tipo_defesa_display }}</strong><br>
+                        <small class="muted">
+                            {{ solicitacao.aluno.nome }} - {{ solicitacao.trajetoria.get_nivel_curso_display }}
+                            | Status: {{ solicitacao.get_status_display }}
+                            {% if solicitacao.finalizado_em %}| Finalizada em: {{ solicitacao.finalizado_em|date:"d/m/Y H:i" }}{% endif %}
+                        </small>
+                    </div>
+                    <button class="btn btn-secondary" type="button" data-open-banca-modal="modal-banca-{{ solicitacao.id }}">Ver formulário</button>
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+
+{% for solicitacao in processo.solicitacoes_banca_anexadas.all %}
+    <dialog id="modal-banca-{{ solicitacao.id }}" class="modal-dialog">
+        <div class="modal-body">
+            <div class="actions-row">
+                <div>
+                    <h2 class="section-title">{{ solicitacao.get_tipo_defesa_display }}</h2>
+                    <p class="muted" style="margin: 0;">{{ solicitacao.aluno.nome }} - {{ solicitacao.trajetoria.get_nivel_curso_display }}</p>
+                </div>
+                <button class="btn btn-secondary" type="button" data-close-banca-modal>Fechar</button>
+            </div>
+
+            <h3>Discente e trajetória</h3>
+            <ul class="info-list">
+                <li><span class="info-label">Aluno</span><span>{{ solicitacao.aluno.nome }}{% if solicitacao.aluno.matricula %} - {{ solicitacao.aluno.matricula }}{% endif %}</span></li>
+                <li><span class="info-label">E-mail</span><span>{{ solicitacao.aluno.email }}</span></li>
+                <li><span class="info-label">Nível</span><span>{{ solicitacao.trajetoria.get_nivel_curso_display }}</span></li>
+                <li><span class="info-label">Ingresso</span><span>{{ solicitacao.trajetoria.ingresso|default:"-" }}</span></li>
+                <li><span class="info-label">Prazo qualificação/projeto</span><span>{{ solicitacao.trajetoria.prazo_qualificacao|default:"-" }}</span></li>
+                <li><span class="info-label">Prazo defesa</span><span>{{ solicitacao.trajetoria.prazo_defesa|default:"-" }}</span></li>
+                <li><span class="info-label">Orientador</span><span>{{ solicitacao.trajetoria.orientador.nome|default:"-" }}</span></li>
+                <li><span class="info-label">Coorientador</span><span>{{ solicitacao.trajetoria.coorientador_display|default:"-" }}</span></li>
+            </ul>
+
+            <h3>Dados gerais</h3>
+            <ul class="info-list">
+                <li><span class="info-label">Status</span><span>{{ solicitacao.get_status_display }}</span></li>
+                <li><span class="info-label">Docente</span><span>{{ solicitacao.docente.nome }}</span></li>
+                <li><span class="info-label">Título</span><span>{{ solicitacao.titulo|default:"-" }}</span></li>
+                <li><span class="info-label">Data prevista</span><span>{{ solicitacao.data_prevista|date:"d/m/Y"|default:"-" }}</span></li>
+                <li><span class="info-label">Horário previsto</span><span>{{ solicitacao.horario_previsto|time:"H:i"|default:"-" }}</span></li>
+                <li><span class="info-label">Local/modalidade/link</span><span>{{ solicitacao.modalidade_local_link|default:"-"|linebreaksbr }}</span></li>
+                <li><span class="info-label">Palavras-chave</span><span>{{ solicitacao.palavras_chave|default:"-" }}</span></li>
+                <li><span class="info-label">Requisitos</span><span>{% if solicitacao.requisitos_cumpridos %}Confirmados{% else %}Não confirmados{% endif %}</span></li>
+                <li><span class="info-label">Ciência MPF</span><span>{% if solicitacao.ciencia_recomendacao_mpf %}Confirmada{% else %}Não confirmada{% endif %}</span></li>
+                {% if solicitacao.finalizado_em %}
+                    <li><span class="info-label">Finalização</span><span>{{ solicitacao.finalizado_em|date:"d/m/Y H:i" }} por {{ solicitacao.finalizado_por.nome|default:"-" }}</span></li>
+                {% endif %}
+            </ul>
+
+            <h3>Resumo</h3>
+            <p style="white-space: pre-wrap;">{{ solicitacao.resumo|default:"-" }}</p>
+
+            {% if solicitacao.justificativa_excepcionalidade %}
+                <h3>Justificativa para excepcionalidades</h3>
+                <p style="white-space: pre-wrap;">{{ solicitacao.justificativa_excepcionalidade }}</p>
+            {% endif %}
+
+            <h3>Composição da banca</h3>
+            {% if solicitacao.membros.all %}
+                <ul class="list">
+                    {% for membro in solicitacao.membros.all %}
+                        <li>
+                            <strong>{{ membro.get_papel_display }}: {{ membro.nome|default:"-" }}</strong><br>
+                            <small class="muted">
+                                Instituição/IES: {{ membro.instituicao|default:"-" }}
+                                | CPF: {{ membro.cpf|default:"-" }}
+                            </small>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="muted">Nenhum membro informado.</p>
+            {% endif %}
+        </div>
+    </dialog>
+{% endfor %}
+{% endif %}
+
 {% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo %}
 <section class="card" style="margin-bottom: 1rem;">
     <h2 class="section-title">Acoes</h2>
@@ -460,4 +550,24 @@
     })();
 </script>
 {% endif %}
+<script>
+    (function () {
+        document.querySelectorAll("[data-open-banca-modal]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const modal = document.getElementById(button.dataset.openBancaModal);
+                if (modal) {
+                    modal.showModal();
+                }
+            });
+        });
+        document.querySelectorAll("[data-close-banca-modal]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const modal = button.closest("dialog");
+                if (modal) {
+                    modal.close();
+                }
+            });
+        });
+    })();
+</script>
 {% endblock %}

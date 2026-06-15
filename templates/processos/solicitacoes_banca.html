@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Solicitações de Banca | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Solicitações de Banca</h1>
+            <p class="muted">Acompanhe suas solicitações de defesa e qualificação.</p>
+        </div>
+        <a class="btn" href="{% url 'solicitacao_banca_nova' %}">Nova solicitação</a>
+    </div>
+</section>
+
+<section class="card">
+    {% if solicitacoes %}
+        <ul class="list">
+            {% for solicitacao in solicitacoes %}
+                <li>
+                    <div class="item-row">
+                        <div>
+                            <strong>{{ solicitacao.get_tipo_defesa_display }}</strong>
+                            <small class="muted">
+                                {{ solicitacao.aluno.nome }} - {{ solicitacao.trajetoria.get_nivel_curso_display }}
+                                {% if solicitacao.data_prevista %} - {{ solicitacao.data_prevista|date:"d/m/Y" }}{% endif %}
+                            </small>
+                        </div>
+                        <div class="calendar-nav">
+                            <span class="badge {% if solicitacao.status == 'FINALIZADA' %}badge-ok{% else %}badge-info{% endif %}">
+                                {{ solicitacao.get_status_display }}
+                            </span>
+                            <a class="btn btn-secondary" href="{% url 'solicitacao_banca_detalhe' solicitacao.id %}">
+                                {% if solicitacao.is_rascunho %}Editar{% else %}Ver{% endif %}
+                            </a>
+                        </div>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhuma solicitação de banca registrada.</p>
+    {% endif %}
+</section>
+{% endblock %}

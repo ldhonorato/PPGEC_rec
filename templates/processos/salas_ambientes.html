@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}Cadastro de Salas | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Cadastro de Salas</h1>
+            {% if polo %}
+                <p class="muted">Cadastro de salas e horarios gerais de disponibilidade do polo {{ polo.nome }}.</p>
+            {% elif can_choose_polo %}
+                <p class="muted">Cadastro de salas e horarios gerais de disponibilidade dos polos.</p>
+            {% else %}
+                <p class="muted">Seu usuario ainda nao possui polo de atuacao definido.</p>
+            {% endif %}
+        </div>
+        <div class="calendar-nav">
+            {% if polo or can_choose_polo %}
+                <button class="btn" type="button" data-open-dialog="nova-sala">Nova sala</button>
+            {% endif %}
+            <a class="btn btn-secondary" href="{% url 'reservas_ambientes_feitas' %}">Ver reservas</a>
+        </div>
+    </div>
+</section>
+
+{% if polo or can_choose_polo %}
+<dialog id="nova-sala" class="modal-dialog" {% if modal_aberto == "nova-sala" %}data-open-on-load{% endif %}>
+    <div class="modal-body">
+        <div class="actions-row">
+            <h2 class="section-title">Nova sala</h2>
+            <button class="btn btn-secondary" type="button" data-close-dialog>Fechar</button>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="criar_sala">
+            {% for field in sala_form %}
+                <div class="field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+            {% endfor %}
+            <div class="form-actions">
+                <button class="btn" type="submit">Cadastrar sala</button>
+            </div>
+        </form>
+    </div>
+</dialog>
+{% endif %}
+
+<section class="card">
+    <h2 class="section-title">Salas cadastradas</h2>
+    {% if salas %}
+        <ul class="list room-list">
+            {% for sala in salas %}
+                <li>
+                    <div class="item-row room-heading">
+                        <div>
+                            <div class="item-row room-title">
+                                <strong>{{ sala.nome }}</strong>
+                                {% if sala.ativa %}
+                                    <span class="badge badge-ok">Ativa</span>
+                                {% else %}
+                                    <span class="badge badge-no">Inativa</span>
+                                {% endif %}
+                            </div>
+                            <small class="muted">
+                                {{ sala.polo.nome }} - Capacidade: {{ sala.capacidade|default:"-" }}
+                            </small>
+                        </div>
+                        {% if polo or can_choose_polo %}
+                            <button class="btn btn-secondary" type="button" data-open-dialog="editar-sala-{{ sala.pk }}">Editar sala</button>
+                        {% endif %}
+                    </div>
+                    {% if sala.disponibilidades.all %}
+                        <ul class="availability-list">
+                            {% for disponibilidade in sala.disponibilidades.all %}
+                                <li>
+                                    <strong>{{ disponibilidade.get_dia_semana_display }}</strong>
+                                    <span>{{ disponibilidade.hora_inicio|time:"H:i" }} - {{ disponibilidade.hora_fim|time:"H:i" }}</span>
+                                    {% if polo or can_choose_polo %}
+                                        <form method="post" class="inline-delete-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="acao" value="excluir_disponibilidade">
+                                            <input type="hidden" name="disponibilidade_id" value="{{ disponibilidade.id }}">
+                                            <button class="btn btn-secondary btn-compact" type="submit">Excluir</button>
+                                        </form>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="muted">Sem horarios gerais cadastrados.</p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhuma sala cadastrada para este polo.</p>
+    {% endif %}
+</section>
+
+{% if polo or can_choose_polo %}
+    {% for sala in salas %}
+        {% with sala_id_str=sala.pk|stringformat:"s" %}
+        {% with sala_modal_id="editar-sala-"|add:sala_id_str %}
+        <dialog id="{{ sala_modal_id }}" class="modal-dialog" {% if modal_aberto == sala_modal_id %}data-open-on-load{% endif %}>
+            <div class="modal-body">
+                <div class="actions-row">
+                    <h2 class="section-title">Editar {{ sala.nome }}</h2>
+                    <button class="btn btn-secondary" type="button" data-close-dialog>Fechar</button>
+                </div>
+
+                <div class="grid-two room-edit-grid">
+                    <form method="post" class="card room-modal-card">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="editar_sala">
+                        <input type="hidden" name="sala_id" value="{{ sala.pk }}">
+
+                        {% if sala_edit_form and modal_aberto == sala_modal_id %}
+                            {% for field in sala_edit_form %}
+                                <div class="field">
+                                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {{ field }}
+                                    {{ field.errors }}
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="field">
+                                <label for="sala-edit-{{ sala.pk }}-nome">Nome</label>
+                                <input id="sala-edit-{{ sala.pk }}-nome" type="text" name="sala_edit-nome" value="{{ sala.nome }}" maxlength="120" required>
+                            </div>
+                            <div class="field">
+                                <label for="sala-edit-{{ sala.pk }}-capacidade">Capacidade</label>
+                                <input id="sala-edit-{{ sala.pk }}-capacidade" type="number" name="sala_edit-capacidade" value="{{ sala.capacidade|default_if_none:'' }}" min="0">
+                            </div>
+                            {% if can_choose_polo %}
+                                <div class="field">
+                                    <label for="sala-edit-{{ sala.pk }}-polo">Polo</label>
+                                    <select id="sala-edit-{{ sala.pk }}-polo" name="sala_edit-polo" required>
+                                        {% for polo_opcao in sala_form.fields.polo.queryset %}
+                                            <option value="{{ polo_opcao.pk }}" {% if polo_opcao.pk == sala.polo_id %}selected{% endif %}>{{ polo_opcao.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            {% endif %}
+                            <div class="field checkbox-field">
+                                <input id="sala-edit-{{ sala.pk }}-ativa" type="checkbox" name="sala_edit-ativa" {% if sala.ativa %}checked{% endif %}>
+                                <label for="sala-edit-{{ sala.pk }}-ativa">Ativa</label>
+                            </div>
+                        {% endif %}
+
+                        <div class="form-actions">
+                            <button class="btn" type="submit">Salvar sala</button>
+                        </div>
+                    </form>
+
+                    <form method="post" class="card room-modal-card">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="adicionar_disponibilidade">
+                        <input type="hidden" name="sala_id" value="{{ sala.pk }}">
+
+                        <div class="field">
+                            <label>Dias da semana</label>
+                            <div class="weekday-grid">
+                                {% for value, label in disponibilidade_form.fields.dias_semana.choices %}
+                                    <label class="check-chip">
+                                        <input type="checkbox" name="disp-dias_semana" value="{{ value }}">
+                                        <span>{{ label }}</span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                            {% if modal_aberto == sala_modal_id %}
+                                {{ disponibilidade_form.dias_semana.errors }}
+                            {% endif %}
+                        </div>
+
+                        <div class="grid-two time-grid">
+                            <div class="field">
+                                <label for="disp-{{ sala.pk }}-hora-inicio">Hora de inicio</label>
+                                <input id="disp-{{ sala.pk }}-hora-inicio" type="time" name="disp-hora_inicio" required>
+                            </div>
+                            <div class="field">
+                                <label for="disp-{{ sala.pk }}-hora-fim">Hora de fim</label>
+                                <input id="disp-{{ sala.pk }}-hora-fim" type="time" name="disp-hora_fim" required>
+                                {% if modal_aberto == sala_modal_id %}
+                                    {{ disponibilidade_form.hora_fim.errors }}
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button class="btn" type="submit">Adicionar horario</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card room-modal-card availability-edit-list">
+                    <h3>Horarios cadastrados</h3>
+                    {% if sala.disponibilidades.all %}
+                        <ul class="availability-list">
+                            {% for disponibilidade in sala.disponibilidades.all %}
+                                <li>
+                                    <strong>{{ disponibilidade.get_dia_semana_display }}</strong>
+                                    <span>{{ disponibilidade.hora_inicio|time:"H:i" }} - {{ disponibilidade.hora_fim|time:"H:i" }}</span>
+                                    <form method="post" class="inline-delete-form">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="acao" value="excluir_disponibilidade">
+                                        <input type="hidden" name="disponibilidade_id" value="{{ disponibilidade.id }}">
+                                        <button class="btn btn-secondary btn-compact" type="submit">Excluir</button>
+                                    </form>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="muted">Sem horarios gerais cadastrados.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </dialog>
+        {% endwith %}
+        {% endwith %}
+    {% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-open-dialog]").forEach((button) => {
+    button.addEventListener("click", () => {
+        const dialog = document.getElementById(button.dataset.openDialog);
+        if (dialog && !dialog.open) {
+            dialog.showModal();
+        }
+    });
+});
+
+document.querySelectorAll("[data-close-dialog]").forEach((button) => {
+    button.addEventListener("click", () => button.closest("dialog").close());
+});
+
+document.querySelectorAll("dialog[data-open-on-load]").forEach((dialog) => {
+    if (!dialog.open) {
+        dialog.showModal();
+    }
+});
+</script>
+{% endblock %}

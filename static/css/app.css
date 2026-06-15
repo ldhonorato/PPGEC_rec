@@ -40,6 +40,10 @@ body {
         var(--color-bg);
 }
 
+[hidden] {
+    display: none !important;
+}
+
 a {
     color: inherit;
 }
@@ -344,7 +348,8 @@ input[type="checkbox"] {
     list-style: none;
 }
 
-.side-menu a {
+.side-menu a,
+.side-submenu summary {
     display: flex;
     align-items: center;
     gap: 14px;
@@ -355,6 +360,39 @@ input[type="checkbox"] {
     text-decoration: none;
     border-radius: var(--radius-sm);
     border-left: 4px solid transparent;
+}
+
+.side-submenu summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.side-submenu summary::-webkit-details-marker {
+    display: none;
+}
+
+.side-submenu summary::after {
+    content: "v";
+    margin-left: auto;
+    font-size: 0.72rem;
+}
+
+.side-submenu[open] summary::after {
+    content: "^";
+}
+
+.side-submenu ul {
+    display: grid;
+    gap: 8px;
+    margin: 8px 0 0;
+    padding: 0 0 0 20px;
+    list-style: none;
+}
+
+.side-submenu ul a {
+    min-height: 44px;
+    padding: 0.62rem 0.84rem;
+    font-size: 0.92rem;
 }
 
 .side-form {
@@ -380,6 +418,8 @@ input[type="checkbox"] {
 
 .side-menu a:hover,
 .side-menu a.is-active,
+.side-submenu summary:hover,
+.side-submenu summary.is-active,
 .side-form button:hover,
 .side-form button:focus-visible {
     color: var(--color-primary);
@@ -444,6 +484,51 @@ input[type="checkbox"] {
     background: #ffffff;
 }
 
+.room-list > li {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.room-heading {
+    align-items: flex-start;
+}
+
+.room-title {
+    justify-content: flex-start;
+    margin-bottom: 0.25rem;
+}
+
+.availability-list {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.availability-list li {
+    display: inline-flex;
+    gap: 0.35rem;
+    align-items: center;
+    padding: 0.42rem 0.55rem;
+    border-radius: var(--radius-sm);
+    background: #f5f8fc;
+}
+
+.inline-delete-form {
+    margin: 0;
+}
+
+.btn-compact {
+    padding: 0.28rem 0.45rem;
+    font-size: 0.82rem;
+}
+
+.availability-edit-list {
+    margin-top: 0.9rem;
+}
+
 .grid-two {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -457,6 +542,12 @@ input[type="checkbox"] {
     align-items: center;
     justify-content: space-between;
     gap: 0.8rem;
+    flex-wrap: wrap;
+}
+
+.calendar-nav {
+    display: flex;
+    gap: 0.6rem;
     flex-wrap: wrap;
 }
 
@@ -498,6 +589,207 @@ label {
     margin-bottom: 0.9rem;
 }
 
+.checkbox-field {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.checkbox-field input {
+    width: auto;
+    margin: 0;
+}
+
+.room-edit-grid {
+    align-items: start;
+}
+
+.room-modal-card {
+    box-shadow: none;
+}
+
+.weekday-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+    margin-top: 0.45rem;
+}
+
+.check-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 42px;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: #ffffff;
+    font-weight: 700;
+}
+
+.check-chip input {
+    width: auto;
+    margin: 0;
+}
+
+.time-grid {
+    gap: 0.75rem;
+}
+
+.hidden-field {
+    display: none;
+}
+
+.trajectory-panel {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.trajectory-card {
+    display: grid;
+    grid-template-columns: auto repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+    align-items: start;
+    padding: 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: #ffffff;
+}
+
+.trajectory-card input {
+    width: auto;
+    margin-top: 0.15rem;
+}
+
+.trajectory-card small,
+.trajectory-card strong {
+    display: block;
+}
+
+.banca-check {
+    align-items: flex-start;
+    margin-bottom: 0.9rem;
+}
+
+.banca-members {
+    display: grid;
+    gap: 0.8rem;
+}
+
+.banca-member-card {
+    padding: 0.9rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: #ffffff;
+}
+
+.banca-member-card h4 {
+    margin: 0 0 0.65rem;
+}
+
+.optional-banca-field {
+    opacity: 0.72;
+}
+
+.info-list {
+    display: grid;
+    gap: 0.55rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.info-list li {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 0.75rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.info-label {
+    color: var(--color-muted);
+    font-weight: 800;
+}
+
+.calendar-shell {
+    margin-top: 1rem;
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: #ffffff;
+}
+
+.week-calendar {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: collapse;
+}
+
+.week-calendar th,
+.week-calendar td {
+    width: 12.5%;
+    min-width: 118px;
+    padding: 0.72rem;
+    vertical-align: top;
+    border-bottom: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+}
+
+.week-calendar th:first-child,
+.week-calendar td:first-child {
+    width: 180px;
+}
+
+.week-calendar thead th {
+    color: var(--color-muted);
+    background: #f7fbff;
+    font-size: 0.82rem;
+    text-align: left;
+}
+
+.week-calendar tbody th {
+    color: var(--color-text);
+    background: #fbfdff;
+    text-align: left;
+}
+
+.week-calendar tbody th span {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--color-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.calendar-slot {
+    display: block;
+    margin-bottom: 0.42rem;
+    padding: 0.38rem 0.46rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.calendar-slot-free {
+    color: #14643d;
+    background: #eaf8f0;
+    border: 1px solid #bfe8ce;
+}
+
+.calendar-slot-busy {
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+    border: 1px solid #c9dcf5;
+}
+
+.calendar-slot-closed {
+    color: var(--color-muted);
+    background: #f2f5f8;
+    border: 1px solid var(--color-border);
+}
+
 .errorlist {
     margin: 0.4rem 0 0;
     padding-left: 1rem;
@@ -517,7 +809,7 @@ dialog::backdrop {
 }
 
 .modal-dialog {
-    width: min(680px, 92vw);
+    width: min(900px, 92vw);
 }
 
 .modal-body {
@@ -840,6 +1132,11 @@ dialog::backdrop {
         grid-template-columns: 1fr;
     }
 
+    .trajectory-card,
+    .info-list li {
+        grid-template-columns: 1fr;
+    }
+
     .hero-mark {
         margin: 0;
     }
@@ -880,5 +1177,9 @@ dialog::backdrop {
     .activity-list time,
     .quick-list span:last-child {
         grid-column: 2;
+    }
+
+    .weekday-grid {
+        grid-template-columns: 1fr;
     }
 }
