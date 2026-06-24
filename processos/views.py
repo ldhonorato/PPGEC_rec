@@ -22,6 +22,8 @@ from .forms import (
     AlunoReingressoForm,
     AlunoStatusForm,
     TrajetoriaAcademicaForm,
+    EstagioDocenciaForm,
+    EstagioDocenciaEdicaoForm,
     TrajetoriaStatusForm,
     ManifestarCienteOrientadorForm,
     ComentarioProcessoForm,
@@ -43,6 +45,7 @@ from .models import (
     Setor,
     TrajetoriaAcademica,
     User,
+    EstagioDocencia,
 )
 
 from .tasks import(
@@ -1189,6 +1192,84 @@ def aluno_detalhe_view(request, aluno_id):
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
             else:
                 messages.error(request, "Nao foi possivel atualizar o coorientador.")
+                
+                
+                
+                
+        elif acao == "Novo Estágio Docência":
+            
+            form = EstagioDocenciaForm(request.POST)
+            if form.is_valid():
+                estagio_id = form.cleaned_data["estagio_id"]
+                supervisor_digitado = form.cleaned_data["supervisor"].strip()
+                comentario = form.cleaned_data["comentario"]
+
+                estagio = get_object_or_404(EstagioDocencia, id=estagio_id)
+                trajetoria_estagio = estagio.trajetoria
+                status_antigo = estagio.get_status_display()
+
+            
+                nome_orientador = trajetoria_estagio.orientador.nome.lower() if trajetoria_estagio.orientador else ""
+                
+                if supervisor_digitado.lower() == nome_orientador:
+                    estagio.status = EstagioDocencia.Status.AGUARD_ASSINATURA
+                else:
+                    estagio.status = EstagioDocencia.Status.AGUARD_CIENTE_ORIENTADOR
+
+                estagio.supervisor = supervisor_digitado
+                estagio.save()
+
+                # AUDITORIA: Gravação no histórico da alteração do fluxo do aluno
+                _registrar_alteracao_aluno(
+                    aluno=aluno,
+                    usuario=request.user,
+                    campo_alterado="Estágio de Docência",
+                    valor_antigo=status_antigo,
+                    valor_novo=estagio.get_status_display(),
+                    comentario=f"{comentario} | Supervisor adicionado: {supervisor_digitado}.",
+                )
+                messages.success(request, "Estagio Docência processado")
+                return redirect("aluno_detalhe", aluno_id=aluno.id)
+
+       
+        elif acao == "Editar Estágio Docência":
+         
+            form = EstagioDocenciaEdicaoForm(request.POST)
+            if form.is_valid():
+                estagio_id = form.cleaned_data["estagio_id"]
+                comentario = form.cleaned_data["comentario"]
+
+                estagio = get_object_or_404(EstagioDocencia, id=estagio_id)
+                
+                # Coleta metadados antigos para registrar detalhadamente na auditoria
+                valores_antigos = (
+                    f"Supervisor: {estagio.supervisor}, Status: {estagio.get_status_display()}, "
+                    f"Início: {estagio.inicio}, Término: {estagio.termino}"
+                )
+
+                # SOBRESCRITA DIRETA DO REGISTRO:
+                estagio.supervisor = form.cleaned_data["supervisor"]
+                estagio.status = form.cleaned_data["status"]
+                estagio.inicio = form.cleaned_data["data_inicio"]
+                estagio.termino = form.cleaned_data["data_termino"]
+                estagio.save()
+
+                valores_novos = (
+                    f"Supervisor: {estagio.supervisor}, Status: {estagio.get_status_display()}, "
+                    f"Início: {estagio.inicio}, Término: {estagio.termino}"
+                )
+
+                # AUDITORIA DA CORREÇÃO MANUAL FORÇADA PELA SECRETARIA:
+                _registrar_alteracao_aluno(
+                    aluno=aluno,
+                    usuario=request.user,
+                    campo_alterado="Estágio de Docência (Edição Manual)",
+                    valor_antigo=valores_antigos,
+                    valor_novo=valores_novos,
+                    comentario=comentario,
+                )
+                messages.success(request, "Estágio de docência corrigido manualmente.")
+                return redirect("aluno_detalhe", aluno_id=aluno.id)
 
     processos_aluno = (
         Processo.objects.select_related("setor_atual")

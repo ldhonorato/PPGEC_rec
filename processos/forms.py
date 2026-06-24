@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
-from .models import Aluno, Documento, Processo, Setor, TrajetoriaAcademica
+from .models import Aluno, Documento, Processo, Setor, TrajetoriaAcademica, EstagioDocencia
 
 
 User = get_user_model()
@@ -312,3 +312,45 @@ class TrajetoriaStatusForm(AlunoComentarioForm):
         ),
         label="Status",
     )
+
+
+class EstagioDocenciaForm(AlunoComentarioForm):
+   
+    estagio_id = forms.IntegerField(widget=forms.HiddenInput())
+    supervisor = forms.CharField(max_length=255, label="Supervisor")
+
+
+class EstagioDocenciaEdicaoForm(AlunoComentarioForm):
+    
+    estagio_id = forms.IntegerField(widget=forms.HiddenInput())
+    supervisor = forms.CharField(max_length=255, label="Supervisor")
+    
+
+    status = forms.ChoiceField(
+        choices=EstagioDocencia.Status.choices, 
+        label="Status do Estágio"
+    )
+    
+    data_inicio = forms.DateField(
+        label="Data de Início", 
+        widget=forms.DateInput(attrs={"type": "date"})
+    )
+    data_termino = forms.DateField(
+        label="Data de Término", 
+        widget=forms.DateInput(attrs={"type": "date"})
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        data_inicio = cleaned_data.get("data_inicio")
+        data_termino = cleaned_data.get("data_termino")
+
+        # Validação lógica: data de término não pode ser anterior ao início
+        if data_inicio and data_termino:
+            if data_termino < data_inicio:
+                self.add_error(
+                    "data_termino", 
+                    "A data de término não pode ser anterior à data de início."
+                )
+
+        return cleaned_data
