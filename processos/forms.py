@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
-from .models import Aluno, Documento, Processo, Setor, TrajetoriaAcademica
+from .models import Aluno, Documento, EstagioDocencia, Processo, Setor, TrajetoriaAcademica
 
 
 User = get_user_model()
@@ -312,3 +312,33 @@ class TrajetoriaStatusForm(AlunoComentarioForm):
         ),
         label="Status",
     )
+
+
+class EstagioDocenciaForm(AlunoComentarioForm):
+    """Form de cadastro/edicao de um estagio de docencia.
+
+    Usado tanto para criar um novo estagio (modal "Novo estagio docencia")
+    quanto para editar um estagio ja existente (modal "Alterar estagio
+    docencia"). Uma trajetoria academica pode ter N estagios.
+    """
+
+    supervisor = forms.CharField(max_length=255, required=False, label="Supervisor")
+    status = forms.ChoiceField(choices=EstagioDocencia.Status.choices, label="Status")
+    inicio = forms.DateField(
+        required=False,
+        label="Inicio",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    termino = forms.DateField(
+        required=False,
+        label="Termino",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        inicio = cleaned_data.get("inicio")
+        termino = cleaned_data.get("termino")
+        if inicio and termino and termino < inicio:
+            self.add_error("termino", "Termino nao pode ser anterior ao inicio.")
+        return cleaned_data
