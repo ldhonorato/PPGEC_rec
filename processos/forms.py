@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 
 from .models import Aluno, Documento, Processo, Setor, TrajetoriaAcademica, EstagioDocencia
+from .forms import AlunoComentarioForm
 
 
 User = get_user_model()
@@ -353,4 +354,48 @@ class EstagioDocenciaEdicaoForm(AlunoComentarioForm):
                     "A data de término não pode ser anterior à data de início."
                 )
 
+        return cleaned_data
+
+
+# As regras de validação para a entrada de dados:
+    
+class GatilhoInicialForm(AlunoComentarioForm):
+    estagio_id = forms.IntegerField(widget=forms.HiddenInput())
+    supervisor = forms.CharField(
+        max_length=255, 
+        label="Nome do Supervisor (conforme PDF)"
+    )
+
+class EstagioDocenciaUpdateForm(AlunoComentarioForm):
+    estagio_id = forms.IntegerField(widget=forms.HiddenInput())
+    
+    supervisor = forms.CharField(
+        max_length=255, 
+        required=False, 
+        label="Nome do Supervisor"
+    )
+    status = forms.ChoiceField(
+        choices=EstagioDocencia.Status.choices, 
+        label="Status do Estágio"
+    )
+    inicio = forms.DateField(
+        required=False, 
+        label="Data de Início",
+        widget=forms.DateInput(attrs={"type": "date"})
+    )
+    termino = forms.DateField(
+        required=False, 
+        label="Data de Término",
+        widget=forms.DateInput(attrs={"type": "date"})
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        inicio = cleaned_data.get("inicio")
+        termino = cleaned_data.get("termino")
+
+        # Impede término retroativo
+        if inicio and termino and termino < inicio:
+            self.add_error('termino', "A data de término não pode ser anterior à data de início.")
+        
         return cleaned_data

@@ -33,6 +33,8 @@ from .forms import (
     ProcessoAberturaForm,
     SolicitarCienteOrientadorForm,
     UserProfileForm,
+    GatilhoInicialForm,
+    EstagioDocenciaUpdateForm
 )
 from .models import (
     AlteracaoAluno,
@@ -1194,83 +1196,78 @@ def aluno_detalhe_view(request, aluno_id):
                 messages.error(request, "Nao foi possivel atualizar o coorientador.")
                 
                 
-                
-                
+
         elif acao == "Novo Estágio Docência":
+            form = GatilhoInicialForm(request.POST) # Usando o novo form de Gatilho
             
-            form = EstagioDocenciaForm(request.POST)
             if form.is_valid():
                 estagio_id = form.cleaned_data["estagio_id"]
-                supervisor_digitado = form.cleaned_data["supervisor"].strip()
-                comentario = form.cleaned_data["comentario"]
-
                 estagio = get_object_or_404(EstagioDocencia, id=estagio_id)
                 trajetoria_estagio = estagio.trajetoria
-                status_antigo = estagio.get_status_display()
-
-            
-                nome_orientador = trajetoria_estagio.orientador.nome.lower() if trajetoria_estagio.orientador else ""
                 
-                if supervisor_digitado.lower() == nome_orientador:
+                estado_anterior = f"Status: {estagio.get_status_display()} | Supervisor: Nenhum"
+                
+                supervisor_digitado = form.cleaned_data["supervisor"]
+                estagio.supervisor = supervisor_digitado
+
+                # Máquina de estados
+                nome_orientador = trajetoria_estagio.orientador.nome if trajetoria_estagio.orientador else ""
+                
+                if supervisor_digitado.strip().lower() == nome_orientador.strip().lower() and nome_orientador:
                     estagio.status = EstagioDocencia.Status.AGUARD_ASSINATURA
                 else:
-                    estagio.status = EstagioDocencia.Status.AGUARD_CIENTE_ORIENTADOR
+                    estagio.status = EstagioDocencia.Status.AGUARD_CIENCIA
 
-                estagio.supervisor = supervisor_digitado
                 estagio.save()
-
-                # AUDITORIA: Gravação no histórico da alteração do fluxo do aluno
+                estado_novo = f"Status: {estagio.get_status_display()} | Supervisor: {estagio.supervisor}"
+                
                 _registrar_alteracao_aluno(
-                    aluno=aluno,
-                    usuario=request.user,
-                    campo_alterado="Estágio de Docência",
-                    valor_antigo=status_antigo,
-                    valor_novo=estagio.get_status_display(),
-                    comentario=f"{comentario} | Supervisor adicionado: {supervisor_digitado}.",
+                    aluno=aluno, 
+                    tipo="Gatilho Estágio de Docência",
+                    valor_anterior=estado_anterior,
+                    valor_novo=estado_novo,
+                    comentario=form.cleaned_data["comentario"],
+                    alterado_por=request.user
                 )
-                messages.success(request, "Estagio Docência processado")
+                messages.success(request, "Fluxo de Estágio de Docência iniciado.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
 
-       
+
         elif acao == "Editar Estágio Docência":
-         
-            form = EstagioDocenciaEdicaoForm(request.POST)
+            form = EstagioDocenciaUpdateForm(request.POST) # Usando o form Supremo
+
             if form.is_valid():
                 estagio_id = form.cleaned_data["estagio_id"]
-                comentario = form.cleaned_data["comentario"]
-
                 estagio = get_object_or_404(EstagioDocencia, id=estagio_id)
-                
-                # Coleta metadados antigos para registrar detalhadamente na auditoria
-                valores_antigos = (
-                    f"Supervisor: {estagio.supervisor}, Status: {estagio.get_status_display()}, "
-                    f"Início: {estagio.inicio}, Término: {estagio.termino}"
+
+                estado_anterior = (
+                    f"Supervisor: {estagio.supervisor} | Status: {estagio.get_status_display()} | "
+                    f"Início: {estagio.inicio} | Término: {estagio.termino}"
                 )
 
-                # SOBRESCRITA DIRETA DO REGISTRO:
                 estagio.supervisor = form.cleaned_data["supervisor"]
                 estagio.status = form.cleaned_data["status"]
-                estagio.inicio = form.cleaned_data["data_inicio"]
-                estagio.termino = form.cleaned_data["data_termino"]
+                estagio.inicio = form.cleaned_data["inicio"]
+                estagio.termino = form.cleaned_data["termino"]
+                
                 estagio.save()
 
-                valores_novos = (
-                    f"Supervisor: {estagio.supervisor}, Status: {estagio.get_status_display()}, "
-                    f"Início: {estagio.inicio}, Término: {estagio.termino}"
+                estado_novo = (
+                    f"Supervisor: {estagio.supervisor} | Status: {estagio.get_status_display()} | "
+                    f"Início: {estagio.inicio} | Término: {estagio.termino}"
                 )
 
-                # AUDITORIA DA CORREÇÃO MANUAL FORÇADA PELA SECRETARIA:
                 _registrar_alteracao_aluno(
                     aluno=aluno,
-                    usuario=request.user,
-                    campo_alterado="Estágio de Docência (Edição Manual)",
-                    valor_antigo=valores_antigos,
-                    valor_novo=valores_novos,
-                    comentario=comentario,
+                    tipo="Edição Manual - Estágio de Docência",
+                    valor_anterior=estado_anterior,
+                    valor_novo=estado_novo,
+                    comentario=form.cleaned_data["comentario"],
+                    alterado_por=request.user
                 )
                 messages.success(request, "Estágio de docência corrigido manualmente.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
-
+            
     processos_aluno = (
         Processo.objects.select_related("setor_atual")
         .filter(usuario_criado_por=aluno)
@@ -1306,7 +1303,18 @@ def aluno_detalhe_view(request, aluno_id):
                 "deposito_versao_final": trajetoria.deposito_versao_final,
             }
         )
-        trajetoria_cards.append({"obj": trajetoria, "form": form})
+
+        estagio = EstagioDocencia.objects.filter(trajetoria=trajetoria).last()
+        form_gatilho_estagio = GatilhoInicialForm(initial={'estagio_id': estagio.id}) if estagio else None
+        form_edicao_estagio = EstagioDocenciaUpdateForm(initial={'estagio_id': estagio.id}) if estagio else None
+
+        trajetoria_cards.append({
+            "obj": trajetoria,
+            "form": form,
+            "estagio": estagio,
+            "form_gatilho_estagio": form_gatilho_estagio,
+            "form_edicao_estagio": form_edicao_estagio
+            })
     return render(
         request,
         "processos/aluno_detalhe.html",
