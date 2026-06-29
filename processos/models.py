@@ -274,6 +274,7 @@ class AlteracaoAluno(models.Model):
         COORIENTADOR = "COORIENTADOR", "Coorientador"
         REINGRESSO = "REINGRESSO", "Reingresso"
         TRAJETORIA = "TRAJETORIA", "Trajetoria academica"
+        ESTAGIO_DOCENCIA = "ESTAGIO_DOCENCIA", "Estagio docencia"
 
     aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="alteracoes")
     tipo = models.CharField(max_length=25, choices=TipoAlteracao.choices)
@@ -862,7 +863,7 @@ class EstagioDocencia(models.Model):
     termino = models.DateField(null=True, blank=True)
     
     class Meta:
-        ordering = ["trajetoria"]
+        ordering = ["id"]
         verbose_name = "Estágio de Docência"
         verbose_name_plural = "Estágios de Docência"
         

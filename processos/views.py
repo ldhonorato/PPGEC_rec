@@ -21,9 +21,8 @@ from .forms import (
     AlunoQualificacaoForm,
     AlunoReingressoForm,
     AlunoStatusForm,
-    TrajetoriaAcademicaForm,
     EstagioDocenciaForm,
-    EstagioDocenciaEdicaoForm,
+    TrajetoriaAcademicaForm,
     TrajetoriaStatusForm,
     ManifestarCienteOrientadorForm,
     ComentarioProcessoForm,
@@ -32,9 +31,7 @@ from .forms import (
     FinalizarProcessoForm,
     ProcessoAberturaForm,
     SolicitarCienteOrientadorForm,
-    UserProfileForm,
-    GatilhoInicialForm,
-    EstagioDocenciaUpdateForm
+    UserProfileForm
 )
 from .models import (
     AlteracaoAluno,
@@ -42,12 +39,12 @@ from .models import (
     ComentarioProcesso,
     Docente,
     Documento,
+    EstagioDocencia,
     ManifestacaoProcesso,
     Processo,
     Setor,
     TrajetoriaAcademica,
     User,
-    EstagioDocencia,
 )
 
 from .tasks import(
@@ -227,6 +224,19 @@ def _trajetoria_campo_label(trajetoria: TrajetoriaAcademica, campo: str, valor: 
 def _defesa_display(trajetoria: TrajetoriaAcademica) -> str:
     data = trajetoria.data_defesa.isoformat() if trajetoria.data_defesa else "-"
     return f"{trajetoria.numero_defesa or '-'} - {data}"
+
+
+def _estagio_docencia_label(estagio: EstagioDocencia | None) -> str:
+    if not estagio:
+        return "-"
+    inicio = estagio.inicio.isoformat() if estagio.inicio else "-"
+    termino = estagio.termino.isoformat() if estagio.termino else "-"
+    return (
+        f"supervisor={estagio.supervisor or '-'};"
+        f"status={estagio.get_status_display()};"
+        f"inicio={inicio};"
+        f"termino={termino}"
+    )
 
 
 def _trajetoria_campo_historico(trajetoria: TrajetoriaAcademica, campo: str) -> tuple[str, str]:
@@ -680,6 +690,7 @@ def aluno_detalhe_view(request, aluno_id):
         Aluno.objects.prefetch_related(
             "trajetorias__orientador",
             "trajetorias__coorientador",
+            "trajetorias__estagios_docencia",
         ),
         pk=aluno_id,
     )
@@ -938,6 +949,64 @@ def aluno_detalhe_view(request, aluno_id):
                     )
                     messages.success(request, "Informacao da trajetoria atualizada.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
+
+        elif acao == "novo_estagio_docencia":
+            trajetoria = aluno.trajetorias.filter(id=request.POST.get("trajetoria_id")).first()
+            form = EstagioDocenciaForm(request.POST)
+            if not trajetoria:
+                messages.error(request, "Trajetoria academica nao encontrada.")
+            elif form.is_valid():
+                estagio = EstagioDocencia.objects.create(
+                    trajetoria=trajetoria,
+                    supervisor=form.cleaned_data["supervisor"].strip(),
+                    status=form.cleaned_data["status"],
+                    inicio=form.cleaned_data["inicio"],
+                    termino=form.cleaned_data["termino"],
+                )
+                _registrar_alteracao_aluno(
+                    aluno=aluno,
+                    tipo=AlteracaoAluno.TipoAlteracao.ESTAGIO_DOCENCIA,
+                    valor_anterior=_estagio_docencia_label(estagio),
+                    valor_novo=_estagio_docencia_label(estagio),
+                    comentario=form.cleaned_data["comentario"],
+                    alterado_por=request.user,
+                )
+                messages.success(request, "Estagio docencia cadastrado.")
+                return redirect("aluno_detalhe", aluno_id=aluno.id)
+            else:
+                messages.error(request, "Nao foi possivel cadastrar o estagio docencia.")
+
+        elif acao == "alterar_estagio_docencia":
+            estagio = EstagioDocencia.objects.filter(
+                id=request.POST.get("estagio_id"),
+                trajetoria__aluno=aluno,
+            ).first()
+            form = EstagioDocenciaForm(request.POST)
+            if not estagio:
+                messages.error(request, "Estagio docencia nao encontrado.")
+            elif form.is_valid():
+                anterior = _estagio_docencia_label(estagio)
+                estagio.supervisor = form.cleaned_data["supervisor"].strip()
+                estagio.status = form.cleaned_data["status"]
+                estagio.inicio = form.cleaned_data["inicio"]
+                estagio.termino = form.cleaned_data["termino"]
+                try:
+                    estagio.save()
+                except ValidationError as exc:
+                    messages.error(request, exc.message_dict if hasattr(exc, "message_dict") else str(exc))
+                else:
+                    _registrar_alteracao_aluno(
+                        aluno=aluno,
+                        tipo=AlteracaoAluno.TipoAlteracao.ESTAGIO_DOCENCIA,
+                        valor_anterior=anterior,
+                        valor_novo=_estagio_docencia_label(estagio),
+                        comentario=form.cleaned_data["comentario"],
+                        alterado_por=request.user,
+                    )
+                    messages.success(request, "Estagio docencia atualizado.")
+                    return redirect("aluno_detalhe", aluno_id=aluno.id)
+            else:
+                messages.error(request, "Nao foi possivel atualizar o estagio docencia.")
 
         elif acao == "alterar_qualificacao":
             form = AlunoQualificacaoForm(request.POST)
@@ -1234,7 +1303,7 @@ def aluno_detalhe_view(request, aluno_id):
 
 
         elif acao == "Editar Estágio Docência":
-            form = EstagioDocenciaUpdateForm(request.POST) # Usando o form Supremo
+            form = EstagioDocenciaForm(request.POST) # Usando o form Supremo
 
             if form.is_valid():
                 estagio_id = form.cleaned_data["estagio_id"]
@@ -1303,18 +1372,30 @@ def aluno_detalhe_view(request, aluno_id):
                 "deposito_versao_final": trajetoria.deposito_versao_final,
             }
         )
-
-        estagio = EstagioDocencia.objects.filter(trajetoria=trajetoria).last()
-        form_gatilho_estagio = GatilhoInicialForm(initial={'estagio_id': estagio.id}) if estagio else None
-        form_edicao_estagio = EstagioDocenciaUpdateForm(initial={'estagio_id': estagio.id}) if estagio else None
-
-        trajetoria_cards.append({
-            "obj": trajetoria,
-            "form": form,
-            "estagio": estagio,
-            "form_gatilho_estagio": form_gatilho_estagio,
-            "form_edicao_estagio": form_edicao_estagio
-            })
+        estagio_cards = [
+            {
+                "obj": estagio,
+                "form": EstagioDocenciaForm(
+                    initial={
+                        "supervisor": estagio.supervisor,
+                        "status": estagio.status,
+                        "inicio": estagio.inicio,
+                        "termino": estagio.termino,
+                    }
+                ),
+            }
+            for estagio in trajetoria.estagios_docencia.all()
+        ]
+        trajetoria_cards.append(
+            {
+                "obj": trajetoria,
+                "form": form,
+                "estagio_cards": estagio_cards,
+                "novo_estagio_form": EstagioDocenciaForm(
+                    initial={"status": EstagioDocencia.Status.NAO_INICIADO}
+                ),
+            }
+        )
     return render(
         request,
         "processos/aluno_detalhe.html",

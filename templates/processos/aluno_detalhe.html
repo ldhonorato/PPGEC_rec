@@ -113,6 +113,58 @@
                             <ul class="info-list">
                                 <li><span class="info-label">Nivel</span><span>{{ trajetoria.get_nivel_curso_display }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-nivel-{{ trajetoria.id }}">Alterar</button></li>
                                 <li><span class="info-label">Ingresso</span><span>{{ trajetoria.ingresso|default:"-" }}</span><span></span></li>
+                                <li>
+                                    <span class="info-label">Estágios de docência</span>
+                                    <span>
+                                        {% with ultimo=trajetoria.estagios_docencia.last %}
+                                            {% if ultimo %}
+                                                <span class="badge badge-info">{{ ultimo.get_status_display }}</span>
+                                            {% else %}
+                                                <span class="muted">Nenhum estágio cadastrado</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </span>
+
+                                    <div style="display:flex; gap:0.5rem;"><button type="button" class="btn btn-secondary"data-toggle-estagios="{{ trajetoria.id }}">Ver todos ({{ trajetoria.estagios_docencia.count }})</button>
+
+                                    <button type="button" class="btn btn-secondary" data-modal-open="modal-estagio-create-{{ trajetoria.id }}"> + Novo estágio</button></div>
+                                </li>
+
+                                <li id="lista-estagios-{{ trajetoria.id }}" style="display:none;">
+                                    <div style="grid-column:1/-1; display:flex; flex-direction:column; gap:0.75rem;">
+                                        {% for estagio in trajetoria.estagios_docencia.all|dictsort:"inicio" %}
+                                        <div class="card" style="box-shadow:none;">
+                                                <div style="display:flex; justify-content:space-between; gap:1rem;flex-wrap:wrap;">
+                                                    <div>
+                                                        <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+                                        
+                                                        <strong>
+                                                            {{ estagio.supervisor|default:"Sem supervisor" }}
+                                                        </strong>
+
+                                                        <span class="badge badge-info status-badge">
+                                                            {{ estagio.get_status_display }}
+                                                        </span>
+
+                                                        </div>
+
+                                                        <small class="muted" style="display:block; margin-top:0.35rem;">
+                                                            {{ estagio.inicio|default:"-" }}
+                                                            -
+                                                            {{ estagio.termino|default:"-" }}
+                                                        </small>
+                                                    </div>
+                                                <button type="button" class="btn btn-secondary" data-modal-open="modal-estagio-editar-{{ estagio.id }}">Editar</button>
+                                                </div>
+                                            </div>
+
+                                        {% empty %}
+                                            <p class="muted">Nenhum estágio cadastrado.</p>
+                                        {% endfor %}
+
+                                    </div>
+                                </li>
+
                                 <li><span class="info-label">Prazo {{ trajetoria.qualificacao_label_lower }}</span><span>{{ trajetoria.prazo_qualificacao|default:"-" }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}">Alterar</button></li>
                                 <li><span class="info-label">Prazo defesa</span><span>{{ trajetoria.prazo_defesa|default:"-" }}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}">Alterar</button></li>
                                 <li><span class="info-label">Reingressante</span><span>{% if trajetoria.reingressante %}Sim{% else %}Nao{% endif %}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-reingressante-{{ trajetoria.id }}">Alterar</button></li>
@@ -123,6 +175,7 @@
                                 <li><span class="info-label">Deposito final</span><span>{% if trajetoria.deposito_versao_final %}Sim{% else %}Nao{% endif %}</span><button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-deposito-{{ trajetoria.id }}">Alterar</button></li>
                             </ul>
                         </li>
+
                         {% endwith %}
                     {% endfor %}
                 </ul>
@@ -326,6 +379,130 @@
         </form>
     </div>
 </div>
+<div id="modal-estagio-create-{{ trajetoria.id }}" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head">
+            <h3 class="section-title" style="margin:0;">Novo estágio de docência</h3>
+            <button type="button" class="modal-close" data-modal-close>Fechar</button>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="novo_estagio_docencia">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+
+            <div class="grid-two">
+                <div class="field">
+                    <label>Supervisor</label>
+                    <input name="supervisor">
+                </div>
+                <div class="field">
+                    <label>Data início</label>
+                    <input type="date" name="inicio">
+                </div>
+                <div class="field">
+                    <label>Data término</label>
+                    <input type="date" name="termino">
+                </div>
+                <div class="field">
+                    <label>Status</label>
+                    <select name="status">
+                        <option value="NAO_INICIADO">Não Iniciado</option>
+                        <option value="AGUARD_CIENCIA">Aguardando Ciente do Orientador</option>
+                        <option value="AGUARD_ASSINATURA">Aguardando Aprovação da Coordenação</option>
+                        <option value="ANALISE_DISP">Em Análise de Dispensa</option>
+                        <option value="DISPENSADO">Dispensado</option>
+                        <option value="EM_ANDAMENTO">Em Andamento</option>
+                        <option value="AGUARD_RELAT">Aguardando Relatório</option>
+                        <option value="CONCLUIDO">Concluído</option>
+                    </select>
+                </div>
+            </div>
+
+            <label>Comentário</label>
+            <textarea name="comentario" rows="3" required></textarea>
+
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">
+                Criar estágio
+            </button>
+        </form>
+    </div>
+</div>
+
+{% for estagio in trajetoria.estagios_docencia.all %}
+<div id="modal-estagio-editar-{{ estagio.id }}" class="modal-backdrop">
+    <div class="modal-card">
+
+        <div class="modal-head">
+            <h3 class="section-title" style="margin:0;">
+                Editar estágio de docência
+            </h3>
+
+            <button type="button"
+                    class="modal-close"
+                    data-modal-close>
+                Fechar
+            </button>
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+
+            <input type="hidden" name="acao" value="alterar_estagio_docencia">
+            <input type="hidden" name="estagio_id" value="{{ estagio.id }}">
+
+            <div class="grid-two">
+
+                <div class="field">
+                    <label>Supervisor</label>
+                    <input name="supervisor"
+                           value="{{ estagio.supervisor }}">
+                </div>
+
+                <div class="field">
+                    <label>Data início</label>
+                    <input type="date"
+                           name="inicio"
+                           value="{% if estagio.inicio %}{{ estagio.inicio|date:'Y-m-d' }}{% endif %}">
+                </div>
+
+                <div class="field">
+                    <label>Data término</label>
+                    <input type="date"
+                           name="termino"
+                           value="{% if estagio.termino %}{{ estagio.termino|date:'Y-m-d' }}{% endif %}">
+                </div>
+
+                <div class="field">
+                    <label>Status</label>
+
+                    <select name="status">
+                        {% for value, label in estagio.Status.choices %}
+                            <option value="{{ value }}"
+                                {% if estagio.status == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+            </div>
+
+            <label>Comentário</label>
+            <textarea name="comentario"
+                      rows="3"
+                      required></textarea>
+
+            <button class="btn"
+                    type="submit"
+                    style="margin-top:0.55rem;">
+                Salvar alterações
+            </button>
+
+        </form>
+
+    </div>
+</div>
+{% endfor %}
 
 <div id="modal-trajetoria-qualificacao-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
@@ -466,5 +643,27 @@
             atualizar();
         });
     })();
+
+    document
+    .querySelectorAll("[data-toggle-estagios]")
+    .forEach((btn) => {
+
+        btn.addEventListener("click", () => {
+
+            const id = btn.dataset.toggleEstagios;
+
+            const lista = document.getElementById(
+                `lista-estagios-${id}`
+            );
+
+            const aberto =
+                lista.style.display !== "none";
+
+            lista.style.display =
+                aberto ? "none" : "list-item";
+
+        });
+
+    });
 </script>
 {% endblock %}
