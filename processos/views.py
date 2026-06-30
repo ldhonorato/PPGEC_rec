@@ -951,7 +951,7 @@ def aluno_detalhe_view(request, aluno_id):
                     messages.success(request, "Informacao da trajetoria atualizada.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
 
-        # --- 1. BLOCO DE CRIAÇÃO MANUAL ---
+        
         elif acao == "novo_estagio_docencia":
             form = NovoEstagioDocenciaForm(request.POST)
             
@@ -986,7 +986,7 @@ def aluno_detalhe_view(request, aluno_id):
                 messages.error(request, "Erro ao criar estágio. Verifique os campos.")
 
 
-        # --- 2. BLOCO DE EDIÇÃO MANUAL ---
+        
         elif acao == "alterar_estagio_docencia": # Nome ajustado para bater com o HTML
             form = EstagioDocenciaUpdateForm(request.POST)
 
