@@ -119,14 +119,20 @@
                             <ul class="info-list">
                                 <li><span class="info-label">Nivel</span><span>{{ trajetoria.get_nivel_curso_display }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-nivel-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
                                 <li><span class="info-label">Ingresso</span><span>{{ trajetoria.ingresso|default:"-" }}</span><span></span></li>
-                                <li><span class="info-label">Prazo {{ trajetoria.qualificacao_label_lower }}</span><span>{{ trajetoria.prazo_qualificacao|default:"-" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                <li><span class="info-label">Prazo defesa</span><span>{{ trajetoria.prazo_defesa|default:"-" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                <li><span class="info-label">Reingressante</span><span>{% if trajetoria.reingressante %}Sim{% else %}Nao{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-reingressante-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                <li><span class="info-label">{{ trajetoria.qualificacao_label }}</span><span>{% if trajetoria.isQualificado %}Sim{% else %}Nao{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-qualificacao-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                <li><span class="info-label">Orientador</span><span>{% if trajetoria.orientador %}{{ trajetoria.orientador.nome }}{% else %}-{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-orientador-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                <li><span class="info-label">Coorientador</span><span>{{ trajetoria.coorientador_display|default:"-" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-coorientador-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                <li><span class="info-label">Defesa</span><span>{% if trajetoria.numero_defesa or trajetoria.data_defesa %}{{ trajetoria.numero_defesa|default:"-" }}{% if trajetoria.data_defesa %} - {{ trajetoria.data_defesa|date:"d/m/Y" }}{% endif %}{% else %}-{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-defesa-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                <li><span class="info-label">Deposito final</span><span>{% if trajetoria.deposito_versao_final %}Sim{% else %}Nao{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-deposito-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                {% if trajetoria.usa_prazos_academicos %}
+                                    <li><span class="info-label">Prazo {{ trajetoria.qualificacao_label_lower }}</span><span>{{ trajetoria.prazo_qualificacao|default:"-" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                    <li><span class="info-label">Prazo defesa</span><span>{{ trajetoria.prazo_defesa|default:"-" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                    <li><span class="info-label">Reingressante</span><span>{% if trajetoria.reingressante %}Sim{% else %}Nao{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-reingressante-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                    <li><span class="info-label">{{ trajetoria.qualificacao_label }}</span><span>{% if trajetoria.isQualificado %}Sim{% else %}Nao{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-qualificacao-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                    <li><span class="info-label">Orientador</span><span>{% if trajetoria.orientador %}{{ trajetoria.orientador.nome }}{% else %}-{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-orientador-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                    <li><span class="info-label">Coorientador</span><span>{{ trajetoria.coorientador_display|default:"-" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-coorientador-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                {% endif %}
+                                {% if trajetoria.usa_conclusao %}
+                                    <li><span class="info-label">{{ trajetoria.conclusao_label }}</span><span>{% if trajetoria.numero_defesa or trajetoria.data_defesa %}{{ trajetoria.numero_defesa|default:"-" }}{% if trajetoria.data_defesa %} - {{ trajetoria.data_defesa|date:"d/m/Y" }}{% endif %}{% else %}-{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-defesa-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                {% endif %}
+                                {% if trajetoria.usa_deposito_final %}
+                                    <li><span class="info-label">Deposito final</span><span>{% if trajetoria.deposito_versao_final %}Sim{% else %}Nao{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-deposito-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                {% endif %}
                             </ul>
                             <div class="section-head" style="margin-top: 1rem;">
                                 <h3 class="section-title" style="margin:0;">Publicacoes</h3>
@@ -271,33 +277,39 @@
                 <div class="field"><label>Nivel</label>{{ nova_trajetoria_form.nivel_curso }}</div>
                 <div class="field"><label>Status</label>{{ nova_trajetoria_form.status }}</div>
                 <div class="field"><label>Ingresso</label>{{ nova_trajetoria_form.ingresso }}</div>
-                <div class="field"><label>Prazo de qualificacao/projeto</label>{{ nova_trajetoria_form.prazo_qualificacao }}</div>
-                <div class="field"><label>Prazo defesa</label>{{ nova_trajetoria_form.prazo_defesa }}</div>
-                <div class="field"><label>Orientador</label>{{ nova_trajetoria_form.orientador }}</div>
+                <div class="field" data-nivel-section="PRAZOS"><label>Prazo de qualificacao/projeto</label>{{ nova_trajetoria_form.prazo_qualificacao }}</div>
+                <div class="field" data-nivel-section="PRAZOS"><label>Prazo defesa</label>{{ nova_trajetoria_form.prazo_defesa }}</div>
+                <div class="field" data-nivel-section="ORIENTACAO"><label>Orientador</label>{{ nova_trajetoria_form.orientador }}</div>
             </div>
-            <label>{{ nova_trajetoria_form.reingressante }} Reingressante</label>
-            <label>{{ nova_trajetoria_form.isQualificado }} Projeto/qualificacao concluido</label>
-
-            <label>Tipo de coorientador</label>
-            {{ nova_trajetoria_form.tipo_coorientador }}
-            <div data-coorientador-section="CADASTRADO">
-                <label>Coorientador cadastrado</label>
-                {{ nova_trajetoria_form.coorientador }}
-            </div>
-            <div data-coorientador-section="EXTERNO">
-                <label>Nome do coorientador externo</label>
-                {{ nova_trajetoria_form.coorientador_externo_nome }}
-                <label>Email do coorientador externo</label>
-                {{ nova_trajetoria_form.coorientador_externo_email }}
-                <label>Instituicao do coorientador externo</label>
-                {{ nova_trajetoria_form.coorientador_externo_instituicao }}
+            <div data-nivel-section="PRAZOS">
+                <label>{{ nova_trajetoria_form.reingressante }} Reingressante</label>
+                <label>{{ nova_trajetoria_form.isQualificado }} Projeto/qualificacao concluido</label>
             </div>
 
-            <div class="grid-two">
-                <div class="field"><label>Numero da defesa</label>{{ nova_trajetoria_form.numero_defesa }}</div>
-                <div class="field"><label>Data da defesa</label>{{ nova_trajetoria_form.data_defesa }}</div>
+            <div data-nivel-section="ORIENTACAO">
+                <label>Tipo de coorientador</label>
+                {{ nova_trajetoria_form.tipo_coorientador }}
+                <div data-coorientador-section="CADASTRADO">
+                    <label>Coorientador cadastrado</label>
+                    {{ nova_trajetoria_form.coorientador }}
+                </div>
+                <div data-coorientador-section="EXTERNO">
+                    <label>Nome do coorientador externo</label>
+                    {{ nova_trajetoria_form.coorientador_externo_nome }}
+                    <label>Email do coorientador externo</label>
+                    {{ nova_trajetoria_form.coorientador_externo_email }}
+                    <label>Instituicao do coorientador externo</label>
+                    {{ nova_trajetoria_form.coorientador_externo_instituicao }}
+                </div>
             </div>
-            <label>{{ nova_trajetoria_form.deposito_versao_final }} Deposito da versao final</label>
+
+            <div class="grid-two" data-nivel-section="CONCLUSAO">
+                <div class="field"><label data-conclusao-numero-label>Numero da defesa</label>{{ nova_trajetoria_form.numero_defesa }}</div>
+                <div class="field"><label data-conclusao-data-label>Data da defesa</label>{{ nova_trajetoria_form.data_defesa }}</div>
+            </div>
+            <div data-nivel-section="DEPOSITO">
+                <label>{{ nova_trajetoria_form.deposito_versao_final }} Deposito da versao final</label>
+            </div>
 
             <label>Comentario</label>
             {{ nova_trajetoria_form.comentario }}
@@ -460,19 +472,19 @@
 
 <div id="modal-trajetoria-defesa-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar defesa</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar {{ trajetoria.conclusao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
             <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
             <input type="hidden" name="campo" value="defesa">
             <div class="grid-two">
-                <div class="field"><label>Numero da defesa</label><input name="numero_defesa" value="{{ trajetoria.numero_defesa }}"></div>
-                <div class="field"><label>Data da defesa</label><input type="date" name="data_defesa" value="{% if trajetoria.data_defesa %}{{ trajetoria.data_defesa|date:'Y-m-d' }}{% endif %}"></div>
+                <div class="field"><label>{{ trajetoria.numero_conclusao_label }}</label><input name="numero_defesa" value="{{ trajetoria.numero_defesa }}"></div>
+                <div class="field"><label>{{ trajetoria.data_conclusao_label }}</label><input type="date" name="data_defesa" value="{% if trajetoria.data_defesa %}{{ trajetoria.data_defesa|date:'Y-m-d' }}{% endif %}"></div>
             </div>
             <label>Comentario</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar defesa</button>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar {{ trajetoria.conclusao_label_lower }}</button>
         </form>
     </div>
 </div>
@@ -643,6 +655,34 @@
             }
             select.addEventListener("change", atualizar);
             atualizar();
+        });
+
+        document.querySelectorAll("select[name='nivel_curso']").forEach((select) => {
+            function atualizarNivel() {
+                const modal = select.closest(".modal-backdrop");
+                if (!modal) return;
+                const nivel = select.value;
+                const usaAcademico = nivel === "MESTRADO" || nivel === "DOUTORADO";
+                const usaConclusao = usaAcademico || nivel === "POSDOUTORADO";
+                const usaDeposito = usaAcademico;
+                modal.querySelectorAll("[data-nivel-section]").forEach((section) => {
+                    const tipo = section.dataset.nivelSection;
+                    const mostrar =
+                        (tipo === "PRAZOS" && usaAcademico) ||
+                        (tipo === "ORIENTACAO" && usaAcademico) ||
+                        (tipo === "CONCLUSAO" && usaConclusao) ||
+                        (tipo === "DEPOSITO" && usaDeposito);
+                    section.style.display = mostrar ? "" : "none";
+                });
+                modal.querySelectorAll("[data-conclusao-numero-label]").forEach((label) => {
+                    label.textContent = nivel === "POSDOUTORADO" ? "Numero do relatorio final" : "Numero da defesa";
+                });
+                modal.querySelectorAll("[data-conclusao-data-label]").forEach((label) => {
+                    label.textContent = nivel === "POSDOUTORADO" ? "Data do relatorio final" : "Data da defesa";
+                });
+            }
+            select.addEventListener("change", atualizarNivel);
+            atualizarNivel();
         });
     })();
 </script>

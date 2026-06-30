@@ -1,5 +1,5 @@
 from .services import processos_atrasados_queryset, processos_atrasados_url
-from .models import Docente, SetorMembro, User
+from .models import Aluno, Docente, SetorMembro, User
 
 
 def processos_atrasados(request):
@@ -38,6 +38,17 @@ def _can_view_processos(user):
     return _is_coordenador(user) or _is_servidor(user)
 
 
+def _can_add_processo(user):
+    if not user.is_authenticated or _is_servidor(user):
+        return False
+    if user.tipo_usuario == User.TipoUsuario.ALUNO:
+        return not Aluno.objects.filter(
+            pk=user.pk,
+            status_aluno=Aluno.StatusAluno.EM_AVALIACAO,
+        ).exists()
+    return True
+
+
 def _can_view_caixa(user):
     return (
         _is_servidor(user)
@@ -73,12 +84,9 @@ def _menu_lateral_sections(user):
 
     principal_items = []
     if user.tipo_usuario != User.TipoUsuario.SERVIDOR:
-        principal_items.extend(
-            [
-                _menu_item("Meus Processos", "/menu/meus-processos/", ["menu_meus_processos"], "M"),
-                _menu_item("Novo Processo", "/processos/novo/", ["novo_processo"], "N"),
-            ]
-        )
+        principal_items.append(_menu_item("Meus Processos", "/menu/meus-processos/", ["menu_meus_processos"], "M"))
+        if _can_add_processo(user):
+            principal_items.append(_menu_item("Novo Processo", "/processos/novo/", ["novo_processo"], "N"))
     if user.tipo_usuario == User.TipoUsuario.ALUNO:
         principal_items.append(
             _menu_item("Documento de Vínculo", "/aluno/documento-vinculo/", ["aluno_documento_vinculo"], "D")
@@ -161,6 +169,18 @@ def _menu_lateral_sections(user):
         coordenacao_items.extend([
             _menu_item("Dashboard", "/coordenacao/dashboard/", ["coordenacao_dashboard"], "D"),
             _menu_item("Alunos", "/coordenacao/alunos/", ["coordenacao_alunos", "aluno_detalhe"], "A"),
+            *(
+                [
+                    _menu_item(
+                        "Validar Cadastros",
+                        "/coordenacao/alunos/cadastros/",
+                        ["validar_cadastros_alunos"],
+                        "V",
+                    )
+                ]
+                if _is_servidor(user)
+                else []
+            ),
             _menu_item("Setores e Comissões", "/coordenacao/setores/", ["setores_comissoes"], "S"),
         ])
         if _is_coordenador(user):

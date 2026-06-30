@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Cadastro de aluno | AcadFlow{% endblock %}
+{% block content %}
+<section class="login-page">
+    <article class="card login-card">
+        <div class="login-brand">
+            <img src="{% static 'img/acadflow-logo.png' %}" alt="AcadFlow">
+            <div>
+                <h1 class="section-title">Cadastro de aluno</h1>
+                <p class="muted">Preencha seus dados para avaliacao da secretaria.</p>
+            </div>
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <ul class="errorlist">{{ form.non_field_errors }}</ul>
+            {% endif %}
+            <div class="field">
+                <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+                {{ form.nome }}
+                {{ form.nome.errors }}
+            </div>
+            <div class="field">
+                <label for="{{ form.email.id_for_label }}">Email institucional, preferencialmente</label>
+                {{ form.email }}
+                {{ form.email.errors }}
+            </div>
+            <div class="grid-two">
+                <div class="field">
+                    <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
+                    {{ form.password1 }}
+                    {{ form.password1.errors }}
+                </div>
+                <div class="field">
+                    <label for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
+                    {{ form.password2 }}
+                    {{ form.password2.errors }}
+                </div>
+            </div>
+
+            <div class="grid-two">
+                <div class="field">
+                    <label for="{{ form.nivel_curso.id_for_label }}">{{ form.nivel_curso.label }}</label>
+                    {{ form.nivel_curso }}
+                    {{ form.nivel_curso.errors }}
+                </div>
+                <div class="field">
+                    <label for="{{ form.ingresso.id_for_label }}">{{ form.ingresso.label }}</label>
+                    {{ form.ingresso }}
+                    {{ form.ingresso.errors }}
+                </div>
+            </div>
+
+            <div data-nivel-section="ORIENTACAO">
+                <div class="field">
+                    <label for="{{ form.orientador.id_for_label }}">{{ form.orientador.label }}</label>
+                    {{ form.orientador }}
+                    {{ form.orientador.errors }}
+                </div>
+                <div class="field">
+                    <label for="{{ form.tipo_coorientador.id_for_label }}">{{ form.tipo_coorientador.label }}</label>
+                    {{ form.tipo_coorientador }}
+                    {{ form.tipo_coorientador.errors }}
+                </div>
+                <div data-coorientador-section="CADASTRADO">
+                    <div class="field">
+                        <label for="{{ form.coorientador.id_for_label }}">{{ form.coorientador.label }}</label>
+                        {{ form.coorientador }}
+                        {{ form.coorientador.errors }}
+                    </div>
+                </div>
+                <div data-coorientador-section="EXTERNO">
+                    <div class="field">
+                        <label for="{{ form.coorientador_externo_nome.id_for_label }}">{{ form.coorientador_externo_nome.label }}</label>
+                        {{ form.coorientador_externo_nome }}
+                        {{ form.coorientador_externo_nome.errors }}
+                    </div>
+                    <div class="field">
+                        <label for="{{ form.coorientador_externo_email.id_for_label }}">{{ form.coorientador_externo_email.label }}</label>
+                        {{ form.coorientador_externo_email }}
+                        {{ form.coorientador_externo_email.errors }}
+                    </div>
+                    <div class="field">
+                        <label for="{{ form.coorientador_externo_instituicao.id_for_label }}">{{ form.coorientador_externo_instituicao.label }}</label>
+                        {{ form.coorientador_externo_instituicao }}
+                        {{ form.coorientador_externo_instituicao.errors }}
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-full">Enviar cadastro</button>
+            <p class="form-footer-link">
+                <a href="{% url 'login' %}">Voltar para o login</a>
+            </p>
+        </form>
+    </article>
+</section>
+
+<script>
+    (function () {
+        const nivel = document.querySelector("select[name='nivel_curso']");
+        const tipoCoorientador = document.querySelector("select[name='tipo_coorientador']");
+        function atualizarNivel() {
+            if (!nivel) return;
+            const usaOrientacao = nivel.value === "MESTRADO" || nivel.value === "DOUTORADO";
+            document.querySelectorAll("[data-nivel-section='ORIENTACAO']").forEach((section) => {
+                section.style.display = usaOrientacao ? "" : "none";
+            });
+        }
+        function atualizarCoorientador() {
+            if (!tipoCoorientador) return;
+            document.querySelectorAll("[data-coorientador-section]").forEach((section) => {
+                section.style.display = section.dataset.coorientadorSection === tipoCoorientador.value ? "" : "none";
+            });
+        }
+        if (nivel) {
+            nivel.addEventListener("change", atualizarNivel);
+            atualizarNivel();
+        }
+        if (tipoCoorientador) {
+            tipoCoorientador.addEventListener("change", atualizarCoorientador);
+            atualizarCoorientador();
+        }
+    })();
+</script>
+{% endblock %}

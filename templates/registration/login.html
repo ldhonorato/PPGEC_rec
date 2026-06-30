@@ -28,6 +28,12 @@
                 {{ form.password.errors }}
             </div>
             <button type="submit" class="btn btn-full">Entrar</button>
+            <p class="form-footer-link">
+                <a href="{% url 'password_reset' %}">Esqueci minha senha</a>
+            </p>
+            <p class="form-footer-link">
+                <a href="{% url 'cadastro_aluno' %}">Criar cadastro de aluno</a>
+            </p>
         </form>
     </article>
 </section>

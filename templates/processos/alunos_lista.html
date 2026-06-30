@@ -60,6 +60,7 @@
                         {% if aluno.matricula %} | Matricula: {{ aluno.matricula }}{% endif %}
                         {% if aluno.trajetoria_atual %}
                             | Nivel: {{ aluno.trajetoria_atual.get_nivel_curso_display }}
+                            | Trajetoria: {{ aluno.trajetoria_atual.get_status_display }}
                             | Ingresso: {{ aluno.trajetoria_atual.ingresso }}
                             {% if aluno.trajetoria_atual.orientador %} | Orientador: {{ aluno.trajetoria_atual.orientador.nome }}{% endif %}
                         {% endif %}

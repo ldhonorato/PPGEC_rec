@@ -1056,6 +1056,22 @@ dialog::backdrop {
     height: auto;
 }
 
+.form-footer-link {
+    margin: 1rem 0 0 0;
+    text-align: center;
+}
+
+.form-footer-link a {
+    color: var(--color-primary);
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.form-footer-link a:hover,
+.form-footer-link a:focus-visible {
+    text-decoration: underline;
+}
+
 .badge {
     display: inline-block;
     padding: 0.22rem 0.58rem;
