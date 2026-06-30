@@ -995,7 +995,7 @@ def aluno_detalhe_view(request, aluno_id):
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
 
 
-        elif acao == "Editar Estágio Docência":
+        elif acao == "alterar_estagio_docencia":
             form = EstagioDocenciaUpdateForm(request.POST)
 
             if form.is_valid():
