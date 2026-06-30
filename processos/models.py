@@ -84,8 +84,11 @@ class Aluno(User):
     class NivelCurso(models.TextChoices):
         MESTRADO = "MESTRADO", "Mestrado"
         DOUTORADO = "DOUTORADO", "Doutorado"
+        POSDOUTORADO = "POSDOUTORADO", "Posdoutorado"
+        ALUNO_ESPECIAL = "ALUNO_ESPECIAL", "Aluno especial"
 
     class StatusAluno(models.TextChoices):
+        EM_AVALIACAO = "EM_AVALIACAO", "Em avaliacao"
         ATIVO = "ATIVO", "Ativo"
         DESLIGADO = "DESLIGADO", "Desligado"
         DEFENDEU = "DEFENDEU", "Defendeu"
@@ -116,7 +119,11 @@ class Aluno(User):
 
     def save(self, *args, **kwargs):
         self.tipo_usuario = User.TipoUsuario.ALUNO
-        self.is_active = self.status_aluno == self.StatusAluno.ATIVO
+        self.is_active = self.status_aluno in {
+            self.StatusAluno.EM_AVALIACAO,
+            self.StatusAluno.ATIVO,
+            self.StatusAluno.DEFENDEU,
+        }
         self.full_clean()
         return super().save(*args, **kwargs)
 
@@ -171,13 +178,15 @@ class Docente(User):
 
 class TrajetoriaAcademica(models.Model):
     class Status(models.TextChoices):
+        EM_HOMOLOGACAO = "EM_HOMOLOGACAO", "Em homologacao"
         ATIVA = "ATIVA", "Ativa"
         CONCLUIDA = "CONCLUIDA", "Concluida"
         DESLIGADA = "DESLIGADA", "Desligada"
         TRANCADA = "TRANCADA", "Trancado"
+        REMOVIDA = "REMOVIDA", "Removida"
 
     aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="trajetorias")
-    nivel_curso = models.CharField(max_length=10, choices=Aluno.NivelCurso.choices)
+    nivel_curso = models.CharField(max_length=20, choices=Aluno.NivelCurso.choices)
     status = models.CharField(max_length=15, choices=Status.choices, default=Status.ATIVA)
     ingresso = models.CharField(max_length=6, validators=[Aluno.semestre_validator])
     prazo_qualificacao = models.CharField(max_length=6, blank=True, validators=[Aluno.semestre_validator])
@@ -215,8 +224,78 @@ class TrajetoriaAcademica(models.Model):
     def __str__(self) -> str:
         return f"{self.aluno.nome} - {self.get_nivel_curso_display()} - {self.get_status_display()}"
 
+    @property
+    def usa_prazos_academicos(self) -> bool:
+        return self.nivel_curso in {
+            Aluno.NivelCurso.MESTRADO,
+            Aluno.NivelCurso.DOUTORADO,
+        }
+
+    @property
+    def usa_qualificacao(self) -> bool:
+        return self.usa_prazos_academicos
+
+    @property
+    def usa_orientacao(self) -> bool:
+        return self.usa_prazos_academicos
+
+    @property
+    def usa_conclusao(self) -> bool:
+        return self.nivel_curso in {
+            Aluno.NivelCurso.MESTRADO,
+            Aluno.NivelCurso.DOUTORADO,
+            Aluno.NivelCurso.POSDOUTORADO,
+        }
+
+    @property
+    def usa_deposito_final(self) -> bool:
+        return self.nivel_curso in {
+            Aluno.NivelCurso.MESTRADO,
+            Aluno.NivelCurso.DOUTORADO,
+        }
+
+    @property
+    def conclusao_label(self) -> str:
+        if self.nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
+            return "Relatorio final"
+        return "Defesa"
+
+    @property
+    def conclusao_label_lower(self) -> str:
+        return self.conclusao_label.lower()
+
+    @property
+    def numero_conclusao_label(self) -> str:
+        if self.nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
+            return "Numero do relatorio final"
+        return "Numero da defesa"
+
+    @property
+    def data_conclusao_label(self) -> str:
+        if self.nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
+            return "Data do relatorio final"
+        return "Data da defesa"
+
+    def _normalizar_campos_por_nivel(self):
+        if not self.usa_prazos_academicos:
+            self.prazo_qualificacao = ""
+            self.prazo_defesa = ""
+            self.reingressante = False
+            self.isQualificado = False
+            self.orientador = None
+            self.coorientador = None
+            self.coorientador_externo_nome = ""
+            self.coorientador_externo_email = ""
+            self.coorientador_externo_instituicao = ""
+        if not self.usa_conclusao or self.status != self.Status.CONCLUIDA:
+            self.numero_defesa = ""
+            self.data_defesa = None
+        if not self.usa_deposito_final or self.status != self.Status.CONCLUIDA:
+            self.deposito_versao_final = False
+
     def clean(self):
         errors = {}
+        self._normalizar_campos_por_nivel()
 
         if self.orientador and self.orientador.tipo_usuario != User.TipoUsuario.DOCENTE:
             errors["orientador"] = "Orientador deve ser um usuario do tipo DOCENTE."
@@ -232,11 +311,11 @@ class TrajetoriaAcademica(models.Model):
             self.coorientador_externo_email = ""
             self.coorientador_externo_instituicao = ""
 
-        if self.status == self.Status.CONCLUIDA:
+        if self.status == self.Status.CONCLUIDA and self.usa_conclusao:
             if not (self.numero_defesa or "").strip():
-                errors["numero_defesa"] = "Informe o numero da defesa para trajetoria concluida."
+                errors["numero_defesa"] = f"Informe o {self.conclusao_label_lower} para trajetoria concluida."
             if not self.data_defesa:
-                errors["data_defesa"] = "Informe a data da defesa para trajetoria concluida."
+                errors["data_defesa"] = f"Informe a data do {self.conclusao_label_lower} para trajetoria concluida."
         elif self.deposito_versao_final:
             errors["deposito_versao_final"] = "Deposito da versao final so pode ser marcado apos conclusao."
 
@@ -245,15 +324,14 @@ class TrajetoriaAcademica(models.Model):
 
     def save(self, *args, **kwargs):
         self.numero_defesa = (self.numero_defesa or "").strip()
-        if self.status != self.Status.CONCLUIDA:
-            self.numero_defesa = ""
-            self.data_defesa = None
-            self.deposito_versao_final = False
+        self._normalizar_campos_por_nivel()
         self.full_clean()
         return super().save(*args, **kwargs)
 
     @property
     def qualificacao_label(self) -> str:
+        if not self.usa_qualificacao:
+            return "-"
         if self.nivel_curso == Aluno.NivelCurso.MESTRADO:
             return "Projeto de Dissertação"
         return "Qualificação"

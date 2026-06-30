@@ -407,7 +407,7 @@
                 Status inicial: {{ processo.get_status_inicial_display|default:"-" }}
             </small>
         </li>
-        {% for tramitacao in processo.tramitacoes.all %}
+        {% for tramitacao in tramitacoes_historico %}
             <li>
                 <strong>Tramitacao em {{ tramitacao.data_encaminhamento|date:"d/m/Y H:i" }}</strong><br>
                 <small class="muted">

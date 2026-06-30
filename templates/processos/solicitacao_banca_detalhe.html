@@ -9,6 +9,11 @@
         </div>
         <div class="calendar-nav">
             <span class="badge badge-ok">{{ solicitacao.get_status_display }}</span>
+            {% if solicitacao.processo %}
+                <a class="btn btn-secondary" href="{% url 'processo_detalhe' solicitacao.processo.id %}">
+                    Processo {{ solicitacao.processo.numero }}
+                </a>
+            {% endif %}
             <a class="btn btn-secondary" href="{% url 'solicitacoes_banca' %}">Minhas solicitações</a>
         </div>
     </div>

@@ -1,8 +1,11 @@
+import re
 from datetime import datetime
 from pathlib import Path
 
 from django import forms
+from django.contrib.auth import password_validation
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 
@@ -509,13 +512,6 @@ class EncaminhamentoForm(forms.Form):
 
 
 class ProcessoAberturaForm(forms.ModelForm):
-    formularios_banca = forms.ModelMultipleChoiceField(
-        queryset=SolicitacaoBanca.objects.none(),
-        required=False,
-        label="Formularios salvos",
-        widget=forms.SelectMultiple(attrs={"size": "6", "data-formularios-select": "1"}),
-    )
-
     class Meta:
         model = Processo
         fields = ["tipo", "assunto", "descricao"]
@@ -526,15 +522,6 @@ class ProcessoAberturaForm(forms.ModelForm):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
-        if not user or user.tipo_usuario == User.TipoUsuario.ALUNO:
-            self.fields.pop("formularios_banca")
-            return
-
-        self.fields["formularios_banca"].queryset = (
-            SolicitacaoBanca.objects.select_related("aluno", "trajetoria")
-            .filter(docente=user, processo__isnull=True)
-            .order_by("-atualizado_em")
-        )
 
 
 class SolicitarCienteOrientadorForm(forms.Form):
@@ -596,6 +583,113 @@ class AlunoDadosForm(AlunoComentarioForm):
         if queryset.exists():
             raise forms.ValidationError("Ja existe um usuario com este email.")
         return email
+
+
+class AlunoCadastroForm(forms.Form):
+    nome = forms.CharField(max_length=255, label="Nome completo")
+    email = forms.EmailField(label="Email")
+    password1 = forms.CharField(label="Senha", widget=forms.PasswordInput)
+    password2 = forms.CharField(label="Confirmar senha", widget=forms.PasswordInput)
+    nivel_curso = forms.ChoiceField(choices=Aluno.NivelCurso.choices, label="Tipo de curso")
+    ingresso = forms.CharField(label="Ingresso (ano ou semestre)", max_length=6)
+    orientador = forms.ModelChoiceField(
+        queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE, is_active=True).order_by("nome"),
+        required=False,
+        label="Orientador",
+    )
+    tipo_coorientador = forms.ChoiceField(
+        choices=(
+            ("NENHUM", "Sem coorientador"),
+            ("CADASTRADO", "Docente cadastrado"),
+            ("EXTERNO", "Coorientador externo"),
+        ),
+        label="Tipo de coorientador",
+    )
+    coorientador = forms.ModelChoiceField(
+        queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE, is_active=True).order_by("nome"),
+        required=False,
+        label="Coorientador cadastrado",
+    )
+    coorientador_externo_nome = forms.CharField(max_length=255, required=False, label="Nome do coorientador externo")
+    coorientador_externo_email = forms.EmailField(required=False, label="Email do coorientador externo")
+    coorientador_externo_instituicao = forms.CharField(
+        max_length=255,
+        required=False,
+        label="Instituicao do coorientador externo",
+    )
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("Ja existe um usuario com este email.")
+        return email
+
+    def clean_ingresso(self):
+        ingresso = self.cleaned_data["ingresso"].strip()
+        if re.match(r"^\d{4}$", ingresso):
+            return f"{ingresso}.1"
+        if not re.match(r"^\d{4}\.[12]$", ingresso):
+            raise forms.ValidationError("Informe o ano ou semestre no formato YYYY, YYYY.1 ou YYYY.2.")
+        return ingresso
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get("password1")
+        password2 = cleaned_data.get("password2")
+        nivel_curso = cleaned_data.get("nivel_curso")
+        tipo_coorientador = cleaned_data.get("tipo_coorientador")
+        coorientador = cleaned_data.get("coorientador")
+        externo_nome = (cleaned_data.get("coorientador_externo_nome") or "").strip()
+
+        if password1 and password2 and password1 != password2:
+            self.add_error("password2", "As senhas nao conferem.")
+        if password1:
+            try:
+                password_validation.validate_password(password1)
+            except ValidationError as exc:
+                self.add_error("password1", exc)
+
+        usa_orientacao = nivel_curso in {
+            Aluno.NivelCurso.MESTRADO,
+            Aluno.NivelCurso.DOUTORADO,
+        }
+        if not usa_orientacao:
+            cleaned_data["orientador"] = None
+            cleaned_data["tipo_coorientador"] = "NENHUM"
+            cleaned_data["coorientador"] = None
+            cleaned_data["coorientador_externo_nome"] = ""
+            cleaned_data["coorientador_externo_email"] = ""
+            cleaned_data["coorientador_externo_instituicao"] = ""
+        elif tipo_coorientador == "CADASTRADO" and not coorientador:
+            self.add_error("coorientador", "Selecione um docente cadastrado.")
+        elif tipo_coorientador == "EXTERNO" and not externo_nome:
+            self.add_error("coorientador_externo_nome", "Informe o nome do coorientador externo.")
+
+        return cleaned_data
+
+    def save(self):
+        dados = self.cleaned_data
+        aluno = Aluno.objects.create_user(
+            email=dados["email"],
+            password=dados["password1"],
+            nome=dados["nome"],
+            status_aluno=Aluno.StatusAluno.EM_AVALIACAO,
+        )
+        trajetoria = TrajetoriaAcademica(
+            aluno=aluno,
+            nivel_curso=dados["nivel_curso"],
+            status=TrajetoriaAcademica.Status.EM_HOMOLOGACAO,
+            ingresso=dados["ingresso"],
+            orientador=dados["orientador"],
+        )
+        if dados["tipo_coorientador"] == "CADASTRADO":
+            trajetoria.coorientador = dados["coorientador"]
+        elif dados["tipo_coorientador"] == "EXTERNO":
+            trajetoria.coorientador_externo_nome = dados["coorientador_externo_nome"]
+            trajetoria.coorientador_externo_email = dados["coorientador_externo_email"]
+            trajetoria.coorientador_externo_instituicao = dados["coorientador_externo_instituicao"]
+        trajetoria.save()
+        return aluno
 
 
 class AlunoQualificacaoForm(AlunoComentarioForm):
@@ -762,19 +856,49 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
         tipo_coorientador = cleaned_data.get("tipo_coorientador")
         coorientador = cleaned_data.get("coorientador")
         externo_nome = (cleaned_data.get("coorientador_externo_nome") or "").strip()
+        nivel_curso = cleaned_data.get("nivel_curso")
         status = cleaned_data.get("status")
         numero_defesa = (cleaned_data.get("numero_defesa") or "").strip()
         data_defesa = cleaned_data.get("data_defesa")
+        usa_orientacao = nivel_curso in {
+            Aluno.NivelCurso.MESTRADO,
+            Aluno.NivelCurso.DOUTORADO,
+        }
+        usa_conclusao = nivel_curso in {
+            Aluno.NivelCurso.MESTRADO,
+            Aluno.NivelCurso.DOUTORADO,
+            Aluno.NivelCurso.POSDOUTORADO,
+        }
+        conclusao_label = "relatorio final" if nivel_curso == Aluno.NivelCurso.POSDOUTORADO else "defesa"
 
-        if tipo_coorientador == self.TipoCoorientador.CADASTRADO and not coorientador:
+        if not usa_orientacao:
+            cleaned_data["prazo_qualificacao"] = ""
+            cleaned_data["prazo_defesa"] = ""
+            cleaned_data["reingressante"] = False
+            cleaned_data["isQualificado"] = False
+            cleaned_data["orientador"] = None
+            cleaned_data["tipo_coorientador"] = self.TipoCoorientador.NENHUM
+            cleaned_data["coorientador"] = None
+            cleaned_data["coorientador_externo_nome"] = ""
+            cleaned_data["coorientador_externo_email"] = ""
+            cleaned_data["coorientador_externo_instituicao"] = ""
+
+        if not usa_conclusao:
+            cleaned_data["numero_defesa"] = ""
+            cleaned_data["data_defesa"] = None
+            cleaned_data["deposito_versao_final"] = False
+        elif nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
+            cleaned_data["deposito_versao_final"] = False
+
+        if usa_orientacao and tipo_coorientador == self.TipoCoorientador.CADASTRADO and not coorientador:
             self.add_error("coorientador", "Selecione um docente cadastrado.")
-        if tipo_coorientador == self.TipoCoorientador.EXTERNO and not externo_nome:
+        if usa_orientacao and tipo_coorientador == self.TipoCoorientador.EXTERNO and not externo_nome:
             self.add_error("coorientador_externo_nome", "Informe o nome do coorientador externo.")
-        if status == TrajetoriaAcademica.Status.CONCLUIDA:
+        if status == TrajetoriaAcademica.Status.CONCLUIDA and usa_conclusao:
             if not numero_defesa:
-                self.add_error("numero_defesa", "Informe o numero da defesa.")
+                self.add_error("numero_defesa", f"Informe o numero do {conclusao_label}.")
             if not data_defesa:
-                self.add_error("data_defesa", "Informe a data da defesa.")
+                self.add_error("data_defesa", f"Informe a data do {conclusao_label}.")
 
         return cleaned_data
 

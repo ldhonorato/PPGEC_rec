@@ -1,6 +1,7 @@
 from datetime import date, datetime, time, timedelta
 from unittest.mock import patch
 
+from django.core import mail
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.core.exceptions import ValidationError
@@ -23,6 +24,7 @@ from .models import (
     SetorMembro,
     SolicitacaoBanca,
     TrajetoriaAcademica,
+    TramitacaoProcesso,
     User,
 )
 
@@ -102,6 +104,77 @@ class AlunosViewTests(TestCase):
         response = self.client.get(reverse("coordenacao_alunos"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.aluno.nome)
+
+    def test_secretaria_aprova_cadastro_de_aluno_em_avaliacao(self):
+        aluno_pendente = Aluno.objects.create_user(
+            email="pendente@example.com",
+            password="senha-segura-123",
+            nome="Aluno Pendente",
+            status_aluno=Aluno.StatusAluno.EM_AVALIACAO,
+        )
+        trajetoria = criar_trajetoria(
+            aluno_pendente,
+            status=TrajetoriaAcademica.Status.EM_HOMOLOGACAO,
+            orientador=self.docente,
+        )
+
+        self.client.force_login(self.servidor)
+        home = self.client.get(reverse("home"))
+        response = self.client.get(reverse("validar_cadastros_alunos"))
+
+        self.assertContains(home, "Validar Cadastros")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Aluno Pendente")
+
+        post = self.client.post(
+            reverse("validar_cadastros_alunos"),
+            {"aluno_id": aluno_pendente.id, "acao": "aprovar"},
+        )
+
+        self.assertEqual(post.status_code, 302)
+        aluno_pendente.refresh_from_db()
+        trajetoria.refresh_from_db()
+        self.assertEqual(aluno_pendente.status_aluno, Aluno.StatusAluno.ATIVO)
+        self.assertTrue(aluno_pendente.is_active)
+        self.assertEqual(trajetoria.status, TrajetoriaAcademica.Status.ATIVA)
+
+    def test_secretaria_reprova_cadastro_e_remove_trajetoria_em_homologacao(self):
+        aluno_pendente = Aluno.objects.create_user(
+            email="pendente.reprovado@example.com",
+            password="senha-segura-123",
+            nome="Aluno Reprovado",
+            status_aluno=Aluno.StatusAluno.EM_AVALIACAO,
+        )
+        trajetoria = criar_trajetoria(
+            aluno_pendente,
+            status=TrajetoriaAcademica.Status.EM_HOMOLOGACAO,
+            orientador=self.docente,
+        )
+
+        self.client.force_login(self.servidor)
+        response = self.client.post(
+            reverse("validar_cadastros_alunos"),
+            {"aluno_id": aluno_pendente.id, "acao": "reprovar"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        aluno_pendente.refresh_from_db()
+        trajetoria.refresh_from_db()
+        self.assertEqual(aluno_pendente.status_aluno, Aluno.StatusAluno.DESLIGADO)
+        self.assertFalse(aluno_pendente.is_active)
+        self.assertEqual(trajetoria.status, TrajetoriaAcademica.Status.REMOVIDA)
+        self.assertIsNone(aluno_pendente.trajetoria_ativa())
+
+        lista = self.client.get(reverse("coordenacao_alunos"), {"nome": "Aluno Reprovado"})
+        self.assertEqual(lista.status_code, 200)
+        self.assertContains(lista, "Aluno Reprovado")
+        self.assertContains(lista, "Removida")
+
+    def test_docente_nao_acessa_validacao_de_cadastros(self):
+        self.client.force_login(self.docente)
+        response = self.client.get(reverse("validar_cadastros_alunos"))
+
+        self.assertEqual(response.status_code, 403)
 
     def test_coordenador_acessa_lista_alunos(self):
         self.client.force_login(self.coordenador)
@@ -209,16 +282,21 @@ class AlunosViewTests(TestCase):
 
     def test_membro_de_setor_acessa_caixa_e_detalhe_do_setor(self):
         setor = Setor.objects.create(nome="Comissao de Recursos", tipo=Setor.TipoSetor.COMISSAO)
-        SetorMembro.objects.create(setor=setor, usuario=self.aluno, designado_por=self.coordenador)
+        membro = Docente.objects.create(
+            email="membro.comissao@example.com",
+            password="senha-segura-123",
+            nome="Membro Comissao",
+        )
+        SetorMembro.objects.create(setor=setor, usuario=membro, designado_por=self.coordenador)
         processo = Processo.objects.create(
-            usuario_criado_por=self.docente,
+            usuario_criado_por=self.aluno,
             tipo=Processo.TipoProcesso.OUTRO,
             assunto="Processo da comissao",
             descricao="Analise pela comissao",
             setor_atual=setor,
         )
 
-        self.client.force_login(self.aluno)
+        self.client.force_login(membro)
         caixa = self.client.get(reverse("coordenacao_caixa_processos"))
         self.assertEqual(caixa.status_code, 200)
         self.assertContains(caixa, processo.assunto)
@@ -226,6 +304,61 @@ class AlunosViewTests(TestCase):
         detalhe = self.client.get(reverse("processo_detalhe", args=[processo.id]))
         self.assertEqual(detalhe.status_code, 200)
         self.assertContains(detalhe, processo.assunto)
+
+    def test_aluno_nao_acessa_detalhe_de_processo_que_nao_criou(self):
+        setor = Setor.objects.create(nome="Comissao Discente", tipo=Setor.TipoSetor.COMISSAO)
+        SetorMembro.objects.create(setor=setor, usuario=self.aluno, designado_por=self.coordenador)
+        processo = Processo.objects.create(
+            usuario_criado_por=self.docente,
+            tipo=Processo.TipoProcesso.OUTRO,
+            assunto="Processo de outro usuario",
+            descricao="Aluno membro nao deve visualizar",
+            setor_atual=setor,
+        )
+
+        self.client.force_login(self.aluno)
+        response = self.client.get(reverse("processo_detalhe", args=[processo.id]))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_historico_exibe_tramitacoes_da_mais_recente_para_a_mais_antiga(self):
+        secretaria = Setor.objects.create(nome="Setor Historico Secretaria")
+        coordenacao = Setor.objects.create(nome="Setor Historico Coordenacao")
+        pleno = Setor.objects.create(nome="Setor Historico Pleno")
+        processo = Processo.objects.create(
+            usuario_criado_por=self.aluno,
+            tipo=Processo.TipoProcesso.OUTRO,
+            assunto="Processo com historico",
+            descricao="Ordem de tramitacoes",
+            setor_atual=pleno,
+        )
+        antiga = TramitacaoProcesso.objects.create(
+            processo=processo,
+            setor_origem=secretaria,
+            setor_destino=coordenacao,
+            encaminhado_por=self.servidor,
+            observacao="Tramitacao antiga",
+        )
+        recente = TramitacaoProcesso.objects.create(
+            processo=processo,
+            setor_origem=coordenacao,
+            setor_destino=pleno,
+            encaminhado_por=self.coordenador,
+            observacao="Tramitacao recente",
+        )
+        TramitacaoProcesso.objects.filter(pk=antiga.pk).update(
+            data_encaminhamento=timezone.make_aware(datetime(2026, 6, 1, 9, 0))
+        )
+        TramitacaoProcesso.objects.filter(pk=recente.pk).update(
+            data_encaminhamento=timezone.make_aware(datetime(2026, 6, 2, 9, 0))
+        )
+
+        self.client.force_login(self.servidor)
+        response = self.client.get(reverse("processo_detalhe", args=[processo.id]))
+
+        self.assertEqual(response.status_code, 200)
+        conteudo = response.content.decode()
+        self.assertLess(conteudo.index("Tramitacao recente"), conteudo.index("Tramitacao antiga"))
 
     def test_perfil_exibe_participacoes_ativas_e_historico(self):
         setor_ativo = Setor.objects.create(nome="Comissao Ativa", tipo=Setor.TipoSetor.COMISSAO)
@@ -710,6 +843,73 @@ class AlunosViewTests(TestCase):
                 nivel_curso=Aluno.NivelCurso.MESTRADO,
             )
 
+    def test_trajetoria_aluno_especial_mantem_apenas_ingresso(self):
+        aluno_especial = Aluno.objects.create(
+            email="aluno.especial@example.com",
+            password="senha-segura-123",
+            nome="Aluno Especial",
+        )
+
+        trajetoria = TrajetoriaAcademica.objects.create(
+            aluno=aluno_especial,
+            nivel_curso=Aluno.NivelCurso.ALUNO_ESPECIAL,
+            status=TrajetoriaAcademica.Status.CONCLUIDA,
+            ingresso="2026.1",
+            prazo_qualificacao="2026.2",
+            prazo_defesa="2027.1",
+            orientador=self.docente,
+            numero_defesa="ATA-IGNORADA",
+            data_defesa=date(2026, 12, 20),
+            deposito_versao_final=True,
+            isQualificado=True,
+            reingressante=True,
+        )
+
+        self.assertEqual(trajetoria.ingresso, "2026.1")
+        self.assertEqual(trajetoria.prazo_qualificacao, "")
+        self.assertEqual(trajetoria.prazo_defesa, "")
+        self.assertIsNone(trajetoria.orientador)
+        self.assertEqual(trajetoria.numero_defesa, "")
+        self.assertIsNone(trajetoria.data_defesa)
+        self.assertFalse(trajetoria.deposito_versao_final)
+        self.assertFalse(trajetoria.isQualificado)
+        self.assertFalse(trajetoria.reingressante)
+
+    def test_posdoutorado_exige_relatorio_final_para_conclusao(self):
+        posdoc = Aluno.objects.create(
+            email="posdoc@example.com",
+            password="senha-segura-123",
+            nome="Pesquisador Posdoc",
+        )
+
+        with self.assertRaises(ValidationError):
+            TrajetoriaAcademica.objects.create(
+                aluno=posdoc,
+                nivel_curso=Aluno.NivelCurso.POSDOUTORADO,
+                status=TrajetoriaAcademica.Status.CONCLUIDA,
+                ingresso="2026.1",
+            )
+
+        trajetoria = TrajetoriaAcademica.objects.create(
+            aluno=posdoc,
+            nivel_curso=Aluno.NivelCurso.POSDOUTORADO,
+            status=TrajetoriaAcademica.Status.CONCLUIDA,
+            ingresso="2026.1",
+            numero_defesa="RF-2026-01",
+            data_defesa=date(2026, 12, 20),
+            prazo_qualificacao="2026.2",
+            prazo_defesa="2027.1",
+            orientador=self.docente,
+            deposito_versao_final=True,
+        )
+
+        self.assertEqual(trajetoria.conclusao_label, "Relatorio final")
+        self.assertEqual(trajetoria.numero_defesa, "RF-2026-01")
+        self.assertEqual(trajetoria.prazo_qualificacao, "")
+        self.assertEqual(trajetoria.prazo_defesa, "")
+        self.assertIsNone(trajetoria.orientador)
+        self.assertFalse(trajetoria.deposito_versao_final)
+
     def test_alterar_status_exige_comentario_e_cria_historico(self):
         self.client.force_login(self.servidor)
         url = reverse("aluno_detalhe", args=[self.aluno.id])
@@ -797,6 +997,87 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "img/acadflow-logo.png")
         self.assertContains(response, 'rel="icon"')
         self.assertContains(response, 'class="card login-card"')
+        self.assertContains(response, reverse("password_reset"))
+        self.assertContains(response, reverse("cadastro_aluno"))
+
+    def test_cadastro_aluno_renderiza_identidade_acadflow(self):
+        response = self.client.get(reverse("cadastro_aluno"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cadastro de aluno")
+        self.assertContains(response, "img/acadflow-logo.png")
+        self.assertContains(response, "Email institucional")
+        self.assertContains(response, 'class="card login-card"')
+
+    def test_cadastro_aluno_cria_conta_em_avaliacao(self):
+        response = self.client.post(
+            reverse("cadastro_aluno"),
+            {
+                "nome": "Nova Aluna",
+                "email": "nova.aluna@example.com",
+                "password1": "senha-segura-123",
+                "password2": "senha-segura-123",
+                "nivel_curso": Aluno.NivelCurso.MESTRADO,
+                "ingresso": "2026",
+                "orientador": self.docente.id,
+                "tipo_coorientador": "NENHUM",
+            },
+        )
+
+        self.assertRedirects(response, reverse("cadastro_aluno_sucesso"))
+        aluno = Aluno.objects.get(email="nova.aluna@example.com")
+        self.assertEqual(aluno.status_aluno, Aluno.StatusAluno.EM_AVALIACAO)
+        self.assertTrue(aluno.is_active)
+        trajetoria = aluno.trajetorias.get()
+        self.assertEqual(trajetoria.nivel_curso, Aluno.NivelCurso.MESTRADO)
+        self.assertEqual(trajetoria.status, TrajetoriaAcademica.Status.EM_HOMOLOGACAO)
+        self.assertEqual(trajetoria.ingresso, "2026.1")
+        self.assertEqual(trajetoria.orientador_id, self.docente.id)
+
+        self.assertTrue(self.client.login(email="nova.aluna@example.com", password="senha-segura-123"))
+        home = self.client.get(reverse("home"))
+        novo_processo = self.client.get(reverse("novo_processo"))
+
+        self.assertEqual(home.status_code, 200)
+        self.assertContains(home, "Minha Trajet")
+        self.assertNotContains(home, "Novo requerimento")
+        self.assertNotContains(home, "Novo Processo")
+        self.assertEqual(novo_processo.status_code, 403)
+
+    def test_esqueci_minha_senha_renderiza_identidade_acadflow(self):
+        response = self.client.get(reverse("password_reset"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Recuperar senha")
+        self.assertContains(response, "img/acadflow-logo.png")
+        self.assertContains(response, 'class="card login-card"')
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="AcadFlow <noreply@example.com>",
+    )
+    def test_esqueci_minha_senha_envia_email_com_link_visual_acadflow(self):
+        usuario = User.objects.create_user(
+            email="recuperar.senha@example.com",
+            password="senha-antiga-123",
+            nome="Usuario Recuperacao",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+
+        response = self.client.post(reverse("password_reset"), {"email": usuario.email})
+
+        self.assertRedirects(response, reverse("password_reset_done"))
+        self.assertEqual(len(mail.outbox), 1)
+        mensagem = mail.outbox[0]
+        self.assertEqual(mensagem.to, [usuario.email])
+        self.assertIn("Alteracao de senha", mensagem.subject)
+        self.assertIn("/senha/redefinir/", mensagem.body)
+        self.assertEqual(len(mensagem.alternatives), 1)
+        html, content_type = mensagem.alternatives[0]
+        self.assertEqual(content_type, "text/html")
+        self.assertIn("AcadFlow - PPGEC", html)
+        self.assertIn("Alterar senha", html)
+        self.assertIn("/senha/redefinir/", html)
 
     def test_home_renderiza_shell_e_dashboard_acadflow(self):
         self.client.force_login(self.docente)
@@ -1030,6 +1311,7 @@ class SolicitacaoBancaTests(TestCase):
             nome="Servidor Banca",
             tipo_usuario=User.TipoUsuario.SERVIDOR,
         )
+        self.setor_secretaria, _ = Setor.objects.get_or_create(nome="Secretaria PPGEC", defaults={"ativo": True})
         self.aluno_mestrado = Aluno.objects.create(
             email="mestrando.banca@example.com",
             password="senha-segura-123",
@@ -1164,7 +1446,15 @@ class SolicitacaoBancaTests(TestCase):
         self.assertEqual(solicitacao.status, SolicitacaoBanca.Status.RASCUNHO)
         self.assertEqual(solicitacao.docente_id, self.docente.id)
 
-    def test_docente_finaliza_solicitacao_com_membros_obrigatorios(self):
+    @patch("processos.views.send_email_novo_processo_secretaria.delay")
+    @patch("processos.views.send_email_novo_processo_orientador.delay")
+    @patch("processos.views.send_email_novo_processo_aluno.delay")
+    def test_docente_finaliza_solicitacao_com_membros_obrigatorios(
+        self,
+        email_aluno,
+        email_orientador,
+        email_secretaria,
+    ):
         self.client.force_login(self.docente)
         response = self.client.post(
             reverse("solicitacao_banca_nova"),
@@ -1177,8 +1467,22 @@ class SolicitacaoBancaTests(TestCase):
         self.assertEqual(solicitacao.finalizado_por_id, self.docente.id)
         self.assertIsNotNone(solicitacao.finalizado_em)
         self.assertEqual(solicitacao.membros.count(), 4)
+        self.assertIsNotNone(solicitacao.processo_id)
+        self.assertEqual(solicitacao.processo.tipo, Processo.TipoProcesso.DEFESA_MESTRADO)
+        self.assertEqual(solicitacao.processo.usuario_criado_por_id, self.docente.id)
+        email_aluno.assert_called_once_with(solicitacao.processo_id)
+        email_orientador.assert_called_once_with(solicitacao.processo_id)
+        email_secretaria.assert_called_once_with(solicitacao.processo_id)
 
-    def test_defesa_doutorado_finaliza_sem_quarto_examinador(self):
+    @patch("processos.views.send_email_novo_processo_secretaria.delay")
+    @patch("processos.views.send_email_novo_processo_orientador.delay")
+    @patch("processos.views.send_email_novo_processo_aluno.delay")
+    def test_defesa_doutorado_finaliza_sem_quarto_examinador(
+        self,
+        _email_aluno,
+        _email_orientador,
+        _email_secretaria,
+    ):
         self.client.force_login(self.docente)
         response = self.client.post(
             reverse("solicitacao_banca_nova"),
@@ -1190,6 +1494,7 @@ class SolicitacaoBancaTests(TestCase):
         self.assertEqual(solicitacao.status, SolicitacaoBanca.Status.FINALIZADA)
         self.assertFalse(solicitacao.membros.filter(papel=MembroBanca.Papel.QUARTO_EXAMINADOR).exists())
         self.assertEqual(solicitacao.membros.count(), 5)
+        self.assertEqual(solicitacao.processo.tipo, Processo.TipoProcesso.DEFESA_DOUTORADO)
 
     def test_finalizacao_valida_cpf_brasileiro(self):
         self.client.force_login(self.docente)
@@ -1205,7 +1510,7 @@ class SolicitacaoBancaTests(TestCase):
         self.assertContains(response, "Informe um CPF valido.")
         self.assertEqual(SolicitacaoBanca.objects.count(), 0)
 
-    def test_novo_processo_docente_lista_apenas_formularios_proprios(self):
+    def test_novo_processo_nao_lista_formularios_de_banca(self):
         propria = SolicitacaoBanca.objects.create(
             docente=self.docente,
             aluno=self.aluno_mestrado,
@@ -1225,43 +1530,34 @@ class SolicitacaoBancaTests(TestCase):
         response = self.client.get(reverse("novo_processo"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Formularios salvos")
-        self.assertContains(response, str(propria))
+        self.assertNotContains(response, "Formularios salvos")
+        self.assertNotContains(response, str(propria))
         self.assertNotContains(response, str(outra))
 
     @patch("processos.views.send_email_novo_processo_secretaria.delay")
     @patch("processos.views.send_email_novo_processo_orientador.delay")
     @patch("processos.views.send_email_novo_processo_aluno.delay")
-    def test_docente_anexa_solicitacao_de_banca_ao_criar_processo(
+    def test_solicitacao_finalizada_exibe_link_do_processo_na_listagem(
         self,
         _email_aluno,
         _email_orientador,
         _email_secretaria,
     ):
-        Setor.objects.get_or_create(nome="Secretaria PPGEC", defaults={"ativo": True})
-        solicitacao = SolicitacaoBanca.objects.create(
-            docente=self.docente,
-            aluno=self.aluno_mestrado,
-            trajetoria=self.trajetoria_mestrado,
-            tipo_defesa=SolicitacaoBanca.TipoDefesa.DEFESA_MESTRADO,
-            titulo="Formulario para anexar",
-        )
-
         self.client.force_login(self.docente)
         response = self.client.post(
-            reverse("novo_processo"),
-            {
-                "tipo": Processo.TipoProcesso.DEFESA_MESTRADO,
-                "assunto": "Solicitacao de banca",
-                "descricao": "Processo aberto com formulario salvo.",
-                "formularios_banca": [solicitacao.id],
-            },
+            reverse("solicitacao_banca_nova"),
+            {"acao": "finalizar", **self._dados_defesa_mestrado()},
         )
 
         self.assertEqual(response.status_code, 302)
+        solicitacao = SolicitacaoBanca.objects.get()
         solicitacao.refresh_from_db()
         self.assertIsNotNone(solicitacao.processo_id)
-        self.assertEqual(solicitacao.processo.usuario_criado_por_id, self.docente.id)
+
+        lista = self.client.get(reverse("solicitacoes_banca"))
+        self.assertEqual(lista.status_code, 200)
+        self.assertContains(lista, solicitacao.processo.numero)
+        self.assertContains(lista, reverse("processo_detalhe", args=[solicitacao.processo_id]))
 
         detalhe = self.client.get(reverse("processo_detalhe", args=[solicitacao.processo_id]))
         self.assertEqual(detalhe.status_code, 200)

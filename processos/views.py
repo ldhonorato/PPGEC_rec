@@ -6,12 +6,14 @@ from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from .forms import (
+    AlunoCadastroForm,
     AlunoComentarioForm,
     AlunoDadosForm,
     AlunoDefesaForm,
@@ -57,6 +59,7 @@ from .models import (
     SetorMembro,
     SolicitacaoBanca,
     TrajetoriaAcademica,
+    TramitacaoProcesso,
     User,
 )
 
@@ -106,11 +109,24 @@ def _can_view_processos(user):
     return _is_coordenador(user) or _is_servidor(user)
 
 
+def _can_add_processo(user):
+    if not user.is_authenticated or _is_servidor(user):
+        return False
+    if user.tipo_usuario == User.TipoUsuario.ALUNO:
+        return not Aluno.objects.filter(
+            pk=user.pk,
+            status_aluno=Aluno.StatusAluno.EM_AVALIACAO,
+        ).exists()
+    return True
+
+
 def _can_view_processo_detalhe(user, processo):
     if not user.is_authenticated:
         return False
     if processo.usuario_criado_por_id == user.id:
         return True
+    if user.tipo_usuario == User.TipoUsuario.ALUNO:
+        return False
     if _can_view_processos(user):
         return True
     if processo.setor_atual_id in {setor.id for setor in _setores_caixa(user)}:
@@ -265,12 +281,14 @@ def _menu_lateral_home(user):
             items.insert(1, {"label": "Processos no Pleno", "href": "/menu/processos-pleno/"})
         return items
     if user.tipo_usuario == User.TipoUsuario.ALUNO:
-        return [
+        items = [
             {"label": "Documento de vínculo (TODO)", "href": "/aluno/documento-vinculo/"},
             {"label": "Documento de histórico", "href": "/aluno/documento-historico/"},
             {"label": "Meus Processos", "href": "/menu/meus-processos/"},
-            {"label": "Novo processo", "href": "/processos/novo/"},
         ]
+        if _can_add_processo(user):
+            items.append({"label": "Novo processo", "href": "/processos/novo/"})
+        return items
     return []
 
 
@@ -320,7 +338,7 @@ def home_view(request):
         "can_view_dashboard": can_view_dashboard,
         "can_view_processos": can_view_processos,
         "can_view_caixa": can_view_caixa,
-        "can_add_processo": request.user.tipo_usuario != User.TipoUsuario.SERVIDOR,
+        "can_add_processo": _can_add_processo(request.user),
         "show_side_menu": request.user.tipo_usuario in [User.TipoUsuario.DOCENTE, User.TipoUsuario.ALUNO],
         "side_menu_title": "Menu",
         "side_menu_items": _menu_lateral_home(request.user),
@@ -650,6 +668,106 @@ def processos_view(request):
     )
 
 
+def cadastro_aluno_view(request):
+    if request.user.is_authenticated:
+        return redirect("home")
+
+    if request.method == "POST":
+        form = AlunoCadastroForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("cadastro_aluno_sucesso")
+    else:
+        form = AlunoCadastroForm()
+
+    return render(
+        request,
+        "registration/cadastro_aluno.html",
+        {"form": form},
+    )
+
+
+def cadastro_aluno_sucesso_view(request):
+    if request.user.is_authenticated:
+        return redirect("home")
+    return render(request, "registration/cadastro_aluno_sucesso.html")
+
+
+@login_required
+def validar_cadastros_alunos_view(request):
+    if not _is_servidor(request.user):
+        raise PermissionDenied("Acesso restrito a secretaria.")
+
+    if request.method == "POST":
+        aluno = get_object_or_404(
+            Aluno,
+            pk=request.POST.get("aluno_id"),
+            status_aluno=Aluno.StatusAluno.EM_AVALIACAO,
+        )
+        acao = request.POST.get("acao", "").strip()
+        trajetorias_em_homologacao = aluno.trajetorias.filter(
+            status=TrajetoriaAcademica.Status.EM_HOMOLOGACAO
+        )
+        if acao == "aprovar":
+            aluno.trajetorias.filter(status=TrajetoriaAcademica.Status.ATIVA).update(
+                status=TrajetoriaAcademica.Status.CONCLUIDA,
+            )
+            trajetorias_em_homologacao.update(status=TrajetoriaAcademica.Status.ATIVA)
+            aluno.status_aluno = Aluno.StatusAluno.ATIVO
+            aluno.save()
+            _registrar_alteracao_aluno(
+                aluno=aluno,
+                tipo=AlteracaoAluno.TipoAlteracao.STATUS,
+                valor_anterior="Em avaliacao",
+                valor_novo=aluno.get_status_aluno_display(),
+                comentario="Cadastro aprovado pela secretaria.",
+                alterado_por=request.user,
+            )
+            messages.success(request, f"Cadastro de {aluno.nome} aprovado.")
+        elif acao == "reprovar":
+            trajetorias_em_homologacao.update(status=TrajetoriaAcademica.Status.REMOVIDA)
+            aluno.status_aluno = Aluno.StatusAluno.DESLIGADO
+            aluno.save()
+            _registrar_alteracao_aluno(
+                aluno=aluno,
+                tipo=AlteracaoAluno.TipoAlteracao.STATUS,
+                valor_anterior="Em avaliacao",
+                valor_novo=aluno.get_status_aluno_display(),
+                comentario="Cadastro reprovado pela secretaria.",
+                alterado_por=request.user,
+            )
+            messages.success(request, f"Cadastro de {aluno.nome} reprovado.")
+        else:
+            messages.error(request, "Acao invalida para validacao de cadastro.")
+        return redirect("validar_cadastros_alunos")
+
+    alunos_pendentes = []
+    queryset = (
+        Aluno.objects.filter(status_aluno=Aluno.StatusAluno.EM_AVALIACAO)
+        .prefetch_related("trajetorias__orientador", "trajetorias__coorientador")
+        .order_by("date_joined", "nome")
+    )
+    for aluno in queryset:
+        trajetoria_atual = aluno.trajetoria_ativa()
+        if not trajetoria_atual:
+            trajetoria_atual = aluno.trajetorias.order_by("-criado_em").first()
+        aluno.trajetoria_atual = trajetoria_atual
+        alunos_pendentes.append(aluno)
+
+    return render(
+        request,
+        "processos/validar_cadastros_alunos.html",
+        {
+            "alunos_pendentes": alunos_pendentes,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
 @login_required
 def alunos_view(request):
     if not _has_gestao_access(request.user):
@@ -696,6 +814,7 @@ def alunos_view(request):
             "filtro_ingresso_fim": ingresso_fim_raw,
             "filtro_status": status,
             "status_list": Aluno.StatusAluno.choices,
+            "nivel_list": Aluno.NivelCurso.choices,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -823,7 +942,7 @@ def aluno_detalhe_view(request, aluno_id):
                     trajetoria.coorientador_externo_instituicao = dados["coorientador_externo_instituicao"]
                 trajetoria.save()
 
-                if trajetoria.status == TrajetoriaAcademica.Status.CONCLUIDA:
+                if trajetoria.status == TrajetoriaAcademica.Status.CONCLUIDA and trajetoria.usa_deposito_final:
                     aluno.status_aluno = Aluno.StatusAluno.DEFENDEU
                     aluno.save()
 
@@ -968,8 +1087,9 @@ def aluno_detalhe_view(request, aluno_id):
                 trajetoria.data_defesa = parse_date(request.POST.get("data_defesa", ""))
                 if trajetoria.numero_defesa and trajetoria.data_defesa:
                     trajetoria.status = TrajetoriaAcademica.Status.CONCLUIDA
-                    aluno.status_aluno = Aluno.StatusAluno.DEFENDEU
-                    aluno.save()
+                    if trajetoria.usa_deposito_final:
+                        aluno.status_aluno = Aluno.StatusAluno.DEFENDEU
+                        aluno.save()
                 novo = f"numero={trajetoria.numero_defesa or '-'};data={trajetoria.data_defesa or '-'}"
             elif campo == "deposito_versao_final":
                 tipo = AlteracaoAluno.TipoAlteracao.DEPOSITO_FINAL
@@ -1302,9 +1422,15 @@ def processo_detalhe_view(request, processo_id):
             "comentarios__autor",
             "manifestacoes__responsavel",
             "manifestacoes__solicitado_por",
-            "tramitacoes__setor_origem",
-            "tramitacoes__setor_destino",
-            "tramitacoes__encaminhado_por",
+            Prefetch(
+                "tramitacoes",
+                queryset=TramitacaoProcesso.objects.select_related(
+                    "setor_origem",
+                    "setor_destino",
+                    "encaminhado_por",
+                ).order_by("-data_encaminhamento"),
+                to_attr="tramitacoes_historico",
+            ),
         ),
         id=processo_id,
     )
@@ -1633,6 +1759,7 @@ def processo_detalhe_view(request, processo_id):
         "processos/processo_detalhe.html",
         {
             "processo": processo,
+            "tramitacoes_historico": processo.tramitacoes_historico,
             "documentos_exibicao": documentos_exibicao,
             "can_manage_in_caixa": can_manage_in_caixa,
             "can_manage_requerente": can_manage_requerente,
@@ -1668,8 +1795,8 @@ def processo_detalhe_view(request, processo_id):
 
 @login_required
 def novo_processo_view(request):
-    if _is_servidor(request.user):
-        raise PermissionDenied("Perfil SERVIDOR nao pode abrir processo.")
+    if not _can_add_processo(request.user):
+        raise PermissionDenied("Seu cadastro precisa estar aprovado para abrir processo.")
 
     if request.method == "POST":
         form = ProcessoAberturaForm(request.POST, request.FILES, user=request.user)
@@ -1717,8 +1844,6 @@ def novo_processo_view(request):
                 processo.setor_atual = setor_secretaria
                 processo.status = Processo.StatusProcesso.EM_ANALISE
                 processo.save()
-                if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
-                    form.cleaned_data.get("formularios_banca", SolicitacaoBanca.objects.none()).update(processo=processo)
 
                 for documento_form in documentos_forms:
                     processo.adicionar_documento(
@@ -2114,13 +2239,37 @@ def _solicitacao_banca_context(form, request, solicitacao=None):
     }
 
 
+def _criar_processo_para_solicitacao_banca(solicitacao):
+    if solicitacao.processo_id:
+        return solicitacao.processo, False
+
+    setor_secretaria = Setor.objects.filter(nome="Secretaria PPGEC", ativo=True).first()
+    if not setor_secretaria:
+        raise ValidationError("Setor inicial 'Secretaria PPGEC' nao encontrado. Contate o administrador.")
+
+    processo = Processo.objects.create(
+        usuario_criado_por=solicitacao.docente,
+        tipo=solicitacao.tipo_defesa,
+        assunto=f"{solicitacao.get_tipo_defesa_display()} - {solicitacao.aluno.nome}",
+        descricao=(
+            "Processo gerado automaticamente a partir da solicitacao de banca "
+            f"finalizada em {timezone.localtime(solicitacao.finalizado_em):%d/%m/%Y %H:%M}."
+        ),
+        setor_atual=setor_secretaria,
+        status=Processo.StatusProcesso.EM_ANALISE,
+    )
+    solicitacao.processo = processo
+    solicitacao.save(update_fields=["processo"])
+    return processo, True
+
+
 @login_required
 def solicitacoes_banca_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.DOCENTE:
         raise PermissionDenied("Acesso restrito a docentes.")
 
     solicitacoes = (
-        SolicitacaoBanca.objects.select_related("aluno", "trajetoria")
+        SolicitacaoBanca.objects.select_related("aluno", "trajetoria", "processo")
         .filter(docente=request.user)
         .order_by("-atualizado_em")
     )
@@ -2147,14 +2296,32 @@ def solicitacao_banca_nova_view(request):
     form = SolicitacaoBancaForm(request.POST or None, docente=request.user, finalizar=finalizar)
     if request.method == "POST" and form.is_valid():
         status = SolicitacaoBanca.Status.FINALIZADA if finalizar else SolicitacaoBanca.Status.RASCUNHO
-        solicitacao = form.save(commit=False, docente=request.user, status=status)
-        if finalizar:
-            solicitacao.finalizado_por = request.user
-            solicitacao.finalizado_em = timezone.now()
-        solicitacao.save()
-        form.save_membros(solicitacao)
-        messages.success(request, "Solicitacao de banca finalizada." if finalizar else "Rascunho salvo.")
-        return redirect("solicitacao_banca_detalhe", solicitacao_id=solicitacao.id)
+        processo_criado = None
+        try:
+            with transaction.atomic():
+                solicitacao = form.save(commit=False, docente=request.user, status=status)
+                if finalizar:
+                    solicitacao.finalizado_por = request.user
+                    solicitacao.finalizado_em = timezone.now()
+                solicitacao.save()
+                form.save_membros(solicitacao)
+                if finalizar:
+                    processo, criado = _criar_processo_para_solicitacao_banca(solicitacao)
+                    processo_criado = processo if criado else None
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0] if exc.messages else str(exc))
+        else:
+            if processo_criado:
+                send_email_novo_processo_aluno.delay(processo_criado.id)
+                send_email_novo_processo_orientador.delay(processo_criado.id)
+                send_email_novo_processo_secretaria.delay(processo_criado.id)
+                messages.success(
+                    request,
+                    f"Solicitacao de banca finalizada e processo {processo_criado.numero} aberto com sucesso.",
+                )
+            else:
+                messages.success(request, "Solicitacao de banca finalizada." if finalizar else "Rascunho salvo.")
+            return redirect("solicitacao_banca_detalhe", solicitacao_id=solicitacao.id)
 
     return render(request, "processos/solicitacao_banca_form.html", _solicitacao_banca_context(form, request))
 
@@ -2165,7 +2332,7 @@ def solicitacao_banca_detalhe_view(request, solicitacao_id):
         raise PermissionDenied("Acesso restrito a docentes.")
 
     solicitacao = get_object_or_404(
-        SolicitacaoBanca.objects.select_related("aluno", "trajetoria", "finalizado_por").prefetch_related("membros"),
+        SolicitacaoBanca.objects.select_related("aluno", "trajetoria", "finalizado_por", "processo").prefetch_related("membros"),
         pk=solicitacao_id,
         docente=request.user,
     )
@@ -2192,14 +2359,32 @@ def solicitacao_banca_detalhe_view(request, solicitacao_id):
     )
     if request.method == "POST" and form.is_valid():
         status = SolicitacaoBanca.Status.FINALIZADA if finalizar else SolicitacaoBanca.Status.RASCUNHO
-        solicitacao = form.save(commit=False, docente=request.user, status=status)
-        if finalizar:
-            solicitacao.finalizado_por = request.user
-            solicitacao.finalizado_em = timezone.now()
-        solicitacao.save()
-        form.save_membros(solicitacao)
-        messages.success(request, "Solicitacao de banca finalizada." if finalizar else "Rascunho salvo.")
-        return redirect("solicitacao_banca_detalhe", solicitacao_id=solicitacao.id)
+        processo_criado = None
+        try:
+            with transaction.atomic():
+                solicitacao = form.save(commit=False, docente=request.user, status=status)
+                if finalizar:
+                    solicitacao.finalizado_por = request.user
+                    solicitacao.finalizado_em = timezone.now()
+                solicitacao.save()
+                form.save_membros(solicitacao)
+                if finalizar:
+                    processo, criado = _criar_processo_para_solicitacao_banca(solicitacao)
+                    processo_criado = processo if criado else None
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0] if exc.messages else str(exc))
+        else:
+            if processo_criado:
+                send_email_novo_processo_aluno.delay(processo_criado.id)
+                send_email_novo_processo_orientador.delay(processo_criado.id)
+                send_email_novo_processo_secretaria.delay(processo_criado.id)
+                messages.success(
+                    request,
+                    f"Solicitacao de banca finalizada e processo {processo_criado.numero} aberto com sucesso.",
+                )
+            else:
+                messages.success(request, "Solicitacao de banca finalizada." if finalizar else "Rascunho salvo.")
+            return redirect("solicitacao_banca_detalhe", solicitacao_id=solicitacao.id)
 
     return render(
         request,

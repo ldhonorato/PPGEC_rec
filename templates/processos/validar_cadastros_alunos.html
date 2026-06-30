@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Validar cadastros | Secretaria{% endblock %}
+{% block content %}
+<section class="card">
+    <h1 class="section-title">Validar cadastros de alunos</h1>
+    {% if alunos_pendentes %}
+        <ul class="list">
+            {% for aluno in alunos_pendentes %}
+                <li>
+                    <div class="item-row">
+                        <div>
+                            <strong>{{ aluno.nome }}</strong><br>
+                            <small class="muted">
+                                {{ aluno.email }}
+                                {% if aluno.trajetoria_atual %}
+                                    | {{ aluno.trajetoria_atual.get_nivel_curso_display }}
+                                    | Ingresso: {{ aluno.trajetoria_atual.ingresso }}
+                                    {% if aluno.trajetoria_atual.orientador %} | Orientador: {{ aluno.trajetoria_atual.orientador.nome }}{% endif %}
+                                    {% if aluno.trajetoria_atual.coorientador_display %} | Coorientador: {{ aluno.trajetoria_atual.coorientador_display }}{% endif %}
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <a class="btn btn-secondary" href="{% url 'aluno_detalhe' aluno.id %}">Revisar</a>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="aluno_id" value="{{ aluno.id }}">
+                                <input type="hidden" name="acao" value="aprovar">
+                                <button class="btn" type="submit">Aprovar</button>
+                            </form>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="aluno_id" value="{{ aluno.id }}">
+                                <input type="hidden" name="acao" value="reprovar">
+                                <button class="btn btn-secondary" type="submit">Reprovar</button>
+                            </form>
+                        </div>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nao ha cadastros de alunos em avaliacao.</p>
+    {% endif %}
+</section>
+{% endblock %}
