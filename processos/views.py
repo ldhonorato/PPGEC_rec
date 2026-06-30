@@ -21,7 +21,8 @@ from .forms import (
     AlunoQualificacaoForm,
     AlunoReingressoForm,
     AlunoStatusForm,
-    EstagioDocenciaForm,
+    NovoEstagioDocenciaForm,
+    EstagioDocenciaUpdateForm,
     TrajetoriaAcademicaForm,
     TrajetoriaStatusForm,
     ManifestarCienteOrientadorForm,
@@ -950,63 +951,78 @@ def aluno_detalhe_view(request, aluno_id):
                     messages.success(request, "Informacao da trajetoria atualizada.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
 
-        elif acao == "novo_estagio_docencia":
-            trajetoria = aluno.trajetorias.filter(id=request.POST.get("trajetoria_id")).first()
-            form = EstagioDocenciaForm(request.POST)
-            if not trajetoria:
-                messages.error(request, "Trajetoria academica nao encontrada.")
-            elif form.is_valid():
-                estagio = EstagioDocencia.objects.create(
-                    trajetoria=trajetoria,
-                    supervisor=form.cleaned_data["supervisor"].strip(),
-                    status=form.cleaned_data["status"],
-                    inicio=form.cleaned_data["inicio"],
-                    termino=form.cleaned_data["termino"],
-                )
-                _registrar_alteracao_aluno(
-                    aluno=aluno,
-                    tipo=AlteracaoAluno.TipoAlteracao.ESTAGIO_DOCENCIA,
-                    valor_anterior=_estagio_docencia_label(estagio),
-                    valor_novo=_estagio_docencia_label(estagio),
-                    comentario=form.cleaned_data["comentario"],
-                    alterado_por=request.user,
-                )
-                messages.success(request, "Estagio docencia cadastrado.")
-                return redirect("aluno_detalhe", aluno_id=aluno.id)
-            else:
-                messages.error(request, "Nao foi possivel cadastrar o estagio docencia.")
+        elif acao == "Novo Estágio Docência":
+            # Aqui usamos o novo form que recebe o ID da trajetória
+            form = NovoEstagioDocenciaForm(request.POST)
+            
+            if form.is_valid():
+                trajetoria_id = form.cleaned_data["trajetoria_id"]
+                trajetoria = get_object_or_404(TrajetoriaAcademica, id=trajetoria_id)
+                supervisor_digitado = form.cleaned_data["supervisor"]
 
-        elif acao == "alterar_estagio_docencia":
-            estagio = EstagioDocencia.objects.filter(
-                id=request.POST.get("estagio_id"),
-                trajetoria__aluno=aluno,
-            ).first()
-            form = EstagioDocenciaForm(request.POST)
-            if not estagio:
-                messages.error(request, "Estagio docencia nao encontrado.")
-            elif form.is_valid():
-                anterior = _estagio_docencia_label(estagio)
-                estagio.supervisor = form.cleaned_data["supervisor"].strip()
+                # 1. Máquina de estados (Compara com o orientador da trajetória)
+                nome_orientador = trajetoria.orientador.nome if trajetoria.orientador else ""
+                
+                if supervisor_digitado.strip().lower() == nome_orientador.strip().lower() and nome_orientador:
+                    status_inicial = EstagioDocencia.Status.AGUARD_ASSINATURA
+                else:
+                    status_inicial = EstagioDocencia.Status.AGUARD_CIENCIA
+
+                # 2. Criação oficial do Estágio no banco de dados
+                novo_estagio = EstagioDocencia.objects.create(
+                    trajetoria=trajetoria,
+                    supervisor=supervisor_digitado,
+                    status=status_inicial
+                )
+
+                estado_novo = f"Status: {novo_estagio.get_status_display()} | Supervisor: {novo_estagio.supervisor}"
+                
+                # 3. Auditoria
+                _registrar_alteracao_aluno(
+                    aluno=aluno, 
+                    tipo="Criação - Estágio de Docência",
+                    valor_anterior="Nenhum estágio",
+                    valor_novo=estado_novo,
+                    comentario=form.cleaned_data["comentario"],
+                    alterado_por=request.user
+                )
+                messages.success(request, "Novo estágio de docência criado e fluxo iniciado.")
+                return redirect("aluno_detalhe", aluno_id=aluno.id)
+
+
+        elif acao == "Editar Estágio Docência":
+            form = EstagioDocenciaUpdateForm(request.POST)
+
+            if form.is_valid():
+                estagio_id = form.cleaned_data["estagio_id"]
+                estagio = get_object_or_404(EstagioDocencia, id=estagio_id)
+
+                estado_anterior = (
+                    f"Supervisor: {estagio.supervisor} | Status: {estagio.get_status_display()} | "
+                    f"Início: {estagio.inicio} | Término: {estagio.termino}"
+                )
+
+                estagio.supervisor = form.cleaned_data["supervisor"]
                 estagio.status = form.cleaned_data["status"]
                 estagio.inicio = form.cleaned_data["inicio"]
                 estagio.termino = form.cleaned_data["termino"]
-                try:
-                    estagio.save()
-                except ValidationError as exc:
-                    messages.error(request, exc.message_dict if hasattr(exc, "message_dict") else str(exc))
-                else:
-                    _registrar_alteracao_aluno(
-                        aluno=aluno,
-                        tipo=AlteracaoAluno.TipoAlteracao.ESTAGIO_DOCENCIA,
-                        valor_anterior=anterior,
-                        valor_novo=_estagio_docencia_label(estagio),
-                        comentario=form.cleaned_data["comentario"],
-                        alterado_por=request.user,
-                    )
-                    messages.success(request, "Estagio docencia atualizado.")
-                    return redirect("aluno_detalhe", aluno_id=aluno.id)
-            else:
-                messages.error(request, "Nao foi possivel atualizar o estagio docencia.")
+                estagio.save()
+
+                estado_novo = (
+                    f"Supervisor: {estagio.supervisor} | Status: {estagio.get_status_display()} | "
+                    f"Início: {estagio.inicio} | Término: {estagio.termino}"
+                )
+
+                _registrar_alteracao_aluno(
+                    aluno=aluno,
+                    tipo="Edição Manual - Estágio de Docência",
+                    valor_anterior=estado_anterior,
+                    valor_novo=estado_novo,
+                    comentario=form.cleaned_data["comentario"],
+                    alterado_por=request.user
+                )
+                messages.success(request, "Estágio de docência atualizado com sucesso.")
+                return redirect("aluno_detalhe", aluno_id=aluno.id)
 
         elif acao == "alterar_qualificacao":
             form = AlunoQualificacaoForm(request.POST)
@@ -1265,7 +1281,7 @@ def aluno_detalhe_view(request, aluno_id):
                 messages.error(request, "Nao foi possivel atualizar o coorientador.")
                 
                 
-
+    """
         elif acao == "Novo Estágio Docência":
             form = GatilhoInicialForm(request.POST) # Usando o novo form de Gatilho
             
@@ -1336,7 +1352,7 @@ def aluno_detalhe_view(request, aluno_id):
                 )
                 messages.success(request, "Estágio de docência corrigido manualmente.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
-            
+     """       
     processos_aluno = (
         Processo.objects.select_related("setor_atual")
         .filter(usuario_criado_por=aluno)
@@ -1375,8 +1391,9 @@ def aluno_detalhe_view(request, aluno_id):
         estagio_cards = [
             {
                 "obj": estagio,
-                "form": EstagioDocenciaForm(
+                "form": EstagioDocenciaUpdateForm(
                     initial={
+                        "estagio_id": estagio.id,
                         "supervisor": estagio.supervisor,
                         "status": estagio.status,
                         "inicio": estagio.inicio,
@@ -1391,8 +1408,8 @@ def aluno_detalhe_view(request, aluno_id):
                 "obj": trajetoria,
                 "form": form,
                 "estagio_cards": estagio_cards,
-                "novo_estagio_form": EstagioDocenciaForm(
-                    initial={"status": EstagioDocencia.Status.NAO_INICIADO}
+                "novo_estagio_form": EstagioDocenciaUpdateForm(
+                    initial={"trajetoria_id": trajetoria.id}
                 ),
             }
         )

@@ -314,31 +314,18 @@ class TrajetoriaStatusForm(AlunoComentarioForm):
     )
 
 
-# class EstagioDocenciaForm(AlunoComentarioForm):
+class NovoEstagioDocenciaForm(AlunoComentarioForm):
    
-#     estagio_id = forms.IntegerField(widget=forms.HiddenInput())
-#     supervisor = forms.CharField(max_length=255, label="Supervisor")
-
-
-class EstagioDocenciaForm(AlunoComentarioForm):
-    
-    estagio_id = forms.IntegerField(widget=forms.HiddenInput())
+    trajetoria_id = forms.IntegerField(widget=forms.HiddenInput())
     supervisor = forms.CharField(max_length=255, label="Supervisor")
-    
 
-    status = forms.ChoiceField(
-        choices=EstagioDocencia.Status.choices, 
-        label="Status do Estágio"
-    )
-    
-    data_inicio = forms.DateField(
-        label="Data de Início", 
-        widget=forms.DateInput(attrs={"type": "date"})
-    )
-    data_termino = forms.DateField(
-        label="Data de Término", 
-        widget=forms.DateInput(attrs={"type": "date"})
-    )
+
+class EstagioDocenciaUpdateForm(AlunoComentarioForm):
+    estagio_id = forms.IntegerField(widget=forms.HiddenInput())
+    supervisor = forms.CharField(max_length=255, required=False, label="Nome do Supervisor")
+    status = forms.ChoiceField(choices=EstagioDocencia.Status.choices, label="Status")
+    inicio = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    termino = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
 
     def clean(self):
         cleaned_data = super().clean()
