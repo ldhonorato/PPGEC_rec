@@ -951,7 +951,7 @@ def aluno_detalhe_view(request, aluno_id):
                     messages.success(request, "Informacao da trajetoria atualizada.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
 
-        elif acao == "Novo Estágio Docência":
+        elif acao == "novo_estagio_docencia":
             # Aqui usamos o novo form que recebe o ID da trajetória
             form = NovoEstagioDocenciaForm(request.POST)
             
@@ -972,10 +972,15 @@ def aluno_detalhe_view(request, aluno_id):
                 novo_estagio = EstagioDocencia.objects.create(
                     trajetoria=trajetoria,
                     supervisor=supervisor_digitado,
-                    status=status_inicial
+                    status=status_inicial,
+                    inicio=form.cleaned_data.get("inicio"),
+                    termino=form.cleaned_data.get("termino")
                 )
 
-                estado_novo = f"Status: {novo_estagio.get_status_display()} | Supervisor: {novo_estagio.supervisor}"
+                estado_novo = (
+                    f"Status: {novo_estagio.get_status_display()} | Supervisor: {novo_estagio.supervisor} | "
+                    f"Início: {novo_estagio.inicio} | Término: {novo_estagio.termino}"
+                )
                 
                 # 3. Auditoria
                 _registrar_alteracao_aluno(
