@@ -951,83 +951,76 @@ def aluno_detalhe_view(request, aluno_id):
                     messages.success(request, "Informacao da trajetoria atualizada.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
 
+        # --- 1. BLOCO DE CRIAÇÃO MANUAL ---
         elif acao == "novo_estagio_docencia":
-            # Aqui usamos o novo form que recebe o ID da trajetória
             form = NovoEstagioDocenciaForm(request.POST)
             
             if form.is_valid():
                 trajetoria_id = form.cleaned_data["trajetoria_id"]
                 trajetoria = get_object_or_404(TrajetoriaAcademica, id=trajetoria_id)
-                supervisor_digitado = form.cleaned_data["supervisor"]
 
-                # 1. Máquina de estados (Compara com o orientador da trajetória)
-                nome_orientador = trajetoria.orientador.nome if trajetoria.orientador else ""
-                
-                if supervisor_digitado.strip().lower() == nome_orientador.strip().lower() and nome_orientador:
-                    status_inicial = EstagioDocencia.Status.AGUARD_ASSINATURA
-                else:
-                    status_inicial = EstagioDocencia.Status.AGUARD_CIENCIA
-
-                # 2. Criação oficial do Estágio no banco de dados
+                # Cria o estágio no banco pegando TUDO diretamente do formulário (da tela)
                 novo_estagio = EstagioDocencia.objects.create(
                     trajetoria=trajetoria,
-                    supervisor=supervisor_digitado,
-                    status=status_inicial,
+                    supervisor=form.cleaned_data["supervisor"].strip(),
+                    status=form.cleaned_data["status"],
                     inicio=form.cleaned_data.get("inicio"),
                     termino=form.cleaned_data.get("termino")
                 )
 
-                estado_novo = (
-                    f"Status: {novo_estagio.get_status_display()} | Supervisor: {novo_estagio.supervisor} | "
-                    f"Início: {novo_estagio.inicio} | Término: {novo_estagio.termino}"
-                )
+                estado_novo = _estagio_docencia_label(novo_estagio)
                 
-                # 3. Auditoria
+                # Auditoria
                 _registrar_alteracao_aluno(
                     aluno=aluno, 
-                    tipo="Criação - Estágio de Docência",
+                    tipo=AlteracaoAluno.TipoAlteracao.TRAJETORIA, # Ou o tipo específico que usarem
                     valor_anterior="Nenhum estágio",
                     valor_novo=estado_novo,
-                    comentario=form.cleaned_data["comentario"],
+                    comentario=form.cleaned_data["comentario"].strip(),
                     alterado_por=request.user
                 )
-                messages.success(request, "Novo estágio de docência criado e fluxo iniciado.")
+                
+                messages.success(request, "Novo estágio de docência criado com sucesso.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
+            else:
+                messages.error(request, "Erro ao criar estágio. Verifique os campos.")
 
 
-        elif acao == "Editar Estágio Docência":
+        # --- 2. BLOCO DE EDIÇÃO MANUAL ---
+        elif acao == "alterar_estagio_docencia": # Nome ajustado para bater com o HTML
             form = EstagioDocenciaUpdateForm(request.POST)
 
             if form.is_valid():
                 estagio_id = form.cleaned_data["estagio_id"]
                 estagio = get_object_or_404(EstagioDocencia, id=estagio_id)
 
-                estado_anterior = (
-                    f"Supervisor: {estagio.supervisor} | Status: {estagio.get_status_display()} | "
-                    f"Início: {estagio.inicio} | Término: {estagio.termino}"
-                )
+                # Captura o estado antes usando o padrão da casa
+                estado_anterior = _estagio_docencia_label(estagio)
 
-                estagio.supervisor = form.cleaned_data["supervisor"]
+                # Atualiza os campos
+                estagio.supervisor = form.cleaned_data["supervisor"].strip()
                 estagio.status = form.cleaned_data["status"]
                 estagio.inicio = form.cleaned_data["inicio"]
                 estagio.termino = form.cleaned_data["termino"]
                 estagio.save()
 
-                estado_novo = (
-                    f"Supervisor: {estagio.supervisor} | Status: {estagio.get_status_display()} | "
-                    f"Início: {estagio.inicio} | Término: {estagio.termino}"
-                )
+                # Captura o estado depois usando o padrão da casa
+                estado_novo = _estagio_docencia_label(estagio)
 
+                # Auditoria
                 _registrar_alteracao_aluno(
                     aluno=aluno,
-                    tipo="Edição Manual - Estágio de Docência",
+                    tipo=AlteracaoAluno.TipoAlteracao.TRAJETORIA,
                     valor_anterior=estado_anterior,
                     valor_novo=estado_novo,
-                    comentario=form.cleaned_data["comentario"],
-                    alterado_por=request.user
+                    comentario=form.cleaned_data["comentario"].strip(),
+                    alterado_por=request.user,
                 )
+
                 messages.success(request, "Estágio de docência atualizado com sucesso.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
+            else:
+                messages.error(request, "Não foi possível atualizar o estágio. Verifique os campos.")
 
         elif acao == "alterar_qualificacao":
             form = AlunoQualificacaoForm(request.POST)
