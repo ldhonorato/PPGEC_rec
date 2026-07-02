@@ -1,7 +1,9 @@
+import tempfile
 from datetime import date, datetime, time, timedelta
 from unittest.mock import patch
 
 from django.core import mail
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.core.exceptions import ValidationError
@@ -22,6 +24,7 @@ from .models import (
     Sala,
     Setor,
     SetorMembro,
+    SolicitacaoAssinatura,
     SolicitacaoBanca,
     TrajetoriaAcademica,
     TramitacaoProcesso,
@@ -175,6 +178,7 @@ class AlunosViewTests(TestCase):
         response = self.client.get(reverse("validar_cadastros_alunos"))
 
         self.assertEqual(response.status_code, 403)
+
 
     def test_coordenador_acessa_lista_alunos(self):
         self.client.force_login(self.coordenador)
@@ -1565,6 +1569,193 @@ class SolicitacaoBancaTests(TestCase):
         self.assertContains(detalhe, f'modal-banca-{solicitacao.id}')
         self.assertContains(detalhe, "Discente e trajetória")
         self.assertContains(detalhe, "Composição da banca")
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, MEDIA_ROOT=tempfile.gettempdir())
+class SolicitacaoAssinaturaTests(TestCase):
+    def setUp(self):
+        self.servidor = User.objects.create_user(
+            email="secretaria.assinatura@example.com",
+            password="senha-segura-123",
+            nome="Secretaria Assinatura",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.docente = Docente.objects.create(
+            email="docente.assinatura@example.com",
+            password="senha-segura-123",
+            nome="Docente Assinatura",
+        )
+        self.membro = Docente.objects.create(
+            email="membro.assinatura@example.com",
+            password="senha-segura-123",
+            nome="Membro Assinatura",
+        )
+        self.setor = Setor.objects.create(
+            nome="Comissao de Assinaturas",
+            tipo=Setor.TipoSetor.COMISSAO,
+            email="comissao.assinatura@example.com",
+        )
+        SetorMembro.objects.create(setor=self.setor, usuario=self.membro, designado_por=self.servidor)
+
+    @patch("processos.views.send_email_solicitacao_assinatura.delay")
+    def test_secretaria_cria_solicitacao_para_docente_e_docente_atende_sei(self, email_task):
+        self.client.force_login(self.servidor)
+        response = self.client.post(
+            reverse("nova_solicitacao_assinatura"),
+            {
+                "destinatario_tipo": SolicitacaoAssinatura.DestinatarioTipo.DOCENTE,
+                "docente": self.docente.id,
+                "tipo_documento": SolicitacaoAssinatura.TipoDocumento.DOCUMENTO_SEI,
+                "numero_documento_sei": "12345.000001/2026-10",
+                "observacao": "Assinar despacho.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitacao = SolicitacaoAssinatura.objects.get()
+        self.assertEqual(solicitacao.criado_por_id, self.servidor.id)
+        self.assertEqual(solicitacao.docente_id, self.docente.id)
+        self.assertEqual(solicitacao.status, SolicitacaoAssinatura.Status.PENDENTE)
+        email_task.assert_called_once_with(solicitacao.id)
+
+        lista = self.client.get(reverse("solicitacoes_assinatura"))
+        nova = self.client.get(reverse("nova_solicitacao_assinatura"))
+        self.assertContains(lista, "Acompanhe assinaturas")
+        self.assertNotContains(lista, "Enviar solicitacao")
+        self.assertContains(nova, "Nova Solicitacao de Assinatura")
+        self.assertContains(nova, 'data-destinatario-field="DOCENTE"')
+        self.assertContains(nova, 'data-destinatario-field="SETOR"')
+        self.assertContains(nova, 'data-documento-field="DOCUMENTO_SEI"')
+        self.assertContains(nova, 'data-documento-field="BLOCO_SEI"')
+        self.assertContains(nova, 'data-documento-field="PDF"')
+        self.assertContains(nova, "toggleDestinatario")
+        self.assertContains(nova, "toggleDocumento")
+
+        self.client.force_login(self.docente)
+        detalhe = self.client.get(reverse("solicitacao_assinatura_detalhe", args=[solicitacao.id]))
+        self.assertEqual(detalhe.status_code, 200)
+        self.assertContains(detalhe, "12345.000001/2026-10")
+
+        atender = self.client.post(
+            reverse("solicitacao_assinatura_detalhe", args=[solicitacao.id]),
+            {"observacao_assinatura": "Assinado no SEI."},
+        )
+
+        self.assertEqual(atender.status_code, 302)
+        solicitacao.refresh_from_db()
+        self.assertEqual(solicitacao.status, SolicitacaoAssinatura.Status.ASSINADO)
+        self.assertEqual(solicitacao.assinado_por_id, self.docente.id)
+        self.assertIsNotNone(solicitacao.assinado_em)
+
+    def test_secretaria_ve_menu_de_assinaturas_com_opcoes_separadas(self):
+        self.client.force_login(self.servidor)
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Assinaturas")
+        self.assertContains(response, "Nova solicitacao")
+        self.assertContains(response, "Pendencias de assinatura")
+        self.assertContains(response, "Solicitacoes feitas")
+
+    def test_docente_ve_assinatura_pendente_na_home(self):
+        solicitacao = SolicitacaoAssinatura.objects.create(
+            criado_por=self.servidor,
+            destinatario_tipo=SolicitacaoAssinatura.DestinatarioTipo.DOCENTE,
+            docente=self.docente,
+            tipo_documento=SolicitacaoAssinatura.TipoDocumento.DOCUMENTO_SEI,
+            numero_documento_sei="SEI-555",
+        )
+
+        self.client.force_login(self.docente)
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Assinaturas")
+        self.assertContains(response, "Assinaturas pendentes")
+        self.assertContains(response, "SEI-555")
+        self.assertContains(response, reverse("solicitacao_assinatura_detalhe", args=[solicitacao.id]))
+
+    def test_pendencias_de_assinatura_lista_apenas_o_que_usuario_deve_assinar(self):
+        propria = SolicitacaoAssinatura.objects.create(
+            criado_por=self.servidor,
+            destinatario_tipo=SolicitacaoAssinatura.DestinatarioTipo.DOCENTE,
+            docente=self.docente,
+            tipo_documento=SolicitacaoAssinatura.TipoDocumento.DOCUMENTO_SEI,
+            numero_documento_sei="SEI-PARA-MIM",
+        )
+        SolicitacaoAssinatura.objects.create(
+            criado_por=self.servidor,
+            destinatario_tipo=SolicitacaoAssinatura.DestinatarioTipo.DOCENTE,
+            docente=self.membro,
+            tipo_documento=SolicitacaoAssinatura.TipoDocumento.DOCUMENTO_SEI,
+            numero_documento_sei="SEI-DE-OUTRO",
+        )
+        assinada = SolicitacaoAssinatura.objects.create(
+            criado_por=self.servidor,
+            destinatario_tipo=SolicitacaoAssinatura.DestinatarioTipo.DOCENTE,
+            docente=self.docente,
+            tipo_documento=SolicitacaoAssinatura.TipoDocumento.BLOCO_SEI,
+            numero_bloco_sei="BLOCO-ASSINADO",
+        )
+        assinada.marcar_assinado(usuario=self.docente)
+
+        self.client.force_login(self.docente)
+        response = self.client.get(reverse("pendencias_assinatura"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pendencias de Assinatura")
+        self.assertContains(response, propria.referencia_documento)
+        self.assertNotContains(response, "SEI-DE-OUTRO")
+        self.assertNotContains(response, "BLOCO-ASSINADO")
+
+    def test_membro_do_setor_atende_pdf_e_preserva_documentos(self):
+        original = SimpleUploadedFile("original.pdf", b"%PDF-1.4 original", content_type="application/pdf")
+        solicitacao = SolicitacaoAssinatura.objects.create(
+            criado_por=self.servidor,
+            destinatario_tipo=SolicitacaoAssinatura.DestinatarioTipo.SETOR,
+            setor=self.setor,
+            tipo_documento=SolicitacaoAssinatura.TipoDocumento.PDF,
+            documento_pdf=original,
+        )
+
+        self.client.force_login(self.membro)
+        detalhe = self.client.get(reverse("solicitacao_assinatura_detalhe", args=[solicitacao.id]))
+        self.assertEqual(detalhe.status_code, 200)
+        self.assertContains(detalhe, "Baixar PDF original")
+
+        assinado = SimpleUploadedFile("assinado.pdf", b"%PDF-1.4 assinado", content_type="application/pdf")
+        response = self.client.post(
+            reverse("solicitacao_assinatura_detalhe", args=[solicitacao.id]),
+            {
+                "documento_assinado_pdf": assinado,
+                "observacao_assinatura": "Assinado eletronicamente.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitacao.refresh_from_db()
+        self.assertEqual(solicitacao.status, SolicitacaoAssinatura.Status.ASSINADO)
+        self.assertTrue(solicitacao.documento_pdf)
+        self.assertTrue(solicitacao.documento_assinado_pdf)
+        self.assertNotEqual(solicitacao.documento_pdf.name, solicitacao.documento_assinado_pdf.name)
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_email_de_solicitacao_e_enviado_ao_docente(self):
+        from .tasks import send_email_solicitacao_assinatura
+
+        solicitacao = SolicitacaoAssinatura.objects.create(
+            criado_por=self.servidor,
+            destinatario_tipo=SolicitacaoAssinatura.DestinatarioTipo.DOCENTE,
+            docente=self.docente,
+            tipo_documento=SolicitacaoAssinatura.TipoDocumento.BLOCO_SEI,
+            numero_bloco_sei="987654",
+        )
+
+        send_email_solicitacao_assinatura(solicitacao.id)
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(self.docente.email, mail.outbox[0].to)
+        self.assertIn("Solicitacao de assinatura", mail.outbox[0].subject)
 
 
 class ReservaAmbienteTests(TestCase):

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; color: #004492; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+  <div style="background:#1a3a5c; padding: 24px; border-radius: 8px 8px 0 0;">
+    <h2 style="color: white; margin: 0; font-size: 20px;">AcadFlow - Solicitacao de Assinatura</h2>
+  </div>
+  <div style="background: #f9f9f9; padding: 28px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
+    <p>Uma nova solicitacao de assinatura foi registrada para <strong>{{ solicitacao.destinatario_display }}</strong>.</p>
+
+    <div style="background: #ffffff; padding: 16px; border-left: 4px solid #1a3a5c; margin: 20px 0; border-radius: 4px;">
+      <p style="margin: 4px 0;"><strong>Tipo:</strong> {{ solicitacao.get_tipo_documento_display }}</p>
+      <p style="margin: 4px 0;"><strong>Referencia:</strong> {{ solicitacao.referencia_documento }}</p>
+      <p style="margin: 4px 0;"><strong>Solicitante:</strong> {{ solicitacao.criado_por.nome }} ({{ solicitacao.criado_por.email }})</p>
+      <p style="margin: 4px 0;"><strong>Data:</strong> {{ solicitacao.criado_em|date:"d/m/Y H:i" }}</p>
+      {% if solicitacao.observacao %}
+        <p style="margin: 4px 0;"><strong>Observacao:</strong> {{ solicitacao.observacao }}</p>
+      {% endif %}
+    </div>
+
+    <p>
+      {% if solicitacao.is_pdf %}
+        Acesse o AcadFlow, baixe o PDF original e anexe o documento com assinatura eletronica.
+      {% else %}
+        Realize a assinatura no SEI e informe no AcadFlow que o documento foi assinado.
+      {% endif %}
+    </p>
+
+    <p style="text-align:center; margin-top: 28px; margin-bottom: 24px;">
+      <a href="{{ site_url }}/assinaturas/{{ solicitacao.id }}/"
+         style="background:#6CC858; color:white; padding:12px 28px;
+                border-radius:6px; text-decoration:none; font-weight:bold;">
+        Atender Solicitacao
+      </a>
+    </p>
+
+    <p style="color:#676767; font-size:12px; margin-top:32px; border-top: 1px solid #e0e0e0; padding-top: 12px;">
+      Atenciosamente,<br>
+      Sistema AcadFlow / PPGEC
+    </p>
+  </div>
+</body>
+</html>

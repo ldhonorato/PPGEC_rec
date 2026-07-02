@@ -20,6 +20,7 @@ from .models import (
     Processo,
     ReservaAmbiente,
     Sala,
+    SolicitacaoAssinatura,
     SolicitacaoBanca,
     Setor,
     TrajetoriaAcademica,
@@ -49,6 +50,7 @@ ALLOWED_DOCUMENTO_EXTENSIONS = {
     ".tiff",
 }
 DOCUMENTO_UPLOAD_ACCEPT = ",".join(sorted(ALLOWED_DOCUMENTO_EXTENSIONS))
+MAX_ASSINATURA_UPLOAD_SIZE = 10 * 1024 * 1024
 
 
 class UserProfileForm(forms.ModelForm):
@@ -100,6 +102,78 @@ class SetorComissaoForm(forms.ModelForm):
     class Meta:
         model = Setor
         fields = ["nome", "descricao", "email", "ativo", "docentes", "servidores", "alunos"]
+
+
+def _validar_pdf_upload(arquivo):
+    nome = Path(arquivo.name or "")
+    if nome.suffix.lower() != ".pdf":
+        raise forms.ValidationError("Envie um arquivo PDF.")
+    if arquivo.size > MAX_ASSINATURA_UPLOAD_SIZE:
+        raise forms.ValidationError("O PDF deve ter no maximo 10 MB.")
+
+
+class SolicitacaoAssinaturaForm(forms.ModelForm):
+    class Meta:
+        model = SolicitacaoAssinatura
+        fields = [
+            "destinatario_tipo",
+            "docente",
+            "setor",
+            "tipo_documento",
+            "numero_documento_sei",
+            "numero_bloco_sei",
+            "documento_pdf",
+            "observacao",
+        ]
+        widgets = {
+            "observacao": forms.Textarea(attrs={"rows": 3}),
+            "documento_pdf": forms.FileInput(attrs={"accept": ".pdf"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["docente"].queryset = User.objects.filter(
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+            is_active=True,
+        ).order_by("nome", "email")
+        self.fields["setor"].queryset = Setor.objects.filter(ativo=True).order_by("nome")
+        for field_name in ["docente", "setor", "numero_documento_sei", "numero_bloco_sei", "documento_pdf"]:
+            self.fields[field_name].required = False
+
+    def clean_documento_pdf(self):
+        arquivo = self.cleaned_data.get("documento_pdf")
+        if arquivo:
+            _validar_pdf_upload(arquivo)
+        return arquivo
+
+
+class AtenderSolicitacaoAssinaturaForm(forms.ModelForm):
+    class Meta:
+        model = SolicitacaoAssinatura
+        fields = ["documento_assinado_pdf", "observacao_assinatura"]
+        widgets = {
+            "documento_assinado_pdf": forms.FileInput(attrs={"accept": ".pdf"}),
+            "observacao_assinatura": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, solicitacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.solicitacao = solicitacao
+        self.fields["documento_assinado_pdf"].required = bool(solicitacao and solicitacao.is_pdf)
+        if solicitacao and not solicitacao.is_pdf:
+            self.fields["documento_assinado_pdf"].widget = forms.HiddenInput()
+
+    def clean_documento_assinado_pdf(self):
+        arquivo = self.cleaned_data.get("documento_assinado_pdf")
+        if arquivo:
+            _validar_pdf_upload(arquivo)
+        return arquivo
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.solicitacao and self.solicitacao.is_pdf and not cleaned_data.get("documento_assinado_pdf"):
+            self.add_error("documento_assinado_pdf", "Anexe o PDF assinado.")
+        return cleaned_data
 
 
 class SalaForm(forms.ModelForm):

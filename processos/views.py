@@ -22,6 +22,7 @@ from .forms import (
     AlunoPrazoForm,
     AlunoQualificacaoForm,
     AlunoStatusForm,
+    AtenderSolicitacaoAssinaturaForm,
     ManifestarCienteOrientadorForm,
     ComentarioProcessoForm,
     DisciplinaTrajetoriaForm,
@@ -34,6 +35,7 @@ from .forms import (
     ReservaAmbienteExclusaoForm,
     ReservaAmbienteForm,
     SalaForm,
+    SolicitacaoAssinaturaForm,
     SolicitacaoBancaForm,
     SolicitarCienteOrientadorForm,
     SetorComissaoForm,
@@ -57,6 +59,7 @@ from .models import (
     Sala,
     Setor,
     SetorMembro,
+    SolicitacaoAssinatura,
     SolicitacaoBanca,
     TrajetoriaAcademica,
     TramitacaoProcesso,
@@ -76,7 +79,8 @@ from .tasks import (
     send_email_processo_comentado_pleno,
     send_email_novo_processo_secretaria,
     send_email_mudanca_setor,
-    send_email_status_atualizado
+    send_email_status_atualizado,
+    send_email_solicitacao_assinatura,
 )
 
 
@@ -171,6 +175,52 @@ def _setores_caixa(user):
 
 def _can_view_caixa(user):
     return bool(_setores_caixa(user))
+
+
+def _assinaturas_destinadas_queryset(user):
+    if not user.is_authenticated:
+        return SolicitacaoAssinatura.objects.none()
+    setores_ids = _setores_membro_queryset(user).values_list("id", flat=True)
+    return SolicitacaoAssinatura.objects.filter(
+        Q(docente=user) | Q(setor_id__in=setores_ids)
+    )
+
+
+def _can_view_assinaturas(user):
+    return (
+        _has_gestao_access(user)
+        or _is_docente(user)
+        or _assinaturas_destinadas_queryset(user).exists()
+        or SolicitacaoAssinatura.objects.filter(criado_por=user).exists()
+    )
+
+
+def _assinaturas_pendentes_queryset(user):
+    return _assinaturas_destinadas_queryset(user).filter(
+        status=SolicitacaoAssinatura.Status.PENDENTE
+    ).select_related("criado_por", "docente", "setor").order_by("-criado_em")
+
+
+def _can_view_solicitacao_assinatura(user, solicitacao):
+    if not user.is_authenticated:
+        return False
+    if _has_gestao_access(user) or solicitacao.criado_por_id == user.id:
+        return True
+    if solicitacao.docente_id == user.id:
+        return True
+    if solicitacao.setor_id:
+        return _setores_membro_queryset(user).filter(id=solicitacao.setor_id).exists()
+    return False
+
+
+def _can_atender_solicitacao_assinatura(user, solicitacao):
+    if not user.is_authenticated or not solicitacao.is_pendente:
+        return False
+    if solicitacao.docente_id == user.id:
+        return True
+    if solicitacao.setor_id:
+        return _setores_membro_queryset(user).filter(id=solicitacao.setor_id).exists()
+    return False
 
 
 def _can_manage_restricted_docs(user):
@@ -331,8 +381,10 @@ def home_view(request):
     can_view_caixa = _can_view_caixa(request.user)
     meus_processos_base = Processo.objects.filter(usuario_criado_por=request.user)
     meus_processos_requerente = meus_processos_base.filter(setor_atual__nome="Requerente")
+    assinaturas_pendentes = _assinaturas_pendentes_queryset(request.user)
     context = {
         "meus_processos_requerente": meus_processos_requerente,
+        "assinaturas_pendentes": assinaturas_pendentes,
         "is_coordenador": is_coordenador,
         "has_gestao_access": has_gestao_access,
         "can_view_dashboard": can_view_dashboard,
@@ -2261,6 +2313,152 @@ def _criar_processo_para_solicitacao_banca(solicitacao):
     solicitacao.processo = processo
     solicitacao.save(update_fields=["processo"])
     return processo, True
+
+
+@login_required
+def solicitacoes_assinatura_view(request):
+    if not _can_view_assinaturas(request.user) and not _has_gestao_access(request.user):
+        raise PermissionDenied("Acesso restrito a solicitacoes de assinatura.")
+
+    queryset = SolicitacaoAssinatura.objects.select_related(
+        "criado_por",
+        "docente",
+        "setor",
+        "assinado_por",
+    )
+    if not _has_gestao_access(request.user):
+        queryset = queryset.filter(
+            Q(id__in=_assinaturas_destinadas_queryset(request.user).values("id"))
+            | Q(criado_por=request.user)
+        )
+
+    status = request.GET.get("status", "").strip().upper()
+    if status in {SolicitacaoAssinatura.Status.PENDENTE, SolicitacaoAssinatura.Status.ASSINADO}:
+        queryset = queryset.filter(status=status)
+    else:
+        status = ""
+
+    return render(
+        request,
+        "processos/solicitacoes_assinatura.html",
+        {
+            "page_title": "Solicitacoes de Assinatura",
+            "page_description": "Acompanhe assinaturas em documentos do SEI ou PDFs.",
+            "solicitacoes": queryset,
+            "status_filtro": status,
+            "status_choices": SolicitacaoAssinatura.Status.choices,
+            "show_status_filters": True,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
+@login_required
+def pendencias_assinatura_view(request):
+    pendencias = _assinaturas_pendentes_queryset(request.user)
+    if not pendencias.exists() and not _has_gestao_access(request.user) and not _is_docente(request.user):
+        raise PermissionDenied("Acesso restrito a pendencias de assinatura.")
+
+    return render(
+        request,
+        "processos/solicitacoes_assinatura.html",
+        {
+            "page_title": "Pendencias de Assinatura",
+            "page_description": "Assinaturas pendentes destinadas a voce.",
+            "solicitacoes": pendencias,
+            "status_filtro": SolicitacaoAssinatura.Status.PENDENTE,
+            "status_choices": SolicitacaoAssinatura.Status.choices,
+            "show_status_filters": False,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
+@login_required
+def nova_solicitacao_assinatura_view(request):
+    if not _has_gestao_access(request.user):
+        raise PermissionDenied("Acesso restrito a secretaria e coordenacao.")
+
+    if request.method == "POST":
+        form = SolicitacaoAssinaturaForm(request.POST, request.FILES)
+        if form.is_valid():
+            solicitacao = form.save(commit=False)
+            solicitacao.criado_por = request.user
+            solicitacao.status = SolicitacaoAssinatura.Status.PENDENTE
+            solicitacao.save()
+            send_email_solicitacao_assinatura.delay(solicitacao.id)
+            messages.success(request, "Solicitacao de assinatura enviada.")
+            return redirect("solicitacoes_assinatura")
+    else:
+        form = SolicitacaoAssinaturaForm()
+
+    return render(
+        request,
+        "processos/nova_solicitacao_assinatura.html",
+        {
+            "form": form,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
+@login_required
+def solicitacao_assinatura_detalhe_view(request, solicitacao_id):
+    solicitacao = get_object_or_404(
+        SolicitacaoAssinatura.objects.select_related("criado_por", "docente", "setor", "assinado_por"),
+        pk=solicitacao_id,
+    )
+    if not _can_view_solicitacao_assinatura(request.user, solicitacao):
+        raise PermissionDenied("Voce nao pode visualizar esta solicitacao de assinatura.")
+
+    can_atender = _can_atender_solicitacao_assinatura(request.user, solicitacao)
+    if request.method == "POST":
+        if not can_atender:
+            raise PermissionDenied("Voce nao pode atender esta solicitacao de assinatura.")
+        form = AtenderSolicitacaoAssinaturaForm(
+            request.POST,
+            request.FILES,
+            instance=solicitacao,
+            solicitacao=solicitacao,
+        )
+        if form.is_valid():
+            solicitacao = form.save(commit=False)
+            solicitacao.marcar_assinado(
+                usuario=request.user,
+                documento_assinado=form.cleaned_data.get("documento_assinado_pdf"),
+                observacao=form.cleaned_data.get("observacao_assinatura"),
+            )
+            messages.success(request, "Solicitacao de assinatura concluida.")
+            return redirect("solicitacao_assinatura_detalhe", solicitacao_id=solicitacao.id)
+    else:
+        form = AtenderSolicitacaoAssinaturaForm(instance=solicitacao, solicitacao=solicitacao)
+
+    return render(
+        request,
+        "processos/solicitacao_assinatura_detalhe.html",
+        {
+            "solicitacao": solicitacao,
+            "form": form,
+            "can_atender": can_atender,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
 
 
 @login_required
