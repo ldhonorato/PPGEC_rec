@@ -14,6 +14,7 @@ from .models import (
     DisponibilidadeSala,
     DisciplinaTrajetoria,
     Documento,
+    EstagioDocencia,
     MembroBanca,
     Polo,
     PublicacaoTrajetoria,
@@ -912,3 +913,37 @@ class TrajetoriaStatusForm(AlunoComentarioForm):
         ),
         label="Status",
     )
+
+
+class NovoEstagioDocenciaForm(AlunoComentarioForm):
+    trajetoria_id = forms.IntegerField(widget=forms.HiddenInput())
+    supervisor = forms.CharField(max_length=255, label="Supervisor", required=True)
+    status = forms.ChoiceField(choices=EstagioDocencia.Status.choices, required=True, label="Em Andamento")
+    
+    # Removendo o 'required=False', eles se tornam obrigatórios automaticamente
+    inicio = forms.DateField(label="Data Início", widget=forms.DateInput(attrs={"type": "date"}))
+    termino = forms.DateField(label="Data Término", widget=forms.DateInput(attrs={"type": "date"}))
+
+
+class EstagioDocenciaUpdateForm(AlunoComentarioForm):
+    estagio_id = forms.IntegerField(widget=forms.HiddenInput())
+    supervisor = forms.CharField(max_length=255, required=False, label="Nome do Supervisor")
+    status = forms.ChoiceField(choices=EstagioDocencia.Status.choices, label="Status")
+    inicio = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    termino = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
+
+    def clean(self):
+        cleaned_data = super().clean()
+        data_inicio = cleaned_data.get("inicio")
+        data_termino = cleaned_data.get("termino")
+
+        # Validação lógica: data de término não pode ser anterior ao início
+        if data_inicio and data_termino:
+            if data_termino < data_inicio:
+                self.add_error(
+                    "termino", 
+                    "A data de término não pode ser anterior à data de início."
+                )
+
+        return cleaned_data
+    

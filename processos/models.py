@@ -427,6 +427,7 @@ class AlteracaoAluno(models.Model):
         COORIENTADOR = "COORIENTADOR", "Coorientador"
         REINGRESSO = "REINGRESSO", "Reingresso"
         TRAJETORIA = "TRAJETORIA", "Trajetoria academica"
+        ESTAGIO_DOCENCIA = "ESTAGIO_DOCENCIA", "Estagio docencia"
 
     aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="alteracoes")
     tipo = models.CharField(max_length=25, choices=TipoAlteracao.choices)
@@ -748,6 +749,7 @@ class Processo(models.Model):
         "DEFESA_MESTRADO": 45,
         "DEFESA_DOUTORADO": 45,
         "QUALIFICACAO_DOUTORADO": 45,
+        "ESTAGIO_DOCENCIA": 30,
         "OUTRO": 60,
     }
 
@@ -756,6 +758,7 @@ class Processo(models.Model):
         DEFESA_MESTRADO = "DEFESA_MESTRADO", "Defesa de Mestrado"
         DEFESA_DOUTORADO = "DEFESA_DOUTORADO", "Defesa de Doutorado"
         QUALIFICACAO_DOUTORADO = "QUALIFICACAO_DOUTORADO", "Qualificação de Doutorado"
+        ESTAGIO_DOCENCIA = "ESTAGIO_DOCENCIA", "Estágio docência"
         TRANCAMENTO_MATRICULA = "TRANCAMENTO_MATRICULA", "Trancamento de Matrícula"
         PRORROGACAO_PRAZO = "PRORROGACAO_PRAZO", "Prorrogação de Prazo"
         REINGRESSO = "REINGRESSO", "Reingresso"
@@ -1497,3 +1500,71 @@ class ReservaAmbiente(models.Model):
         for _ in range(quantidade):
             resultado = cls._somar_um_mes(resultado)
         return resultado
+
+
+class EstagioDocencia(models.Model):
+
+    class Status(models.TextChoices):
+        NAO_INICIADO = "NAO_INICIADO", "Não Iniciado"
+        AGUARD_CIENCIA = "AGUARD_CIENCIA", "Aguardando Ciente do Orientador"
+        AGUARD_ASSINATURA = "AGUARD_ASSINATURA", "Aguardando Aprovação da Coordenação"
+        ANALISE_DISP = "ANALISE_DISP", "Em Análise de Dispensa"
+        DISPENSADO = "DISPENSADO", "Dispensado"
+        EM_ANDAMENTO = "EM_ANDAMENTO", "Em Andamento"
+        AGUARD_RELAT = "AGUARD_RELAT", "Aguardando Relatório"
+        CONCLUIDO = "CONCLUIDO", "Concluído"
+
+    # --- 2. AS PONTES DE LIGAÇÃO E DADOS ---
+    trajetoria = models.ForeignKey(
+        "TrajetoriaAcademica", 
+        on_delete=models.CASCADE, 
+        related_name="estagios_docencia"
+    )
+    
+    supervisor = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Nome do Supervisor"
+    ) 
+    
+    processo_vinculado = models.OneToOneField(
+        "Processo", 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name="estagio_gerado"
+    )
+
+    # --- 3. DADOS DE CONTROLE ---
+    status = models.CharField(
+        max_length=25, # Aumentado para 25 para acomodar perfeitamente o AGUARD_ASSINATURA
+        choices=Status.choices, 
+        default=Status.NAO_INICIADO
+    )
+    
+    # --- 4. DATAS ---
+    inicio = models.DateField(null=True, blank=True)
+    termino = models.DateField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "Estágio de Docência"
+        verbose_name_plural = "Estágios de Docência"
+        
+    def __str__(self) -> str:
+        # Traz o nome do aluno puxando a ponte da Trajetória e exibe o status legível
+        return f"{self.trajetoria.aluno.nome} - Status: {self.get_status_display()}"
+    
+    @property
+    def relatorio_pendente_ou_proximo(self) -> bool:
+        """
+        Retorna True se o estágio está em andamento e 
+        falta 15 dias (ou menos) para a data de término (ou se já passou).
+        """
+        if self.status == self.Status.EM_ANDAMENTO and self.termino:
+            hoje = timezone.localdate()
+            # Calcula a diferença de dias entre o término e hoje
+            dias_restantes = (self.termino - hoje).days
+            return dias_restantes <= 30
+            
+        return False

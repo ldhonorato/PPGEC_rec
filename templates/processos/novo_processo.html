@@ -7,7 +7,7 @@
         Todo processo aberto e direcionado inicialmente para o setor <strong>Secretaria PPGEC</strong>.
     </p>
 
-    <form method="post" enctype="multipart/form-data">
+   <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {% for field in form %}
             <div class="field">
@@ -16,6 +16,20 @@
                 {{ field.errors }}
             </div>
         {% endfor %}
+
+         <!-- RETIRANDO CAMPO SUPERVISOR E DISPENSA
+        <div id="campos-estagio" style="display: none">
+        <div class="field">
+           <label for="id_professor">Professor Supervisor</label> 
+            <input type="text" name="professor" id="id_professor" />
+        </div>
+
+        <div class="field">
+            <input type="checkbox" name="dispensa" id="id_dispensa" />
+            <label for="id_disciplina">Solicitar dispensa</label>
+        </div>
+        </div>
+        -->
 
         <div class="field">
             <label>Documentos</label>
@@ -128,6 +142,19 @@
 
         if (btnAbrir) btnAbrir.addEventListener("click", () => modal.showModal());
         if (btnCancelar) btnCancelar.addEventListener("click", () => modal.close());
+
+        const tipoProcesso = document.getElementById("id_tipo");
+        /*const camposEstagio = document.getElementById("campos-estagio");
+
+        tipoProcesso.addEventListener("change", () => {
+        const valor = tipoProcesso.value;
+
+        camposEstagio.style.display = "none";
+
+        if (valor === "ESTAGIO_DOCENCIA") {
+            camposEstagio.style.display = "block";
+        }
+        });*/
 
         formModal.addEventListener("submit", (event) => {
             event.preventDefault();
