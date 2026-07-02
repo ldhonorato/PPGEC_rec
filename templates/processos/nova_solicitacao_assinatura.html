@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Nova Solicitacao de Assinatura | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Nova Solicitacao de Assinatura</h1>
+            <p class="muted">Solicite assinatura em documento do SEI, bloco de assinatura do SEI ou PDF.</p>
+        </div>
+        <a class="btn btn-secondary" href="{% url 'solicitacoes_assinatura' %}">Solicitacoes feitas</a>
+    </div>
+</section>
+
+<section class="card panel">
+    <form method="post" enctype="multipart/form-data" class="stack">
+        {% csrf_token %}
+        <div class="form-grid">
+            <div class="field">
+                <label for="{{ form.destinatario_tipo.id_for_label }}">{{ form.destinatario_tipo.label }}</label>
+                {{ form.destinatario_tipo }}
+                {{ form.destinatario_tipo.errors }}
+            </div>
+            <div class="field" data-destinatario-field="DOCENTE">
+                <label for="{{ form.docente.id_for_label }}">{{ form.docente.label }}</label>
+                {{ form.docente }}
+                {{ form.docente.errors }}
+            </div>
+            <div class="field" data-destinatario-field="SETOR">
+                <label for="{{ form.setor.id_for_label }}">{{ form.setor.label }}</label>
+                {{ form.setor }}
+                {{ form.setor.errors }}
+            </div>
+            <div class="field">
+                <label for="{{ form.tipo_documento.id_for_label }}">{{ form.tipo_documento.label }}</label>
+                {{ form.tipo_documento }}
+                {{ form.tipo_documento.errors }}
+            </div>
+            <div class="field" data-documento-field="DOCUMENTO_SEI">
+                <label for="{{ form.numero_documento_sei.id_for_label }}">Numero do documento no SEI</label>
+                {{ form.numero_documento_sei }}
+                {{ form.numero_documento_sei.errors }}
+            </div>
+            <div class="field" data-documento-field="BLOCO_SEI">
+                <label for="{{ form.numero_bloco_sei.id_for_label }}">Numero do bloco de assinatura no SEI</label>
+                {{ form.numero_bloco_sei }}
+                {{ form.numero_bloco_sei.errors }}
+            </div>
+            <div class="field" data-documento-field="PDF">
+                <label for="{{ form.documento_pdf.id_for_label }}">PDF para assinatura eletronica</label>
+                {{ form.documento_pdf }}
+                {{ form.documento_pdf.errors }}
+            </div>
+        </div>
+        <div class="field">
+            <label for="{{ form.observacao.id_for_label }}">{{ form.observacao.label }}</label>
+            {{ form.observacao }}
+            {{ form.observacao.errors }}
+        </div>
+        {{ form.non_field_errors }}
+        <div style="display:flex; gap:0.7rem; justify-content:flex-end; flex-wrap:wrap;">
+            <a class="btn btn-secondary" href="{% url 'solicitacoes_assinatura' %}">Cancelar</a>
+            <button class="btn" type="submit">Enviar solicitacao</button>
+        </div>
+    </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        const tipo = document.getElementById("{{ form.destinatario_tipo.id_for_label }}");
+        const docente = document.getElementById("{{ form.docente.id_for_label }}");
+        const setor = document.getElementById("{{ form.setor.id_for_label }}");
+        const tipoDocumento = document.getElementById("{{ form.tipo_documento.id_for_label }}");
+        const numeroDocumentoSei = document.getElementById("{{ form.numero_documento_sei.id_for_label }}");
+        const numeroBlocoSei = document.getElementById("{{ form.numero_bloco_sei.id_for_label }}");
+        const documentoPdf = document.getElementById("{{ form.documento_pdf.id_for_label }}");
+        const docenteField = document.querySelector('[data-destinatario-field="DOCENTE"]');
+        const setorField = document.querySelector('[data-destinatario-field="SETOR"]');
+        const numeroDocumentoSeiField = document.querySelector('[data-documento-field="DOCUMENTO_SEI"]');
+        const numeroBlocoSeiField = document.querySelector('[data-documento-field="BLOCO_SEI"]');
+        const documentoPdfField = document.querySelector('[data-documento-field="PDF"]');
+
+        function toggleDestinatario() {
+            const value = tipo ? tipo.value : "";
+            const showDocente = value === "DOCENTE";
+            const showSetor = value === "SETOR";
+
+            if (docenteField) docenteField.hidden = !showDocente;
+            if (setorField) setorField.hidden = !showSetor;
+
+            if (docente) {
+                docente.disabled = !showDocente;
+                if (!showDocente) docente.value = "";
+            }
+            if (setor) {
+                setor.disabled = !showSetor;
+                if (!showSetor) setor.value = "";
+            }
+        }
+
+        function toggleDocumento() {
+            const value = tipoDocumento ? tipoDocumento.value : "";
+            const showDocumentoSei = value === "DOCUMENTO_SEI";
+            const showBlocoSei = value === "BLOCO_SEI";
+            const showPdf = value === "PDF";
+
+            if (numeroDocumentoSeiField) numeroDocumentoSeiField.hidden = !showDocumentoSei;
+            if (numeroBlocoSeiField) numeroBlocoSeiField.hidden = !showBlocoSei;
+            if (documentoPdfField) documentoPdfField.hidden = !showPdf;
+
+            if (numeroDocumentoSei) {
+                numeroDocumentoSei.disabled = !showDocumentoSei;
+                if (!showDocumentoSei) numeroDocumentoSei.value = "";
+            }
+            if (numeroBlocoSei) {
+                numeroBlocoSei.disabled = !showBlocoSei;
+                if (!showBlocoSei) numeroBlocoSei.value = "";
+            }
+            if (documentoPdf) {
+                documentoPdf.disabled = !showPdf;
+                if (!showPdf) documentoPdf.value = "";
+            }
+        }
+
+        if (tipo) {
+            tipo.addEventListener("change", toggleDestinatario);
+            toggleDestinatario();
+        }
+        if (tipoDocumento) {
+            tipoDocumento.addEventListener("change", toggleDocumento);
+            toggleDocumento();
+        }
+    })();
+</script>
+{% endblock %}

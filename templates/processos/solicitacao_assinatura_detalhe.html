@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Solicitacao de Assinatura | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Solicitacao de Assinatura</h1>
+            <p class="muted">{{ solicitacao.destinatario_display }} - {{ solicitacao.get_tipo_documento_display }}</p>
+        </div>
+        <div class="calendar-nav">
+            <span class="badge {% if solicitacao.status == 'ASSINADO' %}badge-ok{% else %}badge-info{% endif %}">
+                {{ solicitacao.get_status_display }}
+            </span>
+            <a class="btn btn-secondary" href="{% url 'solicitacoes_assinatura' %}">Voltar</a>
+        </div>
+    </div>
+</section>
+
+<section class="card panel">
+    <h2 class="section-title">Dados da solicitacao</h2>
+    <ul class="info-list">
+        <li><span class="info-label">Destinatario</span><span>{{ solicitacao.destinatario_display }}</span></li>
+        <li><span class="info-label">Tipo</span><span>{{ solicitacao.get_tipo_documento_display }}</span></li>
+        <li><span class="info-label">Referencia</span><span>{{ solicitacao.referencia_documento }}</span></li>
+        <li><span class="info-label">Solicitante</span><span>{{ solicitacao.criado_por.nome }} ({{ solicitacao.criado_por.email }})</span></li>
+        <li><span class="info-label">Criada em</span><span>{{ solicitacao.criado_em|date:"d/m/Y H:i" }}</span></li>
+        {% if solicitacao.observacao %}
+            <li><span class="info-label">Observacao</span><span>{{ solicitacao.observacao|linebreaksbr }}</span></li>
+        {% endif %}
+    </ul>
+
+    {% if solicitacao.documento_pdf %}
+        <p style="margin-top: 1rem;">
+            <a class="btn btn-secondary" href="{{ solicitacao.documento_pdf.url }}">Baixar PDF original</a>
+        </p>
+    {% endif %}
+    {% if solicitacao.documento_assinado_pdf %}
+        <p>
+            <a class="btn" href="{{ solicitacao.documento_assinado_pdf.url }}">Baixar PDF assinado</a>
+        </p>
+    {% endif %}
+</section>
+
+{% if solicitacao.status == 'ASSINADO' %}
+<section class="card panel">
+    <h2 class="section-title">Assinatura realizada</h2>
+    <ul class="info-list">
+        <li><span class="info-label">Assinado por</span><span>{{ solicitacao.assinado_por.nome }}</span></li>
+        <li><span class="info-label">Assinado em</span><span>{{ solicitacao.assinado_em|date:"d/m/Y H:i" }}</span></li>
+        {% if solicitacao.observacao_assinatura %}
+            <li><span class="info-label">Observacao</span><span>{{ solicitacao.observacao_assinatura|linebreaksbr }}</span></li>
+        {% endif %}
+    </ul>
+</section>
+{% elif can_atender %}
+<section class="card panel">
+    <h2 class="section-title">Atender solicitacao</h2>
+    {% if solicitacao.is_pdf %}
+        <p class="muted">Anexe o PDF com assinatura eletronica. O documento original continuara disponivel.</p>
+    {% else %}
+        <p class="muted">Assine o documento no SEI e registre aqui a conclusao.</p>
+    {% endif %}
+    <form method="post" enctype="multipart/form-data" class="stack">
+        {% csrf_token %}
+        {% if solicitacao.is_pdf %}
+            <div class="field">
+                <label for="{{ form.documento_assinado_pdf.id_for_label }}">PDF assinado</label>
+                {{ form.documento_assinado_pdf }}
+                {{ form.documento_assinado_pdf.errors }}
+            </div>
+        {% else %}
+            {{ form.documento_assinado_pdf }}
+        {% endif %}
+        <div class="field">
+            <label for="{{ form.observacao_assinatura.id_for_label }}">Observacao</label>
+            {{ form.observacao_assinatura }}
+            {{ form.observacao_assinatura.errors }}
+        </div>
+        {{ form.non_field_errors }}
+        <div style="display:flex; justify-content:flex-end;">
+            <button class="btn" type="submit">Confirmar assinatura</button>
+        </div>
+    </form>
+</section>
+{% endif %}
+{% endblock %}

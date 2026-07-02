@@ -1,5 +1,7 @@
+from django.db.models import Q
+
 from .services import processos_atrasados_queryset, processos_atrasados_url
-from .models import Aluno, Docente, SetorMembro, User
+from .models import Aluno, Docente, SetorMembro, SolicitacaoAssinatura, User
 
 
 def processos_atrasados(request):
@@ -69,6 +71,21 @@ def _is_membro_setor_nome(user, nome):
     ).exists()
 
 
+def _has_assinaturas_access(user):
+    if _has_gestao_access(user):
+        return True
+    if _is_docente(user):
+        return True
+    setores_ids = SetorMembro.objects.filter(
+        usuario=user,
+        data_saida__isnull=True,
+        setor__ativo=True,
+    ).values_list("setor_id", flat=True)
+    return SolicitacaoAssinatura.objects.filter(
+        Q(docente=user) | Q(setor_id__in=setores_ids) | Q(criado_por=user)
+    ).exists()
+
+
 def _menu_item(label, href, url_names, icon, children=None):
     return {
         "label": label,
@@ -128,6 +145,15 @@ def _menu_lateral_sections(user):
                 "C",
             )
         )
+    if _has_assinaturas_access(user) and not _has_gestao_access(user):
+        principal_items.append(
+            _menu_item(
+                "Assinaturas",
+                "/assinaturas/pendentes/",
+                ["pendencias_assinatura", "solicitacao_assinatura_detalhe"],
+                "A",
+            )
+        )
     if principal_items:
         sections.append({"label": "Principal", "items": principal_items})
 
@@ -183,6 +209,39 @@ def _menu_lateral_sections(user):
             ),
             _menu_item("Setores e Comissões", "/coordenacao/setores/", ["setores_comissoes"], "S"),
         ])
+        coordenacao_items.append(
+            _menu_item(
+                "Assinaturas",
+                "/assinaturas/",
+                [
+                    "nova_solicitacao_assinatura",
+                    "pendencias_assinatura",
+                    "solicitacoes_assinatura",
+                    "solicitacao_assinatura_detalhe",
+                ],
+                "A",
+                children=[
+                    _menu_item(
+                        "Nova solicitacao",
+                        "/assinaturas/nova/",
+                        ["nova_solicitacao_assinatura"],
+                        "N",
+                    ),
+                    _menu_item(
+                        "Pendencias de assinatura",
+                        "/assinaturas/pendentes/",
+                        ["pendencias_assinatura"],
+                        "P",
+                    ),
+                    _menu_item(
+                        "Solicitacoes feitas",
+                        "/assinaturas/",
+                        ["solicitacoes_assinatura"],
+                        "S",
+                    ),
+                ],
+            )
+        )
         if _is_coordenador(user):
             coordenacao_items.append(
                 _menu_item("Criar Comissão", "/coordenacao/setores/criar/", ["criar_comissao"], "C")
