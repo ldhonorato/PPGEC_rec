@@ -21,6 +21,7 @@ from .models import (
     TrajetoriaAcademica,
     TramitacaoProcesso,
     User,
+    EstagioDocencia,
 )
 
 
@@ -220,3 +221,25 @@ class ReservaAmbienteAdmin(admin.ModelAdmin):
 
 
 #commit de teste 1
+
+@admin.register(EstagioDocencia)
+class EstagioDocenciaAdmin(admin.ModelAdmin):
+    list_display = (
+        "trajetoria", 
+        "supervisor", 
+        "status", 
+        "processo_vinculado", 
+        "inicio",
+        "termino",
+        "relatorio_pendente_ou_proximo"
+    )
+    
+    list_filter = ("status", "inicio")
+    
+    search_fields = (
+        "trajetoria__aluno__nome", 
+        "supervisor", 
+        "processo_vinculado__numero"
+    )
+    
+    autocomplete_fields = ("trajetoria", "processo_vinculado")

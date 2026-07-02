@@ -198,7 +198,6 @@ LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'login'
 
 # email config
-# email config
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
@@ -212,9 +211,15 @@ DEFAULT_FROM_EMAIL = f"AcadFlow <{EMAIL_HOST_USER}>"
 
 SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
 
+
+
 # celery config
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
+# CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0") (tirar comentario dessa linha)
+
+# MUDANÇA AQUI: Trocado de redis para "django-db" para salvar os resultados no seu SQLite local
+CELERY_RESULT_BACKEND = "django-db"
+
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 
