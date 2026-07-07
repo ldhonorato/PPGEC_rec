@@ -1,7 +1,32 @@
 # Documentação Técnica de Transição ⬇️
 ## Setup, Ambiente e Infraestrutura ⚙️
 
-Neste documento se encontram as especificações técnicas da arquitetura e o guia de implantação do ecossistema do **AcadFlow**. Estão inclusas as diretrizes necessárias para configurar, executar, criar usuários de teste e entender as principais regras de negócio do sistema.
+Neste documento se encontram as especificações técnicas da arquitetura, o guia de implantação do ecossistema do **AcadFlow**, as funcionalidades desenvolvidas pela Equipe 7 durante a disciplina e as principais regras de negócio do sistema. O objetivo é permitir que outra equipe consiga dar continuidade ao projeto sem conhecimento prévio sobre o que foi desenvolvido.
+
+> **Contexto:** o AcadFlow é um projeto que já existia antes da Equipe 7. O que está descrito aqui cobre apenas as evoluções realizadas pela equipe durante o semestre, sobre uma base de código preexistente.
+
+---
+
+## 0. Identificação do Projeto e da Equipe 👥
+
+| Campo | Informação |
+| :--- | :--- |
+| **Nome do sistema** | AcadFlow — PPGEC |
+| **Repositório GitHub** | https://github.com/ldhonorato/PPGEC_rec |
+| **Disciplina** | Engenharia de Software |
+| **Período** | 2026.1 |
+| **Quadro Trello** | https://trello.com/b/BusBLA15/esw-sistema-de-gestao-de-processos |
+
+### Equipe 7
+
+| Membro | GitHub |
+| :--- | :--- |
+| Bruno Morato (PO) | brunomoratow |
+| Davi de Oliveira | DaveOlivae |
+| Ellen Beatryz | ellenbeatryzbarone |
+| Guilherme Valença | gpvalencaa |
+| Isabella Nascimento | isabella-sn |
+| Matheus Albuquerque | matheus-albuquerque-dev |
 
 ---
 
@@ -9,18 +34,20 @@ Neste documento se encontram as especificações técnicas da arquitetura e o gu
 
 A aplicação é totalmente orquestrada através do **Docker Compose**, onde cada serviço roda em um ambiente isolado dentro de uma rede virtual privada:
 
-* **Gunicorn (Servidor WSGI):** Recebe as requisições HTTP e as processa através da aplicação Django. Arquivos estáticos são servidos diretamente pelo **WhiteNoise**, sem necessidade de Nginx.
+* **Gunicorn (Servidor WSGI):** Recebe as requisições HTTP e as processa através da aplicação Django. Arquivos estáticos são servidos pelo **WhiteNoise**, sem necessidade de Nginx na stack.
 * **Django (Aplicação Core):** Concentra a lógica de negócios, controle de rotas, autenticação, ORM e renderização de páginas.
-* **PostgreSQL (Banco de Dados):** Instância relacional responsável pela persistência de dados do sistema. Em desenvolvimento local sem Docker, o sistema cai automaticamente para SQLite.
-* **Redis & Celery (Processamento Assíncrono):** Tarefas como disparos de e-mails via SMTP são enviadas para o **Redis** e processadas em background pelo **Celery Worker** e **Celery Beat**, evitando travamentos na navegação.
+* **PostgreSQL (Banco de Dados):** Instância relacional responsável pela persistência de dados. Em desenvolvimento local sem Docker, o sistema usa SQLite automaticamente.
+* **Redis & Celery (Processamento Assíncrono):** Tarefas como disparos de e-mails via SMTP são enviadas ao **Redis** e processadas em background pelo **Celery Worker** e **Celery Beat**, evitando travamentos na navegação.
 * **pgAdmin:** Interface web para administração visual do banco PostgreSQL, acessível na porta 5050.
+
+> **Nginx:** Em produção, o DTI (Departamento de Tecnologia da Informação) gerencia um **Nginx Proxy Manager** externo à stack Docker, que faz o proxy reverso para a aplicação. Os contêineres da aplicação **não incluem Nginx** — ele é infraestrutura da universidade, não da equipe.
 
 Existem dois arquivos de orquestração:
 
 | Arquivo | Contexto | Diferença principal |
 | :--- | :--- | :--- |
-| `docker-compose.yml` | **Desenvolvimento local** | Faz build da imagem a partir do código local (`build: .`). A porta do app é **8000**. |
-| `docker-compose-prod.yml` | **Produção** | Puxa a imagem publicada no GitHub Container Registry (`ghcr.io/ldhonorato/ppgec_rec:latest`). A porta do app é **8001**. Inclui o **Watchtower** para atualizações automáticas de imagem. |
+| `docker-compose.yml` | **Desenvolvimento local** | Faz build a partir do código local (`build: .`). Porta do app: **8000**. |
+| `docker-compose-prod.yml` | **Produção** | Puxa imagem publicada no GitHub Container Registry (`ghcr.io/ldhonorato/ppgec_rec:latest`). Porta: **8001**. Inclui **Watchtower** para atualizações automáticas de imagem. |
 
 ---
 
@@ -131,8 +158,6 @@ docker compose exec web python manage.py migrate
 docker compose exec web python manage.py createsuperuser
 ```
 
-Siga as instruções no terminal para definir e-mail e senha.
-
 ### 4.7 Acessar o sistema
 
 | Interface | URL |
@@ -151,9 +176,6 @@ docker compose down
 docker compose down -v
 
 # Ver logs em tempo real
-docker compose logs -f
-
-# Ver logs de um serviço específico
 docker compose logs -f web
 
 # Criar novas migrações após alterar models.py
@@ -169,32 +191,73 @@ docker compose exec web python manage.py shell
 
 Acesse o Admin Django em http://localhost:8000/admin/ com o superusuário criado no passo 4.6.
 
-### Perfis disponíveis
-
-| Perfil | Onde cadastrar no Admin | Campos obrigatórios |
+| Perfil | Onde cadastrar no Admin | Observação |
 | :--- | :--- | :--- |
-| **Aluno** | Processos → Alunos | nome, e-mail, matrícula, status_aluno |
-| **Docente** | Processos → Docentes | nome, e-mail; marcar `coordenador=True` para Coordenador |
-| **Servidor (Secretaria)** | Processos → Users | nome, e-mail, tipo_usuario = SERVIDOR |
+| **Aluno** | Processos → Alunos | Requer TrajetoriaAcademica ativa |
+| **Docente** | Processos → Docentes | Marcar `coordenador=True` para perfil Coordenador |
+| **Servidor (Secretaria)** | Processos → Users | tipo_usuario = SERVIDOR |
 
-> **Importante:** Para que os fluxos de processo funcionem corretamente, o Aluno deve ter uma **TrajetoriaAcademica ativa** com orientador vinculado. Cadastre em: Processos → Trajetoria academicas.
+> **Importante:** Para que os fluxos funcionem corretamente, o Aluno deve ter uma **TrajetoriaAcademica ativa** com orientador vinculado. Cadastre em: Processos → Trajetoria academicas.
 
-### Fluxo mínimo para testar
-
+**Fluxo mínimo para testar:**
 1. Criar um Docente
 2. Criar um Aluno
-3. Criar uma TrajetoriaAcademica vinculando o Aluno ao Docente (status = ATIVA)
-4. Criar um Setor chamado "Secretaria" (Processos → Setores)
-5. Criar um Setor chamado "Pleno" (necessário para testar encaminhamento ao Pleno)
+3. Criar uma TrajetoriaAcademica vinculando Aluno ao Docente (status = ATIVA)
+4. Criar um Setor chamado "Secretaria" — e configurar o campo **email** do setor para receber notificações
+5. Criar um Setor chamado "Pleno" (para testar encaminhamentos)
 6. Logar como Aluno e abrir um processo
+
+> **Não há credenciais de teste compartilhadas versionadas no projeto.** Os usuários de teste devem ser criados via Admin Django conforme o fluxo mínimo acima. Credenciais de ambientes já configurados devem ser solicitadas ao responsável do projeto por canal privado (nunca compartilhadas em PR, issue ou canal público).
 
 ---
 
-## 6. Regras de Negócio 📋
+## 6. Funcionalidades Desenvolvidas pela Equipe 7 🛠️
 
-Esta seção descreve as principais regras que governam o comportamento do sistema. São essenciais para qualquer desenvolvedor que for evoluir o projeto.
+> **Contexto:** O projeto já existia antes da Equipe 7. Esta seção cobre apenas as evoluções realizadas durante o semestre sobre a base de código preexistente.
 
-### 6.1 Perfis e Permissões
+### 6.1 Épico 1 — Notificações por E-mail (entregue ✅)
+
+Implementação completa do sistema de notificações assíncronas via Celery + Gmail SMTP. Todos os e-mails são processados em background (sem bloquear a requisição web) e incluem o nome do aluno no assunto para facilitar o filtro na caixa de entrada.
+
+Veja a tabela completa de eventos e destinatários na seção **7.7 Notificações por E-mail**.
+
+### 6.2 Infraestrutura e DevOps (entregue ✅)
+
+- Criação do `docker-compose.yml` com todos os serviços (web, db, redis, celery, celery-beat, pgadmin)
+- Criação do `docker-compose-prod.yml` com Watchtower para auto-update de imagens
+- Migração do banco de dados de SQLite para PostgreSQL 16
+- Publicação da imagem Docker no GitHub Container Registry (`ghcr.io`)
+- Disponibilização do container na porta 8001 em produção
+- Apoio ao DTI na configuração do Nginx Proxy Manager externo
+- Merge final e resolução de conflitos com a branch da equipe anterior
+
+### 6.3 Épico 2 — Automação do Pleno (não entregue ❌ — código parcial existe)
+
+O Épico 2 planejava automatizar o fluxo do Pleno. **Nenhuma das features do Épico 2 está ativa em produção**, mas partes do código foram escritas e permanecem no repositório. A próxima equipe **não precisa partir do zero** nessas funcionalidades:
+
+| Feature | Status | O que existe no código |
+| :--- | :--- | :--- |
+| **Encaminhamento ao Pleno com data limite** | Revertido | Campo `prazo_pleno` no `EncaminhamentoForm`; `Processo.encaminhar()` aceita e valida `prazo_limite`. |
+| **Date picker visual no formulário** | Bug ativo | Campo existe no backend mas nunca aparece na tela — erro de nome no template (Bug #1). |
+| **Notificação de intervenção no Pleno** | Task existe, automação inativa | `send_email_processo_comentado_pleno` está implementada e funcional. Lógica de cancelamento da automação não concluída. |
+| **Worker autônomo — aprovação silenciosa** | Revertido / comentado | `verificar_prazos_expirados` em `tasks.py` está comentado. Lógica completa existe, mas foi desativada antes do go-live. |
+
+> **Resumo:** O Épico 2 foi um trabalho **extra-escopo** — não estava previsto no escopo da disciplina e foi alinhado diretamente com o professor Leandro Honorato. Por não fazer parte das entregas obrigatórias do semestre, não foi concluído: o que existe é código parcial (revertido ou comentado) das features acima. A próxima equipe pode retomar a partir do código existente, mas precisa tratá-lo como ponto de partida não validado — não como funcionalidade pronta.
+
+Estas features constituem, junto com os itens abaixo, o backlog não realizado do projeto — o ponto de partida para a próxima equipe:
+
+- Adicionar `bind=True` e retry nas tasks de e-mail de setor (`processos/tasks.py`), que hoje não re-tentam em caso de falha de SMTP (e-mail de setor pode ser perdido).
+- Corrigir o timeout do Gunicorn (`--timeout 120`) no `docker-compose.yml`, que hoje usa o padrão de 30s.
+- Ajustar a rota de teste de e-mail (`/teste-email/`), com remetente/destinatário fixos inválidos (`processos/views.py`, função `teste_email`) — endpoint de desenvolvimento, fora dos fluxos reais.
+- Reativar/definir o destinatário do e-mail de ciência efetivada para a Secretaria (task comentada em `tasks.py`).
+
+---
+
+## 7. Regras de Negócio 📋
+
+> **Nota sobre escopo:** Estas regras descrevem o comportamento do sistema como um todo, incluindo módulos herdados da base preexistente e de outras equipes — não apenas o que a Equipe 7 desenvolveu. Para o que foi entregue especificamente pela Equipe 7, veja a Seção 6.
+
+### 7.1 Perfis e Permissões
 
 | Ação | Aluno | Docente | Coordenador¹ | Servidor |
 | :--- | :---: | :---: | :---: | :---: |
@@ -213,7 +276,9 @@ Esta seção descreve as principais regras que governam o comportamento do siste
 > ³ Docentes sem cargo de coordenador só podem **comentar** em processos `EM_DEBATE` — não podem encaminhar nem deferir  
 > ⁴ Apenas o orientador responsável pelo processo pode confirmar ou recusar a ciência
 
-### 6.2 Ciclo de Vida de um Processo
+### 7.2 Ciclo de Vida de um Processo
+
+> **[INSERIR IMAGEM: Fluxograma do ciclo de vida dos processos]**
 
 ```
 [Aluno abre]
@@ -234,28 +299,13 @@ Esta seção descreve as principais regras que governam o comportamento do siste
 Regras importantes:
 - **Não é possível encaminhar um processo finalizado.**
 - **Não é possível encaminhar com ciência do orientador pendente** — o encaminhamento é bloqueado até a manifestação.
-- **Encaminhar ao Pleno exige data limite** (`prazo_pleno`) — o campo é obrigatório e não pode ser uma data passada.
 - Ao deferir ou indeferir, um **termo de finalização** é obrigatório.
 
-### 6.3 Numeração de Processos
+### 7.3 Numeração de Processos
 
 O número é gerado automaticamente no formato `YYYYMM-NNNNNN` (ex.: `202507-000001`). A sequência reinicia a cada mês. A geração é protegida por `select_for_update` para evitar duplicatas em concorrência.
 
-### 6.4 Prazos Automáticos
-
-Ao criar um processo, o `prazo_limite` é calculado automaticamente:
-
-| Tipo de Processo | Prazo (dias) |
-| :--- | :---: |
-| Trancamento de Matrícula | 15 |
-| Prorrogação de Prazo / Mudança de Orientador | 20 |
-| Aproveitamento de Créditos / Reingresso | 30 |
-| Defesa de Mestrado / Doutorado / Qualificação | 45 |
-| Outro | 60 |
-
-Processos com `prazo_limite < data_atual` e não finalizados são marcados como **atrasados** e exibem um indicador visual.
-
-### 6.5 Solicitação de Ciência do Orientador
+### 7.4 Solicitação de Ciência do Orientador
 
 - Só pode ser solicitada por **Servidor** ou **Coordenador**.
 - Só pode existir **uma solicitação pendente por vez** por processo.
@@ -263,7 +313,7 @@ Processos com `prazo_limite < data_atual` e não finalizados são marcados como 
 - Ao orientador confirmar ou recusar, o processo volta para `EM_ANÁLISE`.
 - O orientador responsável é determinado pela **TrajetoriaAcademica ativa** do aluno criador do processo.
 
-### 6.6 Documentos e Restrição de Acesso
+### 7.5 Documentos e Restrição de Acesso
 
 Documentos podem ser marcados com 7 categorias de restrição baseadas na Lei de Acesso à Informação (Lei 12.527/2011):
 
@@ -275,7 +325,7 @@ Documentos podem ser marcados com 7 categorias de restrição baseadas na Lei de
 
 Alunos e Docentes comuns **não veem** documentos restritos de outros. A remoção de um arquivo exige motivo obrigatório e é rastreada (quem removeu, quando, por quê).
 
-### 6.7 Trajetória Acadêmica e Orientador
+### 7.6 Trajetória Acadêmica e Orientador
 
 O vínculo entre Aluno e Orientador **não fica no modelo Aluno** — fica em `TrajetoriaAcademica`. Isso tem impacto direto em queries:
 
@@ -292,25 +342,67 @@ Aluno.objects.filter(orientador=request.user)
 
 Um aluno pode ter múltiplas trajetórias (ex.: após reingresso), mas apenas **uma ativa por vez** governa o vínculo atual com orientador.
 
-### 6.8 Notificações por E-mail
+### 7.7 Notificações por E-mail
 
-Os e-mails são disparados de forma **assíncrona via Celery** (não bloqueiam a requisição). O nome do aluno é incluído em todos os assuntos para facilitar o filtro na caixa de entrada do destinatário.
+Os e-mails são disparados de forma **assíncrona via Celery** (não bloqueiam a requisição web). O nome do aluno é incluído em todos os assuntos para facilitar o filtro na caixa de entrada.
 
-| Evento | Destinatário |
-| :--- | :--- |
-| Processo aberto | Aluno |
-| Solicitação de ciência | Orientador |
-| Devolução para ajustes | Aluno |
-| Movimentação de processo | Aluno |
-| Processo finalizado | Aluno |
-| Novo processo no Pleno | Setor Pleno (e-mail do setor) |
-| Intervenção no Pleno (aprovação automática cancelada) | Responsáveis |
+> **Remetente institucional:** Todos os e-mails do sistema são enviados a partir do endereço institucional **`acadflow@ecomp.poli.br`**, configurado na variável `EMAIL_HOST_USER` do arquivo `.env`. Esse é o endereço que aparece no campo "De:" das notificações recebidas por alunos, orientadores, setores e docentes.
 
-O e-mail institucional dos setores é configurado no campo `email` do modelo `Setor` (Admin → Processos → Setores).
+**Resumo por evento — quem recebe e-mail em cada ação:**
 
-### 6.9 Reserva de Ambientes
+> ⚠️ **Importante:** uma única ação no sistema pode disparar **vários e-mails simultaneamente** para destinatários diferentes. A tabela abaixo mostra o fan-out completo de cada evento (validado no código-fonte).
 
-- Reservas só podem ser feitas em **horários dentro da disponibilidade** cadastrada para a sala.
-- O sistema detecta **conflito de horário** automaticamente — duas reservas ativas não podem se sobrepor na mesma sala.
-- Reservas recorrentes (diária, semanal, mensal) são limitadas a **6 meses**.
-- A exclusão de uma reserva exige **justificativa obrigatória**.
+| Ação no sistema | Quem recebe e-mail | Tasks disparadas | Local no código |
+| :--- | :--- | :--- | :--- |
+| **Abertura de processo** | Aluno criador · Orientador · Secretaria (setor inicial) | `novo_processo_aluno` + `novo_processo_orientador` + `novo_processo_secretaria` | views.py:1909-1911 / 2513-2515 / 2576-2578 |
+| **Encaminhamento para setor comum** | Aluno criador · Orientador · Setor de destino | `movimentacao_aluno` + `movimentacao_orientador` + `mudanca_setor` | views.py:1680-1685 |
+| **Encaminhamento ao Pleno** | Aluno criador · Orientador · Setor de destino · **Todos os docentes** | `movimentacao_aluno` + `movimentacao_orientador` + `mudanca_setor` + `movimentacao_pleno` | views.py:1680-1685 |
+| **Devolução ao requerente** | Aluno criador · Orientador | `devolucao_requerente` + `movimentacao_orientador` | views.py:1677-1678 + 1685 |
+| **Solicitação de ciência** | Orientador responsável | `solicitacao_ciencia` | views.py:1595 |
+| **Manifestação de ciência** (muda status, não muda setor) | Setor atual (via `setor.email`) | `status_atualizado` | views.py:1622-1627 |
+| **Comentário/intervenção no Pleno** | Todos os docentes | `processo_comentado_pleno` | views.py:1756 |
+| **Finalização (deferido/indeferido)** | Aluno criador · Orientador | `conclusao_aluno` + `conclusao_orientador` | views.py:1534-1550 / 1711-1712 |
+| **Nova solicitação de assinatura** | Docente destinatário **ou** e-mail do setor + membros ativos | `solicitacao_assinatura` | views.py:2397 |
+
+> **Detalhe importante do encaminhamento:** o e-mail para o **orientador** (`movimentacao_orientador`) é disparado **sempre**, inclusive na devolução ao requerente (está fora do `if/else` em [views.py:1685](../processos/views.py#L1685)). Já o e-mail ao **setor de destino** (`mudanca_setor`) **não** é enviado na devolução ao requerente — apenas em encaminhamentos normais.
+
+As tabelas abaixo detalham cada task individualmente.
+
+**E-mails para pessoas (endereço pessoal do usuário):**
+
+| Evento | Destinatário | Task |
+| :--- | :--- | :--- |
+| Processo aberto | **Aluno** (criador) | `send_email_novo_processo_aluno` |
+| Processo aberto | **Orientador** (via TrajetoriaAcademica) | `send_email_novo_processo_orientador` |
+| Solicitação de ciência | **Orientador** responsável | `send_email_solicitacao_ciencia` |
+| Devolução para ajustes | **Aluno** (criador) | `send_email_devolucao_requerente` |
+| Movimentação de processo | **Aluno** (criador) | `send_email_movimentacao_aluno` |
+| Movimentação de processo | **Orientador** (via TrajetoriaAcademica) | `send_email_movimentacao_orientador` |
+| Processo finalizado | **Aluno** (criador) | `send_email_conclusao_aluno` |
+| Processo finalizado | **Orientador** (via TrajetoriaAcademica) | `send_email_conclusao_orientador` |
+| Novo processo no Pleno | **Todos os Docentes** cadastrados | `send_email_movimentacao_pleno` |
+| Intervenção no Pleno (comentário) | **Todos os Docentes** cadastrados | `send_email_processo_comentado_pleno` |
+
+**E-mails para setores (e-mail institucional do setor):**
+
+| Evento | Destinatário | Task |
+| :--- | :--- | :--- |
+| Processo aberto | **Setor inicial** (Secretaria, via `setor.email`) | `send_email_novo_processo_secretaria` |
+| Processo tramitado | **Setor de destino** (via `setor.email`) | `send_email_mudanca_setor` |
+| Status atualizado externamente | **Setor atual** (via `setor.email`) | `send_email_status_atualizado` |
+
+**E-mail para solicitações de assinatura:**
+
+| Evento | Destinatário | Task |
+| :--- | :--- | :--- |
+| Nova solicitação de assinatura | **Docente** (se destinatário for docente) **ou** e-mail do setor + membros ativos do setor | `send_email_solicitacao_assinatura` |
+
+**Desabilitado (comentado em tasks.py):**
+
+| Evento | Destinatário | Motivo |
+| :--- | :--- | :--- |
+| Ciência efetivada pelo orientador | Secretaria | Comentado por decisão da equipe — endereço de destinatário não finalizado |
+
+**Como o e-mail institucional dos setores funciona:**
+
+O campo `email` no modelo `Setor` (configurável em Admin → Processos → Setores) é o endereço para o qual as notificações do setor são enviadas. As tasks verificam `if setor.email:` antes de disparar — se o campo estiver vazio, o e-mail é silenciosamente ignorado. Para que a Secretaria e outros setores recebam notificações, **é obrigatório configurar esse campo no Admin**.
