@@ -739,6 +739,148 @@ class SetorMembro(models.Model):
         return f"{self.usuario} em {self.setor} ({status})"
 
 
+class SolicitacaoAssinatura(models.Model):
+    class DestinatarioTipo(models.TextChoices):
+        DOCENTE = "DOCENTE", "Docente"
+        SETOR = "SETOR", "Setor/Comissao"
+
+    class TipoDocumento(models.TextChoices):
+        DOCUMENTO_SEI = "DOCUMENTO_SEI", "Documento SEI"
+        BLOCO_SEI = "BLOCO_SEI", "Bloco de assinatura SEI"
+        PDF = "PDF", "PDF para assinatura eletronica"
+
+    class Status(models.TextChoices):
+        PENDENTE = "PENDENTE", "Pendente"
+        ASSINADO = "ASSINADO", "Assinado"
+
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="solicitacoes_assinatura_criadas",
+    )
+    destinatario_tipo = models.CharField(max_length=12, choices=DestinatarioTipo.choices)
+    docente = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="solicitacoes_assinatura_docente",
+        limit_choices_to={"tipo_usuario": User.TipoUsuario.DOCENTE},
+    )
+    setor = models.ForeignKey(
+        Setor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="solicitacoes_assinatura",
+    )
+    tipo_documento = models.CharField(max_length=20, choices=TipoDocumento.choices)
+    numero_documento_sei = models.CharField(max_length=80, blank=True)
+    numero_bloco_sei = models.CharField(max_length=80, blank=True)
+    documento_pdf = models.FileField(upload_to="assinaturas/originais/%Y/%m/", blank=True)
+    documento_assinado_pdf = models.FileField(upload_to="assinaturas/assinados/%Y/%m/", blank=True)
+    observacao = models.TextField(blank=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDENTE)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    assinado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="solicitacoes_assinatura_atendidas",
+    )
+    assinado_em = models.DateTimeField(null=True, blank=True)
+    observacao_assinatura = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-criado_em"]
+
+    def __str__(self) -> str:
+        return f"{self.get_tipo_documento_display()} - {self.destinatario_display}"
+
+    @property
+    def destinatario_display(self) -> str:
+        if self.destinatario_tipo == self.DestinatarioTipo.DOCENTE and self.docente:
+            return self.docente.nome
+        if self.destinatario_tipo == self.DestinatarioTipo.SETOR and self.setor:
+            return self.setor.nome
+        return "-"
+
+    @property
+    def referencia_documento(self) -> str:
+        if self.tipo_documento == self.TipoDocumento.DOCUMENTO_SEI:
+            return self.numero_documento_sei
+        if self.tipo_documento == self.TipoDocumento.BLOCO_SEI:
+            return self.numero_bloco_sei
+        if self.documento_pdf:
+            return self.documento_pdf.name.rsplit("/", 1)[-1]
+        return "-"
+
+    @property
+    def is_pdf(self) -> bool:
+        return self.tipo_documento == self.TipoDocumento.PDF
+
+    @property
+    def is_pendente(self) -> bool:
+        return self.status == self.Status.PENDENTE
+
+    def clean(self):
+        errors = {}
+        if self.destinatario_tipo == self.DestinatarioTipo.DOCENTE:
+            if not self.docente_id:
+                errors["docente"] = "Selecione o docente requisitado."
+            if self.setor_id:
+                errors["setor"] = "Nao informe setor para solicitacao destinada a docente."
+        elif self.destinatario_tipo == self.DestinatarioTipo.SETOR:
+            if not self.setor_id:
+                errors["setor"] = "Selecione o setor ou comissao requisitado."
+            if self.docente_id:
+                errors["docente"] = "Nao informe docente para solicitacao destinada a setor."
+
+        if self.tipo_documento == self.TipoDocumento.DOCUMENTO_SEI:
+            if not (self.numero_documento_sei or "").strip():
+                errors["numero_documento_sei"] = "Informe o numero do documento no SEI."
+            if self.numero_bloco_sei or self.documento_pdf:
+                errors["tipo_documento"] = "Informe apenas uma origem para assinatura."
+        elif self.tipo_documento == self.TipoDocumento.BLOCO_SEI:
+            if not (self.numero_bloco_sei or "").strip():
+                errors["numero_bloco_sei"] = "Informe o numero do bloco de assinatura no SEI."
+            if self.numero_documento_sei or self.documento_pdf:
+                errors["tipo_documento"] = "Informe apenas uma origem para assinatura."
+        elif self.tipo_documento == self.TipoDocumento.PDF:
+            if not self.documento_pdf:
+                errors["documento_pdf"] = "Anexe o PDF para assinatura."
+            if self.numero_documento_sei or self.numero_bloco_sei:
+                errors["tipo_documento"] = "Informe apenas uma origem para assinatura."
+
+        if self.status == self.Status.ASSINADO:
+            if not self.assinado_por_id:
+                errors["assinado_por"] = "Informe quem realizou a assinatura."
+            if not self.assinado_em:
+                errors["assinado_em"] = "Informe a data da assinatura."
+            if self.is_pdf and not self.documento_assinado_pdf:
+                errors["documento_assinado_pdf"] = "Anexe o PDF assinado."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.numero_documento_sei = (self.numero_documento_sei or "").strip()
+        self.numero_bloco_sei = (self.numero_bloco_sei or "").strip()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def marcar_assinado(self, *, usuario, documento_assinado=None, observacao=""):
+        if documento_assinado:
+            self.documento_assinado_pdf = documento_assinado
+        self.assinado_por = usuario
+        self.assinado_em = timezone.now()
+        self.observacao_assinatura = (observacao or "").strip()
+        self.status = self.Status.ASSINADO
+        self.save()
+
+
 class Processo(models.Model):
     PRAZOS_DIAS_POR_TIPO = {
         "APROVEITAMENTO_DISPENSA_CREDITOS": 30,

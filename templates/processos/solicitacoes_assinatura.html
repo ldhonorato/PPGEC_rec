@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Solicitacoes de Assinatura | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">{{ page_title|default:"Solicitacoes de Assinatura" }}</h1>
+            <p class="muted">{{ page_description|default:"Acompanhe assinaturas em documentos do SEI ou PDFs." }}</p>
+        </div>
+        {% if show_status_filters %}
+        <div class="calendar-nav">
+            <a class="btn {% if not status_filtro %}{% else %}btn-secondary{% endif %}" href="{% url 'solicitacoes_assinatura' %}">Todas</a>
+            {% for value,label in status_choices %}
+                <a class="btn {% if status_filtro == value %}{% else %}btn-secondary{% endif %}" href="?status={{ value }}">{{ label }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card">
+    {% if solicitacoes %}
+        <ul class="list">
+            {% for solicitacao in solicitacoes %}
+                <li>
+                    <div class="item-row">
+                        <div>
+                            <strong>{{ solicitacao.get_tipo_documento_display }}</strong>
+                            <small class="muted">
+                                {{ solicitacao.destinatario_display }} - {{ solicitacao.referencia_documento }}
+                                | Solicitada em {{ solicitacao.criado_em|date:"d/m/Y H:i" }}
+                            </small>
+                        </div>
+                        <div class="calendar-nav">
+                            <span class="badge {% if solicitacao.status == 'ASSINADO' %}badge-ok{% else %}badge-info{% endif %}">
+                                {{ solicitacao.get_status_display }}
+                            </span>
+                            <a class="btn btn-secondary" href="{% url 'solicitacao_assinatura_detalhe' solicitacao.id %}">Ver</a>
+                        </div>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhuma solicitacao de assinatura encontrada.</p>
+    {% endif %}
+</section>
+{% endblock %}

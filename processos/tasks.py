@@ -394,6 +394,46 @@ def send_email_status_atualizado(processo_id: int, status_anterior: str, status_
             recipient=setor_atual.email
         )
 
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_email_solicitacao_assinatura(self, solicitacao_id: int):
+    from .models import SetorMembro, SolicitacaoAssinatura
+    try:
+        solicitacao = SolicitacaoAssinatura.objects.select_related(
+            "criado_por",
+            "docente",
+            "setor",
+        ).get(pk=solicitacao_id)
+    except SolicitacaoAssinatura.DoesNotExist:
+        logger.error("Solicitacao de assinatura %s nao encontrada", solicitacao_id)
+        return
+
+    recipients = set()
+    if solicitacao.destinatario_tipo == SolicitacaoAssinatura.DestinatarioTipo.DOCENTE and solicitacao.docente.email:
+        recipients.add(solicitacao.docente.email)
+    elif solicitacao.setor_id:
+        if solicitacao.setor.email:
+            recipients.add(solicitacao.setor.email)
+        membros = SetorMembro.objects.select_related("usuario").filter(
+            setor=solicitacao.setor,
+            data_saida__isnull=True,
+            usuario__is_active=True,
+        )
+        recipients.update(membro.usuario.email for membro in membros if membro.usuario.email)
+
+    contexto = {"solicitacao": solicitacao}
+    try:
+        for recipient in recipients:
+            _send_email(
+                subject=f"[PPGEC] Solicitacao de assinatura - {solicitacao.referencia_documento}",
+                template_name="emails/assinatura/solicitacao_assinatura.html",
+                contexto=contexto,
+                recipient=recipient,
+            )
+    except Exception as exc:
+        logger.exception("Falha ao enviar e-mail de solicitacao de assinatura")
+        raise self.retry(exc=exc)
+
 # # AGENDAMENTOS E VARREDURAS AUTOMÁTICAS (CELERY BEAT)====================================
 # @shared_task(name="processos.tasks.verificar_prazos_expirados")
 # def verificar_prazos_expirados():
