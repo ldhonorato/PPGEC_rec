@@ -278,7 +278,7 @@ Estas features constituem, junto com os itens abaixo, o backlog não realizado d
 
 ### 7.2 Ciclo de Vida de um Processo
 
-> **[INSERIR IMAGEM: Fluxograma do ciclo de vida dos processos]**
+![Fluxograma do ciclo de vida dos processos](fluxo_acadflow.jpeg)
 
 ```
 [Aluno abre]
