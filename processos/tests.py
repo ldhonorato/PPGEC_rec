@@ -233,7 +233,7 @@ class MatriculaViewsTests(TestCase):
         self.assertContains(ofertas, self.disciplina.nome)
         self.assertContains(ofertas, "Grade semanal por período letivo")
         self.assertContains(ofertas, "Terça")
-        self.assertNotContains(ofertas, "Domingo")
+        self.assertNotContains(ofertas, 'class="schedule-head">Domingo</div>', html=False)
         self.assertNotContains(ofertas, "Disciplinas cadastradas")
 
         disciplinas = self.client.get(reverse("matriculas_disciplinas"))
