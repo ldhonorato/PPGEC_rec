@@ -84,8 +84,11 @@ class Aluno(User):
     class NivelCurso(models.TextChoices):
         MESTRADO = "MESTRADO", "Mestrado"
         DOUTORADO = "DOUTORADO", "Doutorado"
+        POSDOUTORADO = "POSDOUTORADO", "Posdoutorado"
+        ALUNO_ESPECIAL = "ALUNO_ESPECIAL", "Aluno especial"
 
     class StatusAluno(models.TextChoices):
+        EM_AVALIACAO = "EM_AVALIACAO", "Em avaliacao"
         ATIVO = "ATIVO", "Ativo"
         DESLIGADO = "DESLIGADO", "Desligado"
         DEFENDEU = "DEFENDEU", "Defendeu"
@@ -116,7 +119,11 @@ class Aluno(User):
 
     def save(self, *args, **kwargs):
         self.tipo_usuario = User.TipoUsuario.ALUNO
-        self.is_active = self.status_aluno == self.StatusAluno.ATIVO
+        self.is_active = self.status_aluno in {
+            self.StatusAluno.EM_AVALIACAO,
+            self.StatusAluno.ATIVO,
+            self.StatusAluno.DEFENDEU,
+        }
         self.full_clean()
         return super().save(*args, **kwargs)
 
@@ -171,13 +178,15 @@ class Docente(User):
 
 class TrajetoriaAcademica(models.Model):
     class Status(models.TextChoices):
+        EM_HOMOLOGACAO = "EM_HOMOLOGACAO", "Em homologacao"
         ATIVA = "ATIVA", "Ativa"
         CONCLUIDA = "CONCLUIDA", "Concluida"
         DESLIGADA = "DESLIGADA", "Desligada"
         TRANCADA = "TRANCADA", "Trancado"
+        REMOVIDA = "REMOVIDA", "Removida"
 
     aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="trajetorias")
-    nivel_curso = models.CharField(max_length=10, choices=Aluno.NivelCurso.choices)
+    nivel_curso = models.CharField(max_length=20, choices=Aluno.NivelCurso.choices)
     status = models.CharField(max_length=15, choices=Status.choices, default=Status.ATIVA)
     ingresso = models.CharField(max_length=6, validators=[Aluno.semestre_validator])
     prazo_qualificacao = models.CharField(max_length=6, blank=True, validators=[Aluno.semestre_validator])
@@ -215,8 +224,78 @@ class TrajetoriaAcademica(models.Model):
     def __str__(self) -> str:
         return f"{self.aluno.nome} - {self.get_nivel_curso_display()} - {self.get_status_display()}"
 
+    @property
+    def usa_prazos_academicos(self) -> bool:
+        return self.nivel_curso in {
+            Aluno.NivelCurso.MESTRADO,
+            Aluno.NivelCurso.DOUTORADO,
+        }
+
+    @property
+    def usa_qualificacao(self) -> bool:
+        return self.usa_prazos_academicos
+
+    @property
+    def usa_orientacao(self) -> bool:
+        return self.usa_prazos_academicos
+
+    @property
+    def usa_conclusao(self) -> bool:
+        return self.nivel_curso in {
+            Aluno.NivelCurso.MESTRADO,
+            Aluno.NivelCurso.DOUTORADO,
+            Aluno.NivelCurso.POSDOUTORADO,
+        }
+
+    @property
+    def usa_deposito_final(self) -> bool:
+        return self.nivel_curso in {
+            Aluno.NivelCurso.MESTRADO,
+            Aluno.NivelCurso.DOUTORADO,
+        }
+
+    @property
+    def conclusao_label(self) -> str:
+        if self.nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
+            return "Relatorio final"
+        return "Defesa"
+
+    @property
+    def conclusao_label_lower(self) -> str:
+        return self.conclusao_label.lower()
+
+    @property
+    def numero_conclusao_label(self) -> str:
+        if self.nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
+            return "Numero do relatorio final"
+        return "Numero da defesa"
+
+    @property
+    def data_conclusao_label(self) -> str:
+        if self.nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
+            return "Data do relatorio final"
+        return "Data da defesa"
+
+    def _normalizar_campos_por_nivel(self):
+        if not self.usa_prazos_academicos:
+            self.prazo_qualificacao = ""
+            self.prazo_defesa = ""
+            self.reingressante = False
+            self.isQualificado = False
+            self.orientador = None
+            self.coorientador = None
+            self.coorientador_externo_nome = ""
+            self.coorientador_externo_email = ""
+            self.coorientador_externo_instituicao = ""
+        if not self.usa_conclusao or self.status != self.Status.CONCLUIDA:
+            self.numero_defesa = ""
+            self.data_defesa = None
+        if not self.usa_deposito_final or self.status != self.Status.CONCLUIDA:
+            self.deposito_versao_final = False
+
     def clean(self):
         errors = {}
+        self._normalizar_campos_por_nivel()
 
         if self.orientador and self.orientador.tipo_usuario != User.TipoUsuario.DOCENTE:
             errors["orientador"] = "Orientador deve ser um usuario do tipo DOCENTE."
@@ -232,11 +311,11 @@ class TrajetoriaAcademica(models.Model):
             self.coorientador_externo_email = ""
             self.coorientador_externo_instituicao = ""
 
-        if self.status == self.Status.CONCLUIDA:
+        if self.status == self.Status.CONCLUIDA and self.usa_conclusao:
             if not (self.numero_defesa or "").strip():
-                errors["numero_defesa"] = "Informe o numero da defesa para trajetoria concluida."
+                errors["numero_defesa"] = f"Informe o {self.conclusao_label_lower} para trajetoria concluida."
             if not self.data_defesa:
-                errors["data_defesa"] = "Informe a data da defesa para trajetoria concluida."
+                errors["data_defesa"] = f"Informe a data do {self.conclusao_label_lower} para trajetoria concluida."
         elif self.deposito_versao_final:
             errors["deposito_versao_final"] = "Deposito da versao final so pode ser marcado apos conclusao."
 
@@ -245,15 +324,14 @@ class TrajetoriaAcademica(models.Model):
 
     def save(self, *args, **kwargs):
         self.numero_defesa = (self.numero_defesa or "").strip()
-        if self.status != self.Status.CONCLUIDA:
-            self.numero_defesa = ""
-            self.data_defesa = None
-            self.deposito_versao_final = False
+        self._normalizar_campos_por_nivel()
         self.full_clean()
         return super().save(*args, **kwargs)
 
     @property
     def qualificacao_label(self) -> str:
+        if not self.usa_qualificacao:
+            return "-"
         if self.nivel_curso == Aluno.NivelCurso.MESTRADO:
             return "Projeto de Dissertação"
         return "Qualificação"
@@ -727,6 +805,7 @@ class AlteracaoAluno(models.Model):
         COORIENTADOR = "COORIENTADOR", "Coorientador"
         REINGRESSO = "REINGRESSO", "Reingresso"
         TRAJETORIA = "TRAJETORIA", "Trajetoria academica"
+        ESTAGIO_DOCENCIA = "ESTAGIO_DOCENCIA", "Estagio docencia"
 
     aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="alteracoes")
     tipo = models.CharField(max_length=25, choices=TipoAlteracao.choices)
@@ -1038,6 +1117,148 @@ class SetorMembro(models.Model):
         return f"{self.usuario} em {self.setor} ({status})"
 
 
+class SolicitacaoAssinatura(models.Model):
+    class DestinatarioTipo(models.TextChoices):
+        DOCENTE = "DOCENTE", "Docente"
+        SETOR = "SETOR", "Setor/Comissao"
+
+    class TipoDocumento(models.TextChoices):
+        DOCUMENTO_SEI = "DOCUMENTO_SEI", "Documento SEI"
+        BLOCO_SEI = "BLOCO_SEI", "Bloco de assinatura SEI"
+        PDF = "PDF", "PDF para assinatura eletronica"
+
+    class Status(models.TextChoices):
+        PENDENTE = "PENDENTE", "Pendente"
+        ASSINADO = "ASSINADO", "Assinado"
+
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="solicitacoes_assinatura_criadas",
+    )
+    destinatario_tipo = models.CharField(max_length=12, choices=DestinatarioTipo.choices)
+    docente = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="solicitacoes_assinatura_docente",
+        limit_choices_to={"tipo_usuario": User.TipoUsuario.DOCENTE},
+    )
+    setor = models.ForeignKey(
+        Setor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="solicitacoes_assinatura",
+    )
+    tipo_documento = models.CharField(max_length=20, choices=TipoDocumento.choices)
+    numero_documento_sei = models.CharField(max_length=80, blank=True)
+    numero_bloco_sei = models.CharField(max_length=80, blank=True)
+    documento_pdf = models.FileField(upload_to="assinaturas/originais/%Y/%m/", blank=True)
+    documento_assinado_pdf = models.FileField(upload_to="assinaturas/assinados/%Y/%m/", blank=True)
+    observacao = models.TextField(blank=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDENTE)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    assinado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="solicitacoes_assinatura_atendidas",
+    )
+    assinado_em = models.DateTimeField(null=True, blank=True)
+    observacao_assinatura = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-criado_em"]
+
+    def __str__(self) -> str:
+        return f"{self.get_tipo_documento_display()} - {self.destinatario_display}"
+
+    @property
+    def destinatario_display(self) -> str:
+        if self.destinatario_tipo == self.DestinatarioTipo.DOCENTE and self.docente:
+            return self.docente.nome
+        if self.destinatario_tipo == self.DestinatarioTipo.SETOR and self.setor:
+            return self.setor.nome
+        return "-"
+
+    @property
+    def referencia_documento(self) -> str:
+        if self.tipo_documento == self.TipoDocumento.DOCUMENTO_SEI:
+            return self.numero_documento_sei
+        if self.tipo_documento == self.TipoDocumento.BLOCO_SEI:
+            return self.numero_bloco_sei
+        if self.documento_pdf:
+            return self.documento_pdf.name.rsplit("/", 1)[-1]
+        return "-"
+
+    @property
+    def is_pdf(self) -> bool:
+        return self.tipo_documento == self.TipoDocumento.PDF
+
+    @property
+    def is_pendente(self) -> bool:
+        return self.status == self.Status.PENDENTE
+
+    def clean(self):
+        errors = {}
+        if self.destinatario_tipo == self.DestinatarioTipo.DOCENTE:
+            if not self.docente_id:
+                errors["docente"] = "Selecione o docente requisitado."
+            if self.setor_id:
+                errors["setor"] = "Nao informe setor para solicitacao destinada a docente."
+        elif self.destinatario_tipo == self.DestinatarioTipo.SETOR:
+            if not self.setor_id:
+                errors["setor"] = "Selecione o setor ou comissao requisitado."
+            if self.docente_id:
+                errors["docente"] = "Nao informe docente para solicitacao destinada a setor."
+
+        if self.tipo_documento == self.TipoDocumento.DOCUMENTO_SEI:
+            if not (self.numero_documento_sei or "").strip():
+                errors["numero_documento_sei"] = "Informe o numero do documento no SEI."
+            if self.numero_bloco_sei or self.documento_pdf:
+                errors["tipo_documento"] = "Informe apenas uma origem para assinatura."
+        elif self.tipo_documento == self.TipoDocumento.BLOCO_SEI:
+            if not (self.numero_bloco_sei or "").strip():
+                errors["numero_bloco_sei"] = "Informe o numero do bloco de assinatura no SEI."
+            if self.numero_documento_sei or self.documento_pdf:
+                errors["tipo_documento"] = "Informe apenas uma origem para assinatura."
+        elif self.tipo_documento == self.TipoDocumento.PDF:
+            if not self.documento_pdf:
+                errors["documento_pdf"] = "Anexe o PDF para assinatura."
+            if self.numero_documento_sei or self.numero_bloco_sei:
+                errors["tipo_documento"] = "Informe apenas uma origem para assinatura."
+
+        if self.status == self.Status.ASSINADO:
+            if not self.assinado_por_id:
+                errors["assinado_por"] = "Informe quem realizou a assinatura."
+            if not self.assinado_em:
+                errors["assinado_em"] = "Informe a data da assinatura."
+            if self.is_pdf and not self.documento_assinado_pdf:
+                errors["documento_assinado_pdf"] = "Anexe o PDF assinado."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.numero_documento_sei = (self.numero_documento_sei or "").strip()
+        self.numero_bloco_sei = (self.numero_bloco_sei or "").strip()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def marcar_assinado(self, *, usuario, documento_assinado=None, observacao=""):
+        if documento_assinado:
+            self.documento_assinado_pdf = documento_assinado
+        self.assinado_por = usuario
+        self.assinado_em = timezone.now()
+        self.observacao_assinatura = (observacao or "").strip()
+        self.status = self.Status.ASSINADO
+        self.save()
+
+
 class Processo(models.Model):
     PRAZOS_DIAS_POR_TIPO = {
         "APROVEITAMENTO_DISPENSA_CREDITOS": 30,
@@ -1048,6 +1269,7 @@ class Processo(models.Model):
         "DEFESA_MESTRADO": 45,
         "DEFESA_DOUTORADO": 45,
         "QUALIFICACAO_DOUTORADO": 45,
+        "ESTAGIO_DOCENCIA": 30,
         "OUTRO": 60,
     }
 
@@ -1056,6 +1278,7 @@ class Processo(models.Model):
         DEFESA_MESTRADO = "DEFESA_MESTRADO", "Defesa de Mestrado"
         DEFESA_DOUTORADO = "DEFESA_DOUTORADO", "Defesa de Doutorado"
         QUALIFICACAO_DOUTORADO = "QUALIFICACAO_DOUTORADO", "Qualificação de Doutorado"
+        ESTAGIO_DOCENCIA = "ESTAGIO_DOCENCIA", "Estágio docência"
         TRANCAMENTO_MATRICULA = "TRANCAMENTO_MATRICULA", "Trancamento de Matrícula"
         PRORROGACAO_PRAZO = "PRORROGACAO_PRAZO", "Prorrogação de Prazo"
         REINGRESSO = "REINGRESSO", "Reingresso"
@@ -1797,3 +2020,71 @@ class ReservaAmbiente(models.Model):
         for _ in range(quantidade):
             resultado = cls._somar_um_mes(resultado)
         return resultado
+
+
+class EstagioDocencia(models.Model):
+
+    class Status(models.TextChoices):
+        NAO_INICIADO = "NAO_INICIADO", "Não Iniciado"
+        AGUARD_CIENCIA = "AGUARD_CIENCIA", "Aguardando Ciente do Orientador"
+        AGUARD_ASSINATURA = "AGUARD_ASSINATURA", "Aguardando Aprovação da Coordenação"
+        ANALISE_DISP = "ANALISE_DISP", "Em Análise de Dispensa"
+        DISPENSADO = "DISPENSADO", "Dispensado"
+        EM_ANDAMENTO = "EM_ANDAMENTO", "Em Andamento"
+        AGUARD_RELAT = "AGUARD_RELAT", "Aguardando Relatório"
+        CONCLUIDO = "CONCLUIDO", "Concluído"
+
+    # --- 2. AS PONTES DE LIGAÇÃO E DADOS ---
+    trajetoria = models.ForeignKey(
+        "TrajetoriaAcademica", 
+        on_delete=models.CASCADE, 
+        related_name="estagios_docencia"
+    )
+    
+    supervisor = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Nome do Supervisor"
+    ) 
+    
+    processo_vinculado = models.OneToOneField(
+        "Processo", 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name="estagio_gerado"
+    )
+
+    # --- 3. DADOS DE CONTROLE ---
+    status = models.CharField(
+        max_length=25, # Aumentado para 25 para acomodar perfeitamente o AGUARD_ASSINATURA
+        choices=Status.choices, 
+        default=Status.NAO_INICIADO
+    )
+    
+    # --- 4. DATAS ---
+    inicio = models.DateField(null=True, blank=True)
+    termino = models.DateField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "Estágio de Docência"
+        verbose_name_plural = "Estágios de Docência"
+        
+    def __str__(self) -> str:
+        # Traz o nome do aluno puxando a ponte da Trajetória e exibe o status legível
+        return f"{self.trajetoria.aluno.nome} - Status: {self.get_status_display()}"
+    
+    @property
+    def relatorio_pendente_ou_proximo(self) -> bool:
+        """
+        Retorna True se o estágio está em andamento e 
+        falta 15 dias (ou menos) para a data de término (ou se já passou).
+        """
+        if self.status == self.Status.EM_ANDAMENTO and self.termino:
+            hoje = timezone.localdate()
+            # Calcula a diferença de dias entre o término e hoje
+            dias_restantes = (self.termino - hoje).days
+            return dias_restantes <= 30
+            
+        return False

@@ -48,6 +48,14 @@
             </div>
             <a class="metric-link" href="{% url 'menu_ciencias_manifestadas' %}">Ver todos -></a>
         </article>
+        <article class="card metric-card">
+            <span class="metric-icon">A</span>
+            <div>
+                <p class="metric-value">{% if assinaturas_pendentes %}{{ assinaturas_pendentes|length }}{% else %}0{% endif %}</p>
+                <p class="metric-label">Assinaturas pendentes</p>
+            </div>
+            <a class="metric-link" href="{% url 'solicitacoes_assinatura' %}">Ver todos -></a>
+        </article>
     {% elif user.tipo_usuario == "ALUNO" %}
         <article class="card metric-card">
             <span class="metric-icon">P</span>
@@ -144,6 +152,16 @@
                         <time>{{ manifestacao.data_solicitacao|date:"d/m/Y" }}</time>
                     </li>
                 {% endfor %}
+            {% elif assinaturas_pendentes %}
+                {% for solicitacao in assinaturas_pendentes|slice:":4" %}
+                    <li>
+                        <span class="soft-icon">A</span>
+                        <span>
+                            Assinatura pendente: <strong>{{ solicitacao.referencia_documento }}</strong>
+                        </span>
+                        <time>{{ solicitacao.criado_em|date:"d/m/Y" }}</time>
+                    </li>
+                {% endfor %}
             {% else %}
                 <li>
                     <span class="soft-icon">OK</span>
@@ -189,6 +207,26 @@
                     <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Resolver pendencia</a>
                 </div>
                 <small class="muted">Este processo esta no setor Requerente e pode exigir envio de documentacao.</small>
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
+{% if assinaturas_pendentes %}
+<section class="card panel alert-info">
+    <h2 class="section-title">Assinaturas pendentes</h2>
+    <ul class="list">
+        {% for solicitacao in assinaturas_pendentes %}
+            <li>
+                <div class="item-row">
+                    <strong>{{ solicitacao.get_tipo_documento_display }} - {{ solicitacao.referencia_documento }}</strong>
+                    <a class="btn" href="{% url 'solicitacao_assinatura_detalhe' solicitacao.id %}">Atender assinatura</a>
+                </div>
+                <small class="muted">
+                    Solicitado por: {{ solicitacao.criado_por.nome }} |
+                    Em: {{ solicitacao.criado_em|date:"d/m/Y H:i" }}
+                </small>
             </li>
         {% endfor %}
     </ul>

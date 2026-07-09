@@ -17,8 +17,15 @@ Including another URLconf
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
-from django.urls import path
-from django.contrib.auth.views import LoginView, LogoutView
+from django.urls import path, reverse_lazy
+from django.contrib.auth.views import (
+    LoginView,
+    LogoutView,
+    PasswordResetCompleteView,
+    PasswordResetConfirmView,
+    PasswordResetDoneView,
+    PasswordResetView,
+)
 from django.views.generic import RedirectView
 from ppgec.views import version_view
 
@@ -28,6 +35,8 @@ from processos.views import (
     aluno_documento_historico_view,
     aluno_documento_vinculo_view,
     caixa_processos_view,
+    cadastro_aluno_sucesso_view,
+    cadastro_aluno_view,
     coordenacao_dashboard_view,
     criar_comissao_view,
     disponibilidade_ambientes_view,
@@ -46,17 +55,22 @@ from processos.views import (
     menu_processos_orientandos_view,
     menu_ciencias_manifestadas_view,
     me_view,
+    nova_solicitacao_assinatura_view,
     novo_processo_view,
+    pendencias_assinatura_view,
     processo_detalhe_view,
     processos_view,
     reservas_ambientes_feitas_view,
     reservas_ambientes_view,
     salas_ambientes_view,
+    solicitacao_assinatura_detalhe_view,
+    solicitacoes_assinatura_view,
     solicitacao_banca_detalhe_view,
     solicitacao_banca_nova_view,
     solicitacoes_banca_view,
     setores_comissoes_view,
     teste_email,
+    validar_cadastros_alunos_view,
 )
 
 urlpatterns = [
@@ -65,6 +79,37 @@ urlpatterns = [
     path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}img/acadflow-logo.png", permanent=True)),
     path("login/", LoginView.as_view(template_name="registration/login.html"), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),
+    path("cadastro/aluno/", cadastro_aluno_view, name="cadastro_aluno"),
+    path("cadastro/aluno/sucesso/", cadastro_aluno_sucesso_view, name="cadastro_aluno_sucesso"),
+    path(
+        "senha/esqueci/",
+        PasswordResetView.as_view(
+            template_name="registration/password_reset_form.html",
+            email_template_name="registration/password_reset_email.txt",
+            html_email_template_name="registration/password_reset_email.html",
+            subject_template_name="registration/password_reset_subject.txt",
+            success_url=reverse_lazy("password_reset_done"),
+        ),
+        name="password_reset",
+    ),
+    path(
+        "senha/esqueci/enviado/",
+        PasswordResetDoneView.as_view(template_name="registration/password_reset_done.html"),
+        name="password_reset_done",
+    ),
+    path(
+        "senha/redefinir/<uidb64>/<token>/",
+        PasswordResetConfirmView.as_view(
+            template_name="registration/password_reset_confirm.html",
+            success_url=reverse_lazy("password_reset_complete"),
+        ),
+        name="password_reset_confirm",
+    ),
+    path(
+        "senha/redefinir/concluido/",
+        PasswordResetCompleteView.as_view(template_name="registration/password_reset_complete.html"),
+        name="password_reset_complete",
+    ),
     path("me/", me_view, name="me"),
     path("menu/meus-processos/", menu_meus_processos_view, name="menu_meus_processos"),
     path("menu/processos-pleno/", menu_processos_pleno_view, name="menu_processos_pleno"),
@@ -74,27 +119,20 @@ urlpatterns = [
     path("aluno/documento-vinculo/", aluno_documento_vinculo_view, name="aluno_documento_vinculo"),
     path("aluno/documento-historico/", aluno_documento_historico_view, name="aluno_documento_historico"),
     path("processos/novo/", novo_processo_view, name="novo_processo"),
+    path("processos/<int:processo_id>/", processo_detalhe_view, name="processo_detalhe"),
     path("ambientes/reservas/", reservas_ambientes_view, name="reservas_ambientes"),
     path("ambientes/disponibilidade/", disponibilidade_ambientes_view, name="disponibilidade_ambientes"),
     path("ambientes/reservas/feitas/", reservas_ambientes_feitas_view, name="reservas_ambientes_feitas"),
     path("ambientes/salas/", salas_ambientes_view, name="salas_ambientes"),
-    path("matriculas/", matriculas_minhas_view, name="matriculas_minhas"),
-    path("matriculas/solicitar/", matricula_solicitar_view, name="matricula_solicitar"),
-    path("matriculas/solicitar/<int:periodo_id>/", matricula_solicitar_view, name="matricula_solicitar_periodo"),
-    path("matriculas/solicitacao/<int:solicitacao_id>/", matricula_minha_solicitacao_view, name="matricula_minha_solicitacao"),
-    path("gestao/matriculas/periodos/", matriculas_periodos_view, name="matriculas_periodos"),
-    path("gestao/matriculas/disciplinas/", matriculas_disciplinas_view, name="matriculas_disciplinas"),
-    path("gestao/matriculas/ofertas/", matriculas_ofertas_view, name="matriculas_ofertas"),
-    path("gestao/matriculas/ofertas/<int:oferta_id>/alunos/", matricula_oferta_alunos_view, name="matricula_oferta_alunos"),
-    path("gestao/matriculas/ofertas/<int:oferta_id>/exportar/", matricula_oferta_exportar_view, name="matricula_oferta_exportar"),
     path("bancas/", solicitacoes_banca_view, name="solicitacoes_banca"),
     path("bancas/nova/", solicitacao_banca_nova_view, name="solicitacao_banca_nova"),
     path("bancas/<int:solicitacao_id>/", solicitacao_banca_detalhe_view, name="solicitacao_banca_detalhe"),
     path("coordenacao/dashboard/", coordenacao_dashboard_view, name="coordenacao_dashboard"),
+    path("coordenacao/alunos/cadastros/", validar_cadastros_alunos_view, name="validar_cadastros_alunos"),
     path("coordenacao/alunos/", alunos_view, name="coordenacao_alunos"),
     path("coordenacao/alunos/<int:aluno_id>/", aluno_detalhe_view, name="aluno_detalhe"),
     path("coordenacao/processos/", processos_view, name="coordenacao_processos"),
-    path("coordenacao/processos/<int:processo_id>/", processo_detalhe_view, name="processo_detalhe"),
+    path("coordenacao/processos/<int:processo_id>/", RedirectView.as_view(pattern_name="processo_detalhe", permanent=False)),
     path("coordenacao/caixa-processos/", caixa_processos_view, name="coordenacao_caixa_processos"),
     path("coordenacao/setores/", setores_comissoes_view, name="setores_comissoes"),
     path("coordenacao/setores/criar/", criar_comissao_view, name="criar_comissao"),

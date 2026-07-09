@@ -6,6 +6,7 @@ from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -13,6 +14,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from .forms import (
+    AlunoCadastroForm,
     AlunoComentarioForm,
     AlunoDadosForm,
     AlunoDefesaForm,
@@ -21,6 +23,9 @@ from .forms import (
     AlunoPrazoForm,
     AlunoQualificacaoForm,
     AlunoStatusForm,
+    EstagioDocenciaUpdateForm,
+    NovoEstagioDocenciaForm,
+    AtenderSolicitacaoAssinaturaForm,
     ManifestarCienteOrientadorForm,
     ComentarioProcessoForm,
     DisciplinaForm,
@@ -37,10 +42,12 @@ from .forms import (
     ReservaAmbienteForm,
     SalaForm,
     SolicitacaoMatriculaForm,
+    SolicitacaoAssinaturaForm,
     SolicitacaoBancaForm,
     SolicitarCienteOrientadorForm,
     SetorComissaoForm,
     TrajetoriaAcademicaForm,
+    TrajetoriaStatusForm,
     UserProfileForm,
 )
 from .models import (
@@ -54,6 +61,7 @@ from .models import (
     Documento,
     EncontroOferta,
     ItemSolicitacaoMatricula,
+    EstagioDocencia,
     ManifestacaoProcesso,
     MembroBanca,
     OfertaDisciplina,
@@ -66,8 +74,10 @@ from .models import (
     Setor,
     SetorMembro,
     SolicitacaoMatricula,
+    SolicitacaoAssinatura,
     SolicitacaoBanca,
     TrajetoriaAcademica,
+    TramitacaoProcesso,
     User,
 )
 
@@ -84,7 +94,16 @@ from .tasks import (
     send_email_processo_comentado_pleno,
     send_email_novo_processo_secretaria,
     send_email_mudanca_setor,
-    send_email_status_atualizado
+    send_email_status_atualizado,
+    send_email_solicitacao_assinatura,
+)
+from .services import (
+    cancelar_item_matricula,
+    gerar_xlsx_lista_oferta,
+    homologar_item_matricula,
+    indeferir_item_matricula,
+    promover_proximo_lista_espera,
+    salvar_solicitacao_matricula,
 )
 from .services import (
     cancelar_item_matricula,
@@ -125,11 +144,24 @@ def _can_view_processos(user):
     return _is_coordenador(user) or _is_servidor(user)
 
 
+def _can_add_processo(user):
+    if not user.is_authenticated or _is_servidor(user):
+        return False
+    if user.tipo_usuario == User.TipoUsuario.ALUNO:
+        return not Aluno.objects.filter(
+            pk=user.pk,
+            status_aluno=Aluno.StatusAluno.EM_AVALIACAO,
+        ).exists()
+    return True
+
+
 def _can_view_processo_detalhe(user, processo):
     if not user.is_authenticated:
         return False
     if processo.usuario_criado_por_id == user.id:
         return True
+    if user.tipo_usuario == User.TipoUsuario.ALUNO:
+        return False
     if _can_view_processos(user):
         return True
     if processo.setor_atual_id in {setor.id for setor in _setores_caixa(user)}:
@@ -174,6 +206,52 @@ def _setores_caixa(user):
 
 def _can_view_caixa(user):
     return bool(_setores_caixa(user))
+
+
+def _assinaturas_destinadas_queryset(user):
+    if not user.is_authenticated:
+        return SolicitacaoAssinatura.objects.none()
+    setores_ids = _setores_membro_queryset(user).values_list("id", flat=True)
+    return SolicitacaoAssinatura.objects.filter(
+        Q(docente=user) | Q(setor_id__in=setores_ids)
+    )
+
+
+def _can_view_assinaturas(user):
+    return (
+        _has_gestao_access(user)
+        or _is_docente(user)
+        or _assinaturas_destinadas_queryset(user).exists()
+        or SolicitacaoAssinatura.objects.filter(criado_por=user).exists()
+    )
+
+
+def _assinaturas_pendentes_queryset(user):
+    return _assinaturas_destinadas_queryset(user).filter(
+        status=SolicitacaoAssinatura.Status.PENDENTE
+    ).select_related("criado_por", "docente", "setor").order_by("-criado_em")
+
+
+def _can_view_solicitacao_assinatura(user, solicitacao):
+    if not user.is_authenticated:
+        return False
+    if _has_gestao_access(user) or solicitacao.criado_por_id == user.id:
+        return True
+    if solicitacao.docente_id == user.id:
+        return True
+    if solicitacao.setor_id:
+        return _setores_membro_queryset(user).filter(id=solicitacao.setor_id).exists()
+    return False
+
+
+def _can_atender_solicitacao_assinatura(user, solicitacao):
+    if not user.is_authenticated or not solicitacao.is_pendente:
+        return False
+    if solicitacao.docente_id == user.id:
+        return True
+    if solicitacao.setor_id:
+        return _setores_membro_queryset(user).filter(id=solicitacao.setor_id).exists()
+    return False
 
 
 def _can_manage_restricted_docs(user):
@@ -370,6 +448,212 @@ def _registrar_alteracao_trajetoria(
     )
 
 
+def _trajetoria_label(trajetoria: TrajetoriaAcademica | None) -> str:
+    if not trajetoria:
+        return "-"
+    qualificacao = "Sim" if trajetoria.isQualificado else "Nao"
+    return (
+        f"{trajetoria.get_nivel_curso_display()};"
+        f"status={trajetoria.get_status_display()};"
+        f"ingresso={trajetoria.ingresso or '-'};"
+        f"{trajetoria.qualificacao_label_lower}={trajetoria.prazo_qualificacao or '-'};"
+        f"{trajetoria.qualificacao_label}={qualificacao};"
+        f"defesa={trajetoria.prazo_defesa or '-'};"
+        f"orientador={_docente_label(trajetoria.orientador)};"
+        f"coorientador={_coorientador_label(trajetoria)};"
+        f"reingressante={'Sim' if trajetoria.reingressante else 'Nao'}"
+    )
+
+
+def _trajetoria_campo_label(trajetoria: TrajetoriaAcademica, campo: str, valor: str) -> str:
+    return (
+        f"{trajetoria.get_nivel_curso_display()};"
+        f"ingresso={trajetoria.ingresso or '-'};"
+        f"{campo}={valor or '-'}"
+    )
+
+
+def _defesa_display(trajetoria: TrajetoriaAcademica) -> str:
+    data = trajetoria.data_defesa.isoformat() if trajetoria.data_defesa else "-"
+    return f"{trajetoria.numero_defesa or '-'} - {data}"
+
+
+def _estagio_docencia_label(estagio: EstagioDocencia | None) -> str:
+    if not estagio:
+        return "-"
+    inicio = estagio.inicio.isoformat() if estagio.inicio else "-"
+    termino = estagio.termino.isoformat() if estagio.termino else "-"
+    return (
+        f"supervisor={estagio.supervisor or '-'};"
+        f"status={estagio.get_status_display()};"
+        f"inicio={inicio};"
+        f"termino={termino}"
+    )
+
+
+def _trajetoria_campo_historico(trajetoria: TrajetoriaAcademica, campo: str) -> tuple[str, str]:
+    if campo == "status":
+        return "Status", trajetoria.get_status_display()
+    if campo == "nivel_curso":
+        return "Nivel", trajetoria.get_nivel_curso_display()
+    if campo == "prazo_qualificacao":
+        return f"Prazo {trajetoria.qualificacao_label_lower}", trajetoria.prazo_qualificacao or "-"
+    if campo == "prazo_defesa":
+        return "Prazo defesa", trajetoria.prazo_defesa or "-"
+    if campo == "reingressante":
+        return "Reingressante", _bool_label(trajetoria.reingressante)
+    if campo == "isQualificado":
+        return trajetoria.qualificacao_label, _bool_label(trajetoria.isQualificado)
+    if campo == "orientador":
+        return "Orientador", _docente_label(trajetoria.orientador)
+    if campo == "coorientador":
+        return "Coorientador", _coorientador_label(trajetoria)
+    if campo == "defesa":
+        return "Defesa", _defesa_display(trajetoria)
+    if campo == "deposito_versao_final":
+        return "Deposito final", _bool_label(trajetoria.deposito_versao_final)
+    return "Alteracao", "-"
+
+
+def _dados_aluno_label(aluno: Aluno) -> str:
+    return f"nome={aluno.nome or '-'};email={aluno.email or '-'};matricula={aluno.matricula or '-'}"
+
+
+def _parse_label_fields(valor: str) -> dict:
+    campos = {}
+    for index, parte in enumerate((valor or "").split(";")):
+        parte = parte.strip()
+        if not parte:
+            continue
+        if "=" in parte:
+            chave, conteudo = parte.split("=", 1)
+            campos[chave.strip()] = conteudo.strip()
+        elif index == 0:
+            campos["nivel"] = parte
+    return campos
+
+
+def _campo_alteracao_label(campo: str) -> str:
+    labels = {
+        "nivel": "Nivel",
+        "Nivel": "Nivel",
+        "status": "Status",
+        "Status": "Status",
+        "ingresso": "Ingresso",
+        "Ingresso": "Ingresso",
+        "defesa": "Defesa",
+        "Defesa": "Defesa",
+        "orientador": "Orientador",
+        "Orientador": "Orientador",
+        "coorientador": "Coorientador",
+        "Coorientador": "Coorientador",
+        "reingressante": "Reingressante",
+        "Reingressante": "Reingressante",
+        "nome": "Nome",
+        "email": "Email",
+        "matricula": "Matricula",
+        "Deposito final": "Deposito final",
+    }
+    if campo.lower().startswith("prazo "):
+        return "Prazo de qualificacao/projeto"
+    return labels.get(campo, campo.replace("_", " ").capitalize())
+
+
+def _alteracao_aluno_display(alteracao: AlteracaoAluno) -> dict:
+    anterior = _parse_label_fields(alteracao.valor_anterior)
+    novo = _parse_label_fields(alteracao.valor_novo)
+    nivel = novo.get("nivel") or anterior.get("nivel")
+    ingresso = novo.get("ingresso") or anterior.get("ingresso")
+
+    if nivel and ingresso:
+        trajetoria = f"{nivel} - Ingresso {ingresso}"
+    elif nivel:
+        trajetoria = nivel
+    else:
+        trajetoria = "Dados do aluno"
+
+    alteracoes = []
+    for campo in sorted(set(anterior) | set(novo)):
+        valor_anterior = anterior.get(campo, "-") or "-"
+        valor_novo = novo.get(campo, "-") or "-"
+        if valor_anterior != valor_novo:
+            alteracoes.append((_campo_alteracao_label(campo), valor_anterior, valor_novo))
+
+    if len(alteracoes) == 1:
+        campo, _valor_anterior, valor_novo = alteracoes[0]
+        texto_alteracao = f"Alteracao no {campo} ({valor_novo})"
+    elif alteracoes:
+        texto_alteracao = "; ".join(
+            f"{campo}: {valor_anterior} -> {valor_novo}"
+            for campo, valor_anterior, valor_novo in alteracoes
+        )
+    else:
+        texto_alteracao = "Alteracao registrada"
+
+    return {
+        "obj": alteracao,
+        "trajetoria": trajetoria,
+        "alteracao": texto_alteracao,
+    }
+
+
+def _bool_label(valor: bool) -> str:
+    return "Sim" if valor else "Nao"
+
+
+def _trajetoria_ativa(aluno: Aluno) -> TrajetoriaAcademica:
+    trajetoria = aluno.trajetorias.filter(status=TrajetoriaAcademica.Status.ATIVA).order_by("-criado_em").first()
+    return trajetoria
+
+
+def _trajetoria_referencia_listagem(aluno: Aluno) -> TrajetoriaAcademica:
+    trajetorias = list(aluno.trajetorias.all())
+    for trajetoria in trajetorias:
+        if trajetoria.status == TrajetoriaAcademica.Status.ATIVA:
+            return trajetoria
+    for trajetoria in trajetorias:
+        if trajetoria.status == TrajetoriaAcademica.Status.CONCLUIDA:
+            return trajetoria
+    return None
+
+
+def _status_trajetoria_listagem(status: str) -> str:
+    status_map = {
+        Aluno.StatusAluno.ATIVO: TrajetoriaAcademica.Status.ATIVA,
+        Aluno.StatusAluno.DEFENDEU: TrajetoriaAcademica.Status.CONCLUIDA,
+        Aluno.StatusAluno.DESLIGADO: TrajetoriaAcademica.Status.DESLIGADA,
+        "ATIVA": TrajetoriaAcademica.Status.ATIVA,
+        "CONCLUIDA": TrajetoriaAcademica.Status.CONCLUIDA,
+        "DESLIGADA": TrajetoriaAcademica.Status.DESLIGADA,
+        "TRANCADA": TrajetoriaAcademica.Status.TRANCADA,
+    }
+    return status_map.get(status, status)
+
+
+def _status_trajetoria_display(trajetoria: TrajetoriaAcademica) -> str:
+    status_map = {
+        TrajetoriaAcademica.Status.ATIVA: "Ativo",
+        TrajetoriaAcademica.Status.CONCLUIDA: "Concluido",
+        TrajetoriaAcademica.Status.DESLIGADA: "Desligado",
+        TrajetoriaAcademica.Status.TRANCADA: "Trancado",
+    }
+    return status_map.get(trajetoria.status, trajetoria.get_status_display())
+
+
+def _sincronizar_trajetoria_ativa(aluno: Aluno) -> TrajetoriaAcademica:
+    trajetoria = _trajetoria_ativa(aluno)
+    if not trajetoria:
+        return None
+    if aluno.status_aluno == Aluno.StatusAluno.DEFENDEU:
+        trajetoria.status = TrajetoriaAcademica.Status.CONCLUIDA
+    elif aluno.status_aluno == Aluno.StatusAluno.DESLIGADO:
+        trajetoria.status = TrajetoriaAcademica.Status.DESLIGADA
+    else:
+        trajetoria.status = TrajetoriaAcademica.Status.ATIVA
+    trajetoria.save()
+    return trajetoria
+
+
 def _is_processo_no_pleno(processo: Processo) -> bool:
     return _is_setor_pleno_nome(processo.setor_atual.nome)
 
@@ -396,12 +680,14 @@ def _menu_lateral_home(user):
             items.insert(1, {"label": "Processos no Pleno", "href": "/menu/processos-pleno/"})
         return items
     if user.tipo_usuario == User.TipoUsuario.ALUNO:
-        return [
+        items = [
             {"label": "Documento de vínculo (TODO)", "href": "/aluno/documento-vinculo/"},
             {"label": "Documento de histórico", "href": "/aluno/documento-historico/"},
             {"label": "Meus Processos", "href": "/menu/meus-processos/"},
-            {"label": "Novo processo", "href": "/processos/novo/"},
         ]
+        if _can_add_processo(user):
+            items.append({"label": "Novo processo", "href": "/processos/novo/"})
+        return items
     return []
 
 
@@ -765,14 +1051,16 @@ def home_view(request):
     can_view_caixa = _can_view_caixa(request.user)
     meus_processos_base = Processo.objects.filter(usuario_criado_por=request.user)
     meus_processos_requerente = meus_processos_base.filter(setor_atual__nome="Requerente")
+    assinaturas_pendentes = _assinaturas_pendentes_queryset(request.user)
     context = {
         "meus_processos_requerente": meus_processos_requerente,
+        "assinaturas_pendentes": assinaturas_pendentes,
         "is_coordenador": is_coordenador,
         "has_gestao_access": has_gestao_access,
         "can_view_dashboard": can_view_dashboard,
         "can_view_processos": can_view_processos,
         "can_view_caixa": can_view_caixa,
-        "can_add_processo": request.user.tipo_usuario != User.TipoUsuario.SERVIDOR,
+        "can_add_processo": _can_add_processo(request.user),
         "show_side_menu": request.user.tipo_usuario in [User.TipoUsuario.DOCENTE, User.TipoUsuario.ALUNO],
         "side_menu_title": "Menu",
         "side_menu_items": _menu_lateral_home(request.user),
@@ -1102,6 +1390,106 @@ def processos_view(request):
     )
 
 
+def cadastro_aluno_view(request):
+    if request.user.is_authenticated:
+        return redirect("home")
+
+    if request.method == "POST":
+        form = AlunoCadastroForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("cadastro_aluno_sucesso")
+    else:
+        form = AlunoCadastroForm()
+
+    return render(
+        request,
+        "registration/cadastro_aluno.html",
+        {"form": form},
+    )
+
+
+def cadastro_aluno_sucesso_view(request):
+    if request.user.is_authenticated:
+        return redirect("home")
+    return render(request, "registration/cadastro_aluno_sucesso.html")
+
+
+@login_required
+def validar_cadastros_alunos_view(request):
+    if not _is_servidor(request.user):
+        raise PermissionDenied("Acesso restrito a secretaria.")
+
+    if request.method == "POST":
+        aluno = get_object_or_404(
+            Aluno,
+            pk=request.POST.get("aluno_id"),
+            status_aluno=Aluno.StatusAluno.EM_AVALIACAO,
+        )
+        acao = request.POST.get("acao", "").strip()
+        trajetorias_em_homologacao = aluno.trajetorias.filter(
+            status=TrajetoriaAcademica.Status.EM_HOMOLOGACAO
+        )
+        if acao == "aprovar":
+            aluno.trajetorias.filter(status=TrajetoriaAcademica.Status.ATIVA).update(
+                status=TrajetoriaAcademica.Status.CONCLUIDA,
+            )
+            trajetorias_em_homologacao.update(status=TrajetoriaAcademica.Status.ATIVA)
+            aluno.status_aluno = Aluno.StatusAluno.ATIVO
+            aluno.save()
+            _registrar_alteracao_aluno(
+                aluno=aluno,
+                tipo=AlteracaoAluno.TipoAlteracao.STATUS,
+                valor_anterior="Em avaliacao",
+                valor_novo=aluno.get_status_aluno_display(),
+                comentario="Cadastro aprovado pela secretaria.",
+                alterado_por=request.user,
+            )
+            messages.success(request, f"Cadastro de {aluno.nome} aprovado.")
+        elif acao == "reprovar":
+            trajetorias_em_homologacao.update(status=TrajetoriaAcademica.Status.REMOVIDA)
+            aluno.status_aluno = Aluno.StatusAluno.DESLIGADO
+            aluno.save()
+            _registrar_alteracao_aluno(
+                aluno=aluno,
+                tipo=AlteracaoAluno.TipoAlteracao.STATUS,
+                valor_anterior="Em avaliacao",
+                valor_novo=aluno.get_status_aluno_display(),
+                comentario="Cadastro reprovado pela secretaria.",
+                alterado_por=request.user,
+            )
+            messages.success(request, f"Cadastro de {aluno.nome} reprovado.")
+        else:
+            messages.error(request, "Acao invalida para validacao de cadastro.")
+        return redirect("validar_cadastros_alunos")
+
+    alunos_pendentes = []
+    queryset = (
+        Aluno.objects.filter(status_aluno=Aluno.StatusAluno.EM_AVALIACAO)
+        .prefetch_related("trajetorias__orientador", "trajetorias__coorientador")
+        .order_by("date_joined", "nome")
+    )
+    for aluno in queryset:
+        trajetoria_atual = aluno.trajetoria_ativa()
+        if not trajetoria_atual:
+            trajetoria_atual = aluno.trajetorias.order_by("-criado_em").first()
+        aluno.trajetoria_atual = trajetoria_atual
+        alunos_pendentes.append(aluno)
+
+    return render(
+        request,
+        "processos/validar_cadastros_alunos.html",
+        {
+            "alunos_pendentes": alunos_pendentes,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
 @login_required
 def alunos_view(request):
     if not _has_gestao_access(request.user):
@@ -1148,6 +1536,7 @@ def alunos_view(request):
             "filtro_ingresso_fim": ingresso_fim_raw,
             "filtro_status": status,
             "status_list": Aluno.StatusAluno.choices,
+            "nivel_list": Aluno.NivelCurso.choices,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -1164,7 +1553,15 @@ def aluno_detalhe_view(request, aluno_id):
     if not (can_manage_aluno or is_self_aluno):
         raise PermissionDenied("Acesso restrito ao aluno, coordenadores e servidores.")
 
-    aluno = get_object_or_404(Aluno, pk=aluno_id)
+    aluno = get_object_or_404(
+        Aluno.objects.prefetch_related(
+            "trajetorias__orientador",
+            "trajetorias__coorientador",
+            "trajetorias__estagios_docencia",
+        ),
+        pk=aluno_id,
+    )
+    trajetoria_atual = _trajetoria_ativa(aluno)
     can_edit_publicacoes = can_manage_aluno or is_self_aluno
     can_edit_disciplinas = can_manage_aluno
 
@@ -1275,7 +1672,7 @@ def aluno_detalhe_view(request, aluno_id):
                     trajetoria.coorientador_externo_instituicao = dados["coorientador_externo_instituicao"]
                 trajetoria.save()
 
-                if trajetoria.status == TrajetoriaAcademica.Status.CONCLUIDA:
+                if trajetoria.status == TrajetoriaAcademica.Status.CONCLUIDA and trajetoria.usa_deposito_final:
                     aluno.status_aluno = Aluno.StatusAluno.DEFENDEU
                     aluno.save()
 
@@ -1420,8 +1817,9 @@ def aluno_detalhe_view(request, aluno_id):
                 trajetoria.data_defesa = parse_date(request.POST.get("data_defesa", ""))
                 if trajetoria.numero_defesa and trajetoria.data_defesa:
                     trajetoria.status = TrajetoriaAcademica.Status.CONCLUIDA
-                    aluno.status_aluno = Aluno.StatusAluno.DEFENDEU
-                    aluno.save()
+                    if trajetoria.usa_deposito_final:
+                        aluno.status_aluno = Aluno.StatusAluno.DEFENDEU
+                        aluno.save()
                 novo = f"numero={trajetoria.numero_defesa or '-'};data={trajetoria.data_defesa or '-'}"
             elif campo == "deposito_versao_final":
                 tipo = AlteracaoAluno.TipoAlteracao.DEPOSITO_FINAL
@@ -1460,6 +1858,308 @@ def aluno_detalhe_view(request, aluno_id):
                 messages.success(request, "Status do aluno atualizado.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
             messages.error(request, "Nao foi possivel alterar o status do aluno.")
+
+        elif acao == "alterar_dados":
+            form = AlunoDadosForm(request.POST, aluno=aluno)
+            if form.is_valid():
+                anterior = _dados_aluno_label(aluno)
+                aluno.nome = form.cleaned_data["nome"].strip()
+                aluno.email = form.cleaned_data["email"].strip()
+                aluno.matricula = form.cleaned_data["matricula"].strip()
+                try:
+                    aluno.save()
+                except ValidationError as exc:
+                    messages.error(request, exc.message_dict if hasattr(exc, "message_dict") else str(exc))
+                else:
+                    _registrar_alteracao_aluno(
+                        aluno=aluno,
+                        tipo=AlteracaoAluno.TipoAlteracao.TRAJETORIA,
+                        valor_anterior=anterior,
+                        valor_novo=_dados_aluno_label(aluno),
+                        comentario=form.cleaned_data["comentario"],
+                        alterado_por=request.user,
+                    )
+                    messages.success(request, "Dados do aluno atualizados.")
+                    return redirect("aluno_detalhe", aluno_id=aluno.id)
+            else:
+                messages.error(request, "Nao foi possivel atualizar os dados do aluno.")
+
+        elif acao == "editar_trajetoria":
+            form = TrajetoriaAcademicaForm(request.POST)
+            trajetoria = aluno.trajetorias.filter(id=request.POST.get("trajetoria_id")).first()
+            if not trajetoria:
+                messages.error(request, "Trajetoria academica nao encontrada.")
+            elif form.is_valid():
+                anterior = _trajetoria_label(trajetoria)
+                trajetoria.nivel_curso = form.cleaned_data["nivel_curso"]
+                trajetoria.status = form.cleaned_data["status"]
+                trajetoria.ingresso = form.cleaned_data["ingresso"].strip()
+                trajetoria.prazo_qualificacao = form.cleaned_data["prazo_qualificacao"].strip()
+                trajetoria.prazo_defesa = form.cleaned_data["prazo_defesa"].strip()
+                trajetoria.reingressante = form.cleaned_data["reingressante"]
+                trajetoria.isQualificado = form.cleaned_data["isQualificado"]
+                trajetoria.orientador = form.cleaned_data["orientador"]
+                trajetoria.coorientador = None
+                trajetoria.coorientador_externo_nome = ""
+                trajetoria.coorientador_externo_email = ""
+                trajetoria.coorientador_externo_instituicao = ""
+                if form.cleaned_data["tipo_coorientador"] == TrajetoriaAcademicaForm.TipoCoorientador.CADASTRADO:
+                    trajetoria.coorientador = form.cleaned_data["coorientador"]
+                elif form.cleaned_data["tipo_coorientador"] == TrajetoriaAcademicaForm.TipoCoorientador.EXTERNO:
+                    trajetoria.coorientador_externo_nome = form.cleaned_data["coorientador_externo_nome"].strip()
+                    trajetoria.coorientador_externo_email = form.cleaned_data["coorientador_externo_email"].strip()
+                    trajetoria.coorientador_externo_instituicao = form.cleaned_data[
+                        "coorientador_externo_instituicao"
+                    ].strip()
+                trajetoria.numero_defesa = form.cleaned_data["numero_defesa"].strip()
+                trajetoria.data_defesa = form.cleaned_data["data_defesa"]
+                trajetoria.deposito_versao_final = form.cleaned_data["deposito_versao_final"]
+                try:
+                    trajetoria.save()
+                except ValidationError as exc:
+                    messages.error(request, exc.message_dict if hasattr(exc, "message_dict") else str(exc))
+                else:
+                    if trajetoria.status == TrajetoriaAcademica.Status.ATIVA:
+                        aluno.trajetorias.exclude(id=trajetoria.id).filter(
+                            status=TrajetoriaAcademica.Status.ATIVA
+                        ).update(status=TrajetoriaAcademica.Status.CONCLUIDA)
+                    _registrar_alteracao_aluno(
+                        aluno=aluno,
+                        tipo=AlteracaoAluno.TipoAlteracao.TRAJETORIA,
+                        valor_anterior=anterior,
+                        valor_novo=_trajetoria_label(trajetoria),
+                        comentario=form.cleaned_data["comentario"],
+                        alterado_por=request.user,
+                    )
+                    messages.success(request, "Trajetoria academica atualizada.")
+                    return redirect("aluno_detalhe", aluno_id=aluno.id)
+            else:
+                messages.error(request, "Nao foi possivel atualizar a trajetoria academica.")
+
+        elif acao == "nova_trajetoria":
+            form = TrajetoriaAcademicaForm(request.POST)
+            if form.is_valid():
+                trajetoria = TrajetoriaAcademica(
+                    aluno=aluno,
+                    nivel_curso=form.cleaned_data["nivel_curso"],
+                    status=form.cleaned_data["status"],
+                    ingresso=form.cleaned_data["ingresso"].strip(),
+                    prazo_qualificacao=form.cleaned_data["prazo_qualificacao"].strip(),
+                    prazo_defesa=form.cleaned_data["prazo_defesa"].strip(),
+                    reingressante=form.cleaned_data["reingressante"],
+                    isQualificado=form.cleaned_data["isQualificado"],
+                    orientador=form.cleaned_data["orientador"],
+                    numero_defesa=form.cleaned_data["numero_defesa"].strip(),
+                    data_defesa=form.cleaned_data["data_defesa"],
+                    deposito_versao_final=form.cleaned_data["deposito_versao_final"],
+                )
+                if form.cleaned_data["tipo_coorientador"] == TrajetoriaAcademicaForm.TipoCoorientador.CADASTRADO:
+                    trajetoria.coorientador = form.cleaned_data["coorientador"]
+                elif form.cleaned_data["tipo_coorientador"] == TrajetoriaAcademicaForm.TipoCoorientador.EXTERNO:
+                    trajetoria.coorientador_externo_nome = form.cleaned_data["coorientador_externo_nome"].strip()
+                    trajetoria.coorientador_externo_email = form.cleaned_data["coorientador_externo_email"].strip()
+                    trajetoria.coorientador_externo_instituicao = form.cleaned_data[
+                        "coorientador_externo_instituicao"
+                    ].strip()
+                try:
+                    trajetoria.save()
+                except ValidationError as exc:
+                    messages.error(request, exc.message_dict if hasattr(exc, "message_dict") else str(exc))
+                else:
+                    if trajetoria.status == TrajetoriaAcademica.Status.ATIVA:
+                        aluno.trajetorias.exclude(id=trajetoria.id).filter(
+                            status=TrajetoriaAcademica.Status.ATIVA
+                        ).update(status=TrajetoriaAcademica.Status.CONCLUIDA)
+                    _registrar_alteracao_aluno(
+                        aluno=aluno,
+                        tipo=AlteracaoAluno.TipoAlteracao.TRAJETORIA,
+                        valor_anterior="Sem trajetoria",
+                        valor_novo=_trajetoria_label(trajetoria),
+                        comentario=form.cleaned_data["comentario"],
+                        alterado_por=request.user,
+                    )
+                    messages.success(request, "Nova trajetoria academica cadastrada.")
+                    return redirect("aluno_detalhe", aluno_id=aluno.id)
+            else:
+                messages.error(request, "Nao foi possivel cadastrar a trajetoria academica.")
+
+        elif acao == "alterar_trajetoria_campo":
+            trajetoria = aluno.trajetorias.filter(id=request.POST.get("trajetoria_id")).first()
+            campo = request.POST.get("campo", "").strip()
+            comentario = request.POST.get("comentario", "").strip()
+            if not trajetoria:
+                messages.error(request, "Trajetoria academica nao encontrada.")
+            elif not comentario:
+                messages.error(request, "Informe um comentario para registrar a alteracao.")
+            else:
+                campo_historico, valor_anterior = _trajetoria_campo_historico(trajetoria, campo)
+                try:
+                    if campo == "status":
+                        form = TrajetoriaStatusForm(request.POST)
+                        if not form.is_valid():
+                            raise ValidationError(form.errors)
+                        trajetoria.status = form.cleaned_data["status"]
+                    elif campo == "nivel_curso":
+                        nivel = request.POST.get("nivel_curso", "").strip()
+                        niveis_validos = dict(Aluno.NivelCurso.choices)
+                        if nivel not in niveis_validos:
+                            raise ValidationError("Nivel de curso invalido.")
+                        trajetoria.nivel_curso = nivel
+                    elif campo == "prazo_qualificacao":
+                        valor = request.POST.get("prazo_qualificacao", "").strip()
+                        if valor and not _semestre_valido(valor):
+                            raise ValidationError("Informe o prazo no formato YYYY.1 ou YYYY.2.")
+                        trajetoria.prazo_qualificacao = valor
+                    elif campo == "prazo_defesa":
+                        valor = request.POST.get("prazo_defesa", "").strip()
+                        if valor and not _semestre_valido(valor):
+                            raise ValidationError("Informe o prazo no formato YYYY.1 ou YYYY.2.")
+                        trajetoria.prazo_defesa = valor
+                    elif campo == "reingressante":
+                        trajetoria.reingressante = request.POST.get("reingressante") == "on"
+                    elif campo == "isQualificado":
+                        trajetoria.isQualificado = request.POST.get("isQualificado") == "on"
+                    elif campo == "orientador":
+                        orientador_id = request.POST.get("orientador", "").strip()
+                        trajetoria.orientador = (
+                            User.objects.filter(id=orientador_id, tipo_usuario=User.TipoUsuario.DOCENTE).first()
+                            if orientador_id
+                            else None
+                        )
+                    elif campo == "coorientador":
+                        tipo_coorientador = request.POST.get("tipo_coorientador", "").strip()
+                        trajetoria.coorientador = None
+                        trajetoria.coorientador_externo_nome = ""
+                        trajetoria.coorientador_externo_email = ""
+                        trajetoria.coorientador_externo_instituicao = ""
+                        if tipo_coorientador == TrajetoriaAcademicaForm.TipoCoorientador.CADASTRADO:
+                            coorientador_id = request.POST.get("coorientador", "").strip()
+                            coorientador = User.objects.filter(
+                                id=coorientador_id,
+                                tipo_usuario=User.TipoUsuario.DOCENTE,
+                            ).first()
+                            if not coorientador:
+                                raise ValidationError("Selecione um docente cadastrado.")
+                            trajetoria.coorientador = coorientador
+                        elif tipo_coorientador == TrajetoriaAcademicaForm.TipoCoorientador.EXTERNO:
+                            externo_nome = request.POST.get("coorientador_externo_nome", "").strip()
+                            if not externo_nome:
+                                raise ValidationError("Informe o nome do coorientador externo.")
+                            trajetoria.coorientador_externo_nome = externo_nome
+                            trajetoria.coorientador_externo_email = request.POST.get(
+                                "coorientador_externo_email",
+                                "",
+                            ).strip()
+                            trajetoria.coorientador_externo_instituicao = request.POST.get(
+                                "coorientador_externo_instituicao",
+                                "",
+                            ).strip()
+                        elif tipo_coorientador != TrajetoriaAcademicaForm.TipoCoorientador.NENHUM:
+                            raise ValidationError("Tipo de coorientador invalido.")
+                    elif campo == "defesa":
+                        trajetoria.numero_defesa = request.POST.get("numero_defesa", "").strip()
+                        data_defesa = request.POST.get("data_defesa", "").strip()
+                        trajetoria.data_defesa = data_defesa or None
+                        if trajetoria.numero_defesa or trajetoria.data_defesa:
+                            trajetoria.status = TrajetoriaAcademica.Status.CONCLUIDA
+                    elif campo == "deposito_versao_final":
+                        trajetoria.deposito_versao_final = request.POST.get("deposito_versao_final") == "on"
+                    else:
+                        raise ValidationError("Campo de trajetoria invalido.")
+
+                    trajetoria.save()
+                except ValidationError as exc:
+                    messages.error(request, exc.message_dict if hasattr(exc, "message_dict") else str(exc))
+                else:
+                    if campo == "status" and trajetoria.status == TrajetoriaAcademica.Status.ATIVA:
+                        aluno.trajetorias.exclude(id=trajetoria.id).filter(
+                            status=TrajetoriaAcademica.Status.ATIVA
+                        ).update(status=TrajetoriaAcademica.Status.CONCLUIDA)
+                    _registrar_alteracao_aluno(
+                        aluno=aluno,
+                        tipo=AlteracaoAluno.TipoAlteracao.TRAJETORIA,
+                        valor_anterior=_trajetoria_campo_label(trajetoria, campo_historico, valor_anterior),
+                        valor_novo=_trajetoria_campo_label(
+                            trajetoria,
+                            campo_historico,
+                            _trajetoria_campo_historico(trajetoria, campo)[1],
+                        ),
+                        comentario=comentario,
+                        alterado_por=request.user,
+                    )
+                    messages.success(request, "Informacao da trajetoria atualizada.")
+                    return redirect("aluno_detalhe", aluno_id=aluno.id)
+
+        
+        elif acao == "novo_estagio_docencia":
+            form = NovoEstagioDocenciaForm(request.POST)
+            
+            if form.is_valid():
+                trajetoria_id = form.cleaned_data["trajetoria_id"]
+                trajetoria = get_object_or_404(TrajetoriaAcademica, id=trajetoria_id)
+
+                # Cria o estágio no banco pegando TUDO diretamente do formulário (da tela)
+                novo_estagio = EstagioDocencia.objects.create(
+                    trajetoria=trajetoria,
+                    supervisor=form.cleaned_data["supervisor"].strip(),
+                    status=form.cleaned_data["status"],
+                    inicio=form.cleaned_data.get("inicio"),
+                    termino=form.cleaned_data.get("termino")
+                )
+
+                estado_novo = _estagio_docencia_label(novo_estagio)
+                
+                # Auditoria
+                _registrar_alteracao_aluno(
+                    aluno=aluno, 
+                    tipo=AlteracaoAluno.TipoAlteracao.TRAJETORIA, # Ou o tipo específico que usarem
+                    valor_anterior="Nenhum estágio",
+                    valor_novo=estado_novo,
+                    comentario=form.cleaned_data["comentario"].strip(),
+                    alterado_por=request.user
+                )
+                
+                messages.success(request, "Novo estágio de docência criado com sucesso.")
+                return redirect("aluno_detalhe", aluno_id=aluno.id)
+            else:
+                messages.error(request, "Erro ao criar estágio. Verifique os campos.")
+
+
+        
+        elif acao == "alterar_estagio_docencia": # Nome ajustado para bater com o HTML
+            form = EstagioDocenciaUpdateForm(request.POST)
+
+            if form.is_valid():
+                estagio_id = form.cleaned_data["estagio_id"]
+                estagio = get_object_or_404(EstagioDocencia, id=estagio_id)
+
+                # Captura o estado antes usando o padrão da casa
+                estado_anterior = _estagio_docencia_label(estagio)
+
+                # Atualiza os campos
+                estagio.supervisor = form.cleaned_data["supervisor"].strip()
+                estagio.status = form.cleaned_data["status"]
+                estagio.inicio = form.cleaned_data["inicio"]
+                estagio.termino = form.cleaned_data["termino"]
+                estagio.save()
+
+                # Captura o estado depois usando o padrão da casa
+                estado_novo = _estagio_docencia_label(estagio)
+
+                # Auditoria
+                _registrar_alteracao_aluno(
+                    aluno=aluno,
+                    tipo=AlteracaoAluno.TipoAlteracao.TRAJETORIA,
+                    valor_anterior=estado_anterior,
+                    valor_novo=estado_novo,
+                    comentario=form.cleaned_data["comentario"].strip(),
+                    alterado_por=request.user,
+                )
+
+                messages.success(request, "Estágio de docência atualizado com sucesso.")
+                return redirect("aluno_detalhe", aluno_id=aluno.id)
+            else:
+                messages.error(request, "Não foi possível atualizar o estágio. Verifique os campos.")
 
         elif acao == "alterar_qualificacao":
             form = AlunoQualificacaoForm(request.POST)
@@ -1609,14 +2309,33 @@ def aluno_detalhe_view(request, aluno_id):
         .order_by("-data_criacao")
     )
     trajetorias = aluno.trajetorias.select_related("orientador", "coorientador").order_by("-criado_em")
-    trajetoria_atual = aluno.trajetoria_ativa()
-    trajetoria_cards = [
-        {
-            "obj": trajetoria,
-            "form": TrajetoriaAcademicaForm(initial=_trajetoria_form_initial(trajetoria)),
-        }
-        for trajetoria in trajetorias
-    ]
+    trajetoria_cards = []
+    for trajetoria in trajetorias:
+        estagio_cards = [
+            {
+                "obj": estagio,
+                "form": EstagioDocenciaUpdateForm(
+                    initial={
+                        "estagio_id": estagio.id,
+                        "supervisor": estagio.supervisor,
+                        "status": estagio.status,
+                        "inicio": estagio.inicio,
+                        "termino": estagio.termino,
+                    }
+                ),
+            }
+            for estagio in trajetoria.estagios_docencia.all()
+        ]
+        trajetoria_cards.append(
+            {
+                "obj": trajetoria,
+                "form": TrajetoriaAcademicaForm(initial=_trajetoria_form_initial(trajetoria)),
+                "estagio_cards": estagio_cards,
+                "novo_estagio_form": NovoEstagioDocenciaForm(
+                    initial={"trajetoria_id": trajetoria.id}
+                ),
+            }
+        )
     dados_form = AlunoDadosForm(
         aluno=aluno,
         initial={
@@ -1754,9 +2473,15 @@ def processo_detalhe_view(request, processo_id):
             "comentarios__autor",
             "manifestacoes__responsavel",
             "manifestacoes__solicitado_por",
-            "tramitacoes__setor_origem",
-            "tramitacoes__setor_destino",
-            "tramitacoes__encaminhado_por",
+            Prefetch(
+                "tramitacoes",
+                queryset=TramitacaoProcesso.objects.select_related(
+                    "setor_origem",
+                    "setor_destino",
+                    "encaminhado_por",
+                ).order_by("-data_encaminhamento"),
+                to_attr="tramitacoes_historico",
+            ),
         ),
         id=processo_id,
     )
@@ -2085,6 +2810,7 @@ def processo_detalhe_view(request, processo_id):
         "processos/processo_detalhe.html",
         {
             "processo": processo,
+            "tramitacoes_historico": processo.tramitacoes_historico,
             "documentos_exibicao": documentos_exibicao,
             "can_manage_in_caixa": can_manage_in_caixa,
             "can_manage_requerente": can_manage_requerente,
@@ -2120,8 +2846,8 @@ def processo_detalhe_view(request, processo_id):
 
 @login_required
 def novo_processo_view(request):
-    if _is_servidor(request.user):
-        raise PermissionDenied("Perfil SERVIDOR nao pode abrir processo.")
+    if not _can_add_processo(request.user):
+        raise PermissionDenied("Seu cadastro precisa estar aprovado para abrir processo.")
 
     if request.method == "POST":
         form = ProcessoAberturaForm(request.POST, request.FILES, user=request.user)
@@ -2169,8 +2895,6 @@ def novo_processo_view(request):
                 processo.setor_atual = setor_secretaria
                 processo.status = Processo.StatusProcesso.EM_ANALISE
                 processo.save()
-                if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
-                    form.cleaned_data.get("formularios_banca", SolicitacaoBanca.objects.none()).update(processo=processo)
 
                 for documento_form in documentos_forms:
                     processo.adicionar_documento(
@@ -2566,13 +3290,183 @@ def _solicitacao_banca_context(form, request, solicitacao=None):
     }
 
 
+def _criar_processo_para_solicitacao_banca(solicitacao):
+    if solicitacao.processo_id:
+        return solicitacao.processo, False
+
+    setor_secretaria = Setor.objects.filter(nome="Secretaria PPGEC", ativo=True).first()
+    if not setor_secretaria:
+        raise ValidationError("Setor inicial 'Secretaria PPGEC' nao encontrado. Contate o administrador.")
+
+    processo = Processo.objects.create(
+        usuario_criado_por=solicitacao.docente,
+        tipo=solicitacao.tipo_defesa,
+        assunto=f"{solicitacao.get_tipo_defesa_display()} - {solicitacao.aluno.nome}",
+        descricao=(
+            "Processo gerado automaticamente a partir da solicitacao de banca "
+            f"finalizada em {timezone.localtime(solicitacao.finalizado_em):%d/%m/%Y %H:%M}."
+        ),
+        setor_atual=setor_secretaria,
+        status=Processo.StatusProcesso.EM_ANALISE,
+    )
+    solicitacao.processo = processo
+    solicitacao.save(update_fields=["processo"])
+    return processo, True
+
+
+@login_required
+def solicitacoes_assinatura_view(request):
+    if not _can_view_assinaturas(request.user) and not _has_gestao_access(request.user):
+        raise PermissionDenied("Acesso restrito a solicitacoes de assinatura.")
+
+    queryset = SolicitacaoAssinatura.objects.select_related(
+        "criado_por",
+        "docente",
+        "setor",
+        "assinado_por",
+    )
+    if not _has_gestao_access(request.user):
+        queryset = queryset.filter(
+            Q(id__in=_assinaturas_destinadas_queryset(request.user).values("id"))
+            | Q(criado_por=request.user)
+        )
+
+    status = request.GET.get("status", "").strip().upper()
+    if status in {SolicitacaoAssinatura.Status.PENDENTE, SolicitacaoAssinatura.Status.ASSINADO}:
+        queryset = queryset.filter(status=status)
+    else:
+        status = ""
+
+    return render(
+        request,
+        "processos/solicitacoes_assinatura.html",
+        {
+            "page_title": "Solicitacoes de Assinatura",
+            "page_description": "Acompanhe assinaturas em documentos do SEI ou PDFs.",
+            "solicitacoes": queryset,
+            "status_filtro": status,
+            "status_choices": SolicitacaoAssinatura.Status.choices,
+            "show_status_filters": True,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
+@login_required
+def pendencias_assinatura_view(request):
+    pendencias = _assinaturas_pendentes_queryset(request.user)
+    if not pendencias.exists() and not _has_gestao_access(request.user) and not _is_docente(request.user):
+        raise PermissionDenied("Acesso restrito a pendencias de assinatura.")
+
+    return render(
+        request,
+        "processos/solicitacoes_assinatura.html",
+        {
+            "page_title": "Pendencias de Assinatura",
+            "page_description": "Assinaturas pendentes destinadas a voce.",
+            "solicitacoes": pendencias,
+            "status_filtro": SolicitacaoAssinatura.Status.PENDENTE,
+            "status_choices": SolicitacaoAssinatura.Status.choices,
+            "show_status_filters": False,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
+@login_required
+def nova_solicitacao_assinatura_view(request):
+    if not _has_gestao_access(request.user):
+        raise PermissionDenied("Acesso restrito a secretaria e coordenacao.")
+
+    if request.method == "POST":
+        form = SolicitacaoAssinaturaForm(request.POST, request.FILES)
+        if form.is_valid():
+            solicitacao = form.save(commit=False)
+            solicitacao.criado_por = request.user
+            solicitacao.status = SolicitacaoAssinatura.Status.PENDENTE
+            solicitacao.save()
+            send_email_solicitacao_assinatura.delay(solicitacao.id)
+            messages.success(request, "Solicitacao de assinatura enviada.")
+            return redirect("solicitacoes_assinatura")
+    else:
+        form = SolicitacaoAssinaturaForm()
+
+    return render(
+        request,
+        "processos/nova_solicitacao_assinatura.html",
+        {
+            "form": form,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
+@login_required
+def solicitacao_assinatura_detalhe_view(request, solicitacao_id):
+    solicitacao = get_object_or_404(
+        SolicitacaoAssinatura.objects.select_related("criado_por", "docente", "setor", "assinado_por"),
+        pk=solicitacao_id,
+    )
+    if not _can_view_solicitacao_assinatura(request.user, solicitacao):
+        raise PermissionDenied("Voce nao pode visualizar esta solicitacao de assinatura.")
+
+    can_atender = _can_atender_solicitacao_assinatura(request.user, solicitacao)
+    if request.method == "POST":
+        if not can_atender:
+            raise PermissionDenied("Voce nao pode atender esta solicitacao de assinatura.")
+        form = AtenderSolicitacaoAssinaturaForm(
+            request.POST,
+            request.FILES,
+            instance=solicitacao,
+            solicitacao=solicitacao,
+        )
+        if form.is_valid():
+            solicitacao = form.save(commit=False)
+            solicitacao.marcar_assinado(
+                usuario=request.user,
+                documento_assinado=form.cleaned_data.get("documento_assinado_pdf"),
+                observacao=form.cleaned_data.get("observacao_assinatura"),
+            )
+            messages.success(request, "Solicitacao de assinatura concluida.")
+            return redirect("solicitacao_assinatura_detalhe", solicitacao_id=solicitacao.id)
+    else:
+        form = AtenderSolicitacaoAssinaturaForm(instance=solicitacao, solicitacao=solicitacao)
+
+    return render(
+        request,
+        "processos/solicitacao_assinatura_detalhe.html",
+        {
+            "solicitacao": solicitacao,
+            "form": form,
+            "can_atender": can_atender,
+            "is_coordenador": _is_coordenador(request.user),
+            "has_gestao_access": _has_gestao_access(request.user),
+            "can_view_dashboard": _can_view_dashboard(request.user),
+            "can_view_processos": _can_view_processos(request.user),
+            "can_view_caixa": _can_view_caixa(request.user),
+        },
+    )
+
+
 @login_required
 def solicitacoes_banca_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.DOCENTE:
         raise PermissionDenied("Acesso restrito a docentes.")
 
     solicitacoes = (
-        SolicitacaoBanca.objects.select_related("aluno", "trajetoria")
+        SolicitacaoBanca.objects.select_related("aluno", "trajetoria", "processo")
         .filter(docente=request.user)
         .order_by("-atualizado_em")
     )
@@ -2599,14 +3493,32 @@ def solicitacao_banca_nova_view(request):
     form = SolicitacaoBancaForm(request.POST or None, docente=request.user, finalizar=finalizar)
     if request.method == "POST" and form.is_valid():
         status = SolicitacaoBanca.Status.FINALIZADA if finalizar else SolicitacaoBanca.Status.RASCUNHO
-        solicitacao = form.save(commit=False, docente=request.user, status=status)
-        if finalizar:
-            solicitacao.finalizado_por = request.user
-            solicitacao.finalizado_em = timezone.now()
-        solicitacao.save()
-        form.save_membros(solicitacao)
-        messages.success(request, "Solicitacao de banca finalizada." if finalizar else "Rascunho salvo.")
-        return redirect("solicitacao_banca_detalhe", solicitacao_id=solicitacao.id)
+        processo_criado = None
+        try:
+            with transaction.atomic():
+                solicitacao = form.save(commit=False, docente=request.user, status=status)
+                if finalizar:
+                    solicitacao.finalizado_por = request.user
+                    solicitacao.finalizado_em = timezone.now()
+                solicitacao.save()
+                form.save_membros(solicitacao)
+                if finalizar:
+                    processo, criado = _criar_processo_para_solicitacao_banca(solicitacao)
+                    processo_criado = processo if criado else None
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0] if exc.messages else str(exc))
+        else:
+            if processo_criado:
+                send_email_novo_processo_aluno.delay(processo_criado.id)
+                send_email_novo_processo_orientador.delay(processo_criado.id)
+                send_email_novo_processo_secretaria.delay(processo_criado.id)
+                messages.success(
+                    request,
+                    f"Solicitacao de banca finalizada e processo {processo_criado.numero} aberto com sucesso.",
+                )
+            else:
+                messages.success(request, "Solicitacao de banca finalizada." if finalizar else "Rascunho salvo.")
+            return redirect("solicitacao_banca_detalhe", solicitacao_id=solicitacao.id)
 
     return render(request, "processos/solicitacao_banca_form.html", _solicitacao_banca_context(form, request))
 
@@ -2617,7 +3529,7 @@ def solicitacao_banca_detalhe_view(request, solicitacao_id):
         raise PermissionDenied("Acesso restrito a docentes.")
 
     solicitacao = get_object_or_404(
-        SolicitacaoBanca.objects.select_related("aluno", "trajetoria", "finalizado_por").prefetch_related("membros"),
+        SolicitacaoBanca.objects.select_related("aluno", "trajetoria", "finalizado_por", "processo").prefetch_related("membros"),
         pk=solicitacao_id,
         docente=request.user,
     )
@@ -2644,14 +3556,32 @@ def solicitacao_banca_detalhe_view(request, solicitacao_id):
     )
     if request.method == "POST" and form.is_valid():
         status = SolicitacaoBanca.Status.FINALIZADA if finalizar else SolicitacaoBanca.Status.RASCUNHO
-        solicitacao = form.save(commit=False, docente=request.user, status=status)
-        if finalizar:
-            solicitacao.finalizado_por = request.user
-            solicitacao.finalizado_em = timezone.now()
-        solicitacao.save()
-        form.save_membros(solicitacao)
-        messages.success(request, "Solicitacao de banca finalizada." if finalizar else "Rascunho salvo.")
-        return redirect("solicitacao_banca_detalhe", solicitacao_id=solicitacao.id)
+        processo_criado = None
+        try:
+            with transaction.atomic():
+                solicitacao = form.save(commit=False, docente=request.user, status=status)
+                if finalizar:
+                    solicitacao.finalizado_por = request.user
+                    solicitacao.finalizado_em = timezone.now()
+                solicitacao.save()
+                form.save_membros(solicitacao)
+                if finalizar:
+                    processo, criado = _criar_processo_para_solicitacao_banca(solicitacao)
+                    processo_criado = processo if criado else None
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0] if exc.messages else str(exc))
+        else:
+            if processo_criado:
+                send_email_novo_processo_aluno.delay(processo_criado.id)
+                send_email_novo_processo_orientador.delay(processo_criado.id)
+                send_email_novo_processo_secretaria.delay(processo_criado.id)
+                messages.success(
+                    request,
+                    f"Solicitacao de banca finalizada e processo {processo_criado.numero} aberto com sucesso.",
+                )
+            else:
+                messages.success(request, "Solicitacao de banca finalizada." if finalizar else "Rascunho salvo.")
+            return redirect("solicitacao_banca_detalhe", solicitacao_id=solicitacao.id)
 
     return render(
         request,

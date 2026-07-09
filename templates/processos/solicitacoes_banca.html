@@ -28,6 +28,13 @@
                             <span class="badge {% if solicitacao.status == 'FINALIZADA' %}badge-ok{% else %}badge-info{% endif %}">
                                 {{ solicitacao.get_status_display }}
                             </span>
+                            {% if solicitacao.processo %}
+                                <a class="badge badge-info" href="{% url 'processo_detalhe' solicitacao.processo.id %}">
+                                    Processo {{ solicitacao.processo.numero }}
+                                </a>
+                            {% elif solicitacao.status == 'FINALIZADA' %}
+                                <span class="badge badge-info">Processo pendente</span>
+                            {% endif %}
                             <a class="btn btn-secondary" href="{% url 'solicitacao_banca_detalhe' solicitacao.id %}">
                                 {% if solicitacao.is_rascunho %}Editar{% else %}Ver{% endif %}
                             </a>
