@@ -81,6 +81,14 @@ def _menu_lateral_sections(user):
         )
     if user.tipo_usuario == User.TipoUsuario.ALUNO:
         principal_items.append(
+            _menu_item(
+                "Matrícula",
+                "/matriculas/",
+                ["matriculas_minhas", "matricula_solicitar", "matricula_solicitar_periodo", "matricula_minha_solicitacao"],
+                "M",
+            )
+        )
+        principal_items.append(
             _menu_item("Documento de Vínculo", "/aluno/documento-vinculo/", ["aluno_documento_vinculo"], "D")
         )
         principal_items.append(
@@ -125,6 +133,7 @@ def _menu_lateral_sections(user):
 
     if user.tipo_usuario == User.TipoUsuario.DOCENTE:
         docente_items = [
+            _menu_item("Ofertas de Disciplinas", "/gestao/matriculas/ofertas/", ["matriculas_ofertas"], "O"),
             _menu_item("Ciências", "/menu/ciencias-manifestadas/", ["menu_ciencias_manifestadas"], "C"),
             _menu_item("Meus Orientandos", "/menu/meus-orientandos/", ["menu_meus_orientandos"], "O"),
             _menu_item(
@@ -160,6 +169,28 @@ def _menu_lateral_sections(user):
             )
         coordenacao_items.extend([
             _menu_item("Dashboard", "/coordenacao/dashboard/", ["coordenacao_dashboard"], "D"),
+            _menu_item(
+                "Matrículas",
+                "/gestao/matriculas/periodos/",
+                [
+                    "matriculas_periodos",
+                    "matriculas_disciplinas",
+                    "matriculas_ofertas",
+                    "matricula_oferta_alunos",
+                    "matricula_oferta_exportar",
+                ],
+                "M",
+                children=[
+                    _menu_item("Períodos letivos", "/gestao/matriculas/periodos/", ["matriculas_periodos"], "P"),
+                    _menu_item("Disciplinas", "/gestao/matriculas/disciplinas/", ["matriculas_disciplinas"], "D"),
+                    _menu_item(
+                        "Ofertas de disciplinas",
+                        "/gestao/matriculas/ofertas/",
+                        ["matriculas_ofertas", "matricula_oferta_alunos", "matricula_oferta_exportar"],
+                        "O",
+                    ),
+                ],
+            ),
             _menu_item("Alunos", "/coordenacao/alunos/", ["coordenacao_alunos", "aluno_detalhe"], "A"),
             _menu_item("Setores e Comissões", "/coordenacao/setores/", ["setores_comissoes"], "S"),
         ])

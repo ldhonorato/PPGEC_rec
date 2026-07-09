@@ -337,6 +337,384 @@ class DisciplinaTrajetoria(models.Model):
         return super().save(*args, **kwargs)
 
 
+class Disciplina(models.Model):
+    codigo = models.CharField(max_length=40, unique=True)
+    nome = models.CharField(max_length=255)
+    creditos = models.PositiveSmallIntegerField(null=True, blank=True)
+    carga_horaria = models.PositiveSmallIntegerField(null=True, blank=True)
+    ativa = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["codigo", "nome"]
+
+    def __str__(self) -> str:
+        return f"{self.codigo} - {self.nome}" if self.codigo else self.nome
+
+    def save(self, *args, **kwargs):
+        self.codigo = (self.codigo or "").strip().upper()
+        self.nome = (self.nome or "").strip()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class PeriodoLetivo(models.Model):
+    class Status(models.TextChoices):
+        PLANEJAMENTO = "PLANEJAMENTO", "Planejamento"
+        MATRICULA_ABERTA = "MATRICULA_ABERTA", "Matrícula aberta"
+        MODIFICACAO_MATRICULA = "MODIFICACAO_MATRICULA", "Modificação de matrícula"
+        ENCERRADO = "ENCERRADO", "Encerrado"
+
+    nome = models.CharField(max_length=20, unique=True, validators=[Aluno.semestre_validator])
+    status = models.CharField(max_length=25, choices=Status.choices, default=Status.PLANEJAMENTO)
+    prazo_cadastro_disciplinas = models.DateField()
+    matricula_inicio = models.DateField()
+    matricula_fim = models.DateField()
+    modificacao_inicio = models.DateField()
+    modificacao_fim = models.DateField()
+    encerrado_manualmente_em = models.DateTimeField(null=True, blank=True)
+    encerrado_manualmente_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="periodos_letivos_encerrados",
+    )
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="periodos_letivos_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-nome"]
+
+    def __str__(self) -> str:
+        return self.nome
+
+    @property
+    def status_atual(self):
+        return self.status
+
+    def calcular_status_por_data(self, data_base=None):
+        data_base = data_base or timezone.localdate()
+        if self.encerrado_manualmente_em:
+            return self.Status.ENCERRADO
+        if self.matricula_inicio <= data_base <= self.matricula_fim:
+            return self.Status.MATRICULA_ABERTA
+        if self.modificacao_inicio <= data_base <= self.modificacao_fim:
+            return self.Status.MODIFICACAO_MATRICULA
+        if data_base > self.modificacao_fim:
+            return self.Status.ENCERRADO
+        return self.Status.PLANEJAMENTO
+
+    def atualizar_status_por_data(self, data_base=None, *, save=True):
+        novo_status = self.calcular_status_por_data(data_base)
+        if self.status == novo_status:
+            return False
+        self.status = novo_status
+        if save:
+            self.save(update_fields=["status", "atualizado_em"])
+        return True
+
+    @property
+    def status_atual_display(self):
+        return self.get_status_display()
+
+    @property
+    def aceita_ofertas(self):
+        return not self.encerrado_manualmente_em and timezone.localdate() <= self.prazo_cadastro_disciplinas
+
+    @property
+    def aceita_solicitacao_matricula(self):
+        return self.status in {
+            self.Status.MATRICULA_ABERTA,
+            self.Status.MODIFICACAO_MATRICULA,
+        }
+
+    def clean(self):
+        errors = {}
+        if self.matricula_inicio and self.matricula_fim and self.matricula_fim < self.matricula_inicio:
+            errors["matricula_fim"] = "O fim da matrícula deve ser posterior ou igual ao início."
+        if self.modificacao_inicio and self.modificacao_fim and self.modificacao_fim < self.modificacao_inicio:
+            errors["modificacao_fim"] = "O fim da modificação deve ser posterior ou igual ao início."
+        if self.modificacao_inicio and self.matricula_fim and self.modificacao_inicio < self.matricula_fim:
+            errors["modificacao_inicio"] = "A modificação de matrícula deve iniciar após o fim da matrícula."
+        if (
+            self.prazo_cadastro_disciplinas
+            and self.matricula_inicio
+            and self.prazo_cadastro_disciplinas > self.matricula_inicio
+        ):
+            errors["prazo_cadastro_disciplinas"] = "O cadastro de disciplinas deve encerrar antes do início da matrícula."
+        if bool(self.encerrado_manualmente_em) != bool(self.encerrado_manualmente_por_id):
+            errors["encerrado_manualmente_em"] = "Informe data e responsável pelo encerramento manual."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.nome = (self.nome or "").strip()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class OfertaDisciplina(models.Model):
+    class Modalidade(models.TextChoices):
+        PRESENCIAL = "PRESENCIAL", "Presencial"
+        HIBRIDA = "HIBRIDA", "Híbrida"
+
+    periodo = models.ForeignKey(PeriodoLetivo, on_delete=models.CASCADE, related_name="ofertas")
+    disciplina = models.ForeignKey(Disciplina, on_delete=models.PROTECT, related_name="ofertas")
+    docente_responsavel = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="ofertas_disciplinas",
+        limit_choices_to={"tipo_usuario": User.TipoUsuario.DOCENTE},
+    )
+    docente_colaborador = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ofertas_disciplinas_colaboracao",
+        limit_choices_to={"tipo_usuario": User.TipoUsuario.DOCENTE},
+    )
+    modalidade = models.CharField(max_length=12, choices=Modalidade.choices, default=Modalidade.PRESENCIAL)
+    vagas_regulares = models.PositiveSmallIntegerField(default=0)
+    vagas_especiais = models.PositiveSmallIntegerField(default=0)
+    criada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="ofertas_disciplinas_criadas",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["periodo__nome", "disciplina__nome"]
+        constraints = [
+            models.UniqueConstraint(fields=["periodo", "disciplina"], name="unique_oferta_disciplina_periodo"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.disciplina} - {self.periodo}"
+
+    def clean(self):
+        errors = {}
+        if self.docente_responsavel and self.docente_responsavel.tipo_usuario != User.TipoUsuario.DOCENTE:
+            errors["docente_responsavel"] = "O responsável deve ser docente."
+        if self.docente_colaborador and self.docente_colaborador.tipo_usuario != User.TipoUsuario.DOCENTE:
+            errors["docente_colaborador"] = "O colaborador deve ser docente."
+        if self.docente_colaborador_id and self.docente_colaborador_id == self.docente_responsavel_id:
+            errors["docente_colaborador"] = "O segundo docente deve ser diferente do docente responsável."
+        if (self.vagas_regulares or 0) == 0 and (self.vagas_especiais or 0) == 0:
+            errors["vagas_regulares"] = "Informe ao menos uma vaga regular ou especial."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def vagas_ocupadas(self, tipo_aluno):
+        return self.itens_matricula.filter(
+            solicitacao__tipo_aluno=tipo_aluno,
+            status=ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+        ).count()
+
+    def vagas_totais(self, tipo_aluno):
+        if tipo_aluno == SolicitacaoMatricula.TipoAluno.ESPECIAL:
+            return self.vagas_especiais
+        return self.vagas_regulares
+
+    def vagas_disponiveis(self, tipo_aluno):
+        return max(self.vagas_totais(tipo_aluno) - self.vagas_ocupadas(tipo_aluno), 0)
+
+    @property
+    def docentes_display(self):
+        nomes = [self.docente_responsavel.nome]
+        if self.docente_colaborador_id:
+            nomes.append(self.docente_colaborador.nome)
+        return " / ".join(nomes)
+
+
+class EncontroOferta(models.Model):
+    class DiaSemana(models.IntegerChoices):
+        SEGUNDA = 0, "Segunda-feira"
+        TERCA = 1, "Terça-feira"
+        QUARTA = 2, "Quarta-feira"
+        QUINTA = 3, "Quinta-feira"
+        SEXTA = 4, "Sexta-feira"
+        SABADO = 5, "Sábado"
+        DOMINGO = 6, "Domingo"
+
+    oferta = models.ForeignKey(OfertaDisciplina, on_delete=models.CASCADE, related_name="encontros")
+    dia_semana = models.PositiveSmallIntegerField(choices=DiaSemana.choices)
+    hora_inicio = models.TimeField()
+    hora_fim = models.TimeField()
+
+    class Meta:
+        ordering = ["oferta", "dia_semana", "hora_inicio"]
+
+    def __str__(self) -> str:
+        return f"{self.oferta} - {self.get_dia_semana_display()} {self.hora_inicio:%H:%M}-{self.hora_fim:%H:%M}"
+
+    def clean(self):
+        errors = {}
+        if self.hora_inicio and self.hora_fim and self.hora_fim <= self.hora_inicio:
+            errors["hora_fim"] = "O horário final deve ser posterior ao horário inicial."
+        if self.oferta_id:
+            encontros = self.oferta.encontros.all()
+            if self.pk:
+                encontros = encontros.exclude(pk=self.pk)
+            if encontros.count() >= 2:
+                errors["oferta"] = "A oferta pode ter no máximo dois encontros semanais."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class SolicitacaoMatricula(models.Model):
+    class TipoAluno(models.TextChoices):
+        REGULAR = "REGULAR", "Regular"
+        ESPECIAL = "ESPECIAL", "Especial"
+
+    class Status(models.TextChoices):
+        RASCUNHO = "RASCUNHO", "Rascunho"
+        SOLICITADA = "SOLICITADA", "Solicitada"
+        PARCIALMENTE_HOMOLOGADA = "PARCIALMENTE_HOMOLOGADA", "Parcialmente homologada"
+        HOMOLOGADA = "HOMOLOGADA", "Homologada"
+        INDEFERIDA = "INDEFERIDA", "Indeferida"
+        CANCELADA = "CANCELADA", "Cancelada"
+
+    periodo = models.ForeignKey(PeriodoLetivo, on_delete=models.PROTECT, related_name="solicitacoes_matricula")
+    aluno = models.ForeignKey(Aluno, on_delete=models.PROTECT, related_name="solicitacoes_matricula")
+    tipo_aluno = models.CharField(max_length=10, choices=TipoAluno.choices, default=TipoAluno.REGULAR)
+    status = models.CharField(max_length=25, choices=Status.choices, default=Status.RASCUNHO)
+    observacao_aluno = models.TextField(blank=True)
+    observacao_secretaria = models.TextField(blank=True)
+    solicitada_em = models.DateTimeField(null=True, blank=True)
+    homologada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="solicitacoes_matricula_homologadas",
+    )
+    homologada_em = models.DateTimeField(null=True, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-criado_em"]
+        constraints = [
+            models.UniqueConstraint(fields=["periodo", "aluno"], name="unique_solicitacao_matricula_aluno_periodo"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.aluno} - {self.periodo}"
+
+    def atualizar_status_por_itens(self, *, usuario=None):
+        itens = list(self.itens.all())
+        if not itens:
+            self.status = self.Status.RASCUNHO
+            self.homologada_em = None
+            self.homologada_por = None
+        elif all(item.status == ItemSolicitacaoMatricula.Status.CANCELADO for item in itens):
+            self.status = self.Status.CANCELADA
+        elif all(item.status == ItemSolicitacaoMatricula.Status.INDEFERIDO for item in itens):
+            self.status = self.Status.INDEFERIDA
+        elif all(item.status == ItemSolicitacaoMatricula.Status.HOMOLOGADO for item in itens):
+            self.status = self.Status.HOMOLOGADA
+            self.homologada_em = self.homologada_em or timezone.now()
+            self.homologada_por = self.homologada_por or usuario
+        elif any(item.status == ItemSolicitacaoMatricula.Status.HOMOLOGADO for item in itens):
+            self.status = self.Status.PARCIALMENTE_HOMOLOGADA
+        else:
+            self.status = self.Status.SOLICITADA
+        self.save(update_fields=["status", "homologada_em", "homologada_por", "atualizado_em"])
+
+    def save(self, *args, **kwargs):
+        self.observacao_aluno = (self.observacao_aluno or "").strip()
+        self.observacao_secretaria = (self.observacao_secretaria or "").strip()
+        if self.status != self.Status.HOMOLOGADA:
+            self.homologada_em = None
+            self.homologada_por = None
+        if self.status == self.Status.SOLICITADA and not self.solicitada_em:
+            self.solicitada_em = timezone.now()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class ItemSolicitacaoMatricula(models.Model):
+    class Status(models.TextChoices):
+        SOLICITADO = "SOLICITADO", "Solicitado"
+        HOMOLOGADO = "HOMOLOGADO", "Homologado"
+        EM_LISTA_ESPERA = "EM_LISTA_ESPERA", "Em lista de espera"
+        INDEFERIDO = "INDEFERIDO", "Indeferido"
+        CANCELADO = "CANCELADO", "Cancelado"
+
+    solicitacao = models.ForeignKey(SolicitacaoMatricula, on_delete=models.CASCADE, related_name="itens")
+    oferta = models.ForeignKey(OfertaDisciplina, on_delete=models.PROTECT, related_name="itens_matricula")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SOLICITADO)
+    solicitado_em = models.DateTimeField(auto_now_add=True)
+    homologado_em = models.DateTimeField(null=True, blank=True)
+    homologado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="itens_matricula_homologados",
+    )
+    indeferido_em = models.DateTimeField(null=True, blank=True)
+    indeferido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="itens_matricula_indeferidos",
+    )
+    motivo_indeferimento = models.TextField(blank=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["solicitado_em", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["solicitacao", "oferta"], name="unique_item_matricula_por_oferta"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.solicitacao.aluno} - {self.oferta}"
+
+    def clean(self):
+        errors = {}
+        if self.solicitacao_id and self.oferta_id and self.solicitacao.periodo_id != self.oferta.periodo_id:
+            errors["oferta"] = "A oferta deve pertencer ao período da solicitação."
+        if self.status == self.Status.HOMOLOGADO and not (self.homologado_em and self.homologado_por_id):
+            errors["status"] = "Informe data e responsável pela homologação."
+        if self.status == self.Status.INDEFERIDO and not (self.indeferido_em and self.indeferido_por_id):
+            errors["status"] = "Informe data e responsável pelo indeferimento."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.motivo_indeferimento = (self.motivo_indeferimento or "").strip()
+        if self.status != self.Status.HOMOLOGADO:
+            self.homologado_em = None
+            self.homologado_por = None
+        if self.status != self.Status.INDEFERIDO:
+            self.indeferido_em = None
+            self.indeferido_por = None
+            self.motivo_indeferimento = ""
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
 class AlteracaoAluno(models.Model):
     class TipoAlteracao(models.TextChoices):
         STATUS = "STATUS", "Status"

@@ -8,15 +8,20 @@ from django.utils import timezone
 
 from .models import (
     Aluno,
+    Disciplina,
     DisponibilidadeSala,
     DisciplinaTrajetoria,
     Documento,
+    EncontroOferta,
     MembroBanca,
+    OfertaDisciplina,
+    PeriodoLetivo,
     Polo,
     PublicacaoTrajetoria,
     Processo,
     ReservaAmbiente,
     Sala,
+    SolicitacaoMatricula,
     SolicitacaoBanca,
     Setor,
     TrajetoriaAcademica,
@@ -72,6 +77,182 @@ class DisciplinaTrajetoriaForm(forms.ModelForm):
             "creditos": forms.NumberInput(attrs={"min": "0"}),
             "carga_horaria": forms.NumberInput(attrs={"min": "0"}),
         }
+
+
+class DisciplinaForm(forms.ModelForm):
+    class Meta:
+        model = Disciplina
+        fields = ["codigo", "nome", "creditos", "carga_horaria", "ativa"]
+        widgets = {
+            "creditos": forms.NumberInput(attrs={"min": "0"}),
+            "carga_horaria": forms.NumberInput(attrs={"min": "0"}),
+        }
+
+
+class PeriodoLetivoForm(forms.ModelForm):
+    class Meta:
+        model = PeriodoLetivo
+        fields = [
+            "nome",
+            "prazo_cadastro_disciplinas",
+            "matricula_inicio",
+            "matricula_fim",
+            "modificacao_inicio",
+            "modificacao_fim",
+        ]
+        widgets = {
+            "prazo_cadastro_disciplinas": forms.DateInput(attrs={"type": "date"}),
+            "matricula_inicio": forms.DateInput(attrs={"type": "date"}),
+            "matricula_fim": forms.DateInput(attrs={"type": "date"}),
+            "modificacao_inicio": forms.DateInput(attrs={"type": "date"}),
+            "modificacao_fim": forms.DateInput(attrs={"type": "date"}),
+        }
+
+
+class OfertaDisciplinaForm(forms.ModelForm):
+    DIAS_OFERTA_CHOICES = [
+        (EncontroOferta.DiaSemana.SEGUNDA, "Segunda-feira"),
+        (EncontroOferta.DiaSemana.TERCA, "Terça-feira"),
+        (EncontroOferta.DiaSemana.QUARTA, "Quarta-feira"),
+        (EncontroOferta.DiaSemana.QUINTA, "Quinta-feira"),
+        (EncontroOferta.DiaSemana.SEXTA, "Sexta-feira"),
+        (EncontroOferta.DiaSemana.SABADO, "Sábado"),
+    ]
+
+    dia_semana_1 = forms.ChoiceField(choices=DIAS_OFERTA_CHOICES, label="Dia da semana 1")
+    hora_inicio_1 = forms.TimeField(label="Horário inicial 1", widget=forms.TimeInput(attrs={"type": "time"}))
+    hora_fim_1 = forms.TimeField(label="Horário final 1", widget=forms.TimeInput(attrs={"type": "time"}))
+    dia_semana_2 = forms.ChoiceField(
+        choices=[("", "---------")] + DIAS_OFERTA_CHOICES,
+        required=False,
+        label="Dia da semana 2",
+    )
+    hora_inicio_2 = forms.TimeField(
+        required=False,
+        label="Horário inicial 2",
+        widget=forms.TimeInput(attrs={"type": "time"}),
+    )
+    hora_fim_2 = forms.TimeField(
+        required=False,
+        label="Horário final 2",
+        widget=forms.TimeInput(attrs={"type": "time"}),
+    )
+
+    class Meta:
+        model = OfertaDisciplina
+        fields = [
+            "periodo",
+            "disciplina",
+            "docente_responsavel",
+            "docente_colaborador",
+            "modalidade",
+            "vagas_regulares",
+            "vagas_especiais",
+        ]
+        widgets = {
+            "vagas_regulares": forms.NumberInput(attrs={"min": "0"}),
+            "vagas_especiais": forms.NumberInput(attrs={"min": "0"}),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.fields["periodo"].queryset = PeriodoLetivo.objects.order_by("-nome")
+        self.fields["disciplina"].queryset = Disciplina.objects.filter(ativa=True).order_by("codigo", "nome")
+        self.fields["docente_responsavel"].queryset = User.objects.filter(
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+            is_active=True,
+        ).order_by("nome")
+        self.fields["docente_colaborador"].queryset = User.objects.filter(
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+            is_active=True,
+        ).order_by("nome")
+        self.fields["docente_colaborador"].required = False
+        if user and user.tipo_usuario == User.TipoUsuario.DOCENTE:
+            if not getattr(getattr(user, "docente", None), "coordenador", False):
+                self.fields["docente_responsavel"].queryset = User.objects.filter(pk=user.pk)
+            self.fields["docente_responsavel"].initial = user
+        if self.instance and self.instance.pk:
+            encontros = list(self.instance.encontros.order_by("dia_semana", "hora_inicio"))
+            for idx, encontro in enumerate(encontros[:2], start=1):
+                self.fields[f"dia_semana_{idx}"].initial = encontro.dia_semana
+                self.fields[f"hora_inicio_{idx}"].initial = encontro.hora_inicio
+                self.fields[f"hora_fim_{idx}"].initial = encontro.hora_fim
+
+    def clean(self):
+        cleaned_data = super().clean()
+        periodo = cleaned_data.get("periodo")
+        if periodo and not periodo.aceita_ofertas:
+            self.add_error("periodo", "O prazo de cadastro de disciplinas deste período está encerrado.")
+        docente_responsavel = cleaned_data.get("docente_responsavel")
+        docente_colaborador = cleaned_data.get("docente_colaborador")
+        if docente_responsavel and docente_colaborador and docente_responsavel.pk == docente_colaborador.pk:
+            self.add_error("docente_colaborador", "O segundo docente deve ser diferente do docente responsável.")
+
+        encontros = []
+        for idx in (1, 2):
+            dia = cleaned_data.get(f"dia_semana_{idx}")
+            inicio = cleaned_data.get(f"hora_inicio_{idx}")
+            fim = cleaned_data.get(f"hora_fim_{idx}")
+            preenchido = bool(dia or inicio or fim)
+            if idx == 1 or preenchido:
+                if dia in ("", None) or not inicio or not fim:
+                    self.add_error(f"hora_inicio_{idx}", "Informe dia, horário inicial e horário final.")
+                    continue
+                if fim <= inicio:
+                    self.add_error(f"hora_fim_{idx}", "O horário final deve ser posterior ao inicial.")
+                    continue
+                encontros.append((int(dia), inicio, fim))
+        for i, encontro_a in enumerate(encontros):
+            for encontro_b in encontros[i + 1:]:
+                if encontro_a[0] == encontro_b[0] and encontro_a[1] < encontro_b[2] and encontro_a[2] > encontro_b[1]:
+                    self.add_error("dia_semana_2", "Os encontros da oferta possuem choque de horário.")
+        return cleaned_data
+
+    def save(self, commit=True):
+        oferta = super().save(commit=False)
+        if self.user and not oferta.criada_por_id:
+            oferta.criada_por = self.user
+        if commit:
+            oferta.save()
+            oferta.encontros.all().delete()
+            for idx in (1, 2):
+                dia = self.cleaned_data.get(f"dia_semana_{idx}")
+                inicio = self.cleaned_data.get(f"hora_inicio_{idx}")
+                fim = self.cleaned_data.get(f"hora_fim_{idx}")
+                if dia not in ("", None) and inicio and fim:
+                    EncontroOferta.objects.create(
+                        oferta=oferta,
+                        dia_semana=int(dia),
+                        hora_inicio=inicio,
+                        hora_fim=fim,
+                    )
+        return oferta
+
+
+class SolicitacaoMatriculaForm(forms.Form):
+    tipo_aluno = forms.ChoiceField(choices=SolicitacaoMatricula.TipoAluno.choices, label="Tipo de aluno")
+    ofertas = forms.ModelMultipleChoiceField(
+        queryset=OfertaDisciplina.objects.none(),
+        label="Disciplinas",
+        widget=forms.CheckboxSelectMultiple,
+    )
+    aceitar_lista_espera = forms.BooleanField(
+        required=False,
+        label="Entrar em lista de espera quando não houver vaga",
+    )
+    observacao = forms.CharField(required=False, label="Observação", widget=forms.Textarea(attrs={"rows": 3}))
+
+    def __init__(self, *args, periodo=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.periodo = periodo
+        if periodo:
+            self.fields["ofertas"].queryset = (
+                OfertaDisciplina.objects.filter(periodo=periodo)
+                .select_related("disciplina", "docente_responsavel", "docente_colaborador")
+                .prefetch_related("encontros")
+                .order_by("disciplina__nome")
+            )
 
 
 class SetorComissaoForm(forms.ModelForm):

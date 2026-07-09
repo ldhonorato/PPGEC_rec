@@ -6,7 +6,7 @@ of tasks defined in the Django app.
 
 import os
 from celery import Celery
-#from celery.schedules import crontab
+from celery.schedules import crontab
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ppgec.settings")
 
@@ -17,6 +17,13 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # discover the tasks in the Django app
 app.autodiscover_tasks()
+
+app.conf.beat_schedule = {
+    "atualizar-status-periodos-letivos-diariamente": {
+        "task": "processos.tasks.atualizar_status_periodos_letivos",
+        "schedule": crontab(hour=3, minute=5),
+    },
+}
 
 # # ROTINA AUTÔNOMA DE TEMPO (CELERY BEAT) ===============================================
 # app.conf.beat_schedule = {
