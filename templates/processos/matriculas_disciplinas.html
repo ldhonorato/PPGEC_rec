@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Disciplinas | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Disciplinas</h1>
+            <p class="muted">Cadastro de disciplinas utilizadas nas ofertas de matrícula.</p>
+        </div>
+        <button class="btn" type="button" data-open-dialog="nova-disciplina">Nova disciplina</button>
+    </div>
+</section>
+
+<dialog id="nova-disciplina" class="modal-dialog" {% if modal_aberto == "nova-disciplina" %}data-open-on-load{% endif %}>
+    <div class="modal-body">
+        <div class="actions-row">
+            <h2 class="section-title">Nova disciplina</h2>
+            <button class="btn btn-secondary" type="button" data-close-dialog>Fechar</button>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="criar_disciplina">
+            <div class="grid-two">
+                {% for field in disciplina_form %}
+                    <div class="field{% if field.field.widget.input_type == 'checkbox' %} checkbox-field{% endif %}">
+                        {% if field.field.widget.input_type == 'checkbox' %}
+                            {{ field }} <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {% else %}
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                        {% endif %}
+                        {{ field.errors }}
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="form-actions">
+                <button class="btn" type="submit">Cadastrar disciplina</button>
+            </div>
+        </form>
+    </div>
+</dialog>
+
+<section class="card">
+    <h2 class="section-title">Disciplinas cadastradas</h2>
+    {% if disciplinas %}
+        <ul class="list">
+            {% for disciplina in disciplinas %}
+                <li>
+                    <div class="actions-row">
+                        <div>
+                            <strong>{{ disciplina.codigo }} - {{ disciplina.nome }}</strong>
+                            {% if disciplina.ativa %}
+                                <span class="badge badge-ok">Ativa</span>
+                            {% else %}
+                                <span class="badge badge-no">Inativa</span>
+                            {% endif %}
+                            <small class="muted" style="display:block; margin-top:0.35rem;">
+                                Créditos: {{ disciplina.creditos|default:"-" }} |
+                                Carga horária: {{ disciplina.carga_horaria|default:"-" }}
+                            </small>
+                        </div>
+                        <button class="btn btn-secondary" type="button" data-open-dialog="editar-disciplina-{{ disciplina.pk }}">Editar</button>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhuma disciplina cadastrada.</p>
+    {% endif %}
+</section>
+
+{% for disciplina in disciplinas %}
+<dialog id="editar-disciplina-{{ disciplina.pk }}" class="modal-dialog" {% if disciplina_editando.pk == disciplina.pk %}data-open-on-load{% endif %}>
+    <div class="modal-body">
+        <div class="actions-row">
+            <h2 class="section-title">Editar disciplina</h2>
+            <button class="btn btn-secondary" type="button" data-close-dialog>Fechar</button>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="editar_disciplina">
+            <input type="hidden" name="disciplina_id" value="{{ disciplina.pk }}">
+            {% if disciplina_editando.pk == disciplina.pk and disciplina_edit_form %}
+                <div class="grid-two">
+                    {% for field in disciplina_edit_form %}
+                        <div class="field{% if field.field.widget.input_type == 'checkbox' %} checkbox-field{% endif %}">
+                            {% if field.field.widget.input_type == 'checkbox' %}
+                                {{ field }} <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {% else %}
+                                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {{ field }}
+                            {% endif %}
+                            {{ field.errors }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="grid-two">
+                    <div class="field"><label>Código</label><input name="codigo" value="{{ disciplina.codigo }}" maxlength="40" required></div>
+                    <div class="field"><label>Nome</label><input name="nome" value="{{ disciplina.nome }}" maxlength="255" required></div>
+                    <div class="field"><label>Créditos</label><input type="number" name="creditos" min="0" value="{{ disciplina.creditos|default_if_none:'' }}"></div>
+                    <div class="field"><label>Carga horária</label><input type="number" name="carga_horaria" min="0" value="{{ disciplina.carga_horaria|default_if_none:'' }}"></div>
+                    <div class="field checkbox-field"><input type="checkbox" name="ativa" {% if disciplina.ativa %}checked{% endif %}> <label>Ativa</label></div>
+                </div>
+            {% endif %}
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar disciplina</button>
+            </div>
+        </form>
+    </div>
+</dialog>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-open-dialog]").forEach((button) => {
+    button.addEventListener("click", () => document.getElementById(button.dataset.openDialog)?.showModal());
+});
+document.querySelectorAll("[data-close-dialog]").forEach((button) => {
+    button.addEventListener("click", () => button.closest("dialog")?.close());
+});
+document.querySelectorAll("dialog[data-open-on-load]").forEach((dialog) => dialog.showModal());
+</script>
+{% endblock %}

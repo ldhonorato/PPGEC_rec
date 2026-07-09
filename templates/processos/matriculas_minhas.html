@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Minhas Matrículas | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Minhas Matrículas</h1>
+            <p class="muted">Acompanhamento das solicitações de matrícula por período letivo.</p>
+        </div>
+        <a class="btn" href="{% url 'matricula_solicitar' %}">Solicitar matrícula</a>
+    </div>
+</section>
+
+<section class="card">
+    {% if solicitacoes %}
+        <ul class="list">
+            {% for solicitacao in solicitacoes %}
+                <li>
+                    <div class="actions-row">
+                        <div>
+                            <strong>{{ solicitacao.periodo.nome }}</strong>
+                            <span class="badge badge-info">{{ solicitacao.get_status_display }}</span>
+                            <small class="muted" style="display:block; margin-top:0.35rem;">
+                                {{ solicitacao.get_tipo_aluno_display }} |
+                                Solicitada em {{ solicitacao.solicitada_em|date:"d/m/Y H:i"|default:"-" }}
+                            </small>
+                        </div>
+                        <a class="btn" href="{% url 'matricula_minha_solicitacao' solicitacao.pk %}">Ver detalhes</a>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Você ainda não possui solicitações de matrícula.</p>
+    {% endif %}
+</section>
+{% endblock %}

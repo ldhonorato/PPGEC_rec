@@ -5,18 +5,24 @@ from django.contrib.auth.hashers import identify_hasher
 from .models import (
     AlteracaoAluno,
     Aluno,
+    Disciplina,
     DisponibilidadeSala,
     DisciplinaTrajetoria,
     Docente,
     Documento,
+    EncontroOferta,
+    ItemSolicitacaoMatricula,
     Polo,
     PublicacaoTrajetoria,
     MembroBanca,
+    OfertaDisciplina,
+    PeriodoLetivo,
     Processo,
     ReservaAmbiente,
     Sala,
     Setor,
     SetorMembro,
+    SolicitacaoMatricula,
     SolicitacaoBanca,
     TrajetoriaAcademica,
     TramitacaoProcesso,
@@ -115,6 +121,54 @@ class DisciplinaTrajetoriaAdmin(admin.ModelAdmin):
     list_filter = ("situacao", "semestre")
     search_fields = ("nome", "codigo", "trajetoria__aluno__nome")
     autocomplete_fields = ("trajetoria",)
+
+
+@admin.register(Disciplina)
+class DisciplinaAdmin(admin.ModelAdmin):
+    list_display = ("codigo", "nome", "creditos", "carga_horaria", "ativa")
+    list_filter = ("ativa",)
+    search_fields = ("codigo", "nome")
+
+
+class EncontroOfertaInline(admin.TabularInline):
+    model = EncontroOferta
+    extra = 0
+    max_num = 2
+
+
+@admin.register(PeriodoLetivo)
+class PeriodoLetivoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "status_atual_display", "prazo_cadastro_disciplinas", "matricula_inicio", "matricula_fim")
+    search_fields = ("nome",)
+    readonly_fields = ("criado_em", "atualizado_em")
+    autocomplete_fields = ("criado_por", "encerrado_manualmente_por")
+
+
+@admin.register(OfertaDisciplina)
+class OfertaDisciplinaAdmin(admin.ModelAdmin):
+    list_display = ("disciplina", "periodo", "docente_responsavel", "docente_colaborador", "modalidade", "vagas_regulares", "vagas_especiais")
+    list_filter = ("periodo", "modalidade")
+    search_fields = ("disciplina__codigo", "disciplina__nome", "docente_responsavel__nome", "docente_colaborador__nome")
+    autocomplete_fields = ("periodo", "disciplina", "docente_responsavel", "docente_colaborador", "criada_por")
+    inlines = [EncontroOfertaInline]
+
+
+@admin.register(SolicitacaoMatricula)
+class SolicitacaoMatriculaAdmin(admin.ModelAdmin):
+    list_display = ("aluno", "periodo", "tipo_aluno", "status", "solicitada_em")
+    list_filter = ("periodo", "tipo_aluno", "status")
+    search_fields = ("aluno__nome", "aluno__email", "aluno__matricula")
+    autocomplete_fields = ("periodo", "aluno", "homologada_por")
+    readonly_fields = ("criado_em", "atualizado_em")
+
+
+@admin.register(ItemSolicitacaoMatricula)
+class ItemSolicitacaoMatriculaAdmin(admin.ModelAdmin):
+    list_display = ("solicitacao", "oferta", "status", "solicitado_em", "homologado_em")
+    list_filter = ("status", "oferta__periodo")
+    search_fields = ("solicitacao__aluno__nome", "oferta__disciplina__nome", "oferta__disciplina__codigo")
+    autocomplete_fields = ("solicitacao", "oferta", "homologado_por", "indeferido_por")
+    readonly_fields = ("solicitado_em", "atualizado_em")
 
 
 @admin.register(Setor)

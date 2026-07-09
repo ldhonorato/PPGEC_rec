@@ -2,10 +2,23 @@ from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
-#from django.utils import timezone
+from django.utils import timezone
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task(name="processos.tasks.atualizar_status_periodos_letivos")
+def atualizar_status_periodos_letivos():
+    from .models import PeriodoLetivo
+
+    hoje = timezone.localdate()
+    atualizados = 0
+    for periodo in PeriodoLetivo.objects.all().iterator():
+        if periodo.atualizar_status_por_data(hoje):
+            atualizados += 1
+            logger.info("Período letivo %s atualizado para %s.", periodo.nome, periodo.get_status_display())
+    return {"data": hoje.isoformat(), "atualizados": atualizados}
 
 
 def _send_email(subject, template_name, contexto, recipient):

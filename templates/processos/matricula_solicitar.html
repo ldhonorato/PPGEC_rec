@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Solicitar Matrícula | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Solicitar Matrícula</h1>
+            {% if periodo %}
+                <p class="muted">Período {{ periodo.nome }} - {{ periodo.status_atual_display }}.</p>
+            {% else %}
+                <p class="muted">Não há período aberto para matrícula ou modificação.</p>
+                {% if proximo_periodo %}
+                    <p class="muted">
+                        Próximo período previsto: {{ proximo_periodo.nome }},
+                        matrícula de {{ proximo_periodo.matricula_inicio|date:"d/m/Y" }} a {{ proximo_periodo.matricula_fim|date:"d/m/Y" }}.
+                    </p>
+                {% endif %}
+            {% endif %}
+        </div>
+        <a class="btn btn-secondary" href="{% url 'matriculas_minhas' %}">Minhas matrículas</a>
+    </div>
+</section>
+
+{% if periodos_abertos %}
+<section class="card panel">
+    <h2 class="section-title">Período</h2>
+    <div class="calendar-nav">
+        {% for periodo_opcao in periodos_abertos %}
+            <a class="btn {% if periodo.pk != periodo_opcao.pk %}btn-secondary{% endif %}" href="{% url 'matricula_solicitar_periodo' periodo_opcao.pk %}">{{ periodo_opcao.nome }}</a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if periodo %}
+<section class="card">
+    <h2 class="section-title">Disciplinas disponíveis</h2>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="periodo_id" value="{{ periodo.pk }}">
+        {{ form.non_field_errors }}
+        <div class="grid-two">
+            <div class="field">
+                <label for="{{ form.tipo_aluno.id_for_label }}">{{ form.tipo_aluno.label }}</label>
+                {{ form.tipo_aluno }}
+                {{ form.tipo_aluno.errors }}
+            </div>
+            <div class="field checkbox-field">
+                {{ form.aceitar_lista_espera }}
+                <label for="{{ form.aceitar_lista_espera.id_for_label }}">{{ form.aceitar_lista_espera.label }}</label>
+                {{ form.aceitar_lista_espera.errors }}
+            </div>
+        </div>
+
+        <div class="field">
+            <label>{{ form.ofertas.label }}</label>
+            {{ form.ofertas.errors }}
+            {% if form.fields.ofertas.queryset %}
+                <ul class="list">
+                    {% for oferta in form.fields.ofertas.queryset %}
+                        <li>
+                            <label class="checkbox-field" style="align-items:flex-start;">
+                                <input type="checkbox" name="ofertas" value="{{ oferta.pk }}">
+                                <span>
+                                    <strong>{{ oferta.disciplina.codigo }} - {{ oferta.disciplina.nome }}</strong>
+                                    <small class="muted" style="display:block; margin-top:0.25rem;">
+                                        {{ oferta.docentes_display }} | {{ oferta.get_modalidade_display }} |
+                                        Vagas regulares: {{ oferta.vagas_regulares }} | Vagas especiais: {{ oferta.vagas_especiais }}
+                                    </small>
+                                    {% if oferta.encontros.all %}
+                                        <span class="availability-list" style="margin-top:0.45rem;">
+                                            {% for encontro in oferta.encontros.all %}
+                                                <span class="badge badge-info">{{ encontro.get_dia_semana_display }} {{ encontro.hora_inicio|time:"H:i" }}-{{ encontro.hora_fim|time:"H:i" }}</span>
+                                            {% endfor %}
+                                        </span>
+                                    {% endif %}
+                                </span>
+                            </label>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="muted">Nenhuma disciplina ofertada para este período.</p>
+            {% endif %}
+        </div>
+
+        <div class="field">
+            <label for="{{ form.observacao.id_for_label }}">{{ form.observacao.label }}</label>
+            {{ form.observacao }}
+            {{ form.observacao.errors }}
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">Enviar solicitação</button>
+        </div>
+    </form>
+</section>
+{% endif %}
+{% endblock %}

@@ -8,6 +8,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -27,16 +28,20 @@ from .forms import (
     AtenderSolicitacaoAssinaturaForm,
     ManifestarCienteOrientadorForm,
     ComentarioProcessoForm,
+    DisciplinaForm,
     DisciplinaTrajetoriaForm,
     DisponibilidadeSalaLoteForm,
     DocumentoCadastroForm,
     EncaminhamentoForm,
     FinalizarProcessoForm,
+    OfertaDisciplinaForm,
+    PeriodoLetivoForm,
     ProcessoAberturaForm,
     PublicacaoTrajetoriaForm,
     ReservaAmbienteExclusaoForm,
     ReservaAmbienteForm,
     SalaForm,
+    SolicitacaoMatriculaForm,
     SolicitacaoAssinaturaForm,
     SolicitacaoBancaForm,
     SolicitarCienteOrientadorForm,
@@ -48,14 +53,19 @@ from .forms import (
 from .models import (
     AlteracaoAluno,
     Aluno,
+    Disciplina,
     DisciplinaTrajetoria,
     DisponibilidadeSala,
     ComentarioProcesso,
     Docente,
     Documento,
+    EncontroOferta,
+    ItemSolicitacaoMatricula,
     EstagioDocencia,
     ManifestacaoProcesso,
     MembroBanca,
+    OfertaDisciplina,
+    PeriodoLetivo,
     Polo,
     Processo,
     PublicacaoTrajetoria,
@@ -63,6 +73,7 @@ from .models import (
     Sala,
     Setor,
     SetorMembro,
+    SolicitacaoMatricula,
     SolicitacaoAssinatura,
     SolicitacaoBanca,
     TrajetoriaAcademica,
@@ -85,6 +96,22 @@ from .tasks import (
     send_email_mudanca_setor,
     send_email_status_atualizado,
     send_email_solicitacao_assinatura,
+)
+from .services import (
+    cancelar_item_matricula,
+    gerar_xlsx_lista_oferta,
+    homologar_item_matricula,
+    indeferir_item_matricula,
+    promover_proximo_lista_espera,
+    salvar_solicitacao_matricula,
+)
+from .services import (
+    cancelar_item_matricula,
+    gerar_xlsx_lista_oferta,
+    homologar_item_matricula,
+    indeferir_item_matricula,
+    promover_proximo_lista_espera,
+    salvar_solicitacao_matricula,
 )
 
 
@@ -229,6 +256,118 @@ def _can_atender_solicitacao_assinatura(user, solicitacao):
 
 def _can_manage_restricted_docs(user):
     return _is_servidor(user) or _is_coordenador(user)
+
+
+def _can_manage_matriculas(user):
+    return _is_servidor(user) or _is_coordenador(user)
+
+
+def _can_create_oferta(user):
+    return _can_manage_matriculas(user) or _is_docente(user)
+
+
+def _montar_grade_ofertas(ofertas):
+    dias = [
+        (EncontroOferta.DiaSemana.SEGUNDA, "Segunda"),
+        (EncontroOferta.DiaSemana.TERCA, "Terça"),
+        (EncontroOferta.DiaSemana.QUARTA, "Quarta"),
+        (EncontroOferta.DiaSemana.QUINTA, "Quinta"),
+        (EncontroOferta.DiaSemana.SEXTA, "Sexta"),
+        (EncontroOferta.DiaSemana.SABADO, "Sábado"),
+    ]
+    dias_validos = {dia_value for dia_value, _ in dias}
+    periodos = {}
+    for oferta in ofertas:
+        periodo_id = oferta.periodo_id
+        if periodo_id not in periodos:
+            periodos[periodo_id] = {
+                "periodo": oferta.periodo,
+                "eventos_por_dia": {dia_value: [] for dia_value, _ in dias},
+            }
+        for encontro in oferta.encontros.all():
+            if encontro.dia_semana not in dias_validos:
+                continue
+            periodos[periodo_id]["eventos_por_dia"][encontro.dia_semana].append(
+                {"oferta": oferta, "encontro": encontro}
+            )
+
+    grades = []
+    for dados in periodos.values():
+        todos_eventos = [
+            evento
+            for eventos in dados["eventos_por_dia"].values()
+            for evento in eventos
+        ]
+        if not todos_eventos:
+            grades.append({"periodo": dados["periodo"], "dias": [], "marcas_hora": [], "altura_grade": 0})
+            continue
+
+        inicio_minutos = min(evento["encontro"].hora_inicio.hour * 60 + evento["encontro"].hora_inicio.minute for evento in todos_eventos)
+        fim_minutos = max(evento["encontro"].hora_fim.hour * 60 + evento["encontro"].hora_fim.minute for evento in todos_eventos)
+        inicio_grade = (inicio_minutos // 60) * 60
+        fim_grade = ((fim_minutos + 59) // 60) * 60
+        total_minutos = max(fim_grade - inicio_grade, 60)
+        pixels_por_minuto = 1.15
+        altura_grade = max(int(total_minutos * pixels_por_minuto), 160)
+
+        marcas_hora = []
+        hora_atual = inicio_grade
+        while hora_atual <= fim_grade:
+            topo = ((hora_atual - inicio_grade) / total_minutos) * 100
+            marcas_hora.append({"label": f"{hora_atual // 60:02d}:00", "top": f"{topo:.3f}%"})
+            hora_atual += 60
+
+        dias_render = []
+        for dia_value, dia_label in dias:
+            eventos = sorted(
+                dados["eventos_por_dia"][dia_value],
+                key=lambda evento: (evento["encontro"].hora_inicio, evento["encontro"].hora_fim),
+            )
+            ativos = []
+            eventos_render = []
+            for evento in eventos:
+                encontro = evento["encontro"]
+                evento_inicio = encontro.hora_inicio.hour * 60 + encontro.hora_inicio.minute
+                evento_fim = encontro.hora_fim.hour * 60 + encontro.hora_fim.minute
+                ativos = [ativo for ativo in ativos if ativo["fim"] > evento_inicio]
+                colunas_ocupadas = {ativo["coluna"] for ativo in ativos}
+                coluna = 0
+                while coluna in colunas_ocupadas:
+                    coluna += 1
+                ativos.append({"fim": evento_fim, "coluna": coluna})
+                total_colunas = max([ativo["coluna"] for ativo in ativos] + [coluna]) + 1
+                for evento_render in eventos_render:
+                    if evento_render["fim_minutos"] > evento_inicio:
+                        evento_render["total_colunas"] = max(evento_render["total_colunas"], total_colunas)
+
+                eventos_render.append(
+                    {
+                        "oferta": evento["oferta"],
+                        "encontro": encontro,
+                        "fim_minutos": evento_fim,
+                        "top": f"{((evento_inicio - inicio_grade) / total_minutos) * 100:.3f}%",
+                        "height": f"{max(((evento_fim - evento_inicio) / total_minutos) * 100, 8):.3f}%",
+                        "coluna": coluna,
+                        "total_colunas": total_colunas,
+                    }
+                )
+
+            for evento_render in eventos_render:
+                largura = 100 / evento_render["total_colunas"]
+                evento_render["left"] = f"{evento_render['coluna'] * largura:.3f}%"
+                evento_render["width"] = f"calc({largura:.3f}% - 0.25rem)"
+
+            dias_render.append({"label": dia_label, "eventos": eventos_render})
+
+        grades.append(
+            {
+                "periodo": dados["periodo"],
+                "dias": dias_render,
+                "marcas_hora": marcas_hora,
+                "altura_grade": altura_grade,
+            }
+        )
+    return sorted(grades, key=lambda item: item["periodo"].nome, reverse=True), dias
 
 
 def _nomes_setores_caixa(user):
@@ -552,7 +691,6 @@ def _menu_lateral_home(user):
     return []
 
 
-from django.http import JsonResponse
 from django.core.mail import send_mail
 
 
@@ -580,6 +718,328 @@ Equipe AcadFlow - PPGEC
         fail_silently=False,
     )
     return JsonResponse({"status": "success", "message": "E-mail enviado com sucesso!"})
+
+
+@login_required
+def matriculas_periodos_view(request):
+    if not _can_manage_matriculas(request.user):
+        raise PermissionDenied("Apenas secretaria e coordenação podem gerenciar períodos letivos.")
+
+    form = PeriodoLetivoForm()
+    edit_form = None
+    periodo_editando = None
+
+    if request.method == "POST":
+        acao = request.POST.get("acao")
+        if acao == "criar_periodo":
+            form = PeriodoLetivoForm(request.POST)
+            if form.is_valid():
+                periodo = form.save(commit=False)
+                periodo.criado_por = request.user
+                periodo.save()
+                messages.success(request, "Período letivo criado.")
+                return redirect("matriculas_periodos")
+            messages.error(request, "Não foi possível criar o período letivo.")
+        elif acao == "editar_periodo":
+            periodo_editando = get_object_or_404(PeriodoLetivo, pk=request.POST.get("periodo_id"))
+            edit_form = PeriodoLetivoForm(request.POST, instance=periodo_editando)
+            if edit_form.is_valid():
+                edit_form.save()
+                messages.success(request, "Período letivo atualizado.")
+                return redirect("matriculas_periodos")
+            messages.error(request, "Não foi possível atualizar o período letivo.")
+        elif acao == "encerrar_periodo":
+            periodo = get_object_or_404(PeriodoLetivo, pk=request.POST.get("periodo_id"))
+            periodo.encerrado_manualmente_em = timezone.now()
+            periodo.encerrado_manualmente_por = request.user
+            periodo.status = PeriodoLetivo.Status.ENCERRADO
+            periodo.save(update_fields=["encerrado_manualmente_em", "encerrado_manualmente_por", "status", "atualizado_em"])
+            messages.success(request, "Período encerrado manualmente.")
+            return redirect("matriculas_periodos")
+        elif acao == "reabrir_periodo":
+            periodo = get_object_or_404(PeriodoLetivo, pk=request.POST.get("periodo_id"))
+            periodo.encerrado_manualmente_em = None
+            periodo.encerrado_manualmente_por = None
+            periodo.status = periodo.calcular_status_por_data()
+            periodo.save(update_fields=["encerrado_manualmente_em", "encerrado_manualmente_por", "status", "atualizado_em"])
+            messages.success(request, "Período reaberto.")
+            return redirect("matriculas_periodos")
+
+    periodos = PeriodoLetivo.objects.select_related("criado_por").prefetch_related("ofertas").order_by("-nome")
+    return render(
+        request,
+        "processos/matriculas_periodos.html",
+        {
+            "form": form,
+            "edit_form": edit_form,
+            "periodo_editando": periodo_editando,
+            "periodos": periodos,
+        },
+    )
+
+
+@login_required
+def matriculas_disciplinas_view(request):
+    if not _can_manage_matriculas(request.user):
+        raise PermissionDenied("Apenas secretaria e coordenação podem gerenciar disciplinas.")
+
+    disciplina_form = DisciplinaForm()
+    disciplina_edit_form = None
+    disciplina_editando = None
+    modal_aberto = ""
+
+    if request.method == "POST":
+        acao = request.POST.get("acao")
+        if acao == "criar_disciplina":
+            disciplina_form = DisciplinaForm(request.POST)
+            if disciplina_form.is_valid():
+                disciplina_form.save()
+                messages.success(request, "Disciplina cadastrada.")
+                return redirect("matriculas_disciplinas")
+            messages.error(request, "Não foi possível cadastrar a disciplina.")
+            modal_aberto = "nova-disciplina"
+        elif acao == "editar_disciplina":
+            disciplina_editando = get_object_or_404(Disciplina, pk=request.POST.get("disciplina_id"))
+            disciplina_edit_form = DisciplinaForm(request.POST, instance=disciplina_editando)
+            modal_aberto = f"editar-disciplina-{disciplina_editando.pk}"
+            if disciplina_edit_form.is_valid():
+                disciplina_edit_form.save()
+                messages.success(request, "Disciplina atualizada.")
+                return redirect("matriculas_disciplinas")
+            messages.error(request, "Não foi possível atualizar a disciplina.")
+
+    disciplinas = Disciplina.objects.order_by("codigo", "nome")
+
+    return render(
+        request,
+        "processos/matriculas_disciplinas.html",
+        {
+            "disciplina_form": disciplina_form,
+            "disciplina_edit_form": disciplina_edit_form,
+            "disciplina_editando": disciplina_editando,
+            "disciplinas": disciplinas,
+            "modal_aberto": modal_aberto,
+        },
+    )
+
+
+@login_required
+def matriculas_ofertas_view(request):
+    if not _can_create_oferta(request.user):
+        raise PermissionDenied("Apenas docentes, secretaria e coordenação podem cadastrar ofertas.")
+
+    oferta_form = OfertaDisciplinaForm(user=request.user)
+    oferta_editando = None
+    modal_aberto = ""
+
+    if request.method == "POST":
+        acao = request.POST.get("acao")
+        if acao in {"criar_oferta", "editar_oferta"}:
+            instance = None
+            if acao == "editar_oferta":
+                instance = get_object_or_404(OfertaDisciplina, pk=request.POST.get("oferta_id"))
+                if not (
+                    _can_manage_matriculas(request.user)
+                    or instance.docente_responsavel_id == request.user.id
+                    or instance.docente_colaborador_id == request.user.id
+                ):
+                    raise PermissionDenied("Você não pode editar esta oferta.")
+                oferta_editando = instance
+                modal_aberto = f"editar-oferta-{instance.pk}"
+            oferta_form = OfertaDisciplinaForm(request.POST, instance=instance, user=request.user)
+            if oferta_form.is_valid():
+                oferta = oferta_form.save()
+                messages.success(request, "Oferta salva.")
+                return redirect("matriculas_ofertas")
+            messages.error(request, "Não foi possível salvar a oferta.")
+            if acao == "criar_oferta":
+                modal_aberto = "nova-oferta"
+
+    ofertas = (
+        OfertaDisciplina.objects.select_related("periodo", "disciplina", "docente_responsavel", "docente_colaborador")
+        .prefetch_related("encontros", "itens_matricula")
+        .annotate(
+            matriculados=Count(
+                "itens_matricula",
+                filter=Q(itens_matricula__status=ItemSolicitacaoMatricula.Status.HOMOLOGADO),
+            ),
+            lista_espera=Count(
+                "itens_matricula",
+                filter=Q(itens_matricula__status=ItemSolicitacaoMatricula.Status.EM_LISTA_ESPERA),
+            ),
+        )
+        .order_by("-periodo__nome", "disciplina__nome")
+    )
+    ofertas = list(ofertas)
+    grades_periodos, dias_grade = _montar_grade_ofertas(ofertas)
+
+    return render(
+        request,
+        "processos/matriculas_ofertas.html",
+        {
+            "oferta_form": oferta_form,
+            "ofertas": ofertas,
+            "grades_periodos": grades_periodos,
+            "dias_grade": dias_grade,
+            "can_manage_matriculas": _can_manage_matriculas(request.user),
+            "oferta_editando": oferta_editando,
+            "modal_aberto": modal_aberto,
+        },
+    )
+
+
+@login_required
+def matricula_solicitar_view(request, periodo_id=None):
+    if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
+        raise PermissionDenied("Apenas alunos podem solicitar matrícula.")
+
+    hoje_servidor = timezone.localdate()
+    periodos_abertos = [periodo for periodo in PeriodoLetivo.objects.order_by("-nome") if periodo.aceita_solicitacao_matricula]
+    proximo_periodo = (
+        PeriodoLetivo.objects.filter(matricula_inicio__gt=hoje_servidor, encerrado_manualmente_em__isnull=True)
+        .order_by("matricula_inicio", "nome")
+        .first()
+    )
+    periodo = None
+    if periodo_id:
+        periodo_selecionado = get_object_or_404(PeriodoLetivo, pk=periodo_id)
+        if periodo_selecionado.aceita_solicitacao_matricula:
+            periodo = periodo_selecionado
+        else:
+            proximo_periodo = periodo_selecionado if periodo_selecionado.matricula_inicio > hoje_servidor else proximo_periodo
+    else:
+        periodo = periodos_abertos[0] if periodos_abertos else None
+    form = SolicitacaoMatriculaForm(periodo=periodo)
+
+    if request.method == "POST":
+        periodo = get_object_or_404(PeriodoLetivo, pk=request.POST.get("periodo_id"))
+        form = SolicitacaoMatriculaForm(request.POST, periodo=periodo)
+        if form.is_valid():
+            try:
+                solicitacao = salvar_solicitacao_matricula(
+                    aluno=request.user.aluno,
+                    periodo=periodo,
+                    tipo_aluno=form.cleaned_data["tipo_aluno"],
+                    ofertas=form.cleaned_data["ofertas"],
+                    aceitar_lista_espera=form.cleaned_data["aceitar_lista_espera"],
+                    observacao=form.cleaned_data["observacao"],
+                )
+                messages.success(request, "Solicitação de matrícula registrada.")
+                return redirect("matricula_minha_solicitacao", solicitacao_id=solicitacao.pk)
+            except ValidationError as exc:
+                form.add_error(None, exc)
+        messages.error(request, "Não foi possível registrar a solicitação.")
+
+    return render(
+        request,
+        "processos/matricula_solicitar.html",
+        {
+            "periodos_abertos": periodos_abertos,
+            "proximo_periodo": proximo_periodo,
+            "periodo": periodo,
+            "form": form,
+        },
+    )
+
+
+@login_required
+def matriculas_minhas_view(request):
+    if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
+        raise PermissionDenied("Apenas alunos acessam suas matrículas.")
+    solicitacoes = (
+        SolicitacaoMatricula.objects.filter(aluno=request.user)
+        .select_related("periodo")
+        .prefetch_related("itens__oferta__disciplina", "itens__oferta__encontros")
+        .order_by("-periodo__nome")
+    )
+    return render(request, "processos/matriculas_minhas.html", {"solicitacoes": solicitacoes})
+
+
+@login_required
+def matricula_minha_solicitacao_view(request, solicitacao_id):
+    solicitacao = get_object_or_404(
+        SolicitacaoMatricula.objects.select_related("periodo", "aluno").prefetch_related(
+            "itens__oferta__disciplina",
+            "itens__oferta__docente_responsavel",
+            "itens__oferta__docente_colaborador",
+            "itens__oferta__encontros",
+        ),
+        pk=solicitacao_id,
+    )
+    if solicitacao.aluno_id != request.user.id and not _can_manage_matriculas(request.user):
+        raise PermissionDenied("Você não pode visualizar esta solicitação.")
+    return render(request, "processos/matricula_minha_solicitacao.html", {"solicitacao": solicitacao})
+
+
+@login_required
+def matricula_oferta_alunos_view(request, oferta_id):
+    if not _can_manage_matriculas(request.user):
+        raise PermissionDenied("Apenas secretaria e coordenação podem gerir matrículas.")
+
+    oferta = get_object_or_404(
+        OfertaDisciplina.objects.select_related(
+            "periodo",
+            "disciplina",
+            "docente_responsavel",
+            "docente_colaborador",
+        ).prefetch_related("encontros"),
+        pk=oferta_id,
+    )
+    if request.method == "POST":
+        acao = request.POST.get("acao")
+        item = get_object_or_404(ItemSolicitacaoMatricula, pk=request.POST.get("item_id")) if request.POST.get("item_id") else None
+        try:
+            if acao == "homologar" and item:
+                homologar_item_matricula(item=item, usuario=request.user)
+                messages.success(request, "Matrícula homologada.")
+            elif acao == "indeferir" and item:
+                indeferir_item_matricula(item=item, usuario=request.user, motivo=request.POST.get("motivo", ""))
+                messages.success(request, "Solicitação indeferida.")
+            elif acao == "cancelar" and item:
+                cancelar_item_matricula(item=item, usuario=request.user)
+                messages.success(request, "Matrícula cancelada.")
+            elif acao == "promover":
+                tipo_aluno = request.POST.get("tipo_aluno") or SolicitacaoMatricula.TipoAluno.REGULAR
+                promovido = promover_proximo_lista_espera(oferta=oferta, tipo_aluno=tipo_aluno, usuario=request.user)
+                if promovido:
+                    messages.success(request, "Próximo aluno da lista de espera promovido.")
+                else:
+                    messages.info(request, "Não há aluno apto na lista de espera ou não há vaga.")
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+        return redirect("matricula_oferta_alunos", oferta_id=oferta.pk)
+
+    itens = (
+        ItemSolicitacaoMatricula.objects.filter(oferta=oferta)
+        .select_related("solicitacao", "solicitacao__aluno", "homologado_por", "indeferido_por")
+        .order_by("status", "solicitado_em", "solicitacao__aluno__nome")
+    )
+    return render(
+        request,
+        "processos/matricula_oferta_alunos.html",
+        {
+            "oferta": oferta,
+            "itens": itens,
+            "tipos_aluno": SolicitacaoMatricula.TipoAluno.choices,
+            "vagas_regulares_disponiveis": oferta.vagas_disponiveis(SolicitacaoMatricula.TipoAluno.REGULAR),
+            "vagas_especiais_disponiveis": oferta.vagas_disponiveis(SolicitacaoMatricula.TipoAluno.ESPECIAL),
+        },
+    )
+
+
+@login_required
+def matricula_oferta_exportar_view(request, oferta_id):
+    if not _can_manage_matriculas(request.user):
+        raise PermissionDenied("Apenas secretaria e coordenação podem exportar listas.")
+    oferta = get_object_or_404(OfertaDisciplina.objects.select_related("disciplina", "periodo"), pk=oferta_id)
+    conteudo = gerar_xlsx_lista_oferta(oferta)
+    filename = f"matricula_{oferta.periodo.nome}_{oferta.disciplina.codigo or oferta.pk}.xlsx"
+    response = HttpResponse(
+        conteudo,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
 
 
 @login_required

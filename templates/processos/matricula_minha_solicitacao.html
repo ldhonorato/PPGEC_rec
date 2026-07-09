@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Solicitação de Matrícula | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Solicitação de Matrícula</h1>
+            <p class="muted">{{ solicitacao.aluno.nome }} | Período {{ solicitacao.periodo.nome }}</p>
+        </div>
+        <span class="badge badge-info">{{ solicitacao.get_status_display }}</span>
+    </div>
+</section>
+
+<section class="card">
+    <h2 class="section-title">Disciplinas</h2>
+    {% if solicitacao.itens.all %}
+        <ul class="list">
+            {% for item in solicitacao.itens.all %}
+                <li>
+                    <div class="actions-row">
+                        <div>
+                            <strong>{{ item.oferta.disciplina.codigo }} - {{ item.oferta.disciplina.nome }}</strong>
+                            <span class="badge {% if item.status == 'HOMOLOGADO' %}badge-ok{% elif item.status == 'INDEFERIDO' or item.status == 'CANCELADO' %}badge-no{% else %}badge-info{% endif %}">
+                                {{ item.get_status_display }}
+                            </span>
+                            <small class="muted" style="display:block; margin-top:0.35rem;">
+                                {{ item.oferta.docentes_display }} | {{ item.oferta.get_modalidade_display }}
+                            </small>
+                            {% if item.oferta.encontros.all %}
+                                <ul class="availability-list" style="margin-top:0.55rem;">
+                                    {% for encontro in item.oferta.encontros.all %}
+                                        <li><strong>{{ encontro.get_dia_semana_display }}</strong> {{ encontro.hora_inicio|time:"H:i" }} - {{ encontro.hora_fim|time:"H:i" }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            {% if item.motivo_indeferimento %}
+                                <p class="muted">Motivo: {{ item.motivo_indeferimento }}</p>
+                            {% endif %}
+                        </div>
+                        <small class="muted">
+                            Solicitado em {{ item.solicitado_em|date:"d/m/Y H:i" }}
+                            {% if item.homologado_em %}<br>Homologado em {{ item.homologado_em|date:"d/m/Y H:i" }}{% endif %}
+                        </small>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhuma disciplina nesta solicitação.</p>
+    {% endif %}
+</section>
+{% endblock %}

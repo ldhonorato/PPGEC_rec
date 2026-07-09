@@ -61,7 +61,7 @@ input[type="checkbox"] {
 }
 
 .container {
-    width: min(1180px, calc(100vw - 48px));
+    width: min(1540px, calc(100vw - 48px));
     margin: 0 auto;
 }
 
@@ -714,7 +714,9 @@ label {
 
 .calendar-shell {
     margin-top: 1rem;
+    max-width: 100%;
     overflow-x: auto;
+    overflow-y: hidden;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     background: #ffffff;
@@ -722,54 +724,76 @@ label {
 
 .week-calendar {
     width: 100%;
-    min-width: 980px;
+    min-width: 0;
     border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.week-calendar-time-col {
+    width: 64px;
+}
+
+.week-calendar-day-col {
+    width: calc((100% - 64px) / 6);
 }
 
 .week-calendar th,
 .week-calendar td {
-    width: 12.5%;
-    min-width: 118px;
-    padding: 0.72rem;
+    padding: 0.5rem;
     vertical-align: top;
     border-bottom: 1px solid var(--color-border);
     border-right: 1px solid var(--color-border);
+    overflow: hidden;
 }
 
 .week-calendar th:first-child,
 .week-calendar td:first-child {
-    width: 180px;
+    width: 64px;
 }
 
 .week-calendar thead th {
     color: var(--color-muted);
     background: #f7fbff;
-    font-size: 0.82rem;
+    font-size: 0.76rem;
     text-align: left;
+    overflow-wrap: anywhere;
 }
 
 .week-calendar tbody th {
     color: var(--color-text);
     background: #fbfdff;
     text-align: left;
+    white-space: nowrap;
 }
 
 .week-calendar tbody th span {
     display: block;
     margin-top: 0.2rem;
     color: var(--color-muted);
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 600;
 }
 
 .calendar-slot {
     display: block;
-    margin-bottom: 0.42rem;
-    padding: 0.38rem 0.46rem;
+    margin-bottom: 0.35rem;
+    padding: 0.34rem 0.38rem;
     border-radius: var(--radius-sm);
-    font-size: 0.82rem;
+    font-size: 0.76rem;
     font-weight: 700;
     line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.calendar-slot small {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.68rem;
+    line-height: 1.2;
+}
+
+.optional-schedule {
+    margin-bottom: 1rem;
 }
 
 .calendar-slot-free {
