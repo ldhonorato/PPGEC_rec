@@ -145,6 +145,7 @@ urlpatterns = [
     path("gestao/matriculas/ofertas/", matriculas_ofertas_view, name="matriculas_ofertas"),
     path("gestao/matriculas/ofertas/<int:oferta_id>/alunos/", matricula_oferta_alunos_view, name="matricula_oferta_alunos"),
     path("gestao/matriculas/ofertas/<int:oferta_id>/exportar/", matricula_oferta_exportar_view, name="matricula_oferta_exportar"),
+    path("matriculas/", RedirectView.as_view(pattern_name="matriculas_minhas", permanent=False), name="matriculas"),
     path("matriculas/solicitar/", matricula_solicitar_view, name="matricula_solicitar"),
     path("matriculas/solicitar/<int:periodo_id>/", matricula_solicitar_view, name="matricula_solicitar_periodo"),
     path("matriculas/minhas/", matriculas_minhas_view, name="matriculas_minhas"),

@@ -658,6 +658,10 @@ class EncontroOferta(models.Model):
 
 
 class SolicitacaoMatricula(models.Model):
+    class TipoMatricula(models.TextChoices):
+        DISCIPLINAS = "DISCIPLINAS", "Disciplinas"
+        VINCULO = "VINCULO", "Matrícula vínculo"
+
     class TipoAluno(models.TextChoices):
         REGULAR = "REGULAR", "Regular"
         ESPECIAL = "ESPECIAL", "Especial"
@@ -672,6 +676,7 @@ class SolicitacaoMatricula(models.Model):
 
     periodo = models.ForeignKey(PeriodoLetivo, on_delete=models.PROTECT, related_name="solicitacoes_matricula")
     aluno = models.ForeignKey(Aluno, on_delete=models.PROTECT, related_name="solicitacoes_matricula")
+    tipo_matricula = models.CharField(max_length=12, choices=TipoMatricula.choices, default=TipoMatricula.DISCIPLINAS)
     tipo_aluno = models.CharField(max_length=10, choices=TipoAluno.choices, default=TipoAluno.REGULAR)
     status = models.CharField(max_length=25, choices=Status.choices, default=Status.RASCUNHO)
     observacao_aluno = models.TextField(blank=True)
@@ -700,9 +705,17 @@ class SolicitacaoMatricula(models.Model):
     def atualizar_status_por_itens(self, *, usuario=None):
         itens = list(self.itens.all())
         if not itens:
-            self.status = self.Status.RASCUNHO
-            self.homologada_em = None
-            self.homologada_por = None
+            if self.tipo_matricula == self.TipoMatricula.VINCULO and self.status in {
+                self.Status.SOLICITADA,
+                self.Status.HOMOLOGADA,
+                self.Status.INDEFERIDA,
+                self.Status.CANCELADA,
+            }:
+                pass
+            else:
+                self.status = self.Status.RASCUNHO
+                self.homologada_em = None
+                self.homologada_por = None
         elif all(item.status == ItemSolicitacaoMatricula.Status.CANCELADO for item in itens):
             self.status = self.Status.CANCELADA
         elif all(item.status == ItemSolicitacaoMatricula.Status.INDEFERIDO for item in itens):

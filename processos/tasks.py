@@ -21,6 +21,34 @@ def atualizar_status_periodos_letivos():
     return {"data": hoje.isoformat(), "atualizados": atualizados}
 
 
+@shared_task(name="processos.tasks.send_email_alunos_sem_matricula")
+def send_email_alunos_sem_matricula(periodo_id: int):
+    from .models import PeriodoLetivo
+    from .services import alunos_ativos_sem_matricula
+
+    try:
+        periodo = PeriodoLetivo.objects.get(pk=periodo_id)
+    except PeriodoLetivo.DoesNotExist:
+        logger.error("Período letivo %s não encontrado", periodo_id)
+        return {"enviados": 0}
+
+    enviados = 0
+    for aluno in alunos_ativos_sem_matricula(periodo).iterator():
+        if not aluno.email:
+            continue
+        try:
+            _send_email(
+                subject=f"[PPGEC] Matrícula pendente para o período {periodo.nome}",
+                template_name="emails/aluno/matricula_pendente.html",
+                contexto={"aluno": aluno, "periodo": periodo},
+                recipient=aluno.email,
+            )
+            enviados += 1
+        except Exception:
+            logger.exception("Falha ao enviar e-mail de matrícula pendente para aluno %s", aluno.pk)
+    return {"periodo": periodo.nome, "enviados": enviados}
+
+
 def _send_email(subject, template_name, contexto, recipient):
     contexto.setdefault("site_url", getattr(settings, "SITE_URL", "http://localhost:8000"))
     html = render_to_string(template_name, contexto)

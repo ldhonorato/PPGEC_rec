@@ -113,12 +113,64 @@ def validar_choque_ofertas(ofertas, *, aluno=None, periodo=None, ignorar_solicit
                 )
 
 
+def alunos_ativos_sem_matricula(periodo):
+    return (
+        Aluno.objects.filter(trajetorias__status=TrajetoriaAcademica.Status.ATIVA)
+        .exclude(solicitacoes_matricula__periodo=periodo)
+        .distinct()
+        .order_by("nome", "email")
+    )
+
+
+def tipo_aluno_matricula_por_trajetoria(trajetoria):
+    if trajetoria.nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
+        return None
+    if trajetoria.nivel_curso == Aluno.NivelCurso.ALUNO_ESPECIAL:
+        return SolicitacaoMatricula.TipoAluno.ESPECIAL
+    return SolicitacaoMatricula.TipoAluno.REGULAR
+
+
 @transaction.atomic
-def salvar_solicitacao_matricula(*, aluno, periodo, tipo_aluno, ofertas, aceitar_lista_espera=False, observacao=""):
+def salvar_solicitacao_matricula(
+    *,
+    aluno,
+    periodo,
+    tipo_aluno,
+    ofertas,
+    aceitar_lista_espera=False,
+    observacao="",
+    tipo_matricula=SolicitacaoMatricula.TipoMatricula.DISCIPLINAS,
+):
     if aluno.tipo_usuario != User.TipoUsuario.ALUNO:
         raise ValidationError("A solicitação de matrícula deve ser feita por aluno.")
+    trajetoria_ativa = aluno.trajetoria_ativa()
+    if not trajetoria_ativa:
+        raise ValidationError("A solicitação de matrícula exige trajetória acadêmica ativa.")
+    tipo_aluno_esperado = tipo_aluno_matricula_por_trajetoria(trajetoria_ativa)
+    if tipo_aluno_esperado is None:
+        raise ValidationError("Aluno de pós-doutorado não realiza matrícula em disciplinas.")
+    if tipo_aluno != tipo_aluno_esperado:
+        raise ValidationError("O tipo de aluno deve ser obtido da trajetória acadêmica ativa.")
     if not periodo.aceita_solicitacao_matricula:
         raise ValidationError("O período não está aberto para matrícula ou modificação.")
+
+    if tipo_matricula == SolicitacaoMatricula.TipoMatricula.VINCULO:
+        solicitacao, _ = SolicitacaoMatricula.objects.select_for_update().get_or_create(
+            periodo=periodo,
+            aluno=aluno,
+            defaults={"tipo_aluno": tipo_aluno, "status": SolicitacaoMatricula.Status.RASCUNHO},
+        )
+        if solicitacao.status == SolicitacaoMatricula.Status.CANCELADA:
+            raise ValidationError("A solicitação deste período está cancelada.")
+        if solicitacao.itens.exclude(status=ItemSolicitacaoMatricula.Status.CANCELADO).exists():
+            raise ValidationError("Não é possível solicitar matrícula vínculo com disciplinas ativas neste período.")
+        solicitacao.tipo_matricula = SolicitacaoMatricula.TipoMatricula.VINCULO
+        solicitacao.tipo_aluno = tipo_aluno
+        solicitacao.observacao_aluno = observacao
+        solicitacao.status = SolicitacaoMatricula.Status.SOLICITADA
+        solicitacao.solicitada_em = solicitacao.solicitada_em or timezone.now()
+        solicitacao.save()
+        return solicitacao
 
     ofertas = list(
         OfertaDisciplina.objects.select_for_update()
@@ -139,6 +191,7 @@ def salvar_solicitacao_matricula(*, aluno, periodo, tipo_aluno, ofertas, aceitar
     if solicitacao.status == SolicitacaoMatricula.Status.CANCELADA:
         raise ValidationError("A solicitação deste período está cancelada.")
 
+    solicitacao.tipo_matricula = SolicitacaoMatricula.TipoMatricula.DISCIPLINAS
     solicitacao.tipo_aluno = tipo_aluno
     solicitacao.observacao_aluno = observacao
     solicitacao.status = SolicitacaoMatricula.Status.SOLICITADA
@@ -160,6 +213,33 @@ def salvar_solicitacao_matricula(*, aluno, periodo, tipo_aluno, ofertas, aceitar
         )
 
     solicitacao.atualizar_status_por_itens()
+    return solicitacao
+
+
+@transaction.atomic
+def homologar_solicitacao_vinculo(*, solicitacao, usuario):
+    solicitacao = SolicitacaoMatricula.objects.select_for_update().get(pk=solicitacao.pk)
+    if solicitacao.tipo_matricula != SolicitacaoMatricula.TipoMatricula.VINCULO:
+        raise ValidationError("A solicitação não é de matrícula vínculo.")
+    if solicitacao.status in {SolicitacaoMatricula.Status.CANCELADA, SolicitacaoMatricula.Status.INDEFERIDA}:
+        raise ValidationError("Não é possível homologar solicitação cancelada ou indeferida.")
+    solicitacao.status = SolicitacaoMatricula.Status.HOMOLOGADA
+    solicitacao.homologada_em = timezone.now()
+    solicitacao.homologada_por = usuario
+    solicitacao.save()
+    return solicitacao
+
+
+@transaction.atomic
+def indeferir_solicitacao_vinculo(*, solicitacao, usuario, motivo=""):
+    solicitacao = SolicitacaoMatricula.objects.select_for_update().get(pk=solicitacao.pk)
+    if solicitacao.tipo_matricula != SolicitacaoMatricula.TipoMatricula.VINCULO:
+        raise ValidationError("A solicitação não é de matrícula vínculo.")
+    if solicitacao.status == SolicitacaoMatricula.Status.CANCELADA:
+        raise ValidationError("Não é possível indeferir solicitação cancelada.")
+    solicitacao.status = SolicitacaoMatricula.Status.INDEFERIDA
+    solicitacao.observacao_secretaria = motivo
+    solicitacao.save()
     return solicitacao
 
 

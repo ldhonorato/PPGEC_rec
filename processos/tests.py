@@ -36,7 +36,12 @@ from .models import (
     TramitacaoProcesso,
     User,
 )
-from .services import cancelar_item_matricula, homologar_item_matricula, salvar_solicitacao_matricula
+from .services import (
+    alunos_ativos_sem_matricula,
+    cancelar_item_matricula,
+    homologar_item_matricula,
+    salvar_solicitacao_matricula,
+)
 from .tasks import atualizar_status_periodos_letivos
 
 
@@ -92,6 +97,7 @@ class MatriculaDomainTests(TestCase):
             password="senha-segura-123",
             nome="Aluno Matricula",
         )
+        criar_trajetoria(self.aluno)
         self.periodo = PeriodoLetivo.objects.create(
             nome="2026.1",
             status=PeriodoLetivo.Status.MATRICULA_ABERTA,
@@ -140,6 +146,7 @@ class MatriculaDomainTests(TestCase):
             password="senha-segura-123",
             nome="Aluno Espera",
         )
+        criar_trajetoria(aluno_espera)
         solicitacao = salvar_solicitacao_matricula(
             aluno=self.aluno,
             periodo=self.periodo,
@@ -174,6 +181,41 @@ class MatriculaDomainTests(TestCase):
         self.assertEqual(self.periodo.status, PeriodoLetivo.Status.MATRICULA_ABERTA)
         self.assertEqual(resultado["atualizados"], 1)
 
+    def test_aluno_pode_solicitar_matricula_vinculo_sem_disciplinas(self):
+        solicitacao = salvar_solicitacao_matricula(
+            aluno=self.aluno,
+            periodo=self.periodo,
+            tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
+            tipo_aluno=SolicitacaoMatricula.TipoAluno.REGULAR,
+            ofertas=[],
+            observacao="Manter vínculo no semestre.",
+        )
+
+        self.assertEqual(solicitacao.tipo_matricula, SolicitacaoMatricula.TipoMatricula.VINCULO)
+        self.assertEqual(solicitacao.status, SolicitacaoMatricula.Status.SOLICITADA)
+        self.assertEqual(solicitacao.itens.count(), 0)
+
+    def test_lista_alunos_ativos_sem_matricula_exclui_quem_fez_vinculo(self):
+        criar_trajetoria(self.aluno)
+        aluno_sem_matricula = Aluno.objects.create(
+            email="sem.matricula@example.com",
+            password="senha-segura-123",
+            nome="Aluno Sem Matricula",
+        )
+        criar_trajetoria(aluno_sem_matricula)
+
+        salvar_solicitacao_matricula(
+            aluno=self.aluno,
+            periodo=self.periodo,
+            tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
+            tipo_aluno=SolicitacaoMatricula.TipoAluno.REGULAR,
+            ofertas=[],
+        )
+
+        pendentes = alunos_ativos_sem_matricula(self.periodo)
+        self.assertIn(aluno_sem_matricula, pendentes)
+        self.assertNotIn(self.aluno, pendentes)
+
 
 class MatriculaViewsTests(TestCase):
     def setUp(self):
@@ -194,6 +236,7 @@ class MatriculaViewsTests(TestCase):
             password="senha-segura-123",
             nome="Aluno Views",
         )
+        criar_trajetoria(self.aluno)
         self.periodo = PeriodoLetivo.objects.create(
             nome="2026.2",
             status=PeriodoLetivo.Status.MATRICULA_ABERTA,
@@ -266,13 +309,77 @@ class MatriculaViewsTests(TestCase):
         self.assertEqual(self.disciplina.codigo, "VIS002")
         self.assertEqual(self.disciplina.nome, "Visualização Atualizada")
 
+    def test_editar_periodo_recalcula_status_para_matricula_aberta(self):
+        hoje = timezone.localdate()
+        futuro = PeriodoLetivo.objects.create(
+            nome="2028.1",
+            status=PeriodoLetivo.Status.PLANEJAMENTO,
+            prazo_cadastro_disciplinas=hoje + timedelta(days=10),
+            matricula_inicio=hoje + timedelta(days=20),
+            matricula_fim=hoje + timedelta(days=25),
+            modificacao_inicio=hoje + timedelta(days=26),
+            modificacao_fim=hoje + timedelta(days=30),
+            criado_por=self.secretaria,
+        )
+        self.client.force_login(self.secretaria)
+
+        response = self.client.post(
+            reverse("matriculas_periodos"),
+            {
+                "acao": "editar_periodo",
+                "periodo_id": futuro.pk,
+                "nome": futuro.nome,
+                "prazo_cadastro_disciplinas": hoje.isoformat(),
+                "matricula_inicio": hoje.isoformat(),
+                "matricula_fim": (hoje + timedelta(days=5)).isoformat(),
+                "modificacao_inicio": (hoje + timedelta(days=6)).isoformat(),
+                "modificacao_fim": (hoje + timedelta(days=10)).isoformat(),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        futuro.refresh_from_db()
+        self.assertEqual(futuro.status, PeriodoLetivo.Status.MATRICULA_ABERTA)
+
     def test_aluno_renderiza_solicitacao_de_matricula(self):
         self.client.force_login(self.aluno)
 
         response = self.client.get(reverse("matricula_solicitar_periodo", args=[self.periodo.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.disciplina.nome)
+        self.assertContains(response, "Matrícula vínculo")
+        self.assertContains(response, "Tipo de vínculo")
+        self.assertContains(response, "Confirmar matrícula")
+        self.assertContains(response, "Confirmar e enviar")
+        self.assertContains(response, "data-matricula-form")
+        self.assertContains(response, 'document.querySelector("[data-matricula-form]")')
+        self.assertNotContains(response, 'document.querySelector("form[method=&#x27;post&#x27;]")')
+        self.assertContains(response, "Mestrado")
+        self.assertContains(response, "aluno regular")
+        self.assertNotContains(response, "Tipo de aluno</label>")
         self.assertNotContains(response, "data do servidor do AcadFlow")
+
+    def test_aluno_sem_trajetoria_ativa_nao_visualiza_formulario_matricula(self):
+        aluno_sem_trajetoria = Aluno.objects.create(
+            email="sem.trajetoria.matricula@example.com",
+            password="senha-segura-123",
+            nome="Aluno Sem Trajetoria",
+        )
+        self.client.force_login(aluno_sem_trajetoria)
+
+        response = self.client.get(reverse("matricula_solicitar_periodo", args=[self.periodo.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "trajetória acadêmica ativa")
+        self.assertNotContains(response, "Enviar solicitação")
+
+    def test_rota_base_matriculas_redireciona_para_minhas_matriculas(self):
+        self.client.force_login(self.aluno)
+
+        response = self.client.get("/matriculas/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("matriculas_minhas"))
 
     def test_aluno_visualiza_proximo_periodo_futuro_sem_formulario(self):
         hoje = timezone.localdate()
@@ -370,6 +477,147 @@ class MatriculaViewsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         self.assertGreater(len(response.content), 100)
+
+    @patch("processos.views.send_email_alunos_sem_matricula.delay")
+    def test_gestao_lista_alunos_sem_matricula_e_envia_email(self, mock_email):
+        aluno_sem_matricula = Aluno.objects.create(
+            email="pendente.matricula@example.com",
+            password="senha-segura-123",
+            nome="Aluno Pendente Matricula",
+        )
+        criar_trajetoria(aluno_sem_matricula)
+        self.client.force_login(self.secretaria)
+        total_pendentes = alunos_ativos_sem_matricula(self.periodo).count()
+
+        response = self.client.get(reverse("matriculas_periodos"))
+        self.assertContains(response, f"Alunos sem matrícula: {total_pendentes}")
+        self.assertContains(response, "Aluno Pendente Matricula")
+
+        post = self.client.post(
+            reverse("matriculas_periodos"),
+            {"acao": "enviar_email_sem_matricula", "periodo_id": self.periodo.pk},
+        )
+
+        self.assertEqual(post.status_code, 302)
+        mock_email.assert_called_once_with(self.periodo.pk)
+
+    def test_aluno_solicita_matricula_vinculo_pela_interface(self):
+        self.client.force_login(self.aluno)
+
+        response = self.client.post(
+            reverse("matricula_solicitar_periodo", args=[self.periodo.pk]),
+            {
+                "periodo_id": self.periodo.pk,
+                "matricula_vinculo": "on",
+                "aceitar_lista_espera": "on",
+                "observacao": "Sem disciplinas neste semestre.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitacao = SolicitacaoMatricula.objects.get(aluno=self.aluno, periodo=self.periodo)
+        self.assertEqual(solicitacao.tipo_matricula, SolicitacaoMatricula.TipoMatricula.VINCULO)
+        self.assertEqual(solicitacao.itens.count(), 0)
+
+    def test_sem_disciplinas_cria_matricula_vinculo_automaticamente(self):
+        self.client.force_login(self.aluno)
+
+        response = self.client.post(
+            reverse("matricula_solicitar_periodo", args=[self.periodo.pk]),
+            {
+                "periodo_id": self.periodo.pk,
+                "aceitar_lista_espera": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitacao = SolicitacaoMatricula.objects.get(aluno=self.aluno, periodo=self.periodo)
+        self.assertEqual(solicitacao.tipo_matricula, SolicitacaoMatricula.TipoMatricula.VINCULO)
+        self.assertEqual(solicitacao.itens.count(), 0)
+
+    def test_aluno_nao_consegue_solicitar_disciplinas_com_choque_de_horario(self):
+        disciplina = Disciplina.objects.create(codigo="VIS002", nome="Visualização Avançada")
+        oferta_conflitante = OfertaDisciplina.objects.create(
+            periodo=self.periodo,
+            disciplina=disciplina,
+            docente_responsavel=self.docente,
+            vagas_regulares=2,
+            vagas_especiais=1,
+            criada_por=self.secretaria,
+        )
+        EncontroOferta.objects.create(
+            oferta=oferta_conflitante,
+            dia_semana=EncontroOferta.DiaSemana.TERCA,
+            hora_inicio=time(15, 0),
+            hora_fim=time(17, 0),
+        )
+        self.client.force_login(self.aluno)
+
+        response = self.client.post(
+            reverse("matricula_solicitar_periodo", args=[self.periodo.pk]),
+            {
+                "periodo_id": self.periodo.pk,
+                "ofertas": [str(self.oferta.pk), str(oferta_conflitante.pk)],
+                "aceitar_lista_espera": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Choque de horário")
+        self.assertFalse(SolicitacaoMatricula.objects.filter(aluno=self.aluno, periodo=self.periodo).exists())
+
+    def test_tipo_aluno_matricula_vem_da_trajetoria_ativa(self):
+        aluno_especial = Aluno.objects.create(
+            email="especial.matricula@example.com",
+            password="senha-segura-123",
+            nome="Aluno Especial Matricula",
+        )
+        criar_trajetoria(aluno_especial, nivel_curso=Aluno.NivelCurso.ALUNO_ESPECIAL)
+        self.client.force_login(aluno_especial)
+
+        response = self.client.post(
+            reverse("matricula_solicitar_periodo", args=[self.periodo.pk]),
+            {
+                "periodo_id": self.periodo.pk,
+                "ofertas": [str(self.oferta.pk)],
+                "tipo_aluno": SolicitacaoMatricula.TipoAluno.REGULAR,
+                "aceitar_lista_espera": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitacao = SolicitacaoMatricula.objects.get(aluno=aluno_especial, periodo=self.periodo)
+        self.assertEqual(solicitacao.tipo_aluno, SolicitacaoMatricula.TipoAluno.ESPECIAL)
+
+    def test_aluno_precisa_confirmar_ciencia_para_solicitar_matricula(self):
+        self.client.force_login(self.aluno)
+
+        response = self.client.post(
+            reverse("matricula_solicitar_periodo", args=[self.periodo.pk]),
+            {
+                "periodo_id": self.periodo.pk,
+                "ofertas": [str(self.oferta.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Confirme a ciência para enviar a solicitação.")
+        self.assertFalse(SolicitacaoMatricula.objects.filter(aluno=self.aluno, periodo=self.periodo).exists())
+
+    def test_aluno_posdoutorado_nao_visualiza_formulario_matricula(self):
+        aluno_posdoc = Aluno.objects.create(
+            email="posdoc.matricula@example.com",
+            password="senha-segura-123",
+            nome="Aluno Posdoc",
+        )
+        criar_trajetoria(aluno_posdoc, nivel_curso=Aluno.NivelCurso.POSDOUTORADO)
+        self.client.force_login(aluno_posdoc)
+
+        response = self.client.get(reverse("matricula_solicitar_periodo", args=[self.periodo.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alunos de pós-doutorado não realizam matrícula")
+        self.assertNotContains(response, "Enviar solicitação")
 
 
 class AlunosViewTests(TestCase):
