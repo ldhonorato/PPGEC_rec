@@ -5,14 +5,17 @@
     <div class="actions-row">
         <div>
             <h1 class="section-title">Solicitação de Matrícula</h1>
-            <p class="muted">{{ solicitacao.aluno.nome }} | Período {{ solicitacao.periodo.nome }}</p>
+            <p class="muted">
+                {{ solicitacao.aluno.nome }} | Período {{ solicitacao.periodo.nome }} |
+                {{ solicitacao.get_tipo_matricula_display }}
+            </p>
         </div>
         <span class="badge badge-info">{{ solicitacao.get_status_display }}</span>
     </div>
 </section>
 
 <section class="card">
-    <h2 class="section-title">Disciplinas</h2>
+    <h2 class="section-title">{% if solicitacao.tipo_matricula == "VINCULO" %}Matrícula vínculo{% else %}Disciplinas{% endif %}</h2>
     {% if solicitacao.itens.all %}
         <ul class="list">
             {% for item in solicitacao.itens.all %}
@@ -46,7 +49,14 @@
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhuma disciplina nesta solicitação.</p>
+        {% if solicitacao.tipo_matricula == "VINCULO" %}
+            <p class="muted">Solicitação para manutenção de vínculo sem cursar disciplinas neste período.</p>
+            {% if solicitacao.observacao_secretaria %}
+                <p class="muted">Observação da secretaria: {{ solicitacao.observacao_secretaria }}</p>
+            {% endif %}
+        {% else %}
+            <p class="muted">Nenhuma disciplina nesta solicitação.</p>
+        {% endif %}
     {% endif %}
 </section>
 {% endblock %}

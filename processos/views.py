@@ -96,22 +96,19 @@ from .tasks import (
     send_email_mudanca_setor,
     send_email_status_atualizado,
     send_email_solicitacao_assinatura,
+    send_email_alunos_sem_matricula,
 )
 from .services import (
+    alunos_ativos_sem_matricula,
     cancelar_item_matricula,
     gerar_xlsx_lista_oferta,
     homologar_item_matricula,
+    homologar_solicitacao_vinculo,
     indeferir_item_matricula,
+    indeferir_solicitacao_vinculo,
     promover_proximo_lista_espera,
     salvar_solicitacao_matricula,
-)
-from .services import (
-    cancelar_item_matricula,
-    gerar_xlsx_lista_oferta,
-    homologar_item_matricula,
-    indeferir_item_matricula,
-    promover_proximo_lista_espera,
-    salvar_solicitacao_matricula,
+    tipo_aluno_matricula_por_trajetoria,
 )
 
 
@@ -736,6 +733,7 @@ def matriculas_periodos_view(request):
             if form.is_valid():
                 periodo = form.save(commit=False)
                 periodo.criado_por = request.user
+                periodo.status = periodo.calcular_status_por_data()
                 periodo.save()
                 messages.success(request, "Período letivo criado.")
                 return redirect("matriculas_periodos")
@@ -744,7 +742,9 @@ def matriculas_periodos_view(request):
             periodo_editando = get_object_or_404(PeriodoLetivo, pk=request.POST.get("periodo_id"))
             edit_form = PeriodoLetivoForm(request.POST, instance=periodo_editando)
             if edit_form.is_valid():
-                edit_form.save()
+                periodo = edit_form.save(commit=False)
+                periodo.status = periodo.calcular_status_por_data()
+                periodo.save()
                 messages.success(request, "Período letivo atualizado.")
                 return redirect("matriculas_periodos")
             messages.error(request, "Não foi possível atualizar o período letivo.")
@@ -764,8 +764,40 @@ def matriculas_periodos_view(request):
             periodo.save(update_fields=["encerrado_manualmente_em", "encerrado_manualmente_por", "status", "atualizado_em"])
             messages.success(request, "Período reaberto.")
             return redirect("matriculas_periodos")
+        elif acao == "enviar_email_sem_matricula":
+            periodo = get_object_or_404(PeriodoLetivo, pk=request.POST.get("periodo_id"))
+            total_pendentes = alunos_ativos_sem_matricula(periodo).count()
+            send_email_alunos_sem_matricula.delay(periodo.pk)
+            messages.success(request, f"Envio de e-mail agendado para {total_pendentes} aluno(s) sem matrícula.")
+            return redirect("matriculas_periodos")
+        elif acao in {"homologar_vinculo", "indeferir_vinculo"}:
+            solicitacao = get_object_or_404(SolicitacaoMatricula, pk=request.POST.get("solicitacao_id"))
+            try:
+                if acao == "homologar_vinculo":
+                    homologar_solicitacao_vinculo(solicitacao=solicitacao, usuario=request.user)
+                    messages.success(request, "Matrícula vínculo homologada.")
+                else:
+                    indeferir_solicitacao_vinculo(
+                        solicitacao=solicitacao,
+                        usuario=request.user,
+                        motivo=request.POST.get("motivo", ""),
+                    )
+                    messages.success(request, "Matrícula vínculo indeferida.")
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+            return redirect("matriculas_periodos")
 
-    periodos = PeriodoLetivo.objects.select_related("criado_por").prefetch_related("ofertas").order_by("-nome")
+    periodos = list(PeriodoLetivo.objects.select_related("criado_por").prefetch_related("ofertas").order_by("-nome"))
+    for periodo in periodos:
+        periodo.alunos_sem_matricula = list(alunos_ativos_sem_matricula(periodo))
+        periodo.solicitacoes_vinculo = list(
+            SolicitacaoMatricula.objects.filter(
+                periodo=periodo,
+                tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
+            )
+            .select_related("aluno", "homologada_por")
+            .order_by("status", "aluno__nome")
+        )
     return render(
         request,
         "processos/matriculas_periodos.html",
@@ -893,6 +925,9 @@ def matricula_solicitar_view(request, periodo_id=None):
     if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
         raise PermissionDenied("Apenas alunos podem solicitar matrícula.")
 
+    trajetoria_ativa = request.user.aluno.trajetoria_ativa()
+    tipo_aluno = tipo_aluno_matricula_por_trajetoria(trajetoria_ativa) if trajetoria_ativa else None
+    pode_solicitar_matricula = bool(trajetoria_ativa and tipo_aluno)
     hoje_servidor = timezone.localdate()
     periodos_abertos = [periodo for periodo in PeriodoLetivo.objects.order_by("-nome") if periodo.aceita_solicitacao_matricula]
     proximo_periodo = (
@@ -909,9 +944,11 @@ def matricula_solicitar_view(request, periodo_id=None):
             proximo_periodo = periodo_selecionado if periodo_selecionado.matricula_inicio > hoje_servidor else proximo_periodo
     else:
         periodo = periodos_abertos[0] if periodos_abertos else None
-    form = SolicitacaoMatriculaForm(periodo=periodo)
+    form = SolicitacaoMatriculaForm(periodo=periodo) if pode_solicitar_matricula else None
 
     if request.method == "POST":
+        if not pode_solicitar_matricula:
+            raise PermissionDenied("Você não está apto a solicitar matrícula.")
         periodo = get_object_or_404(PeriodoLetivo, pk=request.POST.get("periodo_id"))
         form = SolicitacaoMatriculaForm(request.POST, periodo=periodo)
         if form.is_valid():
@@ -919,7 +956,12 @@ def matricula_solicitar_view(request, periodo_id=None):
                 solicitacao = salvar_solicitacao_matricula(
                     aluno=request.user.aluno,
                     periodo=periodo,
-                    tipo_aluno=form.cleaned_data["tipo_aluno"],
+                    tipo_matricula=(
+                        SolicitacaoMatricula.TipoMatricula.VINCULO
+                        if form.cleaned_data["matricula_vinculo"]
+                        else SolicitacaoMatricula.TipoMatricula.DISCIPLINAS
+                    ),
+                    tipo_aluno=tipo_aluno,
                     ofertas=form.cleaned_data["ofertas"],
                     aceitar_lista_espera=form.cleaned_data["aceitar_lista_espera"],
                     observacao=form.cleaned_data["observacao"],
@@ -938,6 +980,10 @@ def matricula_solicitar_view(request, periodo_id=None):
             "proximo_periodo": proximo_periodo,
             "periodo": periodo,
             "form": form,
+            "trajetoria_ativa": trajetoria_ativa,
+            "pode_solicitar_matricula": pode_solicitar_matricula,
+            "nivel_trajetoria_display": trajetoria_ativa.get_nivel_curso_display() if trajetoria_ativa else "",
+            "tipo_aluno_display": dict(SolicitacaoMatricula.TipoAluno.choices).get(tipo_aluno),
         },
     )
 

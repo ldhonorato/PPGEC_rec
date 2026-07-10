@@ -237,15 +237,22 @@ class OfertaDisciplinaForm(forms.ModelForm):
 
 
 class SolicitacaoMatriculaForm(forms.Form):
-    tipo_aluno = forms.ChoiceField(choices=SolicitacaoMatricula.TipoAluno.choices, label="Tipo de aluno")
+    matricula_vinculo = forms.BooleanField(
+        required=False,
+        label="Matrícula vínculo",
+    )
     ofertas = forms.ModelMultipleChoiceField(
         queryset=OfertaDisciplina.objects.none(),
         label="Disciplinas",
         widget=forms.CheckboxSelectMultiple,
+        required=False,
     )
     aceitar_lista_espera = forms.BooleanField(
         required=False,
-        label="Entrar em lista de espera quando não houver vaga",
+        label=(
+            "Estou ciente de que as matrículas serão processadas por ordem de inscrição "
+            "e que posso ficar em lista de espera quando não houver vaga."
+        ),
     )
     observacao = forms.CharField(required=False, label="Observação", widget=forms.Textarea(attrs={"rows": 3}))
 
@@ -259,6 +266,17 @@ class SolicitacaoMatriculaForm(forms.Form):
                 .prefetch_related("encontros")
                 .order_by("disciplina__nome")
             )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        matricula_vinculo = cleaned_data.get("matricula_vinculo")
+        ofertas = cleaned_data.get("ofertas")
+        if not cleaned_data.get("aceitar_lista_espera"):
+            self.add_error("aceitar_lista_espera", "Confirme a ciência para enviar a solicitação.")
+        if matricula_vinculo or not ofertas:
+            cleaned_data["matricula_vinculo"] = True
+            cleaned_data["ofertas"] = []
+        return cleaned_data
 
 
 class SetorComissaoForm(forms.ModelForm):

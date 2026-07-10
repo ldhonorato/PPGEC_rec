@@ -32,27 +32,40 @@
 </section>
 {% endif %}
 
-{% if periodo %}
+{% if periodo and not trajetoria_ativa %}
+<section class="card panel">
+    <h2 class="section-title">Trajetória acadêmica</h2>
+    <p class="muted">Você só pode solicitar matrícula se possuir trajetória acadêmica ativa.</p>
+</section>
+{% endif %}
+
+{% if periodo and trajetoria_ativa and not pode_solicitar_matricula %}
+<section class="card panel">
+    <h2 class="section-title">Matrícula não disponível</h2>
+    <p class="muted">Alunos de pós-doutorado não realizam matrícula em disciplinas pelo AcadFlow.</p>
+</section>
+{% endif %}
+
+{% if periodo and pode_solicitar_matricula %}
 <section class="card">
     <h2 class="section-title">Disciplinas disponíveis</h2>
-    <form method="post">
+    <form method="post" data-matricula-form>
         {% csrf_token %}
         <input type="hidden" name="periodo_id" value="{{ periodo.pk }}">
+        <input type="hidden" name="aceitar_lista_espera" id="id_aceitar_lista_espera" value="">
         {{ form.non_field_errors }}
-        <div class="grid-two">
-            <div class="field">
-                <label for="{{ form.tipo_aluno.id_for_label }}">{{ form.tipo_aluno.label }}</label>
-                {{ form.tipo_aluno }}
-                {{ form.tipo_aluno.errors }}
-            </div>
-            <div class="field checkbox-field">
-                {{ form.aceitar_lista_espera }}
-                <label for="{{ form.aceitar_lista_espera.id_for_label }}">{{ form.aceitar_lista_espera.label }}</label>
-                {{ form.aceitar_lista_espera.errors }}
-            </div>
+        <div class="field">
+            <span class="info-label">Tipo de vínculo</span>
+            <strong>{{ nivel_trajetoria_display }}</strong>
+            <small class="muted" style="display:block; margin-top:0.25rem;">Matrícula como aluno {{ tipo_aluno_display|lower }}.</small>
+        </div>
+        <div class="field checkbox-field">
+            {{ form.matricula_vinculo }}
+            <label for="{{ form.matricula_vinculo.id_for_label }}">{{ form.matricula_vinculo.label }}</label>
+            {{ form.matricula_vinculo.errors }}
         </div>
 
-        <div class="field">
+        <div class="field" data-disciplinas-field>
             <label>{{ form.ofertas.label }}</label>
             {{ form.ofertas.errors }}
             {% if form.fields.ofertas.queryset %}
@@ -60,7 +73,7 @@
                     {% for oferta in form.fields.ofertas.queryset %}
                         <li>
                             <label class="checkbox-field" style="align-items:flex-start;">
-                                <input type="checkbox" name="ofertas" value="{{ oferta.pk }}">
+                                <input type="checkbox" name="ofertas" value="{{ oferta.pk }}" data-oferta-label="{{ oferta.disciplina.codigo }} - {{ oferta.disciplina.nome }}">
                                 <span>
                                     <strong>{{ oferta.disciplina.codigo }} - {{ oferta.disciplina.nome }}</strong>
                                     <small class="muted" style="display:block; margin-top:0.25rem;">
@@ -85,14 +98,105 @@
         </div>
 
         <div class="field">
+            {{ form.aceitar_lista_espera.errors }}
+        </div>
+
+        <div class="field">
             <label for="{{ form.observacao.id_for_label }}">{{ form.observacao.label }}</label>
             {{ form.observacao }}
             {{ form.observacao.errors }}
         </div>
         <div class="form-actions">
-            <button class="btn" type="submit">Enviar solicitação</button>
+            <button class="btn" type="button" data-open-confirmacao>Enviar solicitação</button>
         </div>
     </form>
 </section>
+
+<dialog id="confirmar-matricula" class="modal-dialog">
+    <div class="modal-body">
+        <div class="actions-row">
+            <h2 class="section-title">Confirmar matrícula</h2>
+            <button class="btn btn-secondary" type="button" data-close-confirmacao>Fechar</button>
+        </div>
+        <div class="field">
+            <span class="info-label">Período</span>
+            <strong>{{ periodo.nome }}</strong>
+        </div>
+        <div class="field">
+            <span class="info-label">Tipo de vínculo</span>
+            <strong>{{ nivel_trajetoria_display }}</strong>
+            <small class="muted" style="display:block; margin-top:0.25rem;">Matrícula como aluno {{ tipo_aluno_display|lower }}.</small>
+        </div>
+        <div class="field">
+            <span class="info-label">Solicitação</span>
+            <strong data-resumo-tipo>Matrícula vínculo</strong>
+        </div>
+        <div class="field" data-resumo-disciplinas-wrap hidden>
+            <span class="info-label">Disciplinas selecionadas</span>
+            <ul class="list" data-resumo-disciplinas></ul>
+        </div>
+        <p class="muted">
+            Estou ciente de que as matrículas serão processadas por ordem de inscrição
+            e que posso ficar em lista de espera quando não houver vaga.
+        </p>
+        <div class="form-actions">
+            <button class="btn btn-secondary" type="button" data-close-confirmacao>Voltar</button>
+            <button class="btn" type="button" data-confirmar-matricula>Confirmar e enviar</button>
+        </div>
+    </div>
+</dialog>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const matriculaForm = document.querySelector("[data-matricula-form]");
+const matriculaVinculoInput = document.querySelector("input[name='matricula_vinculo']");
+const disciplinasField = document.querySelector("[data-disciplinas-field]");
+const cienciaInput = document.querySelector("input[name='aceitar_lista_espera']");
+const confirmacaoDialog = document.getElementById("confirmar-matricula");
+const resumoTipo = document.querySelector("[data-resumo-tipo]");
+const resumoDisciplinasWrap = document.querySelector("[data-resumo-disciplinas-wrap]");
+const resumoDisciplinas = document.querySelector("[data-resumo-disciplinas]");
+
+function disciplinasSelecionadas() {
+    return Array.from(document.querySelectorAll("input[name='ofertas']:checked"));
+}
+
+function atualizarTipoMatricula() {
+    const isVinculo = Boolean(matriculaVinculoInput?.checked);
+    if (disciplinasField) disciplinasField.hidden = isVinculo;
+}
+
+function atualizarResumoConfirmacao() {
+    const selecionadas = disciplinasSelecionadas();
+    const isVinculo = Boolean(matriculaVinculoInput?.checked) || selecionadas.length === 0;
+    if (resumoTipo) resumoTipo.textContent = isVinculo ? "Matrícula vínculo" : "Matrícula em disciplinas";
+    if (resumoDisciplinasWrap) resumoDisciplinasWrap.hidden = isVinculo;
+    if (resumoDisciplinas) {
+        resumoDisciplinas.innerHTML = "";
+        selecionadas.forEach((checkbox) => {
+            const item = document.createElement("li");
+            item.textContent = checkbox.dataset.ofertaLabel || checkbox.value;
+            resumoDisciplinas.appendChild(item);
+        });
+    }
+}
+
+matriculaVinculoInput?.addEventListener("change", atualizarTipoMatricula);
+document.querySelector("[data-open-confirmacao]")?.addEventListener("click", () => {
+    atualizarResumoConfirmacao();
+    confirmacaoDialog?.showModal();
+});
+document.querySelectorAll("[data-close-confirmacao]").forEach((button) => {
+    button.addEventListener("click", () => confirmacaoDialog?.close());
+});
+document.querySelector("[data-confirmar-matricula]")?.addEventListener("click", () => {
+    if (cienciaInput) cienciaInput.value = "on";
+    const selecionadas = disciplinasSelecionadas();
+    if (matriculaVinculoInput && selecionadas.length === 0) matriculaVinculoInput.checked = true;
+    matriculaForm?.submit();
+});
+atualizarTipoMatricula();
+</script>
 {% endblock %}

@@ -51,9 +51,14 @@
                                 Matrícula {{ periodo.matricula_inicio|date:"d/m/Y" }} a {{ periodo.matricula_fim|date:"d/m/Y" }} |
                                 Modificação {{ periodo.modificacao_inicio|date:"d/m/Y" }} a {{ periodo.modificacao_fim|date:"d/m/Y" }}
                             </small>
+                            <small class="muted" style="display:block; margin-top:0.35rem;">
+                                Alunos sem matrícula: {{ periodo.alunos_sem_matricula|length }} |
+                                Matrículas vínculo: {{ periodo.solicitacoes_vinculo|length }}
+                            </small>
                         </div>
                         <div class="calendar-nav">
                             <button class="btn btn-secondary" type="button" data-open-dialog="editar-periodo-{{ periodo.pk }}">Editar</button>
+                            <button class="btn btn-secondary" type="button" data-open-dialog="matriculas-periodo-{{ periodo.pk }}">Matrículas</button>
                             <form method="post">
                                 {% csrf_token %}
                                 <input type="hidden" name="periodo_id" value="{{ periodo.pk }}">
@@ -76,6 +81,86 @@
 </section>
 
 {% for periodo in periodos %}
+<dialog id="matriculas-periodo-{{ periodo.pk }}" class="modal-dialog">
+    <div class="modal-body">
+        <div class="actions-row">
+            <div>
+                <h2 class="section-title">Matrículas - {{ periodo.nome }}</h2>
+                <p class="muted">{{ periodo.alunos_sem_matricula|length }} aluno(s) com trajetória ativa sem matrícula registrada.</p>
+            </div>
+            <button class="btn btn-secondary" type="button" data-close-dialog>Fechar</button>
+        </div>
+
+        <div class="card room-modal-card panel">
+            <div class="actions-row">
+                <h3 class="section-title">Alunos sem matrícula</h3>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="enviar_email_sem_matricula">
+                    <input type="hidden" name="periodo_id" value="{{ periodo.pk }}">
+                    <button class="btn" type="submit" {% if not periodo.alunos_sem_matricula %}disabled{% endif %}>Enviar e-mail</button>
+                </form>
+            </div>
+            {% if periodo.alunos_sem_matricula %}
+                <ul class="list">
+                    {% for aluno in periodo.alunos_sem_matricula %}
+                        <li>
+                            <strong>{{ aluno.nome }}</strong>
+                            <small class="muted" style="display:block;">{{ aluno.email }}{% if aluno.matricula %} | {{ aluno.matricula }}{% endif %}</small>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="muted">Todos os alunos com trajetória ativa possuem matrícula registrada neste período.</p>
+            {% endif %}
+        </div>
+
+        <div class="card room-modal-card">
+            <h3 class="section-title">Matrículas vínculo</h3>
+            {% if periodo.solicitacoes_vinculo %}
+                <ul class="list">
+                    {% for solicitacao in periodo.solicitacoes_vinculo %}
+                        <li>
+                            <div class="actions-row">
+                                <div>
+                                    <strong>{{ solicitacao.aluno.nome }}</strong>
+                                    <span class="badge badge-info">{{ solicitacao.get_status_display }}</span>
+                                    <small class="muted" style="display:block; margin-top:0.35rem;">
+                                        {{ solicitacao.aluno.email }} |
+                                        Solicitada em {{ solicitacao.solicitada_em|date:"d/m/Y H:i"|default:"-" }}
+                                    </small>
+                                    {% if solicitacao.observacao_aluno %}
+                                        <p class="muted">{{ solicitacao.observacao_aluno }}</p>
+                                    {% endif %}
+                                </div>
+                                <div class="calendar-nav">
+                                    {% if solicitacao.status == "SOLICITADA" %}
+                                        <form method="post">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="acao" value="homologar_vinculo">
+                                            <input type="hidden" name="solicitacao_id" value="{{ solicitacao.pk }}">
+                                            <button class="btn" type="submit">Homologar</button>
+                                        </form>
+                                        <form method="post">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="acao" value="indeferir_vinculo">
+                                            <input type="hidden" name="solicitacao_id" value="{{ solicitacao.pk }}">
+                                            <input type="hidden" name="motivo" value="Indeferida pela secretaria.">
+                                            <button class="btn btn-secondary" type="submit">Indeferir</button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="muted">Nenhuma matrícula vínculo registrada neste período.</p>
+            {% endif %}
+        </div>
+    </div>
+</dialog>
+
 <dialog id="editar-periodo-{{ periodo.pk }}" class="modal-dialog" {% if periodo_editando.pk == periodo.pk %}data-open-on-load{% endif %}>
     <div class="modal-body">
         <div class="actions-row">

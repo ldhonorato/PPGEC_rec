@@ -21,7 +21,7 @@
                             <strong>{{ solicitacao.periodo.nome }}</strong>
                             <span class="badge badge-info">{{ solicitacao.get_status_display }}</span>
                             <small class="muted" style="display:block; margin-top:0.35rem;">
-                                {{ solicitacao.get_tipo_aluno_display }} |
+                                {{ solicitacao.get_tipo_matricula_display }} | {{ solicitacao.get_tipo_aluno_display }} |
                                 Solicitada em {{ solicitacao.solicitada_em|date:"d/m/Y H:i"|default:"-" }}
                             </small>
                         </div>
