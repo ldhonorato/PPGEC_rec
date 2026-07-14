@@ -14,9 +14,14 @@
 <section class="card panel {% if conforme %}alert-info{% else %}alert-danger{% endif %}">
     <h2 class="section-title">Conformidade</h2>
     <p class="muted">
-        Carga horária presencial planejada: {{ percentual_presencial }}%.
-        Disciplinas híbridas devem possuir no mínimo 25% da carga horária ofertada de forma presencial.
+        Carga horária presencial planejada: {{ carga_presencial_horas }}h de {{ carga_total_horas }}h ({{ percentual_presencial }}%).
+        Disciplinas híbridas devem possuir no mínimo 25% da carga horária ofertada de forma presencial
+        {% if carga_minima_horas %}({{ carga_minima_horas }}h nesta oferta){% endif %}.
     </p>
+    <div class="progress-track" style="height:0.75rem; background:#e8eef7; border-radius:999px; overflow:hidden; margin:0.85rem 0 0.35rem;">
+        <div data-progress-bar style="height:100%; width:0%; background:#0f62b5; border-radius:999px;"></div>
+    </div>
+    <p class="muted" data-progress-label style="margin:0;"></p>
     <p class="muted">
         Disciplinas 100% presenciais terão prioridade no uso dos ambientes. Ajustes no ambiente reservado para a aula
         podem ser solicitados pela secretaria/coordenação.
@@ -27,48 +32,55 @@
 </section>
 
 <section class="card">
-    <form method="post" data-planejamento-form>
+    <form method="post" data-planejamento-form data-carga-total="{{ carga_total_horas }}" data-carga-minima="{{ carga_minima_horas }}">
         {% csrf_token %}
-        <div class="field">
-            <label for="sala_padrao">Ambiente para aplicar a todas as aulas selecionadas</label>
-            <select name="sala_padrao" id="sala_padrao">
-                <option value="">Selecionar individualmente</option>
-                {% for sala in salas %}
-                    <option value="{{ sala.pk }}">{{ sala.polo.nome }} - {{ sala.nome }}{% if sala.capacidade %} ({{ sala.capacidade }}){% endif %}</option>
-                {% endfor %}
-            </select>
+        <datalist id="datas-aulas">
+            {% for item in datas_planejamento %}
+                <option value="{{ item.data }}" label="{{ item.label }} {{ item.hora_inicio }}-{{ item.hora_fim }}"></option>
+            {% endfor %}
+        </datalist>
+
+        <div class="actions-row" style="align-items:center; margin-bottom:1rem;">
+            <div>
+                <h2 class="section-title" style="margin:0;">Aulas presenciais</h2>
+                <p class="muted" style="margin:0.35rem 0 0;">Adicione uma linha para cada aula presencial planejada.</p>
+            </div>
+            <button class="btn btn-secondary" type="button" data-add-aula>+ Aula presencial</button>
         </div>
 
-        {% for grupo in encontros_planejamento %}
-            <div class="card room-modal-card panel">
-                <h2 class="section-title">{{ grupo.encontro.get_dia_semana_display }} {{ grupo.encontro.hora_inicio|time:"H:i" }} - {{ grupo.encontro.hora_fim|time:"H:i" }}</h2>
-                {% if grupo.aulas %}
-                    <ul class="list">
-                        {% for item in grupo.aulas %}
-                            <li>
-                                <div class="grid-two">
-                                    <label class="checkbox-field">
-                                        <input type="checkbox" name="aula_{{ grupo.encontro.pk }}_{{ item.data|date:'Y-m-d' }}" {% if item.aula %}checked{% endif %}>
-                                        <span>{{ item.data|date:"d/m/Y" }}</span>
-                                    </label>
-                                    <div class="field">
-                                        <label>Ambiente</label>
-                                        <select name="sala_{{ grupo.encontro.pk }}_{{ item.data|date:'Y-m-d' }}">
-                                            <option value="">Usar ambiente padrão</option>
-                                            {% for sala in salas %}
-                                                <option value="{{ sala.pk }}" {% if item.aula.sala_id == sala.pk %}selected{% endif %}>{{ sala.polo.nome }} - {{ sala.nome }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                </div>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="muted">Não há datas no período letivo para este encontro.</p>
-                {% endif %}
-            </div>
-        {% endfor %}
+        <div class="list" data-aulas-list>
+            {% for aula in aulas_form_rows %}
+                <div class="card room-modal-card panel" data-aula-row>
+                    <div class="grid-two">
+                        <div class="field">
+                            <label>Data</label>
+                            <input name="aula_data" list="datas-aulas" value="{{ aula.data }}" placeholder="dd/mm/aaaa" data-aula-data required>
+                            <input type="hidden" name="aula_encontro" value="{{ aula.encontro_id }}" data-aula-encontro>
+                        </div>
+                        <div class="field">
+                            <label>Ambiente</label>
+                            <select name="aula_sala" required>
+                                <option value="">Selecione</option>
+                                {% for sala in salas %}
+                                    <option value="{{ sala.pk }}" {% if aula.sala_id == sala.pk %}selected{% endif %}>{{ sala.polo.nome }} - {{ sala.nome }}{% if sala.capacidade %} ({{ sala.capacidade }}){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Horário inicial</label>
+                            <input type="time" name="aula_hora_inicio" value="{{ aula.hora_inicio }}" data-aula-inicio required>
+                        </div>
+                        <div class="field">
+                            <label>Horário final</label>
+                            <input type="time" name="aula_hora_fim" value="{{ aula.hora_fim }}" data-aula-fim required>
+                        </div>
+                    </div>
+                    <div class="form-actions" style="justify-content:flex-end;">
+                        <button class="btn btn-secondary" type="button" data-remove-aula>Remover</button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
 
         <div class="form-actions">
             <button class="btn" type="button" data-open-norma>Salvar planejamento</button>
@@ -96,12 +108,116 @@
         </div>
     </div>
 </dialog>
+
+{{ datas_planejamento|json_script:"datas-planejamento-data" }}
+
+<template id="aula-row-template">
+    <div class="card room-modal-card panel" data-aula-row>
+        <div class="grid-two">
+            <div class="field">
+                <label>Data</label>
+                <input name="aula_data" list="datas-aulas" placeholder="dd/mm/aaaa" data-aula-data required>
+                <input type="hidden" name="aula_encontro" data-aula-encontro>
+            </div>
+            <div class="field">
+                <label>Ambiente</label>
+                <select name="aula_sala" required>
+                    <option value="">Selecione</option>
+                    {% for sala in salas %}
+                        <option value="{{ sala.pk }}">{{ sala.polo.nome }} - {{ sala.nome }}{% if sala.capacidade %} ({{ sala.capacidade }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label>Horário inicial</label>
+                <input type="time" name="aula_hora_inicio" data-aula-inicio required>
+            </div>
+            <div class="field">
+                <label>Horário final</label>
+                <input type="time" name="aula_hora_fim" data-aula-fim required>
+            </div>
+        </div>
+        <div class="form-actions" style="justify-content:flex-end;">
+            <button class="btn btn-secondary" type="button" data-remove-aula>Remover</button>
+        </div>
+    </div>
+</template>
 {% endblock %}
 
 {% block scripts %}
 <script>
 const planejamentoForm = document.querySelector("[data-planejamento-form]");
 const normaDialog = document.getElementById("norma-capes");
+const aulasList = document.querySelector("[data-aulas-list]");
+const aulaTemplate = document.getElementById("aula-row-template");
+const datasPlanejamento = JSON.parse(document.getElementById("datas-planejamento-data")?.textContent || "[]");
+const datasPorValor = new Map(datasPlanejamento.map((item) => [item.data, item]));
+const progressBar = document.querySelector("[data-progress-bar]");
+const progressLabel = document.querySelector("[data-progress-label]");
+
+function timeToMinutes(value) {
+    if (!value || !value.includes(":")) return null;
+    const [hours, minutes] = value.split(":").map((part) => Number.parseInt(part, 10));
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+    return (hours * 60) + minutes;
+}
+
+function atualizarProgresso() {
+    const cargaTotal = Number.parseFloat(planejamentoForm?.dataset.cargaTotal || "0");
+    const cargaMinima = Number.parseFloat(planejamentoForm?.dataset.cargaMinima || "0");
+    let minutos = 0;
+    document.querySelectorAll("[data-aula-row]").forEach((row) => {
+        const inicio = timeToMinutes(row.querySelector("[data-aula-inicio]")?.value);
+        const fim = timeToMinutes(row.querySelector("[data-aula-fim]")?.value);
+        if (inicio !== null && fim !== null && fim > inicio) minutos += fim - inicio;
+    });
+    const horas = minutos / 60;
+    const percentualOferta = cargaTotal > 0 ? (horas / cargaTotal) * 100 : 0;
+    const percentualMeta = cargaMinima > 0 ? Math.min((horas / cargaMinima) * 100, 100) : 0;
+    if (progressBar) progressBar.style.width = `${percentualMeta}%`;
+    if (progressLabel) {
+        progressLabel.textContent = `${horas.toFixed(1)}h alocadas de ${cargaMinima.toFixed(1)}h mínimas (${percentualOferta.toFixed(1)}% da carga horária).`;
+    }
+}
+
+function bindAulaRow(row) {
+    const dataInput = row.querySelector("[data-aula-data]");
+    const encontroInput = row.querySelector("[data-aula-encontro]");
+    const inicioInput = row.querySelector("[data-aula-inicio]");
+    const fimInput = row.querySelector("[data-aula-fim]");
+    dataInput?.addEventListener("change", () => {
+        const item = datasPorValor.get(dataInput.value);
+        if (!item) {
+            if (encontroInput) encontroInput.value = "";
+            return;
+        }
+        if (encontroInput) encontroInput.value = item.encontro_id;
+        if (inicioInput) inicioInput.value = item.hora_inicio;
+        if (fimInput) fimInput.value = item.hora_fim;
+        atualizarProgresso();
+    });
+    row.querySelectorAll("[data-aula-inicio], [data-aula-fim]").forEach((input) => {
+        input.addEventListener("input", atualizarProgresso);
+    });
+    row.querySelector("[data-remove-aula]")?.addEventListener("click", () => {
+        row.remove();
+        atualizarProgresso();
+    });
+}
+
+function adicionarAula() {
+    if (!aulaTemplate || !aulasList) return;
+    const fragment = aulaTemplate.content.cloneNode(true);
+    const row = fragment.querySelector("[data-aula-row]");
+    aulasList.appendChild(fragment);
+    bindAulaRow(row);
+    row.querySelector("[data-aula-data]")?.focus();
+    atualizarProgresso();
+}
+
+document.querySelector("[data-add-aula]")?.addEventListener("click", adicionarAula);
+document.querySelectorAll("[data-aula-row]").forEach(bindAulaRow);
+atualizarProgresso();
 document.querySelector("[data-open-norma]")?.addEventListener("click", () => normaDialog?.showModal());
 document.querySelectorAll("[data-close-norma]").forEach((button) => {
     button.addEventListener("click", () => normaDialog?.close());

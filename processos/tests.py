@@ -503,14 +503,19 @@ class MatriculaViewsTests(TestCase):
         response = self.client.post(
             reverse("matricula_oferta_planejamento_presencial", args=[self.oferta.pk]),
             {
-                "sala_padrao": sala.pk,
-                f"aula_{encontro.pk}_{data_aula.isoformat()}": "on",
+                "aula_data": data_aula.isoformat(),
+                "aula_encontro": str(encontro.pk),
+                "aula_hora_inicio": encontro.hora_inicio.strftime("%H:%M"),
+                "aula_hora_fim": encontro.hora_fim.strftime("%H:%M"),
+                "aula_sala": str(sala.pk),
             },
         )
 
         self.assertEqual(response.status_code, 302)
         aula = AulaPresencialOferta.objects.get(oferta=self.oferta)
         self.assertEqual(aula.sala, sala)
+        self.assertEqual(aula.hora_inicio, encontro.hora_inicio)
+        self.assertEqual(aula.hora_fim, encontro.hora_fim)
         self.assertEqual(aula.reserva.sala, sala)
         mock_email.assert_called_once_with(self.oferta.pk, self.docente.pk)
 
@@ -523,7 +528,42 @@ class MatriculaViewsTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Não conforme")
-        self.assertContains(response, self.disciplina.nome)
+
+    @patch("processos.views.send_email_secretaria_planejamento_presencial.delay")
+    def test_planejamento_presencial_permite_aula_avulsa_com_horario_editado(self, mock_email):
+        self.oferta.modalidade = OfertaDisciplina.Modalidade.HIBRIDA
+        self.oferta.save(update_fields=["modalidade"])
+        polo = Polo.objects.create(nome="Polo Aula Avulsa")
+        sala = Sala.objects.create(polo=polo, nome="Sala Avulsa", capacidade=20)
+        data_aula = self.periodo.data_inicio + timedelta(days=2)
+        DisponibilidadeSala.objects.create(
+            sala=sala,
+            dia_semana=data_aula.weekday(),
+            hora_inicio=time(8, 0),
+            hora_fim=time(18, 0),
+        )
+        self.client.force_login(self.docente)
+
+        response = self.client.post(
+            reverse("matricula_oferta_planejamento_presencial", args=[self.oferta.pk]),
+            {
+                "aula_data": data_aula.isoformat(),
+                "aula_encontro": "",
+                "aula_hora_inicio": "10:00",
+                "aula_hora_fim": "12:30",
+                "aula_sala": str(sala.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        aula = AulaPresencialOferta.objects.get(oferta=self.oferta)
+        self.assertIsNone(aula.encontro)
+        self.assertEqual(aula.hora_inicio, time(10, 0))
+        self.assertEqual(aula.hora_fim, time(12, 30))
+        self.assertEqual(aula.carga_horaria_minutos, 150)
+        self.assertEqual(aula.reserva.inicio.time(), time(10, 0))
+        self.assertEqual(aula.reserva.fim.time(), time(12, 30))
+        mock_email.assert_called_once_with(self.oferta.pk, self.docente.pk)
 
     @patch("processos.views.send_email_alunos_sem_matricula.delay")
     def test_gestao_lista_alunos_sem_matricula_e_envia_email(self, mock_email):

@@ -153,6 +153,8 @@ def minutos_encontro(encontro):
 
 
 def carga_horaria_total_oferta_minutos(oferta):
+    if oferta.disciplina.carga_horaria:
+        return oferta.disciplina.carga_horaria * 60
     total = 0
     for encontro in oferta.encontros.all():
         total += minutos_encontro(encontro) * len(datas_encontro_no_periodo(encontro))
@@ -160,7 +162,7 @@ def carga_horaria_total_oferta_minutos(oferta):
 
 
 def carga_horaria_presencial_oferta_minutos(oferta):
-    return sum(aula.carga_horaria_minutos for aula in oferta.aulas_presenciais.select_related("encontro"))
+    return sum(aula.carga_horaria_minutos for aula in oferta.aulas_presenciais.all())
 
 
 def percentual_presencial_oferta(oferta):
@@ -197,24 +199,33 @@ def salvar_planejamento_presencial_oferta(*, oferta, usuario, selecoes):
     if oferta.modalidade != OfertaDisciplina.Modalidade.HIBRIDA:
         raise ValidationError("Apenas disciplinas híbridas possuem planejamento de aulas presenciais.")
 
-    existentes = {f"{aula.encontro_id}:{aula.data.isoformat()}": aula for aula in oferta.aulas_presenciais.select_related("reserva")}
-    manter = set()
     titulo = f"Aula presencial - {oferta.disciplina.codigo} - {oferta.disciplina.nome}"
+    chaves = set()
+
+    for aula in oferta.aulas_presenciais.select_related("reserva"):
+        if aula.reserva:
+            aula.reserva.excluir(usuario=usuario, justificativa="Alteração do planejamento presencial da oferta.")
+        aula.delete()
 
     for selecao in selecoes:
-        encontro = oferta.encontros.get(pk=selecao["encontro_id"])
+        encontro = None
+        if selecao.get("encontro_id"):
+            encontro = oferta.encontros.get(pk=selecao["encontro_id"])
         data = selecao["data"]
         sala = selecao["sala"]
-        chave = f"{encontro.pk}:{data.isoformat()}"
-        inicio = timezone.make_aware(datetime.combine(data, encontro.hora_inicio))
-        fim = timezone.make_aware(datetime.combine(data, encontro.hora_fim))
-        aula = existentes.get(chave)
-        if aula and aula.sala_id == sala.id:
-            manter.add(chave)
-            continue
-        if aula:
-            aula.reserva.excluir(usuario=usuario, justificativa="Alteração do planejamento presencial da oferta.")
-            aula.delete()
+        hora_inicio = selecao["hora_inicio"] or getattr(encontro, "hora_inicio", None)
+        hora_fim = selecao["hora_fim"] or getattr(encontro, "hora_fim", None)
+        if not data or not hora_inicio or not hora_fim:
+            raise ValidationError("Informe data, horário inicial e horário final para todas as aulas presenciais.")
+        if hora_fim <= hora_inicio:
+            raise ValidationError("O horário final deve ser posterior ao horário inicial.")
+        chave = (data, hora_inicio, hora_fim)
+        if chave in chaves:
+            raise ValidationError("Há aulas presenciais duplicadas com a mesma data e horário.")
+        chaves.add(chave)
+
+        inicio = timezone.make_aware(datetime.combine(data, hora_inicio))
+        fim = timezone.make_aware(datetime.combine(data, hora_fim))
         reserva = ReservaAmbiente(
             sala=sala,
             docente=oferta.docente_responsavel,
@@ -229,16 +240,12 @@ def salvar_planejamento_presencial_oferta(*, oferta, usuario, selecoes):
             oferta=oferta,
             encontro=encontro,
             data=data,
+            hora_inicio=hora_inicio,
+            hora_fim=hora_fim,
             sala=sala,
             reserva=reserva,
             criado_por=usuario,
         )
-        manter.add(chave)
-
-    for chave, aula in existentes.items():
-        if chave not in manter:
-            aula.reserva.excluir(usuario=usuario, justificativa="Aula presencial removida do planejamento da oferta.")
-            aula.delete()
 
     return oferta
 

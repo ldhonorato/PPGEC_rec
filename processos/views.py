@@ -1,5 +1,5 @@
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
@@ -11,7 +11,7 @@ from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.utils.dateparse import parse_date
+from django.utils.dateparse import parse_date, parse_time
 
 from .forms import (
     AlunoCadastroForm,
@@ -102,6 +102,8 @@ from .tasks import (
 from .services import (
     alunos_ativos_sem_matricula,
     cancelar_item_matricula,
+    carga_horaria_presencial_oferta_minutos,
+    carga_horaria_total_oferta_minutos,
     gerar_xlsx_lista_oferta,
     homologar_item_matricula,
     homologar_solicitacao_vinculo,
@@ -116,6 +118,18 @@ from .services import (
     salvar_solicitacao_matricula,
     tipo_aluno_matricula_por_trajetoria,
 )
+
+
+def _parse_date_input(value):
+    if not value:
+        return None
+    data = parse_date(value)
+    if data:
+        return data
+    try:
+        return datetime.strptime(value, "%d/%m/%Y").date()
+    except ValueError:
+        return None
 
 
 def _is_docente(user):
@@ -953,17 +967,31 @@ def matricula_oferta_planejamento_presencial_view(request, oferta_id):
 
     if request.method == "POST":
         selecoes = []
-        sala_padrao = Sala.objects.filter(pk=request.POST.get("sala_padrao"), ativa=True).first()
-        for key, value in request.POST.items():
-            if not key.startswith("aula_") or value != "on":
+        datas = request.POST.getlist("aula_data")
+        encontros = request.POST.getlist("aula_encontro")
+        horas_inicio = request.POST.getlist("aula_hora_inicio")
+        horas_fim = request.POST.getlist("aula_hora_fim")
+        salas = request.POST.getlist("aula_sala")
+        total_linhas = max(len(datas), len(encontros), len(horas_inicio), len(horas_fim), len(salas))
+        for index in range(total_linhas):
+            data = _parse_date_input(datas[index]) if index < len(datas) and datas[index] else None
+            if not data:
                 continue
-            _prefix, encontro_id, data_iso = key.split("_", 2)
-            sala_id = request.POST.get(f"sala_{encontro_id}_{data_iso}") or getattr(sala_padrao, "pk", None)
+            sala_id = salas[index] if index < len(salas) else ""
             sala = Sala.objects.filter(pk=sala_id, ativa=True).first()
             if not sala:
-                messages.error(request, "Informe um ambiente para todas as aulas presenciais selecionadas.")
+                messages.error(request, "Informe um ambiente para todas as aulas presenciais.")
                 return redirect("matricula_oferta_planejamento_presencial", oferta_id=oferta.pk)
-            selecoes.append({"encontro_id": int(encontro_id), "data": parse_date(data_iso), "sala": sala})
+            encontro_id = encontros[index] if index < len(encontros) and encontros[index] else None
+            selecoes.append(
+                {
+                    "encontro_id": int(encontro_id) if encontro_id else None,
+                    "data": data,
+                    "hora_inicio": parse_time(horas_inicio[index]) if index < len(horas_inicio) else None,
+                    "hora_fim": parse_time(horas_fim[index]) if index < len(horas_fim) else None,
+                    "sala": sala,
+                }
+            )
         try:
             salvar_planejamento_presencial_oferta(oferta=oferta, usuario=request.user, selecoes=selecoes)
             send_email_secretaria_planejamento_presencial.delay(oferta.pk, request.user.pk)
@@ -972,14 +1000,32 @@ def matricula_oferta_planejamento_presencial_view(request, oferta_id):
         except ValidationError as exc:
             messages.error(request, "; ".join(exc.messages))
 
-    aulas_existentes = {f"{aula.encontro_id}_{aula.data.isoformat()}": aula for aula in oferta.aulas_presenciais.all()}
-    encontros_planejamento = []
+    datas_planejamento = []
     for encontro in oferta.encontros.all():
-        aulas = []
         for data in datas_encontro_no_periodo(encontro):
-            chave = f"{encontro.pk}_{data.isoformat()}"
-            aulas.append({"data": data, "chave": chave, "aula": aulas_existentes.get(chave)})
-        encontros_planejamento.append({"encontro": encontro, "aulas": aulas})
+            datas_planejamento.append(
+                {
+                    "data": data.strftime("%d/%m/%Y"),
+                    "data_iso": data.isoformat(),
+                    "label": f"{data:%d/%m/%Y} - {encontro.get_dia_semana_display()}",
+                    "encontro_id": encontro.pk,
+                    "hora_inicio": encontro.hora_inicio.strftime("%H:%M"),
+                    "hora_fim": encontro.hora_fim.strftime("%H:%M"),
+                }
+            )
+
+    aulas_form_rows = [
+        {
+            "data": aula.data.strftime("%d/%m/%Y"),
+            "encontro_id": aula.encontro_id or "",
+            "hora_inicio": aula.hora_inicio.strftime("%H:%M"),
+            "hora_fim": aula.hora_fim.strftime("%H:%M"),
+            "sala_id": aula.sala_id,
+        }
+        for aula in oferta.aulas_presenciais.all()
+    ]
+    carga_total_minutos = carga_horaria_total_oferta_minutos(oferta)
+    carga_presencial_minutos = carga_horaria_presencial_oferta_minutos(oferta)
 
     return render(
         request,
@@ -987,7 +1033,11 @@ def matricula_oferta_planejamento_presencial_view(request, oferta_id):
         {
             "oferta": oferta,
             "salas": Sala.objects.filter(ativa=True, polo__ativo=True).select_related("polo").order_by("polo__nome", "nome"),
-            "encontros_planejamento": encontros_planejamento,
+            "datas_planejamento": datas_planejamento,
+            "aulas_form_rows": aulas_form_rows,
+            "carga_total_horas": round(carga_total_minutos / 60, 1),
+            "carga_presencial_horas": round(carga_presencial_minutos / 60, 1),
+            "carga_minima_horas": round((carga_total_minutos * 0.25) / 60, 1),
             "percentual_presencial": percentual_presencial_oferta(oferta),
             "conforme": oferta_hibrida_conforme(oferta),
         },

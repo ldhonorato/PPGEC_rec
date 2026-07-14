@@ -674,8 +674,16 @@ class EncontroOferta(models.Model):
 
 class AulaPresencialOferta(models.Model):
     oferta = models.ForeignKey(OfertaDisciplina, on_delete=models.CASCADE, related_name="aulas_presenciais")
-    encontro = models.ForeignKey(EncontroOferta, on_delete=models.CASCADE, related_name="aulas_presenciais")
+    encontro = models.ForeignKey(
+        EncontroOferta,
+        on_delete=models.SET_NULL,
+        related_name="aulas_presenciais",
+        null=True,
+        blank=True,
+    )
     data = models.DateField()
+    hora_inicio = models.TimeField()
+    hora_fim = models.TimeField()
     sala = models.ForeignKey("Sala", on_delete=models.PROTECT, related_name="aulas_presenciais_ofertas")
     reserva = models.OneToOneField(
         "ReservaAmbiente",
@@ -693,9 +701,9 @@ class AulaPresencialOferta(models.Model):
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["data", "encontro__hora_inicio"]
+        ordering = ["data", "hora_inicio"]
         constraints = [
-            models.UniqueConstraint(fields=["oferta", "data", "encontro"], name="unique_aula_presencial_oferta_data_encontro"),
+            models.UniqueConstraint(fields=["oferta", "data", "hora_inicio", "hora_fim"], name="unique_aula_presencial_oferta_data_horario"),
         ]
 
     def __str__(self) -> str:
@@ -703,8 +711,8 @@ class AulaPresencialOferta(models.Model):
 
     @property
     def carga_horaria_minutos(self):
-        inicio = datetime.combine(self.data, self.encontro.hora_inicio)
-        fim = datetime.combine(self.data, self.encontro.hora_fim)
+        inicio = datetime.combine(self.data, self.hora_inicio)
+        fim = datetime.combine(self.data, self.hora_fim)
         return int((fim - inicio).total_seconds() // 60)
 
     def clean(self):
@@ -713,16 +721,19 @@ class AulaPresencialOferta(models.Model):
             errors["oferta"] = "O planejamento presencial é exigido apenas para ofertas híbridas."
         if self.oferta_id and self.encontro_id and self.encontro.oferta_id != self.oferta_id:
             errors["encontro"] = "O encontro deve pertencer à oferta."
+        if self.hora_inicio and self.hora_fim and self.hora_fim <= self.hora_inicio:
+            errors["hora_fim"] = "O horário final deve ser posterior ao horário inicial."
         if self.oferta_id and self.oferta.periodo.data_inicio and self.data and self.data < self.oferta.periodo.data_inicio:
             errors["data"] = "A aula deve ocorrer dentro do período letivo."
         if self.oferta_id and self.oferta.periodo.data_fim and self.data and self.data > self.oferta.periodo.data_fim:
             errors["data"] = "A aula deve ocorrer dentro do período letivo."
-        if self.encontro_id and self.data and self.data.weekday() != self.encontro.dia_semana:
-            errors["data"] = "A data deve corresponder ao dia da semana do encontro."
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        if self.encontro_id:
+            self.hora_inicio = self.hora_inicio or self.encontro.hora_inicio
+            self.hora_fim = self.hora_fim or self.encontro.hora_fim
         self.full_clean()
         return super().save(*args, **kwargs)
 
