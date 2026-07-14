@@ -1151,10 +1151,21 @@ class AlunoDadosForm(AlunoComentarioForm):
 
 
 class AlunoCadastroForm(forms.Form):
+    POLOS_CADASTRO_ALUNO = ("POLI", "Caruaru", "Garanhuns", "Petrolina", "Fitec/SP")
+
     nome = forms.CharField(max_length=255, label="Nome completo")
     email = forms.EmailField(label="Email")
     password1 = forms.CharField(label="Senha", widget=forms.PasswordInput)
     password2 = forms.CharField(label="Confirmar senha", widget=forms.PasswordInput)
+    polo_atuacao = forms.ModelChoiceField(
+        queryset=Polo.objects.none(),
+        label="Polo do aluno",
+    )
+    sexo_atribuido_nascimento = forms.ChoiceField(
+        choices=(("", "---------"), *Aluno.SexoAtribuidoNascimento.choices),
+        required=False,
+        label="Sexo atribuido ao nascer",
+    )
     nivel_curso = forms.ChoiceField(choices=Aluno.NivelCurso.choices, label="Tipo de curso")
     ingresso = forms.CharField(label="Ingresso (ano ou semestre)", max_length=6)
     orientador = forms.ModelChoiceField(
@@ -1182,6 +1193,13 @@ class AlunoCadastroForm(forms.Form):
         required=False,
         label="Instituicao do coorientador externo",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["polo_atuacao"].queryset = Polo.objects.filter(
+            nome__in=self.POLOS_CADASTRO_ALUNO,
+            ativo=True,
+        ).order_by("nome")
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
@@ -1239,6 +1257,8 @@ class AlunoCadastroForm(forms.Form):
             password=dados["password1"],
             nome=dados["nome"],
             status_aluno=Aluno.StatusAluno.EM_AVALIACAO,
+            polo_atuacao=dados["polo_atuacao"],
+            sexo_atribuido_nascimento=dados.get("sexo_atribuido_nascimento") or "",
         )
         trajetoria = TrajetoriaAcademica(
             aluno=aluno,

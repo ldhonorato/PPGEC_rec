@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Solicitações de Matrícula | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Solicitações de Matrícula</h1>
+            <p class="muted">Acompanhamento das solicitações e indeferimento manual quando necessário.</p>
+        </div>
+        {% if periodo %}
+            <a class="btn btn-secondary" href="{% url 'matriculas_ofertas' %}?periodo={{ periodo.pk }}">Ver ofertas</a>
+        {% else %}
+            <a class="btn btn-secondary" href="{% url 'matriculas_ofertas' %}">Ver ofertas</a>
+        {% endif %}
+    </div>
+    <form method="get" class="grid-two" style="margin-top:1rem;">
+        <div class="field">
+            <label for="periodo">Período letivo</label>
+            <select id="periodo" name="periodo">
+                {% for periodo_opcao in periodos %}
+                    {% if periodo.pk == periodo_opcao.pk %}
+                        <option value="{{ periodo_opcao.pk }}" selected>{{ periodo_opcao.nome }} - {{ periodo_opcao.status_atual_display }}</option>
+                    {% else %}
+                        <option value="{{ periodo_opcao.pk }}">{{ periodo_opcao.nome }} - {{ periodo_opcao.status_atual_display }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+        <div class="field" style="justify-content:end;">
+            <button class="btn btn-secondary" type="submit">Alterar período</button>
+        </div>
+    </form>
+</section>
+
+<section class="card">
+    <h2 class="section-title">
+        Solicitações
+        {% if periodo %} - {{ periodo.nome }}{% endif %}
+    </h2>
+    <p class="muted">
+        Matrículas solicitadas: regulares {{ resumo_solicitacoes.matriculas_regulares }} |
+        especiais {{ resumo_solicitacoes.matriculas_especiais }}.
+        Lista de espera: regulares {{ resumo_solicitacoes.espera_regulares }} |
+        especiais {{ resumo_solicitacoes.espera_especiais }}.
+    </p>
+    {% if solicitacoes %}
+        <ul class="list">
+            {% for solicitacao in solicitacoes %}
+                <li>
+                    <div class="actions-row">
+                        <div>
+                            <strong>{{ solicitacao.aluno.nome }}</strong>
+                            <span class="badge badge-info">{{ solicitacao.get_status_display }}</span>
+                            <small class="muted" style="display:block; margin-top:0.35rem;">
+                                {{ solicitacao.aluno.email }}
+                                {% if solicitacao.aluno.matricula %} | {{ solicitacao.aluno.matricula }}{% endif %} |
+                                {{ solicitacao.get_tipo_aluno_display }} |
+                                Solicitada em {{ solicitacao.solicitada_em|date:"d/m/Y H:i"|default:"-" }}
+                            </small>
+                            <small class="muted" style="display:block; margin-top:0.35rem;">
+                                Matrículas solicitadas: {{ solicitacao.itens_matricula }} |
+                                Em espera: {{ solicitacao.itens_espera }}
+                            </small>
+                            {% if solicitacao.observacao_aluno %}
+                                <p class="muted">{{ solicitacao.observacao_aluno }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="calendar-nav">
+                            <a class="btn btn-secondary" href="{% url 'matricula_minha_solicitacao' solicitacao.pk %}">Detalhes</a>
+                        </div>
+                    </div>
+
+                    <ul class="availability-list" style="margin-top:0.75rem;">
+                        {% for item in solicitacao.itens.all %}
+                            <li>
+                                <div class="actions-row">
+                                    <div>
+                                        <strong>{{ item.oferta.disciplina.codigo }} - {{ item.oferta.disciplina.nome }}</strong>
+                                        <span class="badge {{ item.badge_class }}">
+                                            {{ item.get_status_display }}
+                                        </span>
+                                        <small class="muted" style="display:block;">
+                                            {{ item.oferta.docentes_display }} |
+                                            Solicitado em {{ item.solicitado_em|date:"d/m/Y H:i" }}
+                                        </small>
+                                    </div>
+                                    <div class="calendar-nav">
+                                        {% if item.editavel %}
+                                            <form method="post">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="acao" value="indeferir_item">
+                                                <input type="hidden" name="periodo_id" value="{{ periodo.pk }}">
+                                                <input type="hidden" name="item_id" value="{{ item.pk }}">
+                                                <input type="hidden" name="motivo" value="Indeferida pela secretaria.">
+                                                <button class="btn btn-secondary" type="submit">Indeferir</button>
+                                            </form>
+                                            <form method="post">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="acao" value="cancelar_item">
+                                                <input type="hidden" name="periodo_id" value="{{ periodo.pk }}">
+                                                <input type="hidden" name="item_id" value="{{ item.pk }}">
+                                                <button class="btn btn-secondary" type="submit">Cancelar</button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhuma solicitação de matrícula em disciplinas registrada para este período.</p>
+    {% endif %}
+</section>
+{% endblock %}

@@ -1,6 +1,8 @@
 import tempfile
 from datetime import date, datetime, time, timedelta
+from io import BytesIO
 from unittest.mock import patch
+from zipfile import ZipFile
 
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -40,7 +42,6 @@ from .models import (
 from .services import (
     alunos_ativos_sem_matricula,
     cancelar_item_matricula,
-    homologar_item_matricula,
     salvar_solicitacao_matricula,
 )
 from .tasks import atualizar_status_periodos_letivos
@@ -154,8 +155,8 @@ class MatriculaDomainTests(TestCase):
             tipo_aluno=SolicitacaoMatricula.TipoAluno.REGULAR,
             ofertas=[oferta],
         )
-        item_homologado = solicitacao.itens.get(oferta=oferta)
-        homologar_item_matricula(item=item_homologado, usuario=self.secretaria)
+        item_solicitado = solicitacao.itens.get(oferta=oferta)
+        self.assertEqual(item_solicitado.status, ItemSolicitacaoMatricula.Status.SOLICITADO)
 
         solicitacao_espera = salvar_solicitacao_matricula(
             aluno=aluno_espera,
@@ -167,9 +168,9 @@ class MatriculaDomainTests(TestCase):
         item_espera = solicitacao_espera.itens.get(oferta=oferta)
         self.assertEqual(item_espera.status, ItemSolicitacaoMatricula.Status.EM_LISTA_ESPERA)
 
-        cancelar_item_matricula(item=item_homologado, usuario=self.secretaria)
+        cancelar_item_matricula(item=item_solicitado, usuario=self.secretaria)
         item_espera.refresh_from_db()
-        self.assertEqual(item_espera.status, ItemSolicitacaoMatricula.Status.HOMOLOGADO)
+        self.assertEqual(item_espera.status, ItemSolicitacaoMatricula.Status.SOLICITADO)
 
     def test_task_atualiza_status_do_periodo_letivo(self):
         self.periodo.status = PeriodoLetivo.Status.PLANEJAMENTO
@@ -218,6 +219,7 @@ class MatriculaDomainTests(TestCase):
         self.assertNotIn(self.aluno, pendentes)
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class MatriculaViewsTests(TestCase):
     def setUp(self):
         hoje = timezone.localdate()
@@ -292,6 +294,175 @@ class MatriculaViewsTests(TestCase):
         self.assertEqual(alunos.status_code, 200)
         self.assertContains(alunos, "Exportar Excel")
 
+    def test_ofertas_contabiliza_matriculas_solicitadas_e_lista_de_espera(self):
+        aluno_espera = Aluno.objects.create(
+            email="aluno.espera.views.matricula@example.com",
+            password="senha-segura-123",
+            nome="Aluno Espera",
+        )
+        aluno_solicitado = Aluno.objects.create(
+            email="aluno.solicitado.views.matricula@example.com",
+            password="senha-segura-123",
+            nome="Aluno Solicitado",
+        )
+        solicitacao_pendente = SolicitacaoMatricula.objects.create(
+            periodo=self.periodo,
+            aluno=aluno_solicitado,
+            status=SolicitacaoMatricula.Status.SOLICITADA,
+        )
+        ItemSolicitacaoMatricula.objects.create(
+            solicitacao=solicitacao_pendente,
+            oferta=self.oferta,
+            status=ItemSolicitacaoMatricula.Status.SOLICITADO,
+        )
+        aluno_especial = Aluno.objects.create(
+            email="aluno.especial.solicitado.views.matricula@example.com",
+            password="senha-segura-123",
+            nome="Aluno Especial Solicitado",
+        )
+        solicitacao_especial = SolicitacaoMatricula.objects.create(
+            periodo=self.periodo,
+            aluno=aluno_especial,
+            tipo_aluno=SolicitacaoMatricula.TipoAluno.ESPECIAL,
+            status=SolicitacaoMatricula.Status.SOLICITADA,
+        )
+        ItemSolicitacaoMatricula.objects.create(
+            solicitacao=solicitacao_especial,
+            oferta=self.oferta,
+            status=ItemSolicitacaoMatricula.Status.SOLICITADO,
+        )
+        solicitacao_espera = SolicitacaoMatricula.objects.create(
+            periodo=self.periodo,
+            aluno=aluno_espera,
+            status=SolicitacaoMatricula.Status.SOLICITADA,
+        )
+        ItemSolicitacaoMatricula.objects.create(
+            solicitacao=solicitacao_espera,
+            oferta=self.oferta,
+            status=ItemSolicitacaoMatricula.Status.EM_LISTA_ESPERA,
+        )
+        aluno_especial_espera = Aluno.objects.create(
+            email="aluno.especial.espera.views.matricula@example.com",
+            password="senha-segura-123",
+            nome="Aluno Especial Espera",
+        )
+        solicitacao_especial_espera = SolicitacaoMatricula.objects.create(
+            periodo=self.periodo,
+            aluno=aluno_especial_espera,
+            tipo_aluno=SolicitacaoMatricula.TipoAluno.ESPECIAL,
+            status=SolicitacaoMatricula.Status.SOLICITADA,
+        )
+        ItemSolicitacaoMatricula.objects.create(
+            solicitacao=solicitacao_especial_espera,
+            oferta=self.oferta,
+            status=ItemSolicitacaoMatricula.Status.EM_LISTA_ESPERA,
+        )
+        self.client.force_login(self.secretaria)
+
+        response = self.client.get(reverse("matriculas_ofertas"), {"periodo": self.periodo.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Matrículas solicitadas: 2")
+        self.assertContains(response, "Espera: 2")
+        self.assertContains(response, "regulares: 1 | especiais: 1", count=2)
+
+    def test_gestao_indefere_item_de_matricula(self):
+        solicitacao = SolicitacaoMatricula.objects.create(
+            periodo=self.periodo,
+            aluno=self.aluno,
+            status=SolicitacaoMatricula.Status.SOLICITADA,
+        )
+        item = ItemSolicitacaoMatricula.objects.create(
+            solicitacao=solicitacao,
+            oferta=self.oferta,
+            status=ItemSolicitacaoMatricula.Status.SOLICITADO,
+        )
+        self.client.force_login(self.secretaria)
+
+        response = self.client.get(reverse("matriculas_solicitacoes"), {"periodo": self.periodo.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Solicitações de Matrícula")
+        self.assertContains(response, self.aluno.nome)
+        self.assertContains(response, self.disciplina.nome)
+        self.assertNotContains(response, "Homologar")
+        self.assertContains(response, "Indeferir")
+        self.assertContains(response, "Matrículas solicitadas: regulares 1")
+        self.assertContains(response, "Lista de espera: regulares 0")
+
+        response = self.client.post(
+            reverse("matriculas_solicitacoes"),
+            {
+                "acao": "indeferir_item",
+                "periodo_id": self.periodo.pk,
+                "item_id": item.pk,
+                "motivo": "Indeferida em teste.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        item.refresh_from_db()
+        solicitacao.refresh_from_db()
+        self.assertEqual(item.status, ItemSolicitacaoMatricula.Status.INDEFERIDO)
+        self.assertEqual(item.indeferido_por_id, self.secretaria.pk)
+        self.assertEqual(item.motivo_indeferimento, "Indeferida em teste.")
+        self.assertEqual(solicitacao.status, SolicitacaoMatricula.Status.INDEFERIDA)
+
+    def test_ofertas_usa_periodo_mais_recente_e_permite_trocar_periodo(self):
+        hoje = timezone.localdate()
+        periodo_recente = PeriodoLetivo.objects.create(
+            nome="2027.1",
+            prazo_cadastro_disciplinas=hoje + timedelta(days=20),
+            matricula_inicio=hoje + timedelta(days=30),
+            matricula_fim=hoje + timedelta(days=35),
+            modificacao_inicio=hoje + timedelta(days=36),
+            modificacao_fim=hoje + timedelta(days=40),
+            criado_por=self.secretaria,
+        )
+        disciplina_recente = Disciplina.objects.create(codigo="VIS888", nome="Oferta Recente")
+        oferta_recente = OfertaDisciplina.objects.create(
+            periodo=periodo_recente,
+            disciplina=disciplina_recente,
+            docente_responsavel=self.docente,
+            vagas_regulares=1,
+            vagas_especiais=0,
+            criada_por=self.secretaria,
+        )
+        EncontroOferta.objects.create(
+            oferta=oferta_recente,
+            dia_semana=EncontroOferta.DiaSemana.QUARTA,
+            hora_inicio=time(8, 0),
+            hora_fim=time(10, 0),
+        )
+        self.client.force_login(self.secretaria)
+
+        response = self.client.get(reverse("matriculas_ofertas"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Oferta Recente")
+        self.assertNotContains(response, f"<strong>{self.disciplina.codigo} - {self.disciplina.nome}</strong>", html=True)
+
+        response = self.client.get(reverse("matriculas_ofertas"), {"periodo": self.periodo.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.disciplina.nome)
+        self.assertNotContains(response, "<strong>VIS888 - Oferta Recente</strong>", html=True)
+
+    def test_nao_permite_segundo_periodo_ativo(self):
+        hoje = timezone.localdate()
+
+        with self.assertRaises(ValidationError):
+            PeriodoLetivo.objects.create(
+                nome="2027.2",
+                status=PeriodoLetivo.Status.MATRICULA_ABERTA,
+                prazo_cadastro_disciplinas=hoje,
+                matricula_inicio=hoje,
+                matricula_fim=hoje + timedelta(days=5),
+                modificacao_inicio=hoje + timedelta(days=6),
+                modificacao_fim=hoje + timedelta(days=10),
+                criado_por=self.secretaria,
+            )
+
     def test_gestao_edita_disciplina_em_matriculas(self):
         self.client.force_login(self.secretaria)
 
@@ -325,6 +496,10 @@ class MatriculaViewsTests(TestCase):
             modificacao_fim=hoje + timedelta(days=30),
             criado_por=self.secretaria,
         )
+        self.periodo.status = PeriodoLetivo.Status.ENCERRADO
+        self.periodo.encerrado_manualmente_em = timezone.now()
+        self.periodo.encerrado_manualmente_por = self.secretaria
+        self.periodo.save()
         self.client.force_login(self.secretaria)
 
         response = self.client.post(
@@ -475,12 +650,26 @@ class MatriculaViewsTests(TestCase):
         self.assertContains(response, "Docente Views / Docente Colaborador")
 
     def test_exportacao_xlsx_da_oferta(self):
+        solicitacao = SolicitacaoMatricula.objects.create(
+            periodo=self.periodo,
+            aluno=self.aluno,
+            status=SolicitacaoMatricula.Status.SOLICITADA,
+        )
+        ItemSolicitacaoMatricula.objects.create(
+            solicitacao=solicitacao,
+            oferta=self.oferta,
+            status=ItemSolicitacaoMatricula.Status.SOLICITADO,
+        )
         self.client.force_login(self.secretaria)
 
         response = self.client.get(reverse("matricula_oferta_exportar", args=[self.oferta.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         self.assertGreater(len(response.content), 100)
+        with ZipFile(BytesIO(response.content)) as xlsx:
+            sheet_xml = xlsx.read("xl/worksheets/sheet1.xml").decode()
+        self.assertIn("Trajetória acadêmica mais recente", sheet_xml)
+        self.assertIn("Mestrado", sheet_xml)
 
     @patch("processos.views.send_email_secretaria_planejamento_presencial.delay")
     def test_planejamento_presencial_cria_reserva_para_oferta_hibrida(self, mock_email):
@@ -1622,6 +1811,7 @@ class AlunosViewTests(TestCase):
 
 class FrontendIdentityTests(TestCase):
     def setUp(self):
+        self.polo, _ = Polo.objects.update_or_create(nome="POLI", defaults={"ativo": True})
         self.docente = Docente.objects.create(
             email="docente.frontend@example.com",
             password="senha-segura-123",
@@ -1653,6 +1843,8 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "Cadastro de aluno")
         self.assertContains(response, "img/acadflow-logo.png")
         self.assertContains(response, "Email institucional")
+        self.assertContains(response, "Polo do aluno")
+        self.assertContains(response, "Sexo atribuido ao nascer")
         self.assertContains(response, 'class="card login-card"')
 
     def test_cadastro_aluno_cria_conta_em_avaliacao(self):
@@ -1663,6 +1855,8 @@ class FrontendIdentityTests(TestCase):
                 "email": "nova.aluna@example.com",
                 "password1": "senha-segura-123",
                 "password2": "senha-segura-123",
+                "polo_atuacao": self.polo.id,
+                "sexo_atribuido_nascimento": Aluno.SexoAtribuidoNascimento.FEMININO,
                 "nivel_curso": Aluno.NivelCurso.MESTRADO,
                 "ingresso": "2026",
                 "orientador": self.docente.id,
@@ -1673,6 +1867,8 @@ class FrontendIdentityTests(TestCase):
         self.assertRedirects(response, reverse("cadastro_aluno_sucesso"))
         aluno = Aluno.objects.get(email="nova.aluna@example.com")
         self.assertEqual(aluno.status_aluno, Aluno.StatusAluno.EM_AVALIACAO)
+        self.assertEqual(aluno.polo_atuacao_id, self.polo.id)
+        self.assertEqual(aluno.sexo_atribuido_nascimento, Aluno.SexoAtribuidoNascimento.FEMININO)
         self.assertTrue(aluno.is_active)
         trajetoria = aluno.trajetorias.get()
         self.assertEqual(trajetoria.nivel_curso, Aluno.NivelCurso.MESTRADO)

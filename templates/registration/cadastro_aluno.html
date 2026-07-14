@@ -52,6 +52,18 @@
                     {{ form.ingresso.errors }}
                 </div>
             </div>
+            <div class="grid-two">
+                <div class="field">
+                    <label for="{{ form.polo_atuacao.id_for_label }}">{{ form.polo_atuacao.label }}</label>
+                    {{ form.polo_atuacao }}
+                    {{ form.polo_atuacao.errors }}
+                </div>
+                <div class="field">
+                    <label for="{{ form.sexo_atribuido_nascimento.id_for_label }}">{{ form.sexo_atribuido_nascimento.label }}</label>
+                    {{ form.sexo_atribuido_nascimento }}
+                    {{ form.sexo_atribuido_nascimento.errors }}
+                </div>
+            </div>
 
             <div data-nivel-section="ORIENTACAO">
                 <div class="field">

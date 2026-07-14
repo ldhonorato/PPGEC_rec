@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import Count, Prefetch, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_time
 
@@ -108,15 +109,12 @@ from .services import (
     carga_horaria_presencial_oferta_minutos,
     carga_horaria_total_oferta_minutos,
     gerar_xlsx_lista_oferta,
-    homologar_item_matricula,
-    homologar_solicitacao_vinculo,
     indeferir_item_matricula,
     indeferir_solicitacao_vinculo,
     datas_encontro_no_periodo,
     oferta_hibrida_conforme,
     ofertas_hibridas_nao_conformes,
     percentual_presencial_oferta,
-    promover_proximo_lista_espera,
     salvar_planejamento_presencial_oferta,
     salvar_solicitacao_matricula,
     tipo_aluno_matricula_por_trajetoria,
@@ -793,19 +791,15 @@ def matriculas_periodos_view(request):
             send_email_alunos_sem_matricula.delay(periodo.pk)
             messages.success(request, f"Envio de e-mail agendado para {total_pendentes} aluno(s) sem matrícula.")
             return redirect("matriculas_periodos")
-        elif acao in {"homologar_vinculo", "indeferir_vinculo"}:
+        elif acao == "indeferir_vinculo":
             solicitacao = get_object_or_404(SolicitacaoMatricula, pk=request.POST.get("solicitacao_id"))
             try:
-                if acao == "homologar_vinculo":
-                    homologar_solicitacao_vinculo(solicitacao=solicitacao, usuario=request.user)
-                    messages.success(request, "Matrícula vínculo homologada.")
-                else:
-                    indeferir_solicitacao_vinculo(
-                        solicitacao=solicitacao,
-                        usuario=request.user,
-                        motivo=request.POST.get("motivo", ""),
-                    )
-                    messages.success(request, "Matrícula vínculo indeferida.")
+                indeferir_solicitacao_vinculo(
+                    solicitacao=solicitacao,
+                    usuario=request.user,
+                    motivo=request.POST.get("motivo", ""),
+                )
+                messages.success(request, "Matrícula vínculo indeferida.")
             except ValidationError as exc:
                 messages.error(request, "; ".join(exc.messages))
             return redirect("matriculas_periodos")
@@ -818,9 +812,13 @@ def matriculas_periodos_view(request):
                 periodo=periodo,
                 tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
             )
-            .select_related("aluno", "homologada_por")
+            .select_related("aluno")
             .order_by("status", "aluno__nome")
         )
+        periodo.solicitacoes_disciplinas_total = SolicitacaoMatricula.objects.filter(
+            periodo=periodo,
+            tipo_matricula=SolicitacaoMatricula.TipoMatricula.DISCIPLINAS,
+        ).count()
     return render(
         request,
         "processos/matriculas_periodos.html",
@@ -883,7 +881,15 @@ def matriculas_ofertas_view(request):
     if not _can_create_oferta(request.user):
         raise PermissionDenied("Apenas docentes, secretaria e coordenação podem cadastrar ofertas.")
 
-    oferta_form = OfertaDisciplinaForm(user=request.user)
+    periodos = list(PeriodoLetivo.objects.order_by("-nome"))
+    periodo_id = request.POST.get("periodo") if request.method == "POST" else request.GET.get("periodo")
+    periodo_selecionado = None
+    if periodo_id:
+        periodo_selecionado = get_object_or_404(PeriodoLetivo, pk=periodo_id)
+    elif periodos:
+        periodo_selecionado = periodos[0]
+
+    oferta_form = OfertaDisciplinaForm(user=request.user, initial={"periodo": periodo_selecionado})
     oferta_editando = None
     modal_aberto = ""
 
@@ -905,7 +911,7 @@ def matriculas_ofertas_view(request):
             if oferta_form.is_valid():
                 oferta = oferta_form.save()
                 messages.success(request, "Oferta salva.")
-                return redirect("matriculas_ofertas")
+                return redirect(f"{reverse('matriculas_ofertas')}?periodo={oferta.periodo_id}")
             messages.error(request, "Não foi possível salvar a oferta.")
             if acao == "criar_oferta":
                 modal_aberto = "nova-oferta"
@@ -914,22 +920,74 @@ def matriculas_ofertas_view(request):
         OfertaDisciplina.objects.select_related("periodo", "disciplina", "docente_responsavel", "docente_colaborador")
         .prefetch_related("encontros", "itens_matricula", "aulas_presenciais__encontro")
         .annotate(
-            matriculados=Count(
+            matriculas_solicitadas=Count(
                 "itens_matricula",
-                filter=Q(itens_matricula__status=ItemSolicitacaoMatricula.Status.HOMOLOGADO),
+                filter=Q(
+                    itens_matricula__status__in=[
+                        ItemSolicitacaoMatricula.Status.SOLICITADO,
+                        ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+                    ]
+                ),
+                distinct=True,
+            ),
+            matriculas_regulares=Count(
+                "itens_matricula",
+                filter=Q(
+                    itens_matricula__status__in=[
+                        ItemSolicitacaoMatricula.Status.SOLICITADO,
+                        ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+                    ],
+                    itens_matricula__solicitacao__tipo_aluno=SolicitacaoMatricula.TipoAluno.REGULAR,
+                ),
+                distinct=True,
+            ),
+            matriculas_especiais=Count(
+                "itens_matricula",
+                filter=Q(
+                    itens_matricula__status__in=[
+                        ItemSolicitacaoMatricula.Status.SOLICITADO,
+                        ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+                    ],
+                    itens_matricula__solicitacao__tipo_aluno=SolicitacaoMatricula.TipoAluno.ESPECIAL,
+                ),
+                distinct=True,
             ),
             lista_espera=Count(
                 "itens_matricula",
                 filter=Q(itens_matricula__status=ItemSolicitacaoMatricula.Status.EM_LISTA_ESPERA),
+                distinct=True,
+            ),
+            lista_espera_regulares=Count(
+                "itens_matricula",
+                filter=Q(
+                    itens_matricula__status=ItemSolicitacaoMatricula.Status.EM_LISTA_ESPERA,
+                    itens_matricula__solicitacao__tipo_aluno=SolicitacaoMatricula.TipoAluno.REGULAR,
+                ),
+                distinct=True,
+            ),
+            lista_espera_especiais=Count(
+                "itens_matricula",
+                filter=Q(
+                    itens_matricula__status=ItemSolicitacaoMatricula.Status.EM_LISTA_ESPERA,
+                    itens_matricula__solicitacao__tipo_aluno=SolicitacaoMatricula.TipoAluno.ESPECIAL,
+                ),
+                distinct=True,
             ),
         )
         .order_by("-periodo__nome", "disciplina__nome")
     )
+    if periodo_selecionado:
+        ofertas = ofertas.filter(periodo=periodo_selecionado)
     ofertas = list(ofertas)
     filtro_nao_conformes = request.GET.get("nao_conformes") == "1"
     for oferta in ofertas:
         oferta.percentual_presencial = percentual_presencial_oferta(oferta)
         oferta.presencial_conforme = oferta_hibrida_conforme(oferta)
+    total_nao_conformes = sum(
+        1
+        for oferta in ofertas
+        if oferta.modalidade == OfertaDisciplina.Modalidade.HIBRIDA and not oferta.presencial_conforme
+    )
     if filtro_nao_conformes:
         ofertas = [oferta for oferta in ofertas if oferta.modalidade == OfertaDisciplina.Modalidade.HIBRIDA and not oferta.presencial_conforme]
     grades_periodos, dias_grade = _montar_grade_ofertas(ofertas)
@@ -940,13 +998,15 @@ def matriculas_ofertas_view(request):
         {
             "oferta_form": oferta_form,
             "ofertas": ofertas,
+            "periodos": periodos,
+            "periodo_selecionado": periodo_selecionado,
             "grades_periodos": grades_periodos,
             "dias_grade": dias_grade,
             "can_manage_matriculas": _can_manage_matriculas(request.user),
             "oferta_editando": oferta_editando,
             "modal_aberto": modal_aberto,
             "filtro_nao_conformes": filtro_nao_conformes,
-            "total_nao_conformes": len(ofertas_hibridas_nao_conformes()),
+            "total_nao_conformes": total_nao_conformes,
         },
     )
 
@@ -1129,6 +1189,113 @@ def matriculas_minhas_view(request):
 
 
 @login_required
+def matriculas_solicitacoes_view(request):
+    if not _can_manage_matriculas(request.user):
+        raise PermissionDenied("Apenas secretaria e coordenação podem gerir solicitações de matrícula.")
+
+    periodos = list(PeriodoLetivo.objects.order_by("-nome"))
+    periodo_id = request.POST.get("periodo_id") or request.GET.get("periodo")
+    periodo = None
+    if periodo_id:
+        periodo = get_object_or_404(PeriodoLetivo, pk=periodo_id)
+    elif periodos:
+        periodo = periodos[0]
+
+    if request.method == "POST":
+        acao = request.POST.get("acao")
+        try:
+            if acao in {"indeferir_item", "cancelar_item"}:
+                item = get_object_or_404(ItemSolicitacaoMatricula, pk=request.POST.get("item_id"))
+                periodo = item.solicitacao.periodo
+                if acao == "indeferir_item":
+                    indeferir_item_matricula(item=item, usuario=request.user, motivo=request.POST.get("motivo", ""))
+                    messages.success(request, "Item de matrícula indeferido.")
+                else:
+                    cancelar_item_matricula(item=item, usuario=request.user)
+                    messages.success(request, "Item de matrícula cancelado.")
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+        periodo_param = f"?periodo={periodo.pk}" if periodo else ""
+        return redirect(f"{reverse('matriculas_solicitacoes')}{periodo_param}")
+
+    solicitacoes = SolicitacaoMatricula.objects.none()
+    resumo_solicitacoes = {
+        "matriculas_regulares": 0,
+        "matriculas_especiais": 0,
+        "espera_regulares": 0,
+        "espera_especiais": 0,
+    }
+    if periodo:
+        solicitacoes = (
+            SolicitacaoMatricula.objects.filter(
+                periodo=periodo,
+                tipo_matricula=SolicitacaoMatricula.TipoMatricula.DISCIPLINAS,
+            )
+            .select_related("aluno", "periodo")
+            .prefetch_related(
+                "itens__oferta__disciplina",
+                "itens__oferta__docente_responsavel",
+                "itens__oferta__docente_colaborador",
+                "itens__oferta__encontros",
+            )
+            .annotate(
+                itens_matricula=Count(
+                    "itens",
+                    filter=Q(
+                        itens__status__in=[
+                            ItemSolicitacaoMatricula.Status.SOLICITADO,
+                            ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+                        ]
+                    ),
+                    distinct=True,
+                ),
+                itens_espera=Count(
+                    "itens",
+                    filter=Q(itens__status=ItemSolicitacaoMatricula.Status.EM_LISTA_ESPERA),
+                    distinct=True,
+                ),
+            )
+            .order_by("status", "aluno__nome")
+        )
+        solicitacoes = list(solicitacoes)
+        for solicitacao in solicitacoes:
+            if solicitacao.tipo_aluno == SolicitacaoMatricula.TipoAluno.ESPECIAL:
+                resumo_solicitacoes["matriculas_especiais"] += solicitacao.itens_matricula
+                resumo_solicitacoes["espera_especiais"] += solicitacao.itens_espera
+            else:
+                resumo_solicitacoes["matriculas_regulares"] += solicitacao.itens_matricula
+                resumo_solicitacoes["espera_regulares"] += solicitacao.itens_espera
+            for item in solicitacao.itens.all():
+                item.editavel = item.status not in {
+                    ItemSolicitacaoMatricula.Status.INDEFERIDO,
+                    ItemSolicitacaoMatricula.Status.CANCELADO,
+                }
+                if item.status in {
+                    ItemSolicitacaoMatricula.Status.SOLICITADO,
+                    ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+                }:
+                    item.badge_class = "badge-ok"
+                elif item.status in {
+                    ItemSolicitacaoMatricula.Status.INDEFERIDO,
+                    ItemSolicitacaoMatricula.Status.CANCELADO,
+                }:
+                    item.badge_class = "badge-no"
+                else:
+                    item.badge_class = "badge-info"
+
+    return render(
+        request,
+        "processos/matriculas_solicitacoes.html",
+        {
+            "periodos": periodos,
+            "periodo": periodo,
+            "solicitacoes": solicitacoes,
+            "resumo_solicitacoes": resumo_solicitacoes,
+        },
+    )
+
+
+@login_required
 def matricula_minha_solicitacao_view(request, solicitacao_id):
     solicitacao = get_object_or_404(
         SolicitacaoMatricula.objects.select_related("periodo", "aluno").prefetch_related(
@@ -1162,29 +1329,19 @@ def matricula_oferta_alunos_view(request, oferta_id):
         acao = request.POST.get("acao")
         item = get_object_or_404(ItemSolicitacaoMatricula, pk=request.POST.get("item_id")) if request.POST.get("item_id") else None
         try:
-            if acao == "homologar" and item:
-                homologar_item_matricula(item=item, usuario=request.user)
-                messages.success(request, "Matrícula homologada.")
-            elif acao == "indeferir" and item:
+            if acao == "indeferir" and item:
                 indeferir_item_matricula(item=item, usuario=request.user, motivo=request.POST.get("motivo", ""))
                 messages.success(request, "Solicitação indeferida.")
             elif acao == "cancelar" and item:
                 cancelar_item_matricula(item=item, usuario=request.user)
                 messages.success(request, "Matrícula cancelada.")
-            elif acao == "promover":
-                tipo_aluno = request.POST.get("tipo_aluno") or SolicitacaoMatricula.TipoAluno.REGULAR
-                promovido = promover_proximo_lista_espera(oferta=oferta, tipo_aluno=tipo_aluno, usuario=request.user)
-                if promovido:
-                    messages.success(request, "Próximo aluno da lista de espera promovido.")
-                else:
-                    messages.info(request, "Não há aluno apto na lista de espera ou não há vaga.")
         except ValidationError as exc:
             messages.error(request, "; ".join(exc.messages))
         return redirect("matricula_oferta_alunos", oferta_id=oferta.pk)
 
     itens = (
         ItemSolicitacaoMatricula.objects.filter(oferta=oferta)
-        .select_related("solicitacao", "solicitacao__aluno", "homologado_por", "indeferido_por")
+        .select_related("solicitacao", "solicitacao__aluno", "indeferido_por")
         .order_by("status", "solicitado_em", "solicitacao__aluno__nome")
     )
     return render(

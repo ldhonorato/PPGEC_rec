@@ -208,6 +208,7 @@ def _menu_lateral_sections(user):
                 "/gestao/matriculas/periodos/",
                 [
                     "matriculas_periodos",
+                    "matriculas_solicitacoes",
                     "matriculas_disciplinas",
                     "matriculas_ofertas",
                     "matricula_oferta_alunos",
@@ -216,6 +217,12 @@ def _menu_lateral_sections(user):
                 "M",
                 children=[
                     _menu_item("Períodos letivos", "/gestao/matriculas/periodos/", ["matriculas_periodos"], "P"),
+                    _menu_item(
+                        "Solicitações",
+                        "/gestao/matriculas/solicitacoes/",
+                        ["matriculas_solicitacoes"],
+                        "S",
+                    ),
                     _menu_item("Disciplinas", "/gestao/matriculas/disciplinas/", ["matriculas_disciplinas"], "D"),
                     _menu_item(
                         "Ofertas de disciplinas",

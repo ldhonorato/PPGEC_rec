@@ -85,12 +85,14 @@ class AlunoAdmin(EnsurePasswordHashedAdminMixin, admin.ModelAdmin):
         "email",
         "nome",
         "polo_atuacao",
+        "sexo_atribuido_nascimento",
         "status_aluno",
         "matricula",
         "is_active",
     )
     list_filter = (
         "polo_atuacao",
+        "sexo_atribuido_nascimento",
         "status_aluno",
         "is_active",
     )
@@ -169,16 +171,16 @@ class SolicitacaoMatriculaAdmin(admin.ModelAdmin):
     list_display = ("aluno", "periodo", "tipo_aluno", "status", "solicitada_em")
     list_filter = ("periodo", "tipo_aluno", "status")
     search_fields = ("aluno__nome", "aluno__email", "aluno__matricula")
-    autocomplete_fields = ("periodo", "aluno", "homologada_por")
+    autocomplete_fields = ("periodo", "aluno")
     readonly_fields = ("criado_em", "atualizado_em")
 
 
 @admin.register(ItemSolicitacaoMatricula)
 class ItemSolicitacaoMatriculaAdmin(admin.ModelAdmin):
-    list_display = ("solicitacao", "oferta", "status", "solicitado_em", "homologado_em")
+    list_display = ("solicitacao", "oferta", "status", "solicitado_em", "indeferido_em")
     list_filter = ("status", "oferta__periodo")
     search_fields = ("solicitacao__aluno__nome", "oferta__disciplina__nome", "oferta__disciplina__codigo")
-    autocomplete_fields = ("solicitacao", "oferta", "homologado_por", "indeferido_por")
+    autocomplete_fields = ("solicitacao", "oferta", "indeferido_por")
     readonly_fields = ("solicitado_em", "atualizado_em")
 
 

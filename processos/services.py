@@ -87,18 +87,21 @@ def validar_choque_ofertas(ofertas, *, aluno=None, periodo=None, ignorar_solicit
             encontros.append((oferta, encontro))
 
     if aluno and periodo:
-        itens_homologados = (
+        itens_com_matricula = (
             ItemSolicitacaoMatricula.objects.select_related("oferta", "oferta__disciplina")
             .prefetch_related("oferta__encontros")
             .filter(
                 solicitacao__aluno=aluno,
                 solicitacao__periodo=periodo,
-                status=ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+                status__in=[
+                    ItemSolicitacaoMatricula.Status.SOLICITADO,
+                    ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+                ],
             )
         )
         if ignorar_solicitacao:
-            itens_homologados = itens_homologados.exclude(solicitacao=ignorar_solicitacao)
-        for item in itens_homologados:
+            itens_com_matricula = itens_com_matricula.exclude(solicitacao=ignorar_solicitacao)
+        for item in itens_com_matricula:
             if item.oferta_id not in {oferta.id for oferta in ofertas}:
                 for encontro in item.oferta.encontros.all():
                     encontros.append((item.oferta, encontro))
@@ -337,20 +340,6 @@ def salvar_solicitacao_matricula(
 
 
 @transaction.atomic
-def homologar_solicitacao_vinculo(*, solicitacao, usuario):
-    solicitacao = SolicitacaoMatricula.objects.select_for_update().get(pk=solicitacao.pk)
-    if solicitacao.tipo_matricula != SolicitacaoMatricula.TipoMatricula.VINCULO:
-        raise ValidationError("A solicitação não é de matrícula vínculo.")
-    if solicitacao.status in {SolicitacaoMatricula.Status.CANCELADA, SolicitacaoMatricula.Status.INDEFERIDA}:
-        raise ValidationError("Não é possível homologar solicitação cancelada ou indeferida.")
-    solicitacao.status = SolicitacaoMatricula.Status.HOMOLOGADA
-    solicitacao.homologada_em = timezone.now()
-    solicitacao.homologada_por = usuario
-    solicitacao.save()
-    return solicitacao
-
-
-@transaction.atomic
 def indeferir_solicitacao_vinculo(*, solicitacao, usuario, motivo=""):
     solicitacao = SolicitacaoMatricula.objects.select_for_update().get(pk=solicitacao.pk)
     if solicitacao.tipo_matricula != SolicitacaoMatricula.TipoMatricula.VINCULO:
@@ -361,35 +350,6 @@ def indeferir_solicitacao_vinculo(*, solicitacao, usuario, motivo=""):
     solicitacao.observacao_secretaria = motivo
     solicitacao.save()
     return solicitacao
-
-
-@transaction.atomic
-def homologar_item_matricula(*, item, usuario):
-    item = (
-        ItemSolicitacaoMatricula.objects.select_for_update()
-        .select_related("solicitacao", "oferta", "oferta__disciplina")
-        .get(pk=item.pk)
-    )
-    OfertaDisciplina.objects.select_for_update().get(pk=item.oferta_id)
-    if item.status == ItemSolicitacaoMatricula.Status.HOMOLOGADO:
-        return item
-    if item.status in {ItemSolicitacaoMatricula.Status.CANCELADO, ItemSolicitacaoMatricula.Status.INDEFERIDO}:
-        raise ValidationError("Não é possível homologar item cancelado ou indeferido.")
-    if item.oferta.vagas_disponiveis(item.solicitacao.tipo_aluno) <= 0:
-        raise ValidationError("Não há vagas disponíveis para homologar esta matrícula.")
-
-    validar_choque_ofertas(
-        [item.oferta],
-        aluno=item.solicitacao.aluno,
-        periodo=item.solicitacao.periodo,
-        ignorar_solicitacao=item.solicitacao,
-    )
-    item.status = ItemSolicitacaoMatricula.Status.HOMOLOGADO
-    item.homologado_em = timezone.now()
-    item.homologado_por = usuario
-    item.save()
-    item.solicitacao.atualizar_status_por_itens(usuario=usuario)
-    return item
 
 
 @transaction.atomic
@@ -434,7 +394,10 @@ def promover_proximo_lista_espera(*, oferta, tipo_aluno, usuario):
     )
     if not proximo:
         return None
-    return homologar_item_matricula(item=proximo, usuario=usuario)
+    proximo.status = ItemSolicitacaoMatricula.Status.SOLICITADO
+    proximo.save(update_fields=["status", "atualizado_em"])
+    proximo.solicitacao.atualizar_status_por_itens(usuario=usuario)
+    return proximo
 
 
 def _xlsx_coluna(indice):
@@ -464,7 +427,8 @@ def _xlsx_planilha_xml(linhas):
 
 def gerar_xlsx_lista_oferta(oferta):
     itens = (
-        oferta.itens_matricula.select_related("solicitacao", "solicitacao__aluno", "homologado_por")
+        oferta.itens_matricula.select_related("solicitacao", "solicitacao__aluno", "indeferido_por")
+        .prefetch_related("solicitacao__aluno__trajetorias")
         .order_by("status", "solicitado_em", "solicitacao__aluno__nome")
     )
     linhas = [[
@@ -472,21 +436,26 @@ def gerar_xlsx_lista_oferta(oferta):
         "Nome",
         "E-mail",
         "Tipo de aluno",
+        "Trajetória acadêmica mais recente",
         "Status",
         "Solicitado em",
-        "Homologado em",
-        "Homologado por",
+        "Indeferido em",
+        "Indeferido por",
+        "Motivo do indeferimento",
     ]]
     for item in itens:
+        trajetoria_recente = next(iter(item.solicitacao.aluno.trajetorias.all()), None)
         linhas.append([
             item.solicitacao.aluno.matricula,
             item.solicitacao.aluno.nome,
             item.solicitacao.aluno.email,
             item.solicitacao.get_tipo_aluno_display(),
+            trajetoria_recente.get_nivel_curso_display() if trajetoria_recente else "",
             item.get_status_display(),
             timezone.localtime(item.solicitado_em).strftime("%d/%m/%Y %H:%M") if item.solicitado_em else "",
-            timezone.localtime(item.homologado_em).strftime("%d/%m/%Y %H:%M") if item.homologado_em else "",
-            item.homologado_por.nome if item.homologado_por else "",
+            timezone.localtime(item.indeferido_em).strftime("%d/%m/%Y %H:%M") if item.indeferido_em else "",
+            item.indeferido_por.nome if item.indeferido_por else "",
+            item.motivo_indeferimento,
         ])
 
     buffer = BytesIO()

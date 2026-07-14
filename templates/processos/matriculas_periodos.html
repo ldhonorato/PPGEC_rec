@@ -54,10 +54,12 @@
                             </small>
                             <small class="muted" style="display:block; margin-top:0.35rem;">
                                 Alunos sem matrícula: {{ periodo.alunos_sem_matricula|length }} |
+                                Solicitações de disciplinas: {{ periodo.solicitacoes_disciplinas_total }} |
                                 Matrículas vínculo: {{ periodo.solicitacoes_vinculo|length }}
                             </small>
                         </div>
                         <div class="calendar-nav">
+                            <a class="btn" href="{% url 'matriculas_solicitacoes' %}?periodo={{ periodo.pk }}">Solicitações</a>
                             <button class="btn btn-secondary" type="button" data-open-dialog="editar-periodo-{{ periodo.pk }}">Editar</button>
                             <button class="btn btn-secondary" type="button" data-open-dialog="matriculas-periodo-{{ periodo.pk }}">Matrículas</button>
                             <form method="post">
@@ -136,12 +138,6 @@
                                 </div>
                                 <div class="calendar-nav">
                                     {% if solicitacao.status == "SOLICITADA" %}
-                                        <form method="post">
-                                            {% csrf_token %}
-                                            <input type="hidden" name="acao" value="homologar_vinculo">
-                                            <input type="hidden" name="solicitacao_id" value="{{ solicitacao.pk }}">
-                                            <button class="btn" type="submit">Homologar</button>
-                                        </form>
                                         <form method="post">
                                             {% csrf_token %}
                                             <input type="hidden" name="acao" value="indeferir_vinculo">

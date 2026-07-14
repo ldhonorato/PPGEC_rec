@@ -88,6 +88,11 @@ class Aluno(User):
         POSDOUTORADO = "POSDOUTORADO", "Posdoutorado"
         ALUNO_ESPECIAL = "ALUNO_ESPECIAL", "Aluno especial"
 
+    class SexoAtribuidoNascimento(models.TextChoices):
+        FEMININO = "FEMININO", "Feminino"
+        MASCULINO = "MASCULINO", "Masculino"
+        NAO_INFORMAR = "NAO_INFORMAR", "Prefiro nao informar"
+
     class StatusAluno(models.TextChoices):
         EM_AVALIACAO = "EM_AVALIACAO", "Em avaliacao"
         ATIVO = "ATIVO", "Ativo"
@@ -104,6 +109,11 @@ class Aluno(User):
         default=StatusAluno.ATIVO,
     )
     matricula = models.CharField(max_length=50, blank=True)
+    sexo_atribuido_nascimento = models.CharField(
+        max_length=15,
+        choices=SexoAtribuidoNascimento.choices,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "Aluno"
@@ -545,6 +555,15 @@ class PeriodoLetivo(models.Model):
             errors["prazo_cadastro_disciplinas"] = "O cadastro de disciplinas deve encerrar antes do início da matrícula."
         if bool(self.encerrado_manualmente_em) != bool(self.encerrado_manualmente_por_id):
             errors["encerrado_manualmente_em"] = "Informe data e responsável pelo encerramento manual."
+        if self.status in {self.Status.MATRICULA_ABERTA, self.Status.MODIFICACAO_MATRICULA}:
+            periodos_ativos = PeriodoLetivo.objects.filter(
+                status__in=[self.Status.MATRICULA_ABERTA, self.Status.MODIFICACAO_MATRICULA],
+                encerrado_manualmente_em__isnull=True,
+            )
+            if self.pk:
+                periodos_ativos = periodos_ativos.exclude(pk=self.pk)
+            if periodos_ativos.exists():
+                errors["status"] = "Só pode haver um período letivo ativo no sistema."
         if errors:
             raise ValidationError(errors)
 
@@ -615,7 +634,10 @@ class OfertaDisciplina(models.Model):
     def vagas_ocupadas(self, tipo_aluno):
         return self.itens_matricula.filter(
             solicitacao__tipo_aluno=tipo_aluno,
-            status=ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+            status__in=[
+                ItemSolicitacaoMatricula.Status.SOLICITADO,
+                ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+            ],
         ).count()
 
     def vagas_totais(self, tipo_aluno):
@@ -751,8 +773,8 @@ class SolicitacaoMatricula(models.Model):
     class Status(models.TextChoices):
         RASCUNHO = "RASCUNHO", "Rascunho"
         SOLICITADA = "SOLICITADA", "Solicitada"
-        PARCIALMENTE_HOMOLOGADA = "PARCIALMENTE_HOMOLOGADA", "Parcialmente homologada"
-        HOMOLOGADA = "HOMOLOGADA", "Homologada"
+        PARCIALMENTE_HOMOLOGADA = "PARCIALMENTE_HOMOLOGADA", "Parcialmente processada"
+        HOMOLOGADA = "HOMOLOGADA", "Processada"
         INDEFERIDA = "INDEFERIDA", "Indeferida"
         CANCELADA = "CANCELADA", "Cancelada"
 
@@ -826,9 +848,9 @@ class SolicitacaoMatricula(models.Model):
 
 class ItemSolicitacaoMatricula(models.Model):
     class Status(models.TextChoices):
-        SOLICITADO = "SOLICITADO", "Solicitado"
-        HOMOLOGADO = "HOMOLOGADO", "Homologado"
-        EM_LISTA_ESPERA = "EM_LISTA_ESPERA", "Em lista de espera"
+        SOLICITADO = "SOLICITADO", "Matrícula solicitada"
+        HOMOLOGADO = "HOMOLOGADO", "Matrícula solicitada"
+        EM_LISTA_ESPERA = "EM_LISTA_ESPERA", "Matrícula solicitada - em lista de espera"
         INDEFERIDO = "INDEFERIDO", "Indeferido"
         CANCELADO = "CANCELADO", "Cancelado"
 

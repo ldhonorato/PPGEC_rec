@@ -23,7 +23,7 @@
                     <div class="actions-row">
                         <div>
                             <strong>{{ item.oferta.disciplina.codigo }} - {{ item.oferta.disciplina.nome }}</strong>
-                            <span class="badge {% if item.status == 'HOMOLOGADO' %}badge-ok{% elif item.status == 'INDEFERIDO' or item.status == 'CANCELADO' %}badge-no{% else %}badge-info{% endif %}">
+                            <span class="badge {% if item.status == 'SOLICITADO' or item.status == 'HOMOLOGADO' %}badge-ok{% elif item.status == 'INDEFERIDO' or item.status == 'CANCELADO' %}badge-no{% else %}badge-info{% endif %}">
                                 {{ item.get_status_display }}
                             </span>
                             <small class="muted" style="display:block; margin-top:0.35rem;">
@@ -42,7 +42,6 @@
                         </div>
                         <small class="muted">
                             Solicitado em {{ item.solicitado_em|date:"d/m/Y H:i" }}
-                            {% if item.homologado_em %}<br>Homologado em {{ item.homologado_em|date:"d/m/Y H:i" }}{% endif %}
                         </small>
                     </div>
                 </li>

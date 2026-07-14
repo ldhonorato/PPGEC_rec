@@ -137,7 +137,7 @@
                 <ul class="activity-list" style="margin-top:0.7rem;">
                     {% for item in aluno_matricula_atual.itens.all|slice:":4" %}
                         <li>
-                            <span class="soft-icon">{% if item.status == "HOMOLOGADO" %}OK{% else %}!{% endif %}</span>
+                            <span class="soft-icon">{% if item.status == "SOLICITADO" or item.status == "HOMOLOGADO" %}OK{% else %}!{% endif %}</span>
                             <span>{{ item.oferta.disciplina.codigo }} - {{ item.oferta.disciplina.nome }}</span>
                             <time>{{ item.get_status_display }}</time>
                         </li>

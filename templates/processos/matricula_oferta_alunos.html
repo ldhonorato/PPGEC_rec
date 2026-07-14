@@ -25,20 +25,6 @@
     {% endif %}
 </section>
 
-<section class="card panel">
-    <h2 class="section-title">Lista de espera</h2>
-    <div class="calendar-nav">
-        {% for value, label in tipos_aluno %}
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="acao" value="promover">
-                <input type="hidden" name="tipo_aluno" value="{{ value }}">
-                <button class="btn btn-secondary" type="submit">Promover próximo {{ label|lower }}</button>
-            </form>
-        {% endfor %}
-    </div>
-</section>
-
 <section class="card">
     <h2 class="section-title">Alunos</h2>
     {% if itens %}
@@ -48,7 +34,7 @@
                     <div class="actions-row">
                         <div>
                             <strong>{{ item.solicitacao.aluno.nome }}</strong>
-                            <span class="badge {% if item.status == 'HOMOLOGADO' %}badge-ok{% elif item.status == 'INDEFERIDO' or item.status == 'CANCELADO' %}badge-no{% else %}badge-info{% endif %}">
+                            <span class="badge {% if item.status == 'SOLICITADO' or item.status == 'HOMOLOGADO' %}badge-ok{% elif item.status == 'INDEFERIDO' or item.status == 'CANCELADO' %}badge-no{% else %}badge-info{% endif %}">
                                 {{ item.get_status_display }}
                             </span>
                             <small class="muted" style="display:block; margin-top:0.35rem;">
@@ -56,21 +42,12 @@
                                 {{ item.solicitacao.aluno.email }} |
                                 {{ item.solicitacao.get_tipo_aluno_display }} |
                                 Solicitado em {{ item.solicitado_em|date:"d/m/Y H:i" }}
-                                {% if item.homologado_por %}| Homologado por {{ item.homologado_por.nome }}{% endif %}
                             </small>
                             {% if item.motivo_indeferimento %}
                                 <small class="muted">Motivo: {{ item.motivo_indeferimento }}</small>
                             {% endif %}
                         </div>
                         <div class="calendar-nav">
-                            {% if item.status != 'HOMOLOGADO' and item.status != 'INDEFERIDO' and item.status != 'CANCELADO' %}
-                                <form method="post">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="acao" value="homologar">
-                                    <input type="hidden" name="item_id" value="{{ item.pk }}">
-                                    <button class="btn" type="submit">Homologar</button>
-                                </form>
-                            {% endif %}
                             {% if item.status != 'INDEFERIDO' and item.status != 'CANCELADO' %}
                                 <button class="btn btn-secondary" type="button" data-open-dialog="indeferir-{{ item.pk }}">Indeferir</button>
                                 <form method="post">
