@@ -88,10 +88,13 @@ class DisciplinaTrajetoriaForm(forms.ModelForm):
 class DisciplinaForm(forms.ModelForm):
     class Meta:
         model = Disciplina
-        fields = ["codigo", "nome", "creditos", "carga_horaria", "ativa"]
+        fields = ["codigo", "nome", "tipo", "creditos", "carga_horaria", "pre_requisitos", "ementa", "bibliografia", "ativa"]
         widgets = {
             "creditos": forms.NumberInput(attrs={"min": "0"}),
             "carga_horaria": forms.NumberInput(attrs={"min": "0"}),
+            "pre_requisitos": forms.Textarea(attrs={"rows": 3}),
+            "ementa": forms.Textarea(attrs={"rows": 5}),
+            "bibliografia": forms.Textarea(attrs={"rows": 5}),
         }
 
 
@@ -100,14 +103,20 @@ class PeriodoLetivoForm(forms.ModelForm):
         model = PeriodoLetivo
         fields = [
             "nome",
+            "data_inicio",
+            "data_fim",
             "prazo_cadastro_disciplinas",
+            "prazo_agendamento_aulas_presenciais",
             "matricula_inicio",
             "matricula_fim",
             "modificacao_inicio",
             "modificacao_fim",
         ]
         widgets = {
+            "data_inicio": forms.DateInput(attrs={"type": "date"}),
+            "data_fim": forms.DateInput(attrs={"type": "date"}),
             "prazo_cadastro_disciplinas": forms.DateInput(attrs={"type": "date"}),
+            "prazo_agendamento_aulas_presenciais": forms.DateInput(attrs={"type": "date"}),
             "matricula_inicio": forms.DateInput(attrs={"type": "date"}),
             "matricula_fim": forms.DateInput(attrs={"type": "date"}),
             "modificacao_inicio": forms.DateInput(attrs={"type": "date"}),

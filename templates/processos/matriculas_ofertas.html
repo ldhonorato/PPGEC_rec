@@ -102,6 +102,9 @@
             <p class="muted">Cadastro de disciplinas ofertadas por período letivo.</p>
         </div>
         <div class="calendar-nav">
+            <a class="btn btn-secondary" href="{% url 'matriculas_ofertas' %}{% if not filtro_nao_conformes %}?nao_conformes=1{% endif %}">
+                {% if filtro_nao_conformes %}Todas as ofertas{% else %}Híbridas não conformes ({{ total_nao_conformes }}){% endif %}
+            </a>
             <button class="btn" type="button" data-open-dialog="nova-oferta">Nova oferta</button>
         </div>
     </div>
@@ -165,6 +168,16 @@
                                 Vagas regulares: {{ oferta.vagas_regulares }} | especiais: {{ oferta.vagas_especiais }} |
                                 Matriculados: {{ oferta.matriculados }} | Espera: {{ oferta.lista_espera }}
                             </small>
+                            {% if oferta.modalidade == "HIBRIDA" %}
+                                <small class="muted" style="display:block; margin-top:0.35rem;">
+                                    Presencial planejado: {{ oferta.percentual_presencial }}%.
+                                    {% if oferta.presencial_conforme %}
+                                        <span class="badge badge-ok">Conforme</span>
+                                    {% else %}
+                                        <span class="badge badge-no">Não conforme</span>
+                                    {% endif %}
+                                </small>
+                            {% endif %}
                             {% if oferta.encontros.all %}
                                 <ul class="availability-list" style="margin-top:0.55rem;">
                                     {% for encontro in oferta.encontros.all %}
@@ -179,6 +192,9 @@
                                 <a class="btn btn-secondary" href="{% url 'matricula_oferta_exportar' oferta.pk %}">Excel</a>
                             {% endif %}
                             {% if can_manage_matriculas or oferta.docente_responsavel_id == request.user.id or oferta.docente_colaborador_id == request.user.id %}
+                                {% if oferta.modalidade == "HIBRIDA" %}
+                                    <a class="btn btn-secondary" href="{% url 'matricula_oferta_planejamento_presencial' oferta.pk %}">Aulas presenciais</a>
+                                {% endif %}
                                 <button class="btn btn-secondary" type="button" data-open-dialog="editar-oferta-{{ oferta.pk }}">Editar</button>
                             {% endif %}
                         </div>

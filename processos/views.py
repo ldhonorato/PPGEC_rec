@@ -97,6 +97,7 @@ from .tasks import (
     send_email_status_atualizado,
     send_email_solicitacao_assinatura,
     send_email_alunos_sem_matricula,
+    send_email_secretaria_planejamento_presencial,
 )
 from .services import (
     alunos_ativos_sem_matricula,
@@ -106,7 +107,12 @@ from .services import (
     homologar_solicitacao_vinculo,
     indeferir_item_matricula,
     indeferir_solicitacao_vinculo,
+    datas_encontro_no_periodo,
+    oferta_hibrida_conforme,
+    ofertas_hibridas_nao_conformes,
+    percentual_presencial_oferta,
     promover_proximo_lista_espera,
+    salvar_planejamento_presencial_oferta,
     salvar_solicitacao_matricula,
     tipo_aluno_matricula_por_trajetoria,
 )
@@ -889,7 +895,7 @@ def matriculas_ofertas_view(request):
 
     ofertas = (
         OfertaDisciplina.objects.select_related("periodo", "disciplina", "docente_responsavel", "docente_colaborador")
-        .prefetch_related("encontros", "itens_matricula")
+        .prefetch_related("encontros", "itens_matricula", "aulas_presenciais__encontro")
         .annotate(
             matriculados=Count(
                 "itens_matricula",
@@ -903,6 +909,12 @@ def matriculas_ofertas_view(request):
         .order_by("-periodo__nome", "disciplina__nome")
     )
     ofertas = list(ofertas)
+    filtro_nao_conformes = request.GET.get("nao_conformes") == "1"
+    for oferta in ofertas:
+        oferta.percentual_presencial = percentual_presencial_oferta(oferta)
+        oferta.presencial_conforme = oferta_hibrida_conforme(oferta)
+    if filtro_nao_conformes:
+        ofertas = [oferta for oferta in ofertas if oferta.modalidade == OfertaDisciplina.Modalidade.HIBRIDA and not oferta.presencial_conforme]
     grades_periodos, dias_grade = _montar_grade_ofertas(ofertas)
 
     return render(
@@ -916,6 +928,68 @@ def matriculas_ofertas_view(request):
             "can_manage_matriculas": _can_manage_matriculas(request.user),
             "oferta_editando": oferta_editando,
             "modal_aberto": modal_aberto,
+            "filtro_nao_conformes": filtro_nao_conformes,
+            "total_nao_conformes": len(ofertas_hibridas_nao_conformes()),
+        },
+    )
+
+
+@login_required
+def matricula_oferta_planejamento_presencial_view(request, oferta_id):
+    oferta = get_object_or_404(
+        OfertaDisciplina.objects.select_related("periodo", "disciplina", "docente_responsavel", "docente_colaborador")
+        .prefetch_related("encontros", "aulas_presenciais__encontro", "aulas_presenciais__sala"),
+        pk=oferta_id,
+    )
+    if not (
+        _can_manage_matriculas(request.user)
+        or oferta.docente_responsavel_id == request.user.id
+        or oferta.docente_colaborador_id == request.user.id
+    ):
+        raise PermissionDenied("Você não pode planejar aulas presenciais desta oferta.")
+    if oferta.modalidade != OfertaDisciplina.Modalidade.HIBRIDA:
+        messages.info(request, "Apenas disciplinas híbridas exigem planejamento de aulas presenciais.")
+        return redirect("matriculas_ofertas")
+
+    if request.method == "POST":
+        selecoes = []
+        sala_padrao = Sala.objects.filter(pk=request.POST.get("sala_padrao"), ativa=True).first()
+        for key, value in request.POST.items():
+            if not key.startswith("aula_") or value != "on":
+                continue
+            _prefix, encontro_id, data_iso = key.split("_", 2)
+            sala_id = request.POST.get(f"sala_{encontro_id}_{data_iso}") or getattr(sala_padrao, "pk", None)
+            sala = Sala.objects.filter(pk=sala_id, ativa=True).first()
+            if not sala:
+                messages.error(request, "Informe um ambiente para todas as aulas presenciais selecionadas.")
+                return redirect("matricula_oferta_planejamento_presencial", oferta_id=oferta.pk)
+            selecoes.append({"encontro_id": int(encontro_id), "data": parse_date(data_iso), "sala": sala})
+        try:
+            salvar_planejamento_presencial_oferta(oferta=oferta, usuario=request.user, selecoes=selecoes)
+            send_email_secretaria_planejamento_presencial.delay(oferta.pk, request.user.pk)
+            messages.success(request, "Planejamento presencial salvo.")
+            return redirect("matricula_oferta_planejamento_presencial", oferta_id=oferta.pk)
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+
+    aulas_existentes = {f"{aula.encontro_id}_{aula.data.isoformat()}": aula for aula in oferta.aulas_presenciais.all()}
+    encontros_planejamento = []
+    for encontro in oferta.encontros.all():
+        aulas = []
+        for data in datas_encontro_no_periodo(encontro):
+            chave = f"{encontro.pk}_{data.isoformat()}"
+            aulas.append({"data": data, "chave": chave, "aula": aulas_existentes.get(chave)})
+        encontros_planejamento.append({"encontro": encontro, "aulas": aulas})
+
+    return render(
+        request,
+        "processos/matricula_oferta_planejamento_presencial.html",
+        {
+            "oferta": oferta,
+            "salas": Sala.objects.filter(ativa=True, polo__ativo=True).select_related("polo").order_by("polo__nome", "nome"),
+            "encontros_planejamento": encontros_planejamento,
+            "percentual_presencial": percentual_presencial_oferta(oferta),
+            "conforme": oferta_hibrida_conforme(oferta),
         },
     )
 

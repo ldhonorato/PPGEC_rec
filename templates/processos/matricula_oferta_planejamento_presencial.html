@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Planejamento Presencial | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Planejamento Presencial</h1>
+            <p class="muted">{{ oferta.disciplina }} | {{ oferta.periodo.nome }} | {{ oferta.docentes_display }}</p>
+        </div>
+        <a class="btn btn-secondary" href="{% url 'matriculas_ofertas' %}">Voltar</a>
+    </div>
+</section>
+
+<section class="card panel {% if conforme %}alert-info{% else %}alert-danger{% endif %}">
+    <h2 class="section-title">Conformidade</h2>
+    <p class="muted">
+        Carga horária presencial planejada: {{ percentual_presencial }}%.
+        Disciplinas híbridas devem possuir no mínimo 25% da carga horária ofertada de forma presencial.
+    </p>
+    <p class="muted">
+        Disciplinas 100% presenciais terão prioridade no uso dos ambientes. Ajustes no ambiente reservado para a aula
+        podem ser solicitados pela secretaria/coordenação.
+    </p>
+    {% if oferta.periodo.prazo_agendamento_aulas_presenciais %}
+        <p class="muted">Prazo para agendamento: {{ oferta.periodo.prazo_agendamento_aulas_presenciais|date:"d/m/Y" }}.</p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <form method="post" data-planejamento-form>
+        {% csrf_token %}
+        <div class="field">
+            <label for="sala_padrao">Ambiente para aplicar a todas as aulas selecionadas</label>
+            <select name="sala_padrao" id="sala_padrao">
+                <option value="">Selecionar individualmente</option>
+                {% for sala in salas %}
+                    <option value="{{ sala.pk }}">{{ sala.polo.nome }} - {{ sala.nome }}{% if sala.capacidade %} ({{ sala.capacidade }}){% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        {% for grupo in encontros_planejamento %}
+            <div class="card room-modal-card panel">
+                <h2 class="section-title">{{ grupo.encontro.get_dia_semana_display }} {{ grupo.encontro.hora_inicio|time:"H:i" }} - {{ grupo.encontro.hora_fim|time:"H:i" }}</h2>
+                {% if grupo.aulas %}
+                    <ul class="list">
+                        {% for item in grupo.aulas %}
+                            <li>
+                                <div class="grid-two">
+                                    <label class="checkbox-field">
+                                        <input type="checkbox" name="aula_{{ grupo.encontro.pk }}_{{ item.data|date:'Y-m-d' }}" {% if item.aula %}checked{% endif %}>
+                                        <span>{{ item.data|date:"d/m/Y" }}</span>
+                                    </label>
+                                    <div class="field">
+                                        <label>Ambiente</label>
+                                        <select name="sala_{{ grupo.encontro.pk }}_{{ item.data|date:'Y-m-d' }}">
+                                            <option value="">Usar ambiente padrão</option>
+                                            {% for sala in salas %}
+                                                <option value="{{ sala.pk }}" {% if item.aula.sala_id == sala.pk %}selected{% endif %}>{{ sala.polo.nome }} - {{ sala.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="muted">Não há datas no período letivo para este encontro.</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <div class="form-actions">
+            <button class="btn" type="button" data-open-norma>Salvar planejamento</button>
+        </div>
+    </form>
+</section>
+
+<dialog id="norma-capes" class="modal-dialog">
+    <div class="modal-body">
+        <div class="actions-row">
+            <h2 class="section-title">Confirmar planejamento</h2>
+            <button class="btn btn-secondary" type="button" data-close-norma>Fechar</button>
+        </div>
+        <p class="muted">
+            A Instrução Normativa nº 2, de 3 de dezembro de 2024, GAB/CAPES, Art. 3º, veda:
+            o emprego de atividades remotas assíncronas para o cômputo de carga horária didática;
+            a oferta de disciplina de forma completamente remota; e o percurso formativo de forma completamente remota.
+        </p>
+        <p class="muted">
+            Ao confirmar, serão criadas ou atualizadas reservas de ambiente para as aulas presenciais selecionadas.
+        </p>
+        <div class="form-actions">
+            <button class="btn btn-secondary" type="button" data-close-norma>Voltar</button>
+            <button class="btn" type="button" data-confirmar-planejamento>Confirmar e salvar</button>
+        </div>
+    </div>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const planejamentoForm = document.querySelector("[data-planejamento-form]");
+const normaDialog = document.getElementById("norma-capes");
+document.querySelector("[data-open-norma]")?.addEventListener("click", () => normaDialog?.showModal());
+document.querySelectorAll("[data-close-norma]").forEach((button) => {
+    button.addEventListener("click", () => normaDialog?.close());
+});
+document.querySelector("[data-confirmar-planejamento]")?.addEventListener("click", () => planejamentoForm?.submit());
+</script>
+{% endblock %}

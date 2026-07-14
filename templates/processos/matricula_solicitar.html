@@ -78,6 +78,9 @@
                                     <strong>{{ oferta.disciplina.codigo }} - {{ oferta.disciplina.nome }}</strong>
                                     <small class="muted" style="display:block; margin-top:0.25rem;">
                                         {{ oferta.docentes_display }} | {{ oferta.get_modalidade_display }} |
+                                        Tipo: {{ oferta.disciplina.tipo|default:"-" }} |
+                                        Carga horária: {{ oferta.disciplina.carga_horaria|default:"-" }}h |
+                                        Créditos: {{ oferta.disciplina.creditos|default:"-" }} |
                                         Vagas regulares: {{ oferta.vagas_regulares }} | Vagas especiais: {{ oferta.vagas_especiais }}
                                     </small>
                                     {% if oferta.encontros.all %}
@@ -89,6 +92,23 @@
                                     {% endif %}
                                 </span>
                             </label>
+                            <details style="margin:0.65rem 0 0 1.75rem;">
+                                <summary class="muted">Ver ementa, pré-requisitos e bibliografia</summary>
+                                <div style="display:grid; gap:0.65rem; margin-top:0.65rem;">
+                                    <div>
+                                        <span class="info-label">Pré-requisitos</span>
+                                        <p class="muted" style="margin:0.25rem 0 0;">{{ oferta.disciplina.pre_requisitos|default:"Não informado." }}</p>
+                                    </div>
+                                    <div>
+                                        <span class="info-label">Ementa</span>
+                                        <p class="muted" style="margin:0.25rem 0 0;">{{ oferta.disciplina.ementa|default:"Não informada." }}</p>
+                                    </div>
+                                    <div>
+                                        <span class="info-label">Bibliografia</span>
+                                        <p class="muted" style="margin:0.25rem 0 0;">{{ oferta.disciplina.bibliografia|default:"Não informada." }}</p>
+                                    </div>
+                                </div>
+                            </details>
                         </li>
                     {% endfor %}
                 </ul>

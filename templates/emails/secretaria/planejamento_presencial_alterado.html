@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="pt-BR">
+<body>
+    <p>O planejamento de aulas presenciais foi alterado no AcadFlow.</p>
+    <p>
+        <strong>Oferta:</strong> {{ oferta.disciplina }}<br>
+        <strong>Período:</strong> {{ oferta.periodo.nome }}<br>
+        <strong>Alterado por:</strong> {{ usuario.nome|default:usuario.email }}
+    </p>
+    <p>Verifique as reservas de ambiente vinculadas à oferta, se necessário.</p>
+</body>
+</html>

@@ -23,6 +23,10 @@ app.conf.beat_schedule = {
         "task": "processos.tasks.atualizar_status_periodos_letivos",
         "schedule": crontab(hour=3, minute=5),
     },
+    "lembrar-planejamento-presencial-diariamente": {
+        "task": "processos.tasks.send_email_lembrete_planejamento_presencial",
+        "schedule": crontab(hour=11, minute=0),
+    },
 }
 
 # # ROTINA AUTÔNOMA DE TEMPO (CELERY BEAT) ===============================================

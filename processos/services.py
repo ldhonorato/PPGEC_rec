@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZipFile
 from xml.sax.saxutils import escape
@@ -11,10 +11,12 @@ from django.utils import timezone
 
 from .models import (
     Aluno,
+    AulaPresencialOferta,
     Docente,
     ItemSolicitacaoMatricula,
     OfertaDisciplina,
     Processo,
+    ReservaAmbiente,
     SolicitacaoMatricula,
     TrajetoriaAcademica,
     User,
@@ -128,6 +130,117 @@ def tipo_aluno_matricula_por_trajetoria(trajetoria):
     if trajetoria.nivel_curso == Aluno.NivelCurso.ALUNO_ESPECIAL:
         return SolicitacaoMatricula.TipoAluno.ESPECIAL
     return SolicitacaoMatricula.TipoAluno.REGULAR
+
+
+def datas_encontro_no_periodo(encontro):
+    periodo = encontro.oferta.periodo
+    if not periodo.data_inicio or not periodo.data_fim:
+        return []
+    data = periodo.data_inicio
+    while data.weekday() != encontro.dia_semana:
+        data += timedelta(days=1)
+    datas = []
+    while data <= periodo.data_fim:
+        datas.append(data)
+        data += timedelta(days=7)
+    return datas
+
+
+def minutos_encontro(encontro):
+    inicio = datetime.combine(timezone.localdate(), encontro.hora_inicio)
+    fim = datetime.combine(timezone.localdate(), encontro.hora_fim)
+    return int((fim - inicio).total_seconds() // 60)
+
+
+def carga_horaria_total_oferta_minutos(oferta):
+    total = 0
+    for encontro in oferta.encontros.all():
+        total += minutos_encontro(encontro) * len(datas_encontro_no_periodo(encontro))
+    return total
+
+
+def carga_horaria_presencial_oferta_minutos(oferta):
+    return sum(aula.carga_horaria_minutos for aula in oferta.aulas_presenciais.select_related("encontro"))
+
+
+def percentual_presencial_oferta(oferta):
+    total = carga_horaria_total_oferta_minutos(oferta)
+    if total <= 0:
+        return 0
+    return round((carga_horaria_presencial_oferta_minutos(oferta) / total) * 100, 1)
+
+
+def oferta_hibrida_conforme(oferta):
+    if oferta.modalidade != OfertaDisciplina.Modalidade.HIBRIDA:
+        return True
+    return percentual_presencial_oferta(oferta) >= 25
+
+
+def ofertas_hibridas_nao_conformes():
+    ofertas = (
+        OfertaDisciplina.objects.filter(modalidade=OfertaDisciplina.Modalidade.HIBRIDA)
+        .select_related("periodo", "disciplina", "docente_responsavel", "docente_colaborador")
+        .prefetch_related("encontros", "aulas_presenciais__encontro")
+        .order_by("-periodo__nome", "disciplina__nome")
+    )
+    return [oferta for oferta in ofertas if not oferta_hibrida_conforme(oferta)]
+
+
+@transaction.atomic
+def salvar_planejamento_presencial_oferta(*, oferta, usuario, selecoes):
+    oferta = (
+        OfertaDisciplina.objects.select_for_update()
+        .select_related("periodo", "disciplina", "docente_responsavel")
+        .prefetch_related("encontros")
+        .get(pk=oferta.pk)
+    )
+    if oferta.modalidade != OfertaDisciplina.Modalidade.HIBRIDA:
+        raise ValidationError("Apenas disciplinas híbridas possuem planejamento de aulas presenciais.")
+
+    existentes = {f"{aula.encontro_id}:{aula.data.isoformat()}": aula for aula in oferta.aulas_presenciais.select_related("reserva")}
+    manter = set()
+    titulo = f"Aula presencial - {oferta.disciplina.codigo} - {oferta.disciplina.nome}"
+
+    for selecao in selecoes:
+        encontro = oferta.encontros.get(pk=selecao["encontro_id"])
+        data = selecao["data"]
+        sala = selecao["sala"]
+        chave = f"{encontro.pk}:{data.isoformat()}"
+        inicio = timezone.make_aware(datetime.combine(data, encontro.hora_inicio))
+        fim = timezone.make_aware(datetime.combine(data, encontro.hora_fim))
+        aula = existentes.get(chave)
+        if aula and aula.sala_id == sala.id:
+            manter.add(chave)
+            continue
+        if aula:
+            aula.reserva.excluir(usuario=usuario, justificativa="Alteração do planejamento presencial da oferta.")
+            aula.delete()
+        reserva = ReservaAmbiente(
+            sala=sala,
+            docente=oferta.docente_responsavel,
+            criado_por=usuario,
+            tipo=ReservaAmbiente.TipoReserva.AULA,
+            titulo=titulo,
+            inicio=inicio,
+            fim=fim,
+        )
+        reserva.save()
+        AulaPresencialOferta.objects.create(
+            oferta=oferta,
+            encontro=encontro,
+            data=data,
+            sala=sala,
+            reserva=reserva,
+            criado_por=usuario,
+        )
+        manter.add(chave)
+
+    for chave, aula in existentes.items():
+        if chave not in manter:
+            aula.reserva.excluir(usuario=usuario, justificativa="Aula presencial removida do planejamento da oferta.")
+            aula.delete()
+
+    return oferta
 
 
 @transaction.atomic

@@ -1,5 +1,5 @@
 import calendar
-from datetime import timedelta
+from datetime import datetime, timedelta
 import uuid
 
 from django.conf import settings
@@ -418,8 +418,12 @@ class DisciplinaTrajetoria(models.Model):
 class Disciplina(models.Model):
     codigo = models.CharField(max_length=40, unique=True)
     nome = models.CharField(max_length=255)
+    tipo = models.CharField(max_length=120, blank=True)
     creditos = models.PositiveSmallIntegerField(null=True, blank=True)
     carga_horaria = models.PositiveSmallIntegerField(null=True, blank=True)
+    pre_requisitos = models.TextField(blank=True)
+    ementa = models.TextField(blank=True)
+    bibliografia = models.TextField(blank=True)
     ativa = models.BooleanField(default=True)
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
@@ -433,6 +437,10 @@ class Disciplina(models.Model):
     def save(self, *args, **kwargs):
         self.codigo = (self.codigo or "").strip().upper()
         self.nome = (self.nome or "").strip()
+        self.tipo = (self.tipo or "").strip()
+        self.pre_requisitos = (self.pre_requisitos or "").strip()
+        self.ementa = (self.ementa or "").strip()
+        self.bibliografia = (self.bibliografia or "").strip()
         self.full_clean()
         return super().save(*args, **kwargs)
 
@@ -446,7 +454,10 @@ class PeriodoLetivo(models.Model):
 
     nome = models.CharField(max_length=20, unique=True, validators=[Aluno.semestre_validator])
     status = models.CharField(max_length=25, choices=Status.choices, default=Status.PLANEJAMENTO)
+    data_inicio = models.DateField(null=True, blank=True)
+    data_fim = models.DateField(null=True, blank=True)
     prazo_cadastro_disciplinas = models.DateField()
+    prazo_agendamento_aulas_presenciais = models.DateField(null=True, blank=True)
     matricula_inicio = models.DateField()
     matricula_fim = models.DateField()
     modificacao_inicio = models.DateField()
@@ -517,6 +528,10 @@ class PeriodoLetivo(models.Model):
         errors = {}
         if self.matricula_inicio and self.matricula_fim and self.matricula_fim < self.matricula_inicio:
             errors["matricula_fim"] = "O fim da matrícula deve ser posterior ou igual ao início."
+        if self.data_inicio and self.data_fim and self.data_fim < self.data_inicio:
+            errors["data_fim"] = "O fim do período letivo deve ser posterior ou igual ao início."
+        if self.prazo_agendamento_aulas_presenciais and self.data_fim and self.prazo_agendamento_aulas_presenciais > self.data_fim:
+            errors["prazo_agendamento_aulas_presenciais"] = "O prazo deve estar dentro do período letivo."
         if self.modificacao_inicio and self.modificacao_fim and self.modificacao_fim < self.modificacao_inicio:
             errors["modificacao_fim"] = "O fim da modificação deve ser posterior ou igual ao início."
         if self.modificacao_inicio and self.matricula_fim and self.modificacao_inicio < self.matricula_fim:
@@ -649,6 +664,61 @@ class EncontroOferta(models.Model):
                 encontros = encontros.exclude(pk=self.pk)
             if encontros.count() >= 2:
                 errors["oferta"] = "A oferta pode ter no máximo dois encontros semanais."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class AulaPresencialOferta(models.Model):
+    oferta = models.ForeignKey(OfertaDisciplina, on_delete=models.CASCADE, related_name="aulas_presenciais")
+    encontro = models.ForeignKey(EncontroOferta, on_delete=models.CASCADE, related_name="aulas_presenciais")
+    data = models.DateField()
+    sala = models.ForeignKey("Sala", on_delete=models.PROTECT, related_name="aulas_presenciais_ofertas")
+    reserva = models.OneToOneField(
+        "ReservaAmbiente",
+        on_delete=models.PROTECT,
+        related_name="aula_presencial_oferta",
+        null=True,
+        blank=True,
+    )
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="aulas_presenciais_ofertas_criadas",
+    )
+    atualizado_em = models.DateTimeField(auto_now=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["data", "encontro__hora_inicio"]
+        constraints = [
+            models.UniqueConstraint(fields=["oferta", "data", "encontro"], name="unique_aula_presencial_oferta_data_encontro"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.oferta} - {self.data:%d/%m/%Y}"
+
+    @property
+    def carga_horaria_minutos(self):
+        inicio = datetime.combine(self.data, self.encontro.hora_inicio)
+        fim = datetime.combine(self.data, self.encontro.hora_fim)
+        return int((fim - inicio).total_seconds() // 60)
+
+    def clean(self):
+        errors = {}
+        if self.oferta_id and self.oferta.modalidade != OfertaDisciplina.Modalidade.HIBRIDA:
+            errors["oferta"] = "O planejamento presencial é exigido apenas para ofertas híbridas."
+        if self.oferta_id and self.encontro_id and self.encontro.oferta_id != self.oferta_id:
+            errors["encontro"] = "O encontro deve pertencer à oferta."
+        if self.oferta_id and self.oferta.periodo.data_inicio and self.data and self.data < self.oferta.periodo.data_inicio:
+            errors["data"] = "A aula deve ocorrer dentro do período letivo."
+        if self.oferta_id and self.oferta.periodo.data_fim and self.data and self.data > self.oferta.periodo.data_fim:
+            errors["data"] = "A aula deve ocorrer dentro do período letivo."
+        if self.encontro_id and self.data and self.data.weekday() != self.encontro.dia_semana:
+            errors["data"] = "A data deve corresponder ao dia da semana do encontro."
         if errors:
             raise ValidationError(errors)
 

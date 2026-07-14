@@ -55,9 +55,20 @@
                                 <span class="badge badge-no">Inativa</span>
                             {% endif %}
                             <small class="muted" style="display:block; margin-top:0.35rem;">
+                                Tipo: {{ disciplina.tipo|default:"-" }} |
                                 Créditos: {{ disciplina.creditos|default:"-" }} |
                                 Carga horária: {{ disciplina.carga_horaria|default:"-" }}
                             </small>
+                            {% if disciplina.pre_requisitos %}
+                                <small class="muted" style="display:block; margin-top:0.35rem;">
+                                    Pré-requisitos: {{ disciplina.pre_requisitos|truncatechars:140 }}
+                                </small>
+                            {% endif %}
+                            {% if disciplina.ementa %}
+                                <small class="muted" style="display:block; margin-top:0.35rem;">
+                                    Ementa: {{ disciplina.ementa|truncatechars:180 }}
+                                </small>
+                            {% endif %}
                         </div>
                         <button class="btn btn-secondary" type="button" data-open-dialog="editar-disciplina-{{ disciplina.pk }}">Editar</button>
                     </div>
@@ -98,8 +109,12 @@
                 <div class="grid-two">
                     <div class="field"><label>Código</label><input name="codigo" value="{{ disciplina.codigo }}" maxlength="40" required></div>
                     <div class="field"><label>Nome</label><input name="nome" value="{{ disciplina.nome }}" maxlength="255" required></div>
+                    <div class="field"><label>Tipo</label><input name="tipo" value="{{ disciplina.tipo }}" maxlength="120"></div>
                     <div class="field"><label>Créditos</label><input type="number" name="creditos" min="0" value="{{ disciplina.creditos|default_if_none:'' }}"></div>
                     <div class="field"><label>Carga horária</label><input type="number" name="carga_horaria" min="0" value="{{ disciplina.carga_horaria|default_if_none:'' }}"></div>
+                    <div class="field"><label>Pré-requisitos</label><textarea name="pre_requisitos" rows="3">{{ disciplina.pre_requisitos }}</textarea></div>
+                    <div class="field"><label>Ementa</label><textarea name="ementa" rows="5">{{ disciplina.ementa }}</textarea></div>
+                    <div class="field"><label>Bibliografia</label><textarea name="bibliografia" rows="5">{{ disciplina.bibliografia }}</textarea></div>
                     <div class="field checkbox-field"><input type="checkbox" name="ativa" {% if disciplina.ativa %}checked{% endif %}> <label>Ativa</label></div>
                 </div>
             {% endif %}

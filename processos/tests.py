@@ -12,6 +12,7 @@ from django.utils import timezone
 from .models import (
     AlteracaoAluno,
     Aluno,
+    AulaPresencialOferta,
     Disciplina,
     DisciplinaTrajetoria,
     DisponibilidadeSala,
@@ -240,6 +241,9 @@ class MatriculaViewsTests(TestCase):
         self.periodo = PeriodoLetivo.objects.create(
             nome="2026.2",
             status=PeriodoLetivo.Status.MATRICULA_ABERTA,
+            data_inicio=hoje,
+            data_fim=hoje + timedelta(days=60),
+            prazo_agendamento_aulas_presenciais=hoje + timedelta(days=7),
             prazo_cadastro_disciplinas=hoje,
             matricula_inicio=hoje,
             matricula_fim=hoje + timedelta(days=5),
@@ -477,6 +481,49 @@ class MatriculaViewsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         self.assertGreater(len(response.content), 100)
+
+    @patch("processos.views.send_email_secretaria_planejamento_presencial.delay")
+    def test_planejamento_presencial_cria_reserva_para_oferta_hibrida(self, mock_email):
+        self.oferta.modalidade = OfertaDisciplina.Modalidade.HIBRIDA
+        self.oferta.save(update_fields=["modalidade"])
+        polo = Polo.objects.create(nome="Polo Matricula")
+        sala = Sala.objects.create(polo=polo, nome="Sala Hibrida", capacidade=30)
+        DisponibilidadeSala.objects.create(
+            sala=sala,
+            dia_semana=EncontroOferta.DiaSemana.TERCA,
+            hora_inicio=time(13, 0),
+            hora_fim=time(18, 0),
+        )
+        data_aula = self.periodo.data_inicio
+        while data_aula.weekday() != EncontroOferta.DiaSemana.TERCA:
+            data_aula += timedelta(days=1)
+        encontro = self.oferta.encontros.get()
+        self.client.force_login(self.docente)
+
+        response = self.client.post(
+            reverse("matricula_oferta_planejamento_presencial", args=[self.oferta.pk]),
+            {
+                "sala_padrao": sala.pk,
+                f"aula_{encontro.pk}_{data_aula.isoformat()}": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        aula = AulaPresencialOferta.objects.get(oferta=self.oferta)
+        self.assertEqual(aula.sala, sala)
+        self.assertEqual(aula.reserva.sala, sala)
+        mock_email.assert_called_once_with(self.oferta.pk, self.docente.pk)
+
+    def test_filtro_exibe_oferta_hibrida_nao_conforme(self):
+        self.oferta.modalidade = OfertaDisciplina.Modalidade.HIBRIDA
+        self.oferta.save(update_fields=["modalidade"])
+        self.client.force_login(self.secretaria)
+
+        response = self.client.get(reverse("matriculas_ofertas"), {"nao_conformes": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Não conforme")
+        self.assertContains(response, self.disciplina.nome)
 
     @patch("processos.views.send_email_alunos_sem_matricula.delay")
     def test_gestao_lista_alunos_sem_matricula_e_envia_email(self, mock_email):

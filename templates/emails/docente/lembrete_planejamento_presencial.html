@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="pt-BR">
+<body>
+    <p>Há pendência no planejamento das aulas presenciais da disciplina híbrida.</p>
+    <p>
+        <strong>Oferta:</strong> {{ oferta.disciplina }}<br>
+        <strong>Período:</strong> {{ oferta.periodo.nome }}<br>
+        <strong>Prazo:</strong> {{ prazo|date:"d/m/Y" }}
+    </p>
+    {% if atrasado %}
+        <p><strong>O prazo para agendamento das aulas presenciais já foi ultrapassado.</strong></p>
+    {% else %}
+        <p>O prazo está próximo. Registre no AcadFlow as aulas presenciais e os ambientes correspondentes.</p>
+    {% endif %}
+</body>
+</html>

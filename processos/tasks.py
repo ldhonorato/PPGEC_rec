@@ -1,4 +1,5 @@
 from celery import shared_task
+from datetime import timedelta
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
@@ -47,6 +48,58 @@ def send_email_alunos_sem_matricula(periodo_id: int):
         except Exception:
             logger.exception("Falha ao enviar e-mail de matrícula pendente para aluno %s", aluno.pk)
     return {"periodo": periodo.nome, "enviados": enviados}
+
+
+@shared_task(name="processos.tasks.send_email_secretaria_planejamento_presencial")
+def send_email_secretaria_planejamento_presencial(oferta_id: int, usuario_id: int):
+    from .models import OfertaDisciplina, User
+
+    try:
+        oferta = OfertaDisciplina.objects.select_related("periodo", "disciplina").get(pk=oferta_id)
+    except OfertaDisciplina.DoesNotExist:
+        return {"enviados": 0}
+    usuario = User.objects.filter(pk=usuario_id).first()
+    enviados = 0
+    for servidor in User.objects.filter(tipo_usuario=User.TipoUsuario.SERVIDOR, is_active=True).exclude(email=""):
+        _send_email(
+            subject=f"[PPGEC] Planejamento presencial alterado - {oferta.disciplina}",
+            template_name="emails/secretaria/planejamento_presencial_alterado.html",
+            contexto={"oferta": oferta, "usuario": usuario},
+            recipient=servidor.email,
+        )
+        enviados += 1
+    return {"enviados": enviados}
+
+
+@shared_task(name="processos.tasks.send_email_lembrete_planejamento_presencial")
+def send_email_lembrete_planejamento_presencial():
+    from .models import OfertaDisciplina
+    from .services import oferta_hibrida_conforme
+
+    hoje = timezone.localdate()
+    enviados = 0
+    ofertas = (
+        OfertaDisciplina.objects.filter(modalidade=OfertaDisciplina.Modalidade.HIBRIDA)
+        .select_related("periodo", "disciplina", "docente_responsavel", "docente_colaborador")
+        .prefetch_related("encontros", "aulas_presenciais__encontro")
+    )
+    for oferta in ofertas:
+        prazo = oferta.periodo.prazo_agendamento_aulas_presenciais
+        if not prazo or oferta_hibrida_conforme(oferta):
+            continue
+        if hoje < prazo - timedelta(days=7):
+            continue
+        atrasado = hoje > prazo
+        for docente in [oferta.docente_responsavel, oferta.docente_colaborador]:
+            if docente and docente.email:
+                _send_email(
+                    subject=f"[PPGEC] Planejamento de aulas presenciais pendente - {oferta.disciplina}",
+                    template_name="emails/docente/lembrete_planejamento_presencial.html",
+                    contexto={"oferta": oferta, "prazo": prazo, "atrasado": atrasado},
+                    recipient=docente.email,
+                )
+                enviados += 1
+    return {"data": hoje.isoformat(), "enviados": enviados}
 
 
 def _send_email(subject, template_name, contexto, recipient):

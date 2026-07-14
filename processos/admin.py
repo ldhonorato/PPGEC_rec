@@ -5,6 +5,7 @@ from django.contrib.auth.hashers import identify_hasher
 from .models import (
     AlteracaoAluno,
     Aluno,
+    AulaPresencialOferta,
     Disciplina,
     DisponibilidadeSala,
     DisciplinaTrajetoria,
@@ -125,9 +126,9 @@ class DisciplinaTrajetoriaAdmin(admin.ModelAdmin):
 
 @admin.register(Disciplina)
 class DisciplinaAdmin(admin.ModelAdmin):
-    list_display = ("codigo", "nome", "creditos", "carga_horaria", "ativa")
-    list_filter = ("ativa",)
-    search_fields = ("codigo", "nome")
+    list_display = ("codigo", "nome", "tipo", "creditos", "carga_horaria", "ativa")
+    list_filter = ("ativa", "tipo")
+    search_fields = ("codigo", "nome", "tipo", "ementa", "bibliografia")
 
 
 class EncontroOfertaInline(admin.TabularInline):
@@ -136,9 +137,15 @@ class EncontroOfertaInline(admin.TabularInline):
     max_num = 2
 
 
+class AulaPresencialOfertaInline(admin.TabularInline):
+    model = AulaPresencialOferta
+    extra = 0
+    autocomplete_fields = ("sala", "reserva", "criado_por")
+
+
 @admin.register(PeriodoLetivo)
 class PeriodoLetivoAdmin(admin.ModelAdmin):
-    list_display = ("nome", "status_atual_display", "prazo_cadastro_disciplinas", "matricula_inicio", "matricula_fim")
+    list_display = ("nome", "status_atual_display", "data_inicio", "data_fim", "prazo_cadastro_disciplinas", "matricula_inicio", "matricula_fim")
     search_fields = ("nome",)
     readonly_fields = ("criado_em", "atualizado_em")
     autocomplete_fields = ("criado_por", "encerrado_manualmente_por")
@@ -150,7 +157,7 @@ class OfertaDisciplinaAdmin(admin.ModelAdmin):
     list_filter = ("periodo", "modalidade")
     search_fields = ("disciplina__codigo", "disciplina__nome", "docente_responsavel__nome", "docente_colaborador__nome")
     autocomplete_fields = ("periodo", "disciplina", "docente_responsavel", "docente_colaborador", "criada_por")
-    inlines = [EncontroOfertaInline]
+    inlines = [EncontroOfertaInline, AulaPresencialOfertaInline]
 
 
 @admin.register(SolicitacaoMatricula)
