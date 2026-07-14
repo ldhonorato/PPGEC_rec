@@ -249,6 +249,73 @@
                             {% else %}
                                 <p class="muted">Nenhuma disciplina registrada.</p>
                             {% endif %}
+
+                            {% with resumo=card.resumo_horas_complementares %}
+                            <div class="section-head" style="margin-top: 1rem;">
+                                <h3 class="section-title" style="margin:0;">Horas complementares</h3>
+                                <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                                    {% if resumo.norma %}
+                                        <span class="badge badge-info">{{ resumo.norma.identificacao }}</span>
+                                    {% endif %}
+                                    {% if can_manage_aluno %}
+                                        <button type="button" class="btn btn-secondary" data-modal-open="modal-horas-complementares-{{ trajetoria.id }}">Adicionar lançamento</button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="grid-two">
+                                <p class="aluno-kv"><strong>Horas exigidas:</strong> {{ resumo.horas_exigidas }}</p>
+                                <p class="aluno-kv"><strong>Horas computadas:</strong> {{ resumo.horas_computadas }}</p>
+                                <p class="aluno-kv"><strong>Horas pendentes:</strong> {{ resumo.horas_pendentes }}</p>
+                                <p class="aluno-kv"><strong>Situação:</strong> {{ resumo.situacao }}</p>
+                            </div>
+
+                            <h4 class="section-title" style="margin-top: 1rem;">Distribuição por grupo</h4>
+                            {% if resumo.grupos %}
+                                <ul class="list">
+                                    {% for item in resumo.grupos %}
+                                        <li>
+                                            <strong>{{ item.grupo.nome }}</strong><br>
+                                            <small class="muted">
+                                                Computadas: {{ item.horas }}h |
+                                                Limite: {% if item.grupo.limite_maximo %}{{ item.grupo.limite_maximo }}h{% else %}Sem limite específico{% endif %} |
+                                                Saldo: {% if item.saldo is not None %}{{ item.saldo }}h{% else %}-{% endif %}
+                                            </small>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p class="muted">Nenhuma norma vigente configurada para esta trajetória.</p>
+                            {% endif %}
+
+                            <h4 class="section-title" style="margin-top: 1rem;">Histórico de lançamentos</h4>
+                            {% if resumo.lancamentos %}
+                                <ul class="list">
+                                    {% for lancamento in resumo.lancamentos %}
+                                        <li>
+                                            <strong>{{ lancamento.tipo_atividade.nome }}</strong>
+                                            <span class="badge badge-info">{{ lancamento.get_status_display }}</span><br>
+                                            <small class="muted">
+                                                {{ lancamento.criado_em|date:"d/m/Y H:i" }} |
+                                                {% if lancamento.processo_origem %}Quantidade: {{ lancamento.quantidade }} {{ lancamento.unidade_quantidade }} |{% endif %}
+                                                Aprovadas: {{ lancamento.horas_aprovadas }}h |
+                                                Processo:
+                                                {% if lancamento.processo_origem %}
+                                                    <a href="{% url 'processo_detalhe' lancamento.processo_origem.id %}">{{ lancamento.processo_origem.numero }}</a>
+                                                {% else %}
+                                                    Migração/administrativo
+                                                {% endif %}
+                                                | Responsável: {{ lancamento.criado_por.nome }}
+                                            </small>
+                                            {% if lancamento.observacoes_secretaria %}
+                                                <p class="muted" style="margin:0.35rem 0 0 0;">{{ lancamento.observacoes_secretaria }}</p>
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p class="muted">Nenhum lançamento registrado para esta trajetória.</p>
+                            {% endif %}
+                            {% endwith %}
                         </li>
 
                         {% endwith %}
@@ -372,7 +439,31 @@
 </div>
 
 {% for card in trajetoria_cards %}
-{% with trajetoria=card.obj form=card.form %}
+{% with trajetoria=card.obj form=card.form horas_form=card.horas_form %}
+<div id="modal-horas-complementares-{{ trajetoria.id }}" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-head"><h3 class="section-title" style="margin:0;">Adicionar horas complementares</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="registrar_horas_complementares">
+            <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            <div class="grid-two">
+                {% for field in horas_form %}
+                    <div class="field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {{ field.errors }}
+                    </div>
+                {% endfor %}
+            </div>
+            <p class="muted" style="margin:0.45rem 0 0 0;">
+                O comentário será registrado como observação administrativa da secretaria.
+            </p>
+            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar lançamento</button>
+        </form>
+    </div>
+</div>
+
 <div id="modal-trajetoria-status-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
         <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar status da trajetoria</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>

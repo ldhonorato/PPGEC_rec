@@ -82,12 +82,12 @@
             <a class="metric-link" href="{% url 'aluno_documento_vinculo' %}">Acessar -></a>
         </article>
         <article class="card metric-card is-orange">
-            <span class="metric-icon">H</span>
+            <span class="metric-icon">M</span>
             <div>
-                <p class="metric-value">1</p>
-                <p class="metric-label">Historico academico</p>
+                <p class="metric-value">{% if aluno_matricula_atual %}{{ aluno_matricula_atual.get_status_display }}{% else %}-{% endif %}</p>
+                <p class="metric-label">Matrícula atual</p>
             </div>
-            <a class="metric-link" href="{% url 'aluno_documento_historico' %}">Acessar -></a>
+            <a class="metric-link" href="{% url 'matriculas_minhas' %}">Ver -></a>
         </article>
     {% else %}
         <article class="card metric-card">
@@ -124,6 +124,89 @@
         </article>
     {% endif %}
 </section>
+
+{% if user.tipo_usuario == "ALUNO" %}
+<section class="dashboard-grid">
+    <article class="card">
+        <h2 class="section-title">Situação de matrícula</h2>
+        {% if aluno_matricula_atual %}
+            <p class="aluno-kv"><strong>Período:</strong> {{ aluno_matricula_atual.periodo.nome }}</p>
+            <p class="aluno-kv"><strong>Tipo:</strong> {{ aluno_matricula_atual.get_tipo_matricula_display }} | {{ aluno_matricula_atual.get_tipo_aluno_display }}</p>
+            <p class="aluno-kv"><strong>Status:</strong> <span class="badge badge-info">{{ aluno_matricula_atual.get_status_display }}</span></p>
+            {% if aluno_matricula_atual.itens.all %}
+                <ul class="activity-list" style="margin-top:0.7rem;">
+                    {% for item in aluno_matricula_atual.itens.all|slice:":4" %}
+                        <li>
+                            <span class="soft-icon">{% if item.status == "HOMOLOGADO" %}OK{% else %}!{% endif %}</span>
+                            <span>{{ item.oferta.disciplina.codigo }} - {{ item.oferta.disciplina.nome }}</span>
+                            <time>{{ item.get_status_display }}</time>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% else %}
+            <p class="muted">Nenhuma solicitação de matrícula registrada.</p>
+        {% endif %}
+    </article>
+
+    <article class="card">
+        <h2 class="section-title">Trajetória acadêmica mais recente</h2>
+        {% if aluno_trajetoria_recente %}
+            <p class="aluno-kv"><strong>Nível:</strong> {{ aluno_trajetoria_recente.get_nivel_curso_display }}</p>
+            <p class="aluno-kv"><strong>Ingresso:</strong> {{ aluno_trajetoria_recente.ingresso|default:"-" }}</p>
+            <p class="aluno-kv"><strong>Status:</strong> <span class="badge badge-info">{{ aluno_trajetoria_recente.get_status_display }}</span></p>
+            <p class="aluno-kv"><strong>Orientador:</strong> {{ aluno_trajetoria_recente.orientador.nome|default:"-" }}</p>
+        {% else %}
+            <p class="muted">Nenhuma trajetória acadêmica registrada.</p>
+        {% endif %}
+    </article>
+</section>
+
+{% if aluno_checklist_integralizacao %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h2 class="section-title">{{ aluno_checklist_integralizacao.titulo }}</h2>
+            <p class="muted">
+                Trajetória {{ aluno_checklist_integralizacao.trajetoria.get_nivel_curso_display }} |
+                Ingresso {{ aluno_checklist_integralizacao.trajetoria.ingresso|default:"-" }} |
+                Créditos aprovados: {{ aluno_checklist_integralizacao.creditos_aprovados }} |
+                Seminários: {{ aluno_checklist_integralizacao.horas_complementares }}h
+            </p>
+        </div>
+    </div>
+    <div class="dashboard-grid">
+        {% for grupo in aluno_checklist_integralizacao.grupos %}
+            <article>
+                <h3 class="section-title">{{ grupo.titulo }}</h3>
+                {% if grupo.tipo == "progresso" %}
+                    <p class="aluno-kv" style="margin-bottom:0.55rem;">
+                        <strong>{{ grupo.progresso.texto }}:</strong>
+                        {{ grupo.progresso.atual }}h de {{ grupo.progresso.total }}h
+                    </p>
+                    <div style="height:0.75rem; border-radius:999px; background:var(--color-border); overflow:hidden;">
+                        <div style="height:100%; width:{{ grupo.progresso.percentual }}%; background:var(--color-primary);"></div>
+                    </div>
+                    <small class="muted" style="display:block; margin-top:0.45rem;">
+                        {{ grupo.progresso.percentual }}% concluído
+                    </small>
+                {% else %}
+                    <ul class="activity-list">
+                        {% for item in grupo.itens %}
+                            <li>
+                                <span class="soft-icon">{% if item.cumprido %}OK{% else %}☐{% endif %}</span>
+                                <span>{{ item.texto }}</span>
+                                <time>{% if item.cumprido %}Cumprido{% else %}Pendente{% endif %}</time>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endif %}
 
 <section class="dashboard-grid">
     <article class="card">

@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Prefetch, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -34,6 +34,8 @@ from .forms import (
     DocumentoCadastroForm,
     EncaminhamentoForm,
     FinalizarProcessoForm,
+    HorasComplementaresAdministrativoForm,
+    LancamentoHorasComplementaresForm,
     OfertaDisciplinaForm,
     PeriodoLetivoForm,
     ProcessoAberturaForm,
@@ -62,6 +64,7 @@ from .models import (
     EncontroOferta,
     ItemSolicitacaoMatricula,
     EstagioDocencia,
+    LancamentoHorasComplementares,
     ManifestacaoProcesso,
     MembroBanca,
     OfertaDisciplina,
@@ -1212,6 +1215,213 @@ def matricula_oferta_exportar_view(request, oferta_id):
     return response
 
 
+def _check_item(texto: str, cumprido: bool = False, detalhe: str = ""):
+    return {"texto": texto, "cumprido": cumprido, "detalhe": detalhe}
+
+
+def _progresso_item(texto: str, atual, total, detalhe: str = ""):
+    percentual = 0
+    if total:
+        percentual = min(int((float(atual) / float(total)) * 100), 100)
+    return {
+        "texto": texto,
+        "atual": atual,
+        "total": total,
+        "percentual": percentual,
+        "detalhe": detalhe,
+        "cumprido": atual >= total,
+    }
+
+
+def _checklist_integralizacao_trajetoria(trajetoria: TrajetoriaAcademica):
+    if not trajetoria:
+        return None
+
+    creditos_aprovados = (
+        trajetoria.disciplinas.filter(situacao=DisciplinaTrajetoria.Situacao.APROVADA).aggregate(
+            total=Sum("creditos")
+        )["total"]
+        or 0
+    )
+    resumo_horas = LancamentoHorasComplementares.resumo_trajetoria(trajetoria)
+    horas_complementares = resumo_horas["horas_computadas"]
+    total_publicacoes = trajetoria.publicacoes.count()
+    estagios = list(trajetoria.estagios_docencia.all())
+    estagio_recente = estagios[-1] if estagios else None
+    estagios_doutorado = estagios[:2]
+    tem_defesa = bool(trajetoria.numero_defesa or trajetoria.data_defesa)
+
+    if trajetoria.nivel_curso == Aluno.NivelCurso.DOUTORADO:
+        grupos = [
+            {
+                "titulo": "Créditos e disciplinas",
+                "itens": [
+                    _check_item("Cursar 3 disciplinas obrigatórias (12 créditos)."),
+                    _check_item("Cursar 3 disciplinas eletivas (12 créditos), podendo ser da área ou gerais."),
+                    _check_item("Cursar Revisão Sistemática da Literatura (4 créditos)."),
+                    _check_item("Desenvolver e aprovar o Projeto de Pesquisa (4 créditos)."),
+                ],
+            },
+            {
+                "titulo": "Seminários / Horas complementares",
+                "tipo": "progresso",
+                "progresso": _progresso_item(
+                    "45h regimentais",
+                    horas_complementares,
+                    45,
+                    "Seminário de Complementação",
+                ),
+            },
+            {
+                "titulo": "Estágio de Docência",
+                "itens": [
+                    _check_item(
+                        f"Estágio 1: {estagios_doutorado[0].get_status_display() if len(estagios_doutorado) >= 1 else 'Não cadastrado'}.",
+                        len(estagios_doutorado) >= 1 and estagios_doutorado[0].status == EstagioDocencia.Status.CONCLUIDO,
+                    ),
+                    _check_item(
+                        f"Estágio 2: {estagios_doutorado[1].get_status_display() if len(estagios_doutorado) >= 2 else 'Não cadastrado'}.",
+                        len(estagios_doutorado) >= 2 and estagios_doutorado[1].status == EstagioDocencia.Status.CONCLUIDO,
+                    ),
+                ],
+            },
+            {
+                "titulo": "Qualificação de Doutorado",
+                "itens": [
+                    _check_item(
+                        f"Prazo: {trajetoria.prazo_qualificacao or '-'}. Status: {'Concluída' if trajetoria.isQualificado else 'Pendente'}.",
+                        trajetoria.isQualificado,
+                    ),
+                ],
+            },
+            {
+                "titulo": "Publicações",
+                "itens": [
+                    _check_item(
+                        f"Publicações registradas na trajetória: {total_publicacoes}.",
+                        total_publicacoes > 0,
+                    ),
+                ],
+            },
+            {
+                "titulo": "Defesa",
+                "itens": [
+                    _check_item(
+                        f"Prazo: {trajetoria.prazo_defesa or '-'}. Status: {'Defendida' if tem_defesa else 'Pendente'}.",
+                        tem_defesa,
+                    ),
+                    _check_item(
+                        f"Depósito final: {'Realizado' if trajetoria.deposito_versao_final else 'Pendente'}.",
+                        trajetoria.deposito_versao_final,
+                    ),
+                ],
+            },
+        ]
+        titulo = "Checklist de Integralização - Doutorado"
+    elif trajetoria.nivel_curso == Aluno.NivelCurso.MESTRADO:
+        grupos = [
+            {
+                "titulo": "Créditos e disciplinas",
+                "itens": [
+                    _check_item("Cursar 2 disciplinas obrigatórias (8 créditos)."),
+                    _check_item("Cursar 2 disciplinas eletivas da área (8 créditos)."),
+                    _check_item(
+                        "Cursar 2 disciplinas eletivas gerais (8 créditos). Pode substituir uma eletiva geral por uma da área, ou vice-versa, mediante justificativa e anuência do orientador.",
+                    ),
+                ],
+            },
+            {
+                "titulo": "Seminários / Horas complementares",
+                "tipo": "progresso",
+                "progresso": _progresso_item(
+                    "45h regimentais",
+                    horas_complementares,
+                    45,
+                    "Seminário de Complementação",
+                ),
+            },
+            {
+                "titulo": "Estágio de Docência",
+                "itens": [
+                    _check_item(
+                        f"Status: {estagio_recente.get_status_display() if estagio_recente else 'Não cadastrado'}.",
+                        bool(estagio_recente and estagio_recente.status == EstagioDocencia.Status.CONCLUIDO),
+                    ),
+                ],
+            },
+            {
+                "titulo": "Projeto de Dissertação",
+                "itens": [
+                    _check_item(
+                        f"Prazo: {trajetoria.prazo_qualificacao or '-'}. Status: {'Concluído' if trajetoria.isQualificado else 'Pendente'}.",
+                        trajetoria.isQualificado,
+                    ),
+                ],
+            },
+            {
+                "titulo": "Publicações",
+                "itens": [
+                    _check_item(
+                        f"Publicações registradas na trajetória: {total_publicacoes}.",
+                        total_publicacoes > 0,
+                    ),
+                ],
+            },
+            {
+                "titulo": "Defesa",
+                "itens": [
+                    _check_item(
+                        f"Prazo: {trajetoria.prazo_defesa or '-'}. Status: {'Defendida' if tem_defesa else 'Pendente'}.",
+                        tem_defesa,
+                    ),
+                    _check_item(
+                        f"Depósito final: {'Realizado' if trajetoria.deposito_versao_final else 'Pendente'}.",
+                        trajetoria.deposito_versao_final,
+                    ),
+                ],
+            },
+        ]
+        titulo = "Checklist de Integralização - Mestrado"
+    else:
+        return None
+
+    return {
+        "titulo": titulo,
+        "trajetoria": trajetoria,
+        "creditos_aprovados": creditos_aprovados,
+        "horas_complementares": horas_complementares,
+        "total_publicacoes": total_publicacoes,
+        "grupos": grupos,
+    }
+
+
+def _resumo_checklist_banca(trajetoria: TrajetoriaAcademica):
+    checklist = _checklist_integralizacao_trajetoria(trajetoria)
+    if not checklist:
+        return None
+    itens = []
+    for grupo in checklist["grupos"]:
+        if grupo.get("tipo") == "progresso":
+            progresso = grupo["progresso"]
+            itens.append(
+                {
+                    "grupo": grupo["titulo"],
+                    "texto": f"{progresso['texto']}: {progresso['atual']}h de {progresso['total']}h",
+                    "cumprido": progresso["cumprido"],
+                }
+            )
+            continue
+        for item in grupo.get("itens", []):
+            itens.append(
+                {
+                    "grupo": grupo["titulo"],
+                    "texto": item["texto"],
+                    "cumprido": item["cumprido"],
+                }
+            )
+    return {"trajetoria": trajetoria, "titulo": checklist["titulo"], "itens": itens}
+
+
 @login_required
 def home_view(request):
     is_coordenador = _is_coordenador(request.user)
@@ -1262,6 +1472,31 @@ def home_view(request):
         context["orientandos"] = orientandos
         context["processos_orientandos"] = processos_orientandos
         context["cientes_pendentes_orientador"] = cientes_pendentes_orientador
+
+    if request.user.tipo_usuario == User.TipoUsuario.ALUNO:
+        aluno = getattr(request.user, "aluno", None)
+        trajetoria_recente = None
+        matricula_atual = None
+        if aluno:
+            trajetoria_recente = (
+                aluno.trajetorias.prefetch_related(
+                    "disciplinas",
+                    "estagios_docencia",
+                    "lancamentos_horas_complementares",
+                )
+                .order_by("-criado_em")
+                .first()
+            )
+            matricula_atual = (
+                SolicitacaoMatricula.objects.select_related("periodo")
+                .prefetch_related("itens__oferta__disciplina")
+                .filter(aluno=aluno)
+                .order_by("-periodo__nome", "-criado_em")
+                .first()
+            )
+        context["aluno_trajetoria_recente"] = trajetoria_recente
+        context["aluno_matricula_atual"] = matricula_atual
+        context["aluno_checklist_integralizacao"] = _checklist_integralizacao_trajetoria(trajetoria_recente)
 
     return render(request, "processos/home.html", context)
 
@@ -2473,6 +2708,42 @@ def aluno_detalhe_view(request, aluno_id):
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
             messages.error(request, "Nao foi possivel salvar a disciplina.")
 
+        elif acao == "registrar_horas_complementares":
+            if not can_manage_aluno:
+                raise PermissionDenied("Apenas coordenacao e secretaria podem registrar horas complementares.")
+            trajetoria = get_object_or_404(TrajetoriaAcademica, pk=request.POST.get("trajetoria_id"), aluno=aluno)
+            form = HorasComplementaresAdministrativoForm(
+                request.POST,
+                trajetoria=trajetoria,
+                usuario=request.user,
+            )
+            if form.is_valid():
+                lancamento = form.save()
+                if lancamento.substitui_lancamento_id:
+                    valor_anterior = f"Retificado lancamento {lancamento.substitui_lancamento_id}"
+                else:
+                    valor_anterior = "-"
+                _registrar_alteracao_aluno(
+                    aluno=aluno,
+                    tipo=AlteracaoAluno.TipoAlteracao.HORAS_COMPLEMENTARES,
+                    valor_anterior=valor_anterior,
+                    valor_novo=(
+                        f"{lancamento.trajetoria.get_nivel_curso_display()} "
+                        f"{lancamento.trajetoria.ingresso}: "
+                        f"{lancamento.tipo_atividade.nome}: {lancamento.horas_aprovadas}h aprovadas"
+                    ),
+                    comentario=lancamento.observacoes_secretaria
+                    or lancamento.referencia_decisao
+                    or lancamento.justificativa_sem_processo
+                    or "Lancamento registrado.",
+                    alterado_por=request.user,
+                )
+                messages.success(request, "Lancamento de horas complementares registrado.")
+                return redirect("aluno_detalhe", aluno_id=aluno.id)
+            for errors in form.errors.values():
+                for error in errors:
+                    messages.error(request, error)
+
     processos_aluno = (
         Processo.objects.select_related("setor_atual")
         .filter(usuario_criado_por=aluno)
@@ -2500,6 +2771,11 @@ def aluno_detalhe_view(request, aluno_id):
             {
                 "obj": trajetoria,
                 "form": TrajetoriaAcademicaForm(initial=_trajetoria_form_initial(trajetoria)),
+                "resumo_horas_complementares": LancamentoHorasComplementares.resumo_trajetoria(trajetoria),
+                "horas_form": HorasComplementaresAdministrativoForm(
+                    trajetoria=trajetoria,
+                    usuario=request.user,
+                ),
                 "estagio_cards": estagio_cards,
                 "novo_estagio_form": NovoEstagioDocenciaForm(
                     initial={"trajetoria_id": trajetoria.id}
@@ -2636,6 +2912,10 @@ def processo_detalhe_view(request, processo_id):
         .prefetch_related(
             "solicitacoes_banca_anexadas__aluno",
             "solicitacoes_banca_anexadas__trajetoria",
+            "solicitacoes_banca_anexadas__trajetoria__disciplinas",
+            "solicitacoes_banca_anexadas__trajetoria__estagios_docencia",
+            "solicitacoes_banca_anexadas__trajetoria__lancamentos_horas_complementares",
+            "solicitacoes_banca_anexadas__trajetoria__publicacoes",
             "solicitacoes_banca_anexadas__docente",
             "solicitacoes_banca_anexadas__finalizado_por",
             "solicitacoes_banca_anexadas__membros",
@@ -2686,16 +2966,95 @@ def processo_detalhe_view(request, processo_id):
     can_encaminhar_processo = can_manage_in_caixa or (can_manage_requerente and setor_solicitante is not None)
     can_finalizar_processo = can_manage_in_caixa and not processo.esta_finalizado
     can_manage_processo_actions = can_add_documento or can_encaminhar_processo
+    aluno_horas_complementares = None
+    trajetoria_horas_complementares = None
+    if processo.tipo == Processo.TipoProcesso.HORAS_COMPLEMENTARES:
+        aluno_horas_complementares = (
+            Aluno.objects.prefetch_related("trajetorias").filter(pk=processo.usuario_criado_por_id).first()
+        )
+        if aluno_horas_complementares:
+            trajetoria_horas_complementares = (
+                aluno_horas_complementares.trajetoria_ativa()
+                or aluno_horas_complementares.trajetorias.order_by("-criado_em").first()
+            )
+    termo_finalizacao_lower = (processo.termo_finalizacao or "").lower()
+    processo_horas_registravel = not processo.esta_finalizado or (
+        "deferid" in termo_finalizacao_lower
+        and "indeferid" not in termo_finalizacao_lower
+        and "arquivad" not in termo_finalizacao_lower
+    )
+    can_registrar_horas_complementares = bool(
+        can_manage_in_caixa and aluno_horas_complementares and trajetoria_horas_complementares and processo_horas_registravel
+    )
     open_documento_modal = False
     open_encaminhamento_modal = False
     open_ciente_modal = False
     open_finalizar_modal = False
+    open_horas_modal = False
     solicitar_ciente_form = SolicitarCienteOrientadorForm()
     manifestar_ciente_form = ManifestarCienteOrientadorForm()
     finalizar_form = FinalizarProcessoForm()
+    horas_complementares_form = LancamentoHorasComplementaresForm(
+        aluno=aluno_horas_complementares,
+        processo=processo,
+        usuario=request.user,
+    )
 
     if request.method == "POST":
-        if "acao_rapida" in request.POST and can_manage_in_caixa:
+        if "registrar_horas_complementares" in request.POST:
+            if not can_registrar_horas_complementares:
+                raise PermissionDenied("Voce nao pode registrar horas complementares neste processo.")
+            horas_complementares_form = LancamentoHorasComplementaresForm(
+                request.POST,
+                aluno=aluno_horas_complementares,
+                processo=processo,
+                usuario=request.user,
+            )
+            if horas_complementares_form.is_valid():
+                lancamento = horas_complementares_form.save()
+                if lancamento.substitui_lancamento_id:
+                    valor_anterior = f"Retificado lancamento {lancamento.substitui_lancamento_id}"
+                else:
+                    valor_anterior = "-"
+                _registrar_alteracao_aluno(
+                    aluno=aluno_horas_complementares,
+                    tipo=AlteracaoAluno.TipoAlteracao.HORAS_COMPLEMENTARES,
+                    valor_anterior=valor_anterior,
+                    valor_novo=f"{lancamento.tipo_atividade.nome}: {lancamento.horas_aprovadas}h aprovadas",
+                    comentario=lancamento.observacoes_secretaria or lancamento.referencia_decisao or "Lancamento registrado.",
+                    alterado_por=request.user,
+                )
+                messages.success(request, "Lancamento de horas complementares registrado.")
+                return redirect("processo_detalhe", processo_id=processo.id)
+            open_horas_modal = True
+
+        elif "cancelar_horas_complementares" in request.POST:
+            if not can_registrar_horas_complementares:
+                raise PermissionDenied("Voce nao pode cancelar lancamentos neste processo.")
+            lancamento = get_object_or_404(
+                LancamentoHorasComplementares,
+                pk=request.POST.get("lancamento_id"),
+                trajetoria__aluno=aluno_horas_complementares,
+                processo_origem=processo,
+            )
+            justificativa = request.POST.get("justificativa_cancelamento", "").strip()
+            try:
+                lancamento.cancelar(usuario=request.user, justificativa=justificativa)
+            except ValidationError as exc:
+                messages.error(request, str(exc))
+            else:
+                _registrar_alteracao_aluno(
+                    aluno=aluno_horas_complementares,
+                    tipo=AlteracaoAluno.TipoAlteracao.HORAS_COMPLEMENTARES,
+                    valor_anterior=f"{lancamento.tipo_atividade.nome}: {lancamento.horas_aprovadas}h",
+                    valor_novo="Lancamento cancelado",
+                    comentario=justificativa,
+                    alterado_por=request.user,
+                )
+                messages.success(request, "Lancamento cancelado.")
+                return redirect("processo_detalhe", processo_id=processo.id)
+
+        elif "acao_rapida" in request.POST and can_manage_in_caixa:
             acao_rapida = (request.POST.get("acao_rapida") or "").strip()
             if acao_rapida == "deferir":
                 processo.deferir()
@@ -2974,6 +3333,60 @@ def processo_detalhe_view(request, processo_id):
                 ),
             }
         )
+    solicitacoes_banca_display = [
+        {
+            "obj": solicitacao,
+            "checklist": _resumo_checklist_banca(solicitacao.trajetoria),
+            "publicacoes": solicitacao.trajetoria.publicacoes.all(),
+        }
+        for solicitacao in processo.solicitacoes_banca_anexadas.all()
+    ]
+    resumo_horas_complementares = (
+        LancamentoHorasComplementares.resumo_trajetoria(trajetoria_horas_complementares)
+        if trajetoria_horas_complementares
+        else None
+    )
+    regras_horas_complementares = []
+    if aluno_horas_complementares:
+        trajetorias_horas = aluno_horas_complementares.trajetorias.order_by("-criado_em")
+        for item_trajetoria in trajetorias_horas:
+            norma_trajetoria = LancamentoHorasComplementares.norma_para_trajetoria(item_trajetoria)
+            if not norma_trajetoria:
+                continue
+            tipos_trajetoria = horas_complementares_form.fields["tipo_atividade"].queryset.filter(
+                norma=norma_trajetoria,
+            )
+            for tipo in tipos_trajetoria:
+                exemplo = LancamentoHorasComplementares(
+                    trajetoria=item_trajetoria,
+                    processo_origem=processo,
+                    tipo_atividade=tipo,
+                    norma=tipo.norma,
+                    grupo_limite=tipo.grupo_limite,
+                    quantidade=1,
+                    unidade_quantidade=tipo.unidade_calculo,
+                    horas_aprovadas=0,
+                    criado_por=request.user,
+                )
+                regras_horas_complementares.append(
+                    {
+                        "trajetoria_id": str(item_trajetoria.id),
+                        "id": str(tipo.id),
+                        "horas_por_unidade": str(tipo.horas_por_unidade),
+                        "unidade": tipo.unidade_calculo,
+                        "maximo": "" if exemplo.maximo_aprovavel() is None else str(exemplo.maximo_aprovavel()),
+                    }
+                )
+    lancamentos_horas_processo = (
+        processo.lancamentos_horas_complementares.select_related(
+            "trajetoria",
+            "trajetoria__aluno",
+            "tipo_atividade",
+            "criado_por",
+        ).all()
+        if trajetoria_horas_complementares
+        else []
+    )
 
     return render(
         request,
@@ -2982,12 +3395,19 @@ def processo_detalhe_view(request, processo_id):
             "processo": processo,
             "tramitacoes_historico": processo.tramitacoes_historico,
             "documentos_exibicao": documentos_exibicao,
+            "solicitacoes_banca_display": solicitacoes_banca_display,
             "can_manage_in_caixa": can_manage_in_caixa,
             "can_manage_requerente": can_manage_requerente,
             "can_manage_processo_actions": can_manage_processo_actions,
             "can_add_documento": can_add_documento,
             "can_encaminhar_processo": can_encaminhar_processo,
             "can_finalizar_processo": can_finalizar_processo,
+            "can_registrar_horas_complementares": can_registrar_horas_complementares,
+            "aluno_horas_complementares": aluno_horas_complementares,
+            "trajetoria_horas_complementares": trajetoria_horas_complementares,
+            "resumo_horas_complementares": resumo_horas_complementares,
+            "regras_horas_complementares": regras_horas_complementares,
+            "lancamentos_horas_processo": lancamentos_horas_processo,
             "setor_solicitante": setor_solicitante,
             "orientador_responsavel": orientador_responsavel,
             "pendente_ciente": pendente_ciente,
@@ -3001,10 +3421,12 @@ def processo_detalhe_view(request, processo_id):
             "documento_form": documento_form,
             "encaminhamento_form": encaminhamento_form,
             "finalizar_form": finalizar_form,
+            "horas_complementares_form": horas_complementares_form,
             "open_documento_modal": open_documento_modal,
             "open_encaminhamento_modal": open_encaminhamento_modal,
             "open_ciente_modal": open_ciente_modal,
             "open_finalizar_modal": open_finalizar_modal,
+            "open_horas_modal": open_horas_modal,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -3428,6 +3850,16 @@ def salas_ambientes_view(request):
 def _solicitacao_banca_context(form, request, solicitacao=None):
     trajetorias = form.fields["trajetoria"].queryset
     alunos = form.fields["aluno"].queryset
+    checklists_integralizacao = []
+    for trajetoria in trajetorias.prefetch_related(
+        "disciplinas",
+        "estagios_docencia",
+        "lancamentos_horas_complementares",
+        "publicacoes",
+    ):
+        resumo = _resumo_checklist_banca(trajetoria)
+        if resumo:
+            checklists_integralizacao.append(resumo)
     papeis_por_tipo = []
     for tipo, label in SolicitacaoBanca.TipoDefesa.choices:
         papeis = []
@@ -3451,6 +3883,7 @@ def _solicitacao_banca_context(form, request, solicitacao=None):
         "solicitacao": solicitacao,
         "alunos_orientados": alunos,
         "trajetorias_orientadas": trajetorias,
+        "checklists_integralizacao": checklists_integralizacao,
         "papeis_por_tipo": papeis_por_tipo,
         "is_coordenador": _is_coordenador(request.user),
         "has_gestao_access": _has_gestao_access(request.user),

@@ -1,5 +1,6 @@
 import calendar
 from datetime import datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 import uuid
 
 from django.conf import settings
@@ -891,6 +892,7 @@ class AlteracaoAluno(models.Model):
     class TipoAlteracao(models.TextChoices):
         STATUS = "STATUS", "Status"
         QUALIFICACAO = "QUALIFICACAO", "Qualificacao"
+        HORAS_COMPLEMENTARES = "HORAS_COMPLEMENTARES", "Horas complementares"
         DEFESA = "DEFESA", "Defesa"
         DEPOSITO_FINAL = "DEPOSITO_FINAL", "Deposito versao final"
         PRAZO_QUALIFICACAO = "PRAZO_QUALIFICACAO", "Prazo qualificacao"
@@ -918,6 +920,328 @@ class AlteracaoAluno(models.Model):
 
     def __str__(self) -> str:
         return f"{self.aluno.nome} - {self.get_tipo_display()} - {self.criado_em:%Y-%m-%d %H:%M}"
+
+
+class NormaHorasComplementares(models.Model):
+    class Status(models.TextChoices):
+        RASCUNHO = "RASCUNHO", "Rascunho"
+        VIGENTE = "VIGENTE", "Vigente"
+        REVOGADA = "REVOGADA", "Revogada"
+
+    nome = models.CharField(max_length=255)
+    identificacao = models.CharField(max_length=80)
+    descricao = models.TextField(blank=True)
+    inicio_vigencia = models.DateField()
+    fim_vigencia = models.DateField(null=True, blank=True)
+    carga_horaria_exigida = models.PositiveIntegerField(default=45)
+    nivel_curso = models.CharField(max_length=20, choices=Aluno.NivelCurso.choices)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.RASCUNHO)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-inicio_vigencia", "identificacao", "nivel_curso"]
+        unique_together = ("identificacao", "nivel_curso")
+
+    def __str__(self) -> str:
+        return f"{self.identificacao} - {self.get_nivel_curso_display()}"
+
+
+class GrupoLimiteHorasComplementares(models.Model):
+    norma = models.ForeignKey(
+        NormaHorasComplementares,
+        on_delete=models.PROTECT,
+        related_name="grupos_limite",
+    )
+    nome = models.CharField(max_length=120)
+    descricao = models.TextField(blank=True)
+    limite_maximo = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    ordem = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["ordem", "nome"]
+        unique_together = ("norma", "nome")
+
+    def __str__(self) -> str:
+        return self.nome
+
+
+class TipoAtividadeHorasComplementares(models.Model):
+    norma = models.ForeignKey(
+        NormaHorasComplementares,
+        on_delete=models.PROTECT,
+        related_name="tipos_atividade",
+    )
+    grupo_limite = models.ForeignKey(
+        GrupoLimiteHorasComplementares,
+        on_delete=models.PROTECT,
+        related_name="tipos_atividade",
+        null=True,
+        blank=True,
+    )
+    nome = models.CharField(max_length=180)
+    descricao = models.TextField(blank=True)
+    unidade_calculo = models.CharField(max_length=40)
+    horas_por_unidade = models.DecimalField(max_digits=6, decimal_places=2)
+    limite_individual = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    ativo = models.BooleanField(default=True)
+    ordem = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["ordem", "nome"]
+        unique_together = ("norma", "nome")
+
+    def __str__(self) -> str:
+        return self.nome
+
+
+class LancamentoHorasComplementares(models.Model):
+    class Status(models.TextChoices):
+        ATIVO = "ATIVO", "Ativo"
+        CANCELADO = "CANCELADO", "Cancelado"
+        RETIFICADO = "RETIFICADO", "Retificado"
+
+    trajetoria = models.ForeignKey(
+        TrajetoriaAcademica,
+        on_delete=models.PROTECT,
+        related_name="lancamentos_horas_complementares",
+    )
+    processo_origem = models.ForeignKey(
+        "Processo",
+        on_delete=models.PROTECT,
+        related_name="lancamentos_horas_complementares",
+        null=True,
+        blank=True,
+    )
+    tipo_atividade = models.ForeignKey(
+        TipoAtividadeHorasComplementares,
+        on_delete=models.PROTECT,
+        related_name="lancamentos",
+    )
+    norma = models.ForeignKey(
+        NormaHorasComplementares,
+        on_delete=models.PROTECT,
+        related_name="lancamentos",
+    )
+    grupo_limite = models.ForeignKey(
+        GrupoLimiteHorasComplementares,
+        on_delete=models.PROTECT,
+        related_name="lancamentos",
+        null=True,
+        blank=True,
+    )
+    descricao = models.CharField(max_length=255)
+    periodo_realizacao = models.CharField(max_length=120, blank=True)
+    quantidade = models.DecimalField(max_digits=8, decimal_places=2)
+    unidade_quantidade = models.CharField(max_length=40)
+    horas_solicitadas = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    horas_calculadas = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    horas_aprovadas = models.DecimalField(max_digits=6, decimal_places=2)
+    limite_grupo_no_lancamento = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    limite_individual_no_lancamento = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    observacoes_secretaria = models.TextField(blank=True)
+    referencia_decisao = models.TextField(blank=True)
+    justificativa_excepcional = models.TextField(blank=True)
+    excepcional_autorizado = models.BooleanField(default=False)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="lancamentos_horas_complementares_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.ATIVO)
+    substitui_lancamento = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="retificacoes",
+    )
+    cancelado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="lancamentos_horas_complementares_cancelados",
+        null=True,
+        blank=True,
+    )
+    cancelado_em = models.DateTimeField(null=True, blank=True)
+    justificativa_cancelamento = models.TextField(blank=True)
+    origem_migracao = models.BooleanField(default=False)
+    justificativa_sem_processo = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-criado_em"]
+
+    @property
+    def aluno(self):
+        return self.trajetoria.aluno
+
+    def __str__(self) -> str:
+        return f"{self.aluno.nome} - {self.tipo_atividade.nome} - {self.horas_aprovadas}h"
+
+    @classmethod
+    def ativos(cls):
+        return cls.objects.filter(status=cls.Status.ATIVO)
+
+    @classmethod
+    def norma_para_trajetoria(cls, trajetoria):
+        nivel = trajetoria.nivel_curso if trajetoria else Aluno.NivelCurso.MESTRADO
+        hoje = timezone.localdate()
+        norma = (
+            NormaHorasComplementares.objects.filter(
+                nivel_curso=nivel,
+                status=NormaHorasComplementares.Status.VIGENTE,
+                inicio_vigencia__lte=hoje,
+            )
+            .filter(models.Q(fim_vigencia__isnull=True) | models.Q(fim_vigencia__gte=hoje))
+            .order_by("-inicio_vigencia")
+            .first()
+        )
+        if norma:
+            return norma
+        return (
+            NormaHorasComplementares.objects.filter(
+                nivel_curso=nivel,
+                status=NormaHorasComplementares.Status.VIGENTE,
+            )
+            .order_by("-inicio_vigencia")
+            .first()
+        )
+
+    @classmethod
+    def norma_para_aluno(cls, aluno):
+        return cls.norma_para_trajetoria(aluno.trajetoria_ativa())
+
+    @staticmethod
+    def _sum_horas(queryset):
+        return queryset.aggregate(total=models.Sum("horas_aprovadas"))["total"] or 0
+
+    def horas_do_grupo_ja_aprovadas(self):
+        if not self.grupo_limite_id:
+            return 0
+        queryset = self.ativos().filter(trajetoria=self.trajetoria, grupo_limite=self.grupo_limite)
+        if self.pk:
+            queryset = queryset.exclude(pk=self.pk)
+        if self.substitui_lancamento_id:
+            queryset = queryset.exclude(pk=self.substitui_lancamento_id)
+        return self._sum_horas(queryset)
+
+    def horas_da_atividade_ja_aprovadas(self):
+        queryset = self.ativos().filter(trajetoria=self.trajetoria, tipo_atividade=self.tipo_atividade)
+        if self.pk:
+            queryset = queryset.exclude(pk=self.pk)
+        if self.substitui_lancamento_id:
+            queryset = queryset.exclude(pk=self.substitui_lancamento_id)
+        return self._sum_horas(queryset)
+
+    def maximo_aprovavel(self):
+        saldos = []
+        if self.grupo_limite and self.grupo_limite.limite_maximo is not None:
+            saldos.append(max(self.grupo_limite.limite_maximo - self.horas_do_grupo_ja_aprovadas(), 0))
+        if self.tipo_atividade and self.tipo_atividade.limite_individual is not None:
+            saldos.append(max(self.tipo_atividade.limite_individual - self.horas_da_atividade_ja_aprovadas(), 0))
+        return min(saldos) if saldos else None
+
+    def clean(self):
+        errors = {}
+        if self.tipo_atividade_id:
+            self.norma = self.tipo_atividade.norma
+            self.grupo_limite = self.tipo_atividade.grupo_limite
+            self.unidade_quantidade = self.tipo_atividade.unidade_calculo
+            self._normalizar_horas_calculadas()
+            self.limite_individual_no_lancamento = self.tipo_atividade.limite_individual
+            self.limite_grupo_no_lancamento = (
+                self.tipo_atividade.grupo_limite.limite_maximo if self.tipo_atividade.grupo_limite else None
+            )
+        if not self.processo_origem_id and not self.origem_migracao and not self.justificativa_sem_processo:
+            errors["processo_origem"] = "Informe o processo de origem ou justifique o lancamento sem processo."
+        if self.processo_origem_id and self.processo_origem.usuario_criado_por_id != self.trajetoria.aluno_id:
+            errors["processo_origem"] = "O processo de origem deve pertencer ao discente informado."
+        if self.horas_aprovadas is not None and self.horas_calculadas and self.horas_aprovadas != self.horas_calculadas:
+            if not (self.observacoes_secretaria or "").strip():
+                errors["observacoes_secretaria"] = "Justifique a diferenca entre horas calculadas e aprovadas."
+        maximo = self.maximo_aprovavel()
+        if (
+            maximo is not None
+            and self.status == self.Status.ATIVO
+            and self.horas_aprovadas is not None
+            and self.horas_aprovadas > maximo
+            and not self.excepcional_autorizado
+        ):
+            errors["horas_aprovadas"] = f"O maximo aprovavel pelas regras vigentes e {maximo}h."
+        if self.excepcional_autorizado and not (self.justificativa_excepcional or "").strip():
+            errors["justificativa_excepcional"] = "Justifique a aprovacao excepcional acima do limite normativo."
+        if errors:
+            raise ValidationError(errors)
+
+    def _normalizar_horas_calculadas(self):
+        if not self.tipo_atividade_id:
+            return
+        self.horas_calculadas = (
+            (self.quantidade or Decimal("0")) * self.tipo_atividade.horas_por_unidade
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    def full_clean(self, *args, **kwargs):
+        self._normalizar_horas_calculadas()
+        return super().full_clean(*args, **kwargs)
+
+    def save(self, *args, **kwargs):
+        self._normalizar_horas_calculadas()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def cancelar(self, *, usuario, justificativa: str):
+        justificativa = (justificativa or "").strip()
+        if not justificativa:
+            raise ValidationError("Informe a justificativa do cancelamento.")
+        self.status = self.Status.CANCELADO
+        self.cancelado_por = usuario
+        self.cancelado_em = timezone.now()
+        self.justificativa_cancelamento = justificativa
+        self.save(update_fields=["status", "cancelado_por", "cancelado_em", "justificativa_cancelamento", "atualizado_em"])
+
+    @classmethod
+    def resumo_trajetoria(cls, trajetoria):
+        norma = cls.norma_para_trajetoria(trajetoria)
+        carga_exigida = norma.carga_horaria_exigida if norma else 45
+        lancamentos = cls.ativos().filter(trajetoria=trajetoria)
+        computadas = cls._sum_horas(lancamentos)
+        pendentes = max(carga_exigida - computadas, 0)
+        grupos = []
+        if norma:
+            for grupo in norma.grupos_limite.all():
+                horas = cls._sum_horas(lancamentos.filter(grupo_limite=grupo))
+                saldo = None if grupo.limite_maximo is None else max(grupo.limite_maximo - horas, 0)
+                grupos.append({"grupo": grupo, "horas": horas, "saldo": saldo})
+        return {
+            "norma": norma,
+            "horas_exigidas": carga_exigida,
+            "horas_computadas": computadas,
+            "horas_pendentes": pendentes,
+            "situacao": "Cumprido" if computadas >= carga_exigida else "Pendente",
+            "grupos": grupos,
+            "lancamentos": cls.objects.filter(trajetoria=trajetoria).select_related(
+                "tipo_atividade",
+                "processo_origem",
+                "criado_por",
+            ),
+        }
+
+    @classmethod
+    def resumo_aluno(cls, aluno):
+        trajetoria = aluno.trajetoria_ativa()
+        if trajetoria:
+            return cls.resumo_trajetoria(trajetoria)
+        return {
+            "norma": None,
+            "horas_exigidas": 45,
+            "horas_computadas": 0,
+            "horas_pendentes": 45,
+            "situacao": "Pendente",
+            "grupos": [],
+            "lancamentos": cls.objects.none(),
+        }
 
 
 def validar_cpf_brasileiro(cpf: str) -> bool:
@@ -1364,6 +1688,7 @@ class Processo(models.Model):
         "DEFESA_DOUTORADO": 45,
         "QUALIFICACAO_DOUTORADO": 45,
         "ESTAGIO_DOCENCIA": 30,
+        "HORAS_COMPLEMENTARES": 30,
         "OUTRO": 60,
     }
 
@@ -1373,6 +1698,7 @@ class Processo(models.Model):
         DEFESA_DOUTORADO = "DEFESA_DOUTORADO", "Defesa de Doutorado"
         QUALIFICACAO_DOUTORADO = "QUALIFICACAO_DOUTORADO", "Qualificação de Doutorado"
         ESTAGIO_DOCENCIA = "ESTAGIO_DOCENCIA", "Estágio docência"
+        HORAS_COMPLEMENTARES = "HORAS_COMPLEMENTARES", "Horas complementares"
         TRANCAMENTO_MATRICULA = "TRANCAMENTO_MATRICULA", "Trancamento de Matrícula"
         PRORROGACAO_PRAZO = "PRORROGACAO_PRAZO", "Prorrogação de Prazo"
         REINGRESSO = "REINGRESSO", "Reingresso"

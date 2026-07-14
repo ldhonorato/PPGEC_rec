@@ -29,11 +29,12 @@
     </div>
 </section>
 
-{% if processo.solicitacoes_banca_anexadas.all %}
+{% if solicitacoes_banca_display %}
 <section class="card" style="margin-bottom: 1rem;">
     <h2 class="section-title">Formulários anexados</h2>
     <ul class="list">
-        {% for solicitacao in processo.solicitacoes_banca_anexadas.all %}
+        {% for item in solicitacoes_banca_display %}
+            {% with solicitacao=item.obj %}
             <li>
                 <div class="item-row">
                     <div>
@@ -47,11 +48,13 @@
                     <button class="btn btn-secondary" type="button" data-open-banca-modal="modal-banca-{{ solicitacao.id }}">Ver formulário</button>
                 </div>
             </li>
+            {% endwith %}
         {% endfor %}
     </ul>
 </section>
 
-{% for solicitacao in processo.solicitacoes_banca_anexadas.all %}
+{% for item in solicitacoes_banca_display %}
+    {% with solicitacao=item.obj %}
     <dialog id="modal-banca-{{ solicitacao.id }}" class="modal-dialog">
         <div class="modal-body">
             <div class="actions-row">
@@ -74,8 +77,44 @@
                 <li><span class="info-label">Coorientador</span><span>{{ solicitacao.trajetoria.coorientador_display|default:"-" }}</span></li>
             </ul>
 
+            {% if item.checklist %}
+                <h3>Status de integralização</h3>
+                <ul class="list">
+                    {% for check in item.checklist.itens %}
+                        <li>
+                            <strong>{{ check.grupo }}</strong>
+                            <span class="badge badge-info">{% if check.cumprido %}OK{% else %}Pendente{% endif %}</span><br>
+                            <small class="muted">{{ check.texto }}</small>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            <h3>Publicações da trajetória</h3>
+            {% if item.publicacoes %}
+                <ul class="list">
+                    {% for publicacao in item.publicacoes %}
+                        <li>
+                            <strong>{{ publicacao.titulo }}</strong><br>
+                            <small class="muted">
+                                Tipo: {{ publicacao.get_tipo_display }}
+                                {% if publicacao.ano %}| Ano: {{ publicacao.ano }}{% endif %}
+                                {% if publicacao.veiculo %}| Veículo: {{ publicacao.veiculo }}{% endif %}
+                                {% if publicacao.doi_url %}| DOI/URL: {{ publicacao.doi_url }}{% endif %}
+                            </small>
+                            {% if publicacao.autores %}
+                                <p style="margin: 0.35rem 0 0 0;"><strong>Autores:</strong> {{ publicacao.autores }}</p>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="muted">Nenhuma publicação registrada na trajetória.</p>
+            {% endif %}
+
             <h3>Dados gerais</h3>
             <ul class="info-list">
+                <li><span class="info-label">Tipo de solicitação</span><span>{{ solicitacao.get_tipo_defesa_display }}</span></li>
                 <li><span class="info-label">Status</span><span>{{ solicitacao.get_status_display }}</span></li>
                 <li><span class="info-label">Docente</span><span>{{ solicitacao.docente.nome }}</span></li>
                 <li><span class="info-label">Título</span><span>{{ solicitacao.titulo|default:"-" }}</span></li>
@@ -116,13 +155,17 @@
             {% endif %}
         </div>
     </dialog>
+    {% endwith %}
 {% endfor %}
 {% endif %}
 
-{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo %}
+{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo or can_registrar_horas_complementares %}
 <section class="card" style="margin-bottom: 1rem;">
     <h2 class="section-title">Acoes</h2>
     <div style="display: flex; gap: 0.7rem; flex-wrap: wrap;">
+        {% if can_registrar_horas_complementares %}
+            <button type="button" class="btn" id="btn-abrir-modal-horas">Registrar horas complementares</button>
+        {% endif %}
         {% if can_add_documento %}
             <button type="button" class="btn" id="btn-abrir-modal-documento">Adicionar documento</button>
         {% endif %}
@@ -149,6 +192,54 @@
     <p class="muted" style="margin: 0;">
         Voce nao tem permissao para adicionar documento ou encaminhar neste processo.
     </p>
+</section>
+{% endif %}
+
+{% if resumo_horas_complementares %}
+<section class="card" style="margin-bottom: 1rem;">
+    <h2 class="section-title">Horas complementares</h2>
+    <div class="grid-two">
+        <p><strong>Aluno:</strong> {{ aluno_horas_complementares.nome }}</p>
+        <p><strong>Trajetória:</strong> {{ trajetoria_horas_complementares.get_nivel_curso_display }} - ingresso {{ trajetoria_horas_complementares.ingresso|default:"-" }}</p>
+        <p><strong>Norma:</strong> {{ resumo_horas_complementares.norma|default:"-" }}</p>
+        <p><strong>Horas computadas:</strong> {{ resumo_horas_complementares.horas_computadas }} / {{ resumo_horas_complementares.horas_exigidas }}</p>
+        <p><strong>Situação:</strong> {{ resumo_horas_complementares.situacao }}</p>
+    </div>
+    {% if lancamentos_horas_processo %}
+        <ul class="list">
+            {% for lancamento in lancamentos_horas_processo %}
+                <li>
+                    <div class="item-row">
+                        <div>
+                            <strong>{{ lancamento.tipo_atividade.nome }}</strong>
+                            <span class="badge badge-info">{{ lancamento.get_status_display }}</span><br>
+                            <small class="muted">
+                                Quantidade: {{ lancamento.quantidade }} {{ lancamento.unidade_quantidade }} |
+                                Calculadas: {{ lancamento.horas_calculadas }}h |
+                                Aprovadas: {{ lancamento.horas_aprovadas }}h |
+                                Responsável: {{ lancamento.criado_por.nome }} |
+                                Em: {{ lancamento.criado_em|date:"d/m/Y H:i" }}
+                            </small>
+                            {% if lancamento.observacoes_secretaria %}
+                                <p class="muted" style="margin:0.35rem 0 0 0;">{{ lancamento.observacoes_secretaria }}</p>
+                            {% endif %}
+                        </div>
+                        {% if can_registrar_horas_complementares and lancamento.status == "ATIVO" %}
+                            <form method="post" style="display:flex; gap:0.45rem; align-items:flex-end; flex-wrap:wrap;">
+                                {% csrf_token %}
+                                <input type="hidden" name="cancelar_horas_complementares" value="1">
+                                <input type="hidden" name="lancamento_id" value="{{ lancamento.id }}">
+                                <input name="justificativa_cancelamento" placeholder="Justificativa" required>
+                                <button class="btn btn-secondary" type="submit">Cancelar</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhum lançamento de horas foi registrado neste processo.</p>
+    {% endif %}
 </section>
 {% endif %}
 
@@ -185,7 +276,40 @@
     {% endif %}
 </section>
 
-{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo %}
+{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo or can_registrar_horas_complementares %}
+{% if can_registrar_horas_complementares %}
+<dialog id="modal-horas-complementares" class="modal-dialog">
+    <div style="padding: 1rem 1rem 0 1rem;">
+        <h2 class="section-title">Registrar horas complementares</h2>
+        <p class="muted" style="margin:0;">{{ aluno_horas_complementares.nome }} | Processo {{ processo.numero }}</p>
+    </div>
+    <form method="post" style="padding: 0 1rem 1rem 1rem;">
+        {% csrf_token %}
+        <input type="hidden" name="registrar_horas_complementares" value="1">
+        <div class="grid-two">
+            {% for field in horas_complementares_form %}
+                <div class="field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+            {% endfor %}
+        </div>
+        <div class="grid-two" style="margin:0.4rem 0;">
+            <p class="muted" style="margin:0;"><strong>Horas calculadas:</strong> <span id="horas-calculadas-preview">-</span></p>
+            <p class="muted" style="margin:0;"><strong>Máximo aprovável:</strong> <span id="horas-maximo-preview">-</span></p>
+        </div>
+        <p class="muted" style="margin:0.4rem 0;">
+            A carga calculada segue a norma vigente do discente. Caso as horas aprovadas sejam diferentes ou excedam o saldo normativo, registre a justificativa.
+        </p>
+        <div style="display: flex; gap: 0.7rem; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary" id="btn-fechar-modal-horas">Cancelar</button>
+            <button type="submit" class="btn">Registrar lançamento</button>
+        </div>
+    </form>
+</dialog>
+{% endif %}
+
 <dialog id="modal-documento" class="modal-dialog">
     <div style="padding: 1rem 1rem 0 1rem;">
         <h2 class="section-title">Adicionar documento</h2>
@@ -436,7 +560,7 @@
         {% endif %}
     </ul>
 </section>
-{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo %}
+{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo or can_registrar_horas_complementares %}
 <dialog id="modal-remocao-arquivo" class="modal-dialog">
     <div style="padding: 1rem 1rem 0 1rem;">
         <h2 class="section-title">Confirmar remocao de arquivo</h2>
@@ -457,19 +581,22 @@
     </form>
 </dialog>
 {% endif %}
-{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo %}
+{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo or can_registrar_horas_complementares %}
 <script>
     (function () {
+        const modalHoras = document.getElementById("modal-horas-complementares");
         const modalDocumento = document.getElementById("modal-documento");
         const modalEncaminhamento = document.getElementById("modal-encaminhamento");
         const modalRemocao = document.getElementById("modal-remocao-arquivo");
         const modalCiente = document.getElementById("modal-ciente");
         const modalFinalizacao = document.getElementById("modal-finalizacao");
+        const btnAbrirHoras = document.getElementById("btn-abrir-modal-horas");
         const btnAbrirDocumento = document.getElementById("btn-abrir-modal-documento");
         const btnAbrirEncaminhar = document.getElementById("btn-abrir-modal-encaminhar");
         const btnAbrirCiente = document.getElementById("btn-abrir-modal-ciente");
         const btnAbrirFinalizar = document.getElementById("btn-abrir-modal-finalizar");
         const btnAbrirRemocao = Array.from(document.querySelectorAll(".btn-abrir-remocao"));
+        const btnFecharHoras = document.getElementById("btn-fechar-modal-horas");
         const btnFecharDocumento = document.getElementById("btn-fechar-modal-documento");
         const btnFecharEncaminhamento = document.getElementById("btn-fechar-modal-encaminhamento");
         const btnFecharCiente = document.getElementById("btn-fechar-modal-ciente");
@@ -478,7 +605,46 @@
         const inputDocumentoIdRemocao = document.getElementById("input-documento-id-remocao");
         const textoRemocaoDocumento = document.getElementById("texto-remocao-documento");
         const inputMotivoRemocao = document.getElementById("id_motivo_remocao");
+        const regrasHoras = [
+            {% for regra in regras_horas_complementares %}
+                {
+                    trajetoriaId: "{{ regra.trajetoria_id }}",
+                    id: "{{ regra.id }}",
+                    horasPorUnidade: Number("{{ regra.horas_por_unidade }}".replace(",", ".")),
+                    unidade: "{{ regra.unidade|escapejs }}",
+                    maximo: "{{ regra.maximo|escapejs }}"
+                }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        const regrasHorasPorId = Object.fromEntries(regrasHoras.map((regra) => [regra.trajetoriaId + ":" + regra.id, regra]));
+        const tipoHoras = document.getElementById("id_tipo_atividade");
+        const trajetoriaHoras = document.getElementById("id_trajetoria");
+        const quantidadeHoras = document.getElementById("id_quantidade");
+        const horasCalculadasPreview = document.getElementById("horas-calculadas-preview");
+        const horasMaximoPreview = document.getElementById("horas-maximo-preview");
 
+        function atualizarPreviewHoras() {
+            if (!tipoHoras || !quantidadeHoras || !horasCalculadasPreview || !horasMaximoPreview) return;
+            const chaveRegra = (trajetoriaHoras?.value || "") + ":" + tipoHoras.value;
+            const regra = regrasHorasPorId[chaveRegra];
+            const quantidade = Number((quantidadeHoras.value || "0").replace(",", "."));
+            if (!regra || !quantidade) {
+                horasCalculadasPreview.textContent = "-";
+                horasMaximoPreview.textContent = "-";
+                return;
+            }
+            const calculadas = quantidade * regra.horasPorUnidade;
+            horasCalculadasPreview.textContent = calculadas.toFixed(2) + "h (" + quantidade + " " + regra.unidade + ")";
+            horasMaximoPreview.textContent = regra.maximo ? regra.maximo + "h" : "Sem limite específico";
+        }
+
+        if (btnAbrirHoras && modalHoras) {
+            btnAbrirHoras.addEventListener("click", () => modalHoras.showModal());
+        }
+        if (tipoHoras) tipoHoras.addEventListener("change", atualizarPreviewHoras);
+        if (quantidadeHoras) quantidadeHoras.addEventListener("input", atualizarPreviewHoras);
+        if (trajetoriaHoras) trajetoriaHoras.addEventListener("change", atualizarPreviewHoras);
+        atualizarPreviewHoras();
         if (btnAbrirDocumento && modalDocumento) {
             btnAbrirDocumento.addEventListener("click", () => modalDocumento.showModal());
         }
@@ -503,6 +669,9 @@
                 });
             });
         }
+        if (btnFecharHoras && modalHoras) {
+            btnFecharHoras.addEventListener("click", () => modalHoras.close());
+        }
         if (btnFecharDocumento && modalDocumento) {
             btnFecharDocumento.addEventListener("click", () => modalDocumento.close());
         }
@@ -518,6 +687,9 @@
         if (btnCancelarRemocao && modalRemocao) {
             btnCancelarRemocao.addEventListener("click", () => modalRemocao.close());
         }
+        {% if open_horas_modal %}
+            if (modalHoras) modalHoras.showModal();
+        {% endif %}
         {% if open_documento_modal %}
             if (modalDocumento) modalDocumento.showModal();
         {% endif %}

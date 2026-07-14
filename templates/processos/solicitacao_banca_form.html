@@ -58,6 +58,28 @@
                 </label>
             {% endfor %}
         </div>
+
+        <div class="trajectory-panel" style="margin-top:1rem;">
+            {% for checklist in checklists_integralizacao %}
+                <article data-integralizacao-checklist data-trajetoria-id="{{ checklist.trajetoria.id }}" hidden>
+                    <h3 class="section-title">{{ checklist.titulo }}</h3>
+                    <p class="muted" style="margin-top:0;">
+                        {{ checklist.trajetoria.aluno.nome }} |
+                        {{ checklist.trajetoria.get_nivel_curso_display }} |
+                        Ingresso {{ checklist.trajetoria.ingresso|default:"-" }}
+                    </p>
+                    <ul class="activity-list">
+                        {% for item in checklist.itens %}
+                            <li>
+                                <span class="soft-icon">{% if item.cumprido %}OK{% else %}☐{% endif %}</span>
+                                <span><strong>{{ item.grupo }}:</strong> {{ item.texto }}</span>
+                                <time>{% if item.cumprido %}OK{% else %}Pendente{% endif %}</time>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </article>
+            {% endfor %}
+        </div>
     </section>
 
     <section class="card">
@@ -169,6 +191,7 @@ const alunoSelect = document.getElementById("{{ form.aluno.id_for_label }}");
 const trajetoriaSelect = document.getElementById("{{ form.trajetoria.id_for_label }}");
 const tipoSelect = document.getElementById("{{ form.tipo_defesa.id_for_label }}");
 const cards = Array.from(document.querySelectorAll("[data-trajetoria-card]"));
+const checklistCards = Array.from(document.querySelectorAll("[data-integralizacao-checklist]"));
 
 function updateTrajectoryCards() {
     const alunoId = alunoSelect.value;
@@ -185,6 +208,13 @@ function updateTrajectoryCards() {
         visibleCards[0].querySelector("input").checked = true;
         trajetoriaSelect.value = visibleCards[0].dataset.trajetoriaId;
     }
+    updateChecklistPanel();
+}
+
+function updateChecklistPanel() {
+    checklistCards.forEach((card) => {
+        card.hidden = !trajetoriaSelect.value || card.dataset.trajetoriaId !== trajetoriaSelect.value;
+    });
 }
 
 function updateBancaFields() {
@@ -205,6 +235,7 @@ alunoSelect?.addEventListener("change", () => {
 cards.forEach((card) => {
     card.addEventListener("click", () => {
         trajetoriaSelect.value = card.dataset.trajetoriaId;
+        updateChecklistPanel();
     });
 });
 tipoSelect?.addEventListener("change", updateBancaFields);
@@ -217,6 +248,7 @@ if (trajetoriaSelect.value) {
     }
 }
 updateTrajectoryCards();
+updateChecklistPanel();
 updateBancaFields();
 </script>
 {% endblock %}

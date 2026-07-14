@@ -13,6 +13,9 @@ from .models import (
     Documento,
     EncontroOferta,
     ItemSolicitacaoMatricula,
+    GrupoLimiteHorasComplementares,
+    LancamentoHorasComplementares,
+    NormaHorasComplementares,
     Polo,
     PublicacaoTrajetoria,
     MembroBanca,
@@ -25,6 +28,7 @@ from .models import (
     SetorMembro,
     SolicitacaoMatricula,
     SolicitacaoBanca,
+    TipoAtividadeHorasComplementares,
     TrajetoriaAcademica,
     TramitacaoProcesso,
     User,
@@ -234,6 +238,47 @@ class AlteracaoAlunoAdmin(admin.ModelAdmin):
     search_fields = ("aluno__nome", "aluno__email", "comentario", "valor_anterior", "valor_novo")
     autocomplete_fields = ("aluno", "alterado_por")
     readonly_fields = ("criado_em",)
+
+
+@admin.register(NormaHorasComplementares)
+class NormaHorasComplementaresAdmin(admin.ModelAdmin):
+    list_display = ("identificacao", "nome", "nivel_curso", "status", "inicio_vigencia", "fim_vigencia", "carga_horaria_exigida")
+    list_filter = ("status", "nivel_curso")
+    search_fields = ("identificacao", "nome", "descricao")
+
+
+@admin.register(GrupoLimiteHorasComplementares)
+class GrupoLimiteHorasComplementaresAdmin(admin.ModelAdmin):
+    list_display = ("nome", "norma", "limite_maximo", "ordem")
+    list_filter = ("norma",)
+    search_fields = ("nome", "descricao", "norma__identificacao")
+    autocomplete_fields = ("norma",)
+
+
+@admin.register(TipoAtividadeHorasComplementares)
+class TipoAtividadeHorasComplementaresAdmin(admin.ModelAdmin):
+    list_display = ("nome", "norma", "grupo_limite", "unidade_calculo", "horas_por_unidade", "limite_individual", "ativo", "ordem")
+    list_filter = ("norma", "grupo_limite", "ativo")
+    search_fields = ("nome", "descricao", "norma__identificacao")
+    autocomplete_fields = ("norma", "grupo_limite")
+
+
+@admin.register(LancamentoHorasComplementares)
+class LancamentoHorasComplementaresAdmin(admin.ModelAdmin):
+    list_display = ("trajetoria", "aluno", "tipo_atividade", "horas_aprovadas", "status", "processo_origem", "criado_por", "criado_em")
+    list_filter = ("status", "norma", "tipo_atividade")
+    search_fields = ("trajetoria__aluno__nome", "trajetoria__aluno__email", "descricao", "processo_origem__numero")
+    autocomplete_fields = (
+        "trajetoria",
+        "processo_origem",
+        "tipo_atividade",
+        "norma",
+        "grupo_limite",
+        "criado_por",
+        "substitui_lancamento",
+        "cancelado_por",
+    )
+    readonly_fields = ("criado_em", "atualizado_em", "horas_calculadas")
 
 
 class MembroBancaInline(admin.TabularInline):

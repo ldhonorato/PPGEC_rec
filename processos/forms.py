@@ -1,11 +1,13 @@
 import re
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
 from django import forms
 from django.contrib.auth import password_validation
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -18,6 +20,7 @@ from .models import (
     EncontroOferta,
     EstagioDocencia,
     MembroBanca,
+    LancamentoHorasComplementares,
     OfertaDisciplina,
     PeriodoLetivo,
     Polo,
@@ -29,6 +32,7 @@ from .models import (
     SolicitacaoBanca,
     SolicitacaoMatricula,
     Setor,
+    TipoAtividadeHorasComplementares,
     TrajetoriaAcademica,
     validar_cpf_brasileiro,
 )
@@ -829,6 +833,284 @@ class ComentarioProcessoForm(forms.Form):
         label="Comentario",
         widget=forms.Textarea(attrs={"rows": 4}),
     )
+
+
+class LancamentoHorasComplementaresForm(forms.ModelForm):
+    trajetoria = forms.ModelChoiceField(
+        queryset=TrajetoriaAcademica.objects.none(),
+        label="Trajetoria academica",
+    )
+    processo_origem = forms.ModelChoiceField(
+        queryset=Processo.objects.none(),
+        required=False,
+        label="Processo de origem",
+    )
+    retificar_lancamento = forms.ModelChoiceField(
+        queryset=LancamentoHorasComplementares.objects.none(),
+        required=False,
+        label="Retifica lancamento",
+    )
+
+    class Meta:
+        model = LancamentoHorasComplementares
+        fields = [
+            "trajetoria",
+            "processo_origem",
+            "tipo_atividade",
+            "descricao",
+            "periodo_realizacao",
+            "quantidade",
+            "horas_solicitadas",
+            "horas_aprovadas",
+            "observacoes_secretaria",
+            "referencia_decisao",
+            "excepcional_autorizado",
+            "justificativa_excepcional",
+            "justificativa_sem_processo",
+        ]
+        widgets = {
+            "periodo_realizacao": forms.TextInput(attrs={"placeholder": "Ex.: 10/03/2026 ou 10 a 12/03/2026"}),
+            "descricao": forms.TextInput(attrs={"placeholder": "Descreva a atividade comprovada"}),
+            "quantidade": forms.NumberInput(attrs={"step": "0.01", "min": "0.01"}),
+            "horas_solicitadas": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+            "horas_aprovadas": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+            "observacoes_secretaria": forms.Textarea(attrs={"rows": 3}),
+            "referencia_decisao": forms.Textarea(attrs={"rows": 2}),
+            "justificativa_excepcional": forms.Textarea(attrs={"rows": 2}),
+            "justificativa_sem_processo": forms.Textarea(attrs={"rows": 2}),
+        }
+
+    def __init__(self, *args, aluno=None, processo=None, usuario=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.aluno = aluno
+        self.processo = processo
+        self.usuario = usuario
+        trajetorias = TrajetoriaAcademica.objects.none()
+        trajetoria = None
+        if aluno:
+            trajetorias = aluno.trajetorias.order_by("-criado_em")
+            trajetoria_id = None
+            if self.data:
+                trajetoria_id = self.data.get(self.add_prefix("trajetoria"))
+            if trajetoria_id:
+                trajetoria = trajetorias.filter(pk=trajetoria_id).first()
+            if not trajetoria:
+                trajetoria = aluno.trajetoria_ativa() or trajetorias.first()
+        self.trajetoria = trajetoria
+        self.fields["trajetoria"].queryset = trajetorias
+        if trajetoria:
+            self.fields["trajetoria"].initial = trajetoria
+        norma = LancamentoHorasComplementares.norma_para_trajetoria(trajetoria) if trajetoria else None
+        self.norma = norma
+        self.fields["tipo_atividade"].queryset = TipoAtividadeHorasComplementares.objects.none()
+        normas_ids = []
+        for item_trajetoria in trajetorias:
+            item_norma = LancamentoHorasComplementares.norma_para_trajetoria(item_trajetoria)
+            if item_norma:
+                normas_ids.append(item_norma.id)
+        if normas_ids:
+            self.fields["tipo_atividade"].queryset = TipoAtividadeHorasComplementares.objects.filter(
+                norma_id__in=normas_ids,
+                ativo=True,
+            ).select_related("grupo_limite", "norma")
+        self.fields["tipo_atividade"].label_from_instance = (
+            lambda obj: f"{obj.nome} ({obj.norma.get_nivel_curso_display()} - {obj.norma.identificacao})"
+        )
+        self.fields["processo_origem"].queryset = Processo.objects.none()
+        if aluno:
+            self.fields["processo_origem"].queryset = Processo.objects.filter(
+                usuario_criado_por=aluno,
+                tipo=Processo.TipoProcesso.HORAS_COMPLEMENTARES,
+            ).order_by("-data_criacao")
+        if processo:
+            self.fields["processo_origem"].initial = processo
+            self.fields["processo_origem"].widget = forms.HiddenInput()
+        self.fields["retificar_lancamento"].queryset = LancamentoHorasComplementares.objects.none()
+        if trajetoria:
+            self.fields["retificar_lancamento"].queryset = LancamentoHorasComplementares.ativos().filter(
+                trajetoria=trajetoria,
+            )
+        self.fields["retificar_lancamento"].required = False
+        self.fields["justificativa_sem_processo"].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo = cleaned_data.get("tipo_atividade")
+        trajetoria = cleaned_data.get("trajetoria")
+        processo_origem = self.processo or cleaned_data.get("processo_origem")
+        quantidade = cleaned_data.get("quantidade")
+        horas_aprovadas = cleaned_data.get("horas_aprovadas")
+        retificado = cleaned_data.get("retificar_lancamento")
+        if not trajetoria:
+            self.add_error("trajetoria", "Selecione a trajetoria academica.")
+            return cleaned_data
+        norma = LancamentoHorasComplementares.norma_para_trajetoria(trajetoria)
+        if not norma:
+            raise forms.ValidationError("Nao ha norma vigente de horas complementares para o nivel do discente.")
+        if not processo_origem and not (cleaned_data.get("justificativa_sem_processo") or "").strip():
+            self.add_error("processo_origem", "Informe o processo de origem ou justifique o lancamento sem processo.")
+        if processo_origem and processo_origem.usuario_criado_por_id != trajetoria.aluno_id:
+            self.add_error("processo_origem", "O processo de origem deve pertencer ao discente da trajetoria.")
+        if tipo and tipo.norma_id != norma.id:
+            self.add_error("tipo_atividade", "Selecione uma atividade da norma vigente da trajetoria.")
+        if tipo and quantidade:
+            calculadas = quantidade * tipo.horas_por_unidade
+            self.horas_calculadas = calculadas
+            lancamento = LancamentoHorasComplementares(
+                trajetoria=trajetoria,
+                processo_origem=processo_origem,
+                tipo_atividade=tipo,
+                norma=tipo.norma,
+                grupo_limite=tipo.grupo_limite,
+                descricao=cleaned_data.get("descricao", ""),
+                periodo_realizacao=cleaned_data.get("periodo_realizacao", ""),
+                quantidade=quantidade,
+                unidade_quantidade=tipo.unidade_calculo,
+                horas_solicitadas=cleaned_data.get("horas_solicitadas") or calculadas,
+                horas_calculadas=calculadas,
+                horas_aprovadas=horas_aprovadas or 0,
+                observacoes_secretaria=cleaned_data.get("observacoes_secretaria", ""),
+                referencia_decisao=cleaned_data.get("referencia_decisao", ""),
+                excepcional_autorizado=cleaned_data.get("excepcional_autorizado") or False,
+                justificativa_excepcional=cleaned_data.get("justificativa_excepcional", ""),
+                justificativa_sem_processo=cleaned_data.get("justificativa_sem_processo", ""),
+                criado_por=self.usuario,
+                substitui_lancamento=retificado,
+            )
+            maximo = lancamento.maximo_aprovavel()
+            self.maximo_aprovavel = maximo
+            if maximo is not None and horas_aprovadas is not None and horas_aprovadas > maximo:
+                if not cleaned_data.get("excepcional_autorizado"):
+                    self.add_error("horas_aprovadas", f"O maximo aprovavel pelas regras vigentes e {maximo}h.")
+                elif not (cleaned_data.get("justificativa_excepcional") or "").strip():
+                    self.add_error("justificativa_excepcional", "Justifique a aprovacao excepcional acima do limite.")
+            if horas_aprovadas is not None and horas_aprovadas != calculadas:
+                if not (cleaned_data.get("observacoes_secretaria") or "").strip():
+                    self.add_error("observacoes_secretaria", "Justifique a diferenca entre horas calculadas e aprovadas.")
+        return cleaned_data
+
+    def save(self, commit=True):
+        tipo = self.cleaned_data["tipo_atividade"]
+        trajetoria = self.cleaned_data["trajetoria"]
+        processo_origem = self.processo or self.cleaned_data.get("processo_origem")
+        quantidade = self.cleaned_data["quantidade"]
+        retificado = self.cleaned_data.get("retificar_lancamento")
+        lancamento = super().save(commit=False)
+        lancamento.trajetoria = trajetoria
+        lancamento.processo_origem = processo_origem
+        lancamento.tipo_atividade = tipo
+        lancamento.norma = tipo.norma
+        lancamento.grupo_limite = tipo.grupo_limite
+        lancamento.unidade_quantidade = tipo.unidade_calculo
+        lancamento.horas_calculadas = quantidade * tipo.horas_por_unidade
+        if not lancamento.horas_solicitadas:
+            lancamento.horas_solicitadas = lancamento.horas_calculadas
+        lancamento.limite_individual_no_lancamento = tipo.limite_individual
+        lancamento.limite_grupo_no_lancamento = tipo.grupo_limite.limite_maximo if tipo.grupo_limite else None
+        lancamento.criado_por = self.usuario
+        lancamento.substitui_lancamento = retificado
+        if commit:
+            with transaction.atomic():
+                if retificado:
+                    retificado.status = LancamentoHorasComplementares.Status.RETIFICADO
+                    retificado.save(update_fields=["status", "atualizado_em"])
+                lancamento.save()
+        return lancamento
+
+
+class HorasComplementaresAdministrativoForm(forms.Form):
+    tipo_atividade = forms.ModelChoiceField(
+        queryset=TipoAtividadeHorasComplementares.objects.none(),
+        label="Tipo da atividade",
+    )
+    horas_aprovadas = forms.DecimalField(
+        label="Quantidade de horas",
+        min_value=Decimal("0.01"),
+        max_digits=6,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"step": "0.01", "min": "0.01"}),
+    )
+    comentario = forms.CharField(
+        label="Comentario",
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+    excepcional_autorizado = forms.BooleanField(
+        required=False,
+        label="Autorizar excepcionalidade acima do limite normativo",
+    )
+
+    def __init__(self, *args, trajetoria=None, usuario=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.trajetoria = trajetoria
+        self.usuario = usuario
+        self.norma = LancamentoHorasComplementares.norma_para_trajetoria(trajetoria) if trajetoria else None
+        if self.norma:
+            self.fields["tipo_atividade"].queryset = self.norma.tipos_atividade.filter(
+                ativo=True,
+            ).select_related("grupo_limite", "norma")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo = cleaned_data.get("tipo_atividade")
+        horas = cleaned_data.get("horas_aprovadas")
+        comentario = (cleaned_data.get("comentario") or "").strip()
+        excepcional = cleaned_data.get("excepcional_autorizado") or False
+
+        if not self.trajetoria:
+            raise forms.ValidationError("Trajetoria academica nao encontrada.")
+        if not self.norma:
+            raise forms.ValidationError("Nao ha norma vigente de horas complementares para esta trajetoria.")
+        if tipo and tipo.norma_id != self.norma.id:
+            self.add_error("tipo_atividade", "Selecione uma atividade da norma vigente da trajetoria.")
+        if not (tipo and horas):
+            return cleaned_data
+
+        quantidade = (horas / tipo.horas_por_unidade).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        lancamento = LancamentoHorasComplementares(
+            trajetoria=self.trajetoria,
+            tipo_atividade=tipo,
+            norma=tipo.norma,
+            grupo_limite=tipo.grupo_limite,
+            descricao=comentario[:255] or "Lancamento administrativo de horas complementares",
+            quantidade=quantidade,
+            unidade_quantidade=tipo.unidade_calculo,
+            horas_solicitadas=horas,
+            horas_calculadas=quantidade * tipo.horas_por_unidade,
+            horas_aprovadas=horas,
+            observacoes_secretaria=comentario,
+            excepcional_autorizado=excepcional,
+            justificativa_excepcional=comentario if excepcional else "",
+            justificativa_sem_processo=comentario,
+            criado_por=self.usuario,
+        )
+        maximo = lancamento.maximo_aprovavel()
+        if maximo is not None and horas > maximo and not excepcional:
+            self.add_error("horas_aprovadas", f"O maximo aprovavel pelas regras vigentes e {maximo}h.")
+        return cleaned_data
+
+    def save(self):
+        tipo = self.cleaned_data["tipo_atividade"]
+        horas = self.cleaned_data["horas_aprovadas"]
+        comentario = self.cleaned_data["comentario"].strip()
+        excepcional = self.cleaned_data.get("excepcional_autorizado") or False
+        quantidade = (horas / tipo.horas_por_unidade).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return LancamentoHorasComplementares.objects.create(
+            trajetoria=self.trajetoria,
+            tipo_atividade=tipo,
+            norma=tipo.norma,
+            grupo_limite=tipo.grupo_limite,
+            descricao=comentario[:255] or "Lancamento administrativo de horas complementares",
+            quantidade=quantidade,
+            unidade_quantidade=tipo.unidade_calculo,
+            horas_solicitadas=horas,
+            horas_calculadas=quantidade * tipo.horas_por_unidade,
+            horas_aprovadas=horas,
+            observacoes_secretaria=comentario,
+            excepcional_autorizado=excepcional,
+            justificativa_excepcional=comentario if excepcional else "",
+            justificativa_sem_processo=comentario,
+            criado_por=self.usuario,
+        )
 
 
 class FinalizarProcessoForm(forms.Form):
