@@ -22,6 +22,15 @@ def _is_servidor(user):
     return user.is_authenticated and user.tipo_usuario == User.TipoUsuario.SERVIDOR
 
 
+def _is_secretaria_member(user):
+    return user.is_authenticated and SetorMembro.objects.filter(
+        usuario=user,
+        data_saida__isnull=True,
+        setor__ativo=True,
+        setor__nome="Secretaria PPGEC",
+    ).exists()
+
+
 def _is_coordenador(user):
     if not _is_docente(user):
         return False
@@ -33,11 +42,11 @@ def _is_coordenador(user):
 
 
 def _has_gestao_access(user):
-    return _is_coordenador(user) or _is_servidor(user)
+    return _is_coordenador(user) or _is_servidor(user) or _is_secretaria_member(user)
 
 
 def _can_view_processos(user):
-    return _is_coordenador(user) or _is_servidor(user)
+    return _has_gestao_access(user)
 
 
 def _can_add_processo(user):
@@ -119,7 +128,7 @@ def _menu_lateral_sections(user):
         principal_items.append(
             _menu_item("Minha Trajetória", f"/coordenacao/alunos/{user.id}/", ["aluno_detalhe"], "T")
         )
-    if user.tipo_usuario in {User.TipoUsuario.DOCENTE, User.TipoUsuario.SERVIDOR}:
+    if user.tipo_usuario in {User.TipoUsuario.DOCENTE, User.TipoUsuario.SERVIDOR} or _is_secretaria_member(user):
         principal_items.append(
             _menu_item(
                 "Reserva de Ambiente",
@@ -242,7 +251,7 @@ def _menu_lateral_sections(user):
                         "V",
                     )
                 ]
-                if _is_servidor(user)
+                if _is_servidor(user) or _is_secretaria_member(user)
                 else []
             ),
             _menu_item("Setores e Comissões", "/coordenacao/setores/", ["setores_comissoes"], "S"),

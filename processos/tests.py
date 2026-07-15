@@ -896,6 +896,7 @@ class MatriculaViewsTests(TestCase):
         self.assertNotContains(response, "Enviar solicitação")
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class AlunosViewTests(TestCase):
     def setUp(self):
         self.servidor = User.objects.create_user(
@@ -1139,6 +1140,55 @@ class AlunosViewTests(TestCase):
         detalhe = self.client.get(reverse("processo_detalhe", args=[processo.id]))
         self.assertEqual(detalhe.status_code, 200)
         self.assertContains(detalhe, processo.assunto)
+
+    def test_aluno_membro_da_secretaria_tem_acesso_de_gestao(self):
+        secretaria, _ = Setor.objects.get_or_create(
+            nome="Secretaria PPGEC",
+            defaults={"tipo": Setor.TipoSetor.SETOR},
+        )
+        bolsista = Aluno.objects.create(
+            email="bolsista.secretaria@example.com",
+            password="senha-segura-123",
+            nome="Bolsista Secretaria",
+        )
+        criar_trajetoria(bolsista)
+        SetorMembro.objects.create(setor=secretaria, usuario=bolsista, designado_por=self.coordenador)
+
+        self.client.force_login(bolsista)
+
+        home = self.client.get(reverse("home"))
+        self.assertEqual(home.status_code, 200)
+        self.assertContains(home, "Dashboard")
+        self.assertContains(home, "Validar Cadastros")
+        self.assertContains(home, "Períodos letivos")
+        self.assertContains(home, "Cadastro de Salas")
+        self.assertContains(home, "Reserva de Ambiente")
+
+        alunos = self.client.get(reverse("coordenacao_alunos"))
+        self.assertEqual(alunos.status_code, 200)
+        self.assertContains(alunos, self.aluno.nome)
+
+        cadastros = self.client.get(reverse("validar_cadastros_alunos"))
+        self.assertEqual(cadastros.status_code, 200)
+
+        periodos = self.client.get(reverse("matriculas_periodos"))
+        self.assertEqual(periodos.status_code, 200)
+
+        setores = self.client.get(reverse("setores_comissoes"))
+        self.assertEqual(setores.status_code, 200)
+
+        reservas = self.client.get(reverse("reservas_ambientes"))
+        self.assertEqual(reservas.status_code, 200)
+
+    def test_aluno_membro_de_comissao_nao_recebe_acesso_global_de_secretaria(self):
+        setor = Setor.objects.create(nome="Comissao Discente Sem Gestao", tipo=Setor.TipoSetor.COMISSAO)
+        SetorMembro.objects.create(setor=setor, usuario=self.aluno, designado_por=self.coordenador)
+
+        self.client.force_login(self.aluno)
+
+        response = self.client.get(reverse("coordenacao_alunos"))
+
+        self.assertEqual(response.status_code, 403)
 
     def test_aluno_nao_acessa_detalhe_de_processo_que_nao_criou(self):
         setor = Setor.objects.create(nome="Comissao Discente", tipo=Setor.TipoSetor.COMISSAO)

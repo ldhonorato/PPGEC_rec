@@ -141,6 +141,15 @@ def _is_servidor(user):
     return user.is_authenticated and user.tipo_usuario == User.TipoUsuario.SERVIDOR
 
 
+def _is_secretaria_member(user):
+    return user.is_authenticated and SetorMembro.objects.filter(
+        usuario=user,
+        data_saida__isnull=True,
+        setor__ativo=True,
+        setor__nome="Secretaria PPGEC",
+    ).exists()
+
+
 def _is_coordenador(user):
     if not user.is_authenticated or user.tipo_usuario != User.TipoUsuario.DOCENTE:
         return False
@@ -151,7 +160,7 @@ def _is_coordenador(user):
 
 
 def _has_gestao_access(user):
-    return _is_coordenador(user) or _is_servidor(user)
+    return _is_coordenador(user) or _is_servidor(user) or _is_secretaria_member(user)
 
 
 def _can_view_dashboard(user):
@@ -159,7 +168,7 @@ def _can_view_dashboard(user):
 
 
 def _can_view_processos(user):
-    return _is_coordenador(user) or _is_servidor(user)
+    return _has_gestao_access(user)
 
 
 def _can_add_processo(user):
@@ -273,11 +282,11 @@ def _can_atender_solicitacao_assinatura(user, solicitacao):
 
 
 def _can_manage_restricted_docs(user):
-    return _is_servidor(user) or _is_coordenador(user)
+    return _has_gestao_access(user)
 
 
 def _can_manage_matriculas(user):
-    return _is_servidor(user) or _is_coordenador(user)
+    return _has_gestao_access(user)
 
 
 def _can_create_oferta(user):
@@ -1714,7 +1723,7 @@ def me_view(request):
 @login_required
 def setores_comissoes_view(request):
     can_edit_setores = _is_coordenador(request.user)
-    if not (can_edit_setores or _is_servidor(request.user)):
+    if not (can_edit_setores or _is_servidor(request.user) or _is_secretaria_member(request.user)):
         raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
 
     setor_editado = None
@@ -1979,7 +1988,7 @@ def cadastro_aluno_sucesso_view(request):
 
 @login_required
 def validar_cadastros_alunos_view(request):
-    if not _is_servidor(request.user):
+    if not _has_gestao_access(request.user):
         raise PermissionDenied("Acesso restrito a secretaria.")
 
     if request.method == "POST":
@@ -3683,10 +3692,13 @@ def novo_processo_view(request):
 
 
 def _can_use_reservas(user):
-    return user.is_authenticated and user.tipo_usuario in {
-        User.TipoUsuario.DOCENTE,
-        User.TipoUsuario.SERVIDOR,
-    }
+    return user.is_authenticated and (
+        user.tipo_usuario in {
+            User.TipoUsuario.DOCENTE,
+            User.TipoUsuario.SERVIDOR,
+        }
+        or _is_secretaria_member(user)
+    )
 
 
 def _reservas_base_context():

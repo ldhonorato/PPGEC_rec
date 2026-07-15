@@ -17,10 +17,20 @@ from .models import (
     OfertaDisciplina,
     Processo,
     ReservaAmbiente,
+    SetorMembro,
     SolicitacaoMatricula,
     TrajetoriaAcademica,
     User,
 )
+
+
+def _is_secretaria_member(user):
+    return user.is_authenticated and SetorMembro.objects.filter(
+        usuario=user,
+        data_saida__isnull=True,
+        setor__ativo=True,
+        setor__nome="Secretaria PPGEC",
+    ).exists()
 
 
 def processos_atrasados_base_queryset():
@@ -34,7 +44,7 @@ def processos_atrasados_queryset(user):
     if not user.is_authenticated:
         return queryset.none()
 
-    if user.tipo_usuario == User.TipoUsuario.SERVIDOR:
+    if user.tipo_usuario == User.TipoUsuario.SERVIDOR or _is_secretaria_member(user):
         return queryset
 
     if user.tipo_usuario == User.TipoUsuario.DOCENTE:
@@ -57,11 +67,13 @@ def processos_atrasados_queryset(user):
 
 
 def processos_atrasados_url(user):
-    if user.is_authenticated and user.tipo_usuario in {User.TipoUsuario.SERVIDOR, User.TipoUsuario.DOCENTE}:
+    if user.is_authenticated and (
+        user.tipo_usuario in {User.TipoUsuario.SERVIDOR, User.TipoUsuario.DOCENTE} or _is_secretaria_member(user)
+    ):
         if user.tipo_usuario == User.TipoUsuario.SERVIDOR or Docente.objects.filter(
             pk=user.pk,
             coordenador=True,
-        ).exists():
+        ).exists() or _is_secretaria_member(user):
             return f"{reverse('coordenacao_processos')}?atrasados=1"
     return f"{reverse('menu_meus_processos')}?my_atrasados=1"
 
