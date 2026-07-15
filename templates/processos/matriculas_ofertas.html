@@ -229,29 +229,29 @@
 </section>
 
 <section class="card panel">
-    <h2 class="section-title">Grade semanal por período letivo</h2>
-    {% if grades_periodos %}
+    <h2 class="section-title">Horário semanal por período letivo</h2>
+    {% if horarios_semanais_periodos %}
         <div class="stack">
-            {% for grade in grades_periodos %}
+            {% for horario in horarios_semanais_periodos %}
                 <div>
                     <div class="actions-row" style="margin-bottom:0.65rem;">
-                        <strong>{{ grade.periodo.nome }}</strong>
-                        <span class="badge badge-info">{{ grade.periodo.status_atual_display }}</span>
+                        <strong>{{ horario.periodo.nome }}</strong>
+                        <span class="badge badge-info">{{ horario.periodo.status_atual_display }}</span>
                     </div>
-                    {% if grade.dias %}
+                    {% if horario.dias %}
                         <div class="calendar-shell">
                             <div class="schedule-calendar">
                                 <div class="schedule-head">Hora</div>
-                                {% for dia in grade.dias %}
+                                {% for dia in horario.dias %}
                                     <div class="schedule-head">{{ dia.label }}</div>
                                 {% endfor %}
-                                <div class="schedule-time-axis" style="height: {{ grade.altura_grade }}px;">
-                                    {% for marca in grade.marcas_hora %}
+                                <div class="schedule-time-axis" style="height: {{ horario.altura_horario }}px;">
+                                    {% for marca in horario.marcas_hora %}
                                         <span class="schedule-time-mark" style="top: {{ marca.top }};">{{ marca.label }}</span>
                                     {% endfor %}
                                 </div>
-                                {% for dia in grade.dias %}
-                                    <div class="schedule-day" style="height: {{ grade.altura_grade }}px;">
+                                {% for dia in horario.dias %}
+                                    <div class="schedule-day" style="height: {{ horario.altura_horario }}px;">
                                         {% for evento in dia.eventos %}
                                             <div class="schedule-event" style="top: {{ evento.top }}; height: {{ evento.height }}; left: {{ evento.left }}; width: {{ evento.width }};">
                                                 {{ evento.oferta.disciplina.codigo }} - {{ evento.oferta.disciplina.nome }}
@@ -270,7 +270,7 @@
             {% endfor %}
         </div>
     {% else %}
-        <p class="muted">Nenhuma oferta cadastrada para montar a grade.</p>
+        <p class="muted">Nenhuma oferta cadastrada para montar o horário semanal.</p>
     {% endif %}
 </section>
 

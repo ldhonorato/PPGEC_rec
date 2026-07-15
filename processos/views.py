@@ -293,7 +293,7 @@ def _can_create_oferta(user):
     return _can_manage_matriculas(user) or _is_docente(user)
 
 
-def _montar_grade_ofertas(ofertas):
+def _montar_horarios_semanais_ofertas(ofertas):
     dias = [
         (EncontroOferta.DiaSemana.SEGUNDA, "Segunda"),
         (EncontroOferta.DiaSemana.TERCA, "Terça"),
@@ -318,7 +318,7 @@ def _montar_grade_ofertas(ofertas):
                 {"oferta": oferta, "encontro": encontro}
             )
 
-    grades = []
+    horarios_semanais = []
     for dados in periodos.values():
         todos_eventos = [
             evento
@@ -326,21 +326,23 @@ def _montar_grade_ofertas(ofertas):
             for evento in eventos
         ]
         if not todos_eventos:
-            grades.append({"periodo": dados["periodo"], "dias": [], "marcas_hora": [], "altura_grade": 0})
+            horarios_semanais.append(
+                {"periodo": dados["periodo"], "dias": [], "marcas_hora": [], "altura_horario": 0}
+            )
             continue
 
         inicio_minutos = min(evento["encontro"].hora_inicio.hour * 60 + evento["encontro"].hora_inicio.minute for evento in todos_eventos)
         fim_minutos = max(evento["encontro"].hora_fim.hour * 60 + evento["encontro"].hora_fim.minute for evento in todos_eventos)
-        inicio_grade = (inicio_minutos // 60) * 60
-        fim_grade = ((fim_minutos + 59) // 60) * 60
-        total_minutos = max(fim_grade - inicio_grade, 60)
+        inicio_horario = (inicio_minutos // 60) * 60
+        fim_horario = ((fim_minutos + 59) // 60) * 60
+        total_minutos = max(fim_horario - inicio_horario, 60)
         pixels_por_minuto = 1.15
-        altura_grade = max(int(total_minutos * pixels_por_minuto), 160)
+        altura_horario = max(int(total_minutos * pixels_por_minuto), 160)
 
         marcas_hora = []
-        hora_atual = inicio_grade
-        while hora_atual <= fim_grade:
-            topo = ((hora_atual - inicio_grade) / total_minutos) * 100
+        hora_atual = inicio_horario
+        while hora_atual <= fim_horario:
+            topo = ((hora_atual - inicio_horario) / total_minutos) * 100
             marcas_hora.append({"label": f"{hora_atual // 60:02d}:00", "top": f"{topo:.3f}%"})
             hora_atual += 60
 
@@ -372,7 +374,7 @@ def _montar_grade_ofertas(ofertas):
                         "oferta": evento["oferta"],
                         "encontro": encontro,
                         "fim_minutos": evento_fim,
-                        "top": f"{((evento_inicio - inicio_grade) / total_minutos) * 100:.3f}%",
+                        "top": f"{((evento_inicio - inicio_horario) / total_minutos) * 100:.3f}%",
                         "height": f"{max(((evento_fim - evento_inicio) / total_minutos) * 100, 8):.3f}%",
                         "coluna": coluna,
                         "total_colunas": total_colunas,
@@ -386,15 +388,15 @@ def _montar_grade_ofertas(ofertas):
 
             dias_render.append({"label": dia_label, "eventos": eventos_render})
 
-        grades.append(
+        horarios_semanais.append(
             {
                 "periodo": dados["periodo"],
                 "dias": dias_render,
                 "marcas_hora": marcas_hora,
-                "altura_grade": altura_grade,
+                "altura_horario": altura_horario,
             }
         )
-    return sorted(grades, key=lambda item: item["periodo"].nome, reverse=True), dias
+    return sorted(horarios_semanais, key=lambda item: item["periodo"].nome, reverse=True), dias
 
 
 def _nomes_setores_caixa(user):
@@ -999,7 +1001,7 @@ def matriculas_ofertas_view(request):
     )
     if filtro_nao_conformes:
         ofertas = [oferta for oferta in ofertas if oferta.modalidade == OfertaDisciplina.Modalidade.HIBRIDA and not oferta.presencial_conforme]
-    grades_periodos, dias_grade = _montar_grade_ofertas(ofertas)
+    horarios_semanais_periodos, dias_horarios = _montar_horarios_semanais_ofertas(ofertas)
 
     return render(
         request,
@@ -1009,8 +1011,8 @@ def matriculas_ofertas_view(request):
             "ofertas": ofertas,
             "periodos": periodos,
             "periodo_selecionado": periodo_selecionado,
-            "grades_periodos": grades_periodos,
-            "dias_grade": dias_grade,
+            "horarios_semanais_periodos": horarios_semanais_periodos,
+            "dias_horarios": dias_horarios,
             "can_manage_matriculas": _can_manage_matriculas(request.user),
             "oferta_editando": oferta_editando,
             "modal_aberto": modal_aberto,

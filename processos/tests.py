@@ -280,7 +280,7 @@ class MatriculaViewsTests(TestCase):
         ofertas = self.client.get(reverse("matriculas_ofertas"))
         self.assertEqual(ofertas.status_code, 200)
         self.assertContains(ofertas, self.disciplina.nome)
-        self.assertContains(ofertas, "Grade semanal por período letivo")
+        self.assertContains(ofertas, "Horário semanal por período letivo")
         self.assertContains(ofertas, "Terça")
         self.assertNotContains(ofertas, 'class="schedule-head">Domingo</div>', html=False)
         self.assertNotContains(ofertas, "Disciplinas cadastradas")
@@ -583,7 +583,7 @@ class MatriculaViewsTests(TestCase):
         self.assertContains(response, "Próximo período previsto: 2027.1")
         self.assertNotContains(response, "Enviar solicitação")
 
-    def test_docente_visualiza_grade_com_ofertas_de_outros_docentes(self):
+    def test_docente_visualiza_horario_semanal_com_ofertas_de_outros_docentes(self):
         outro_docente = Docente.objects.create(
             email="outro.docente.views.matricula@example.com",
             password="senha-segura-123",
