@@ -649,6 +649,56 @@ class MatriculaViewsTests(TestCase):
         response = self.client.get(reverse("matriculas_ofertas"))
         self.assertContains(response, "Docente Views / Docente Colaborador")
 
+    def test_gestao_cria_mesma_disciplina_no_periodo_com_docente_diferente(self):
+        outro_docente = Docente.objects.create(
+            email="outro.docente.oferta@example.com",
+            password="senha-segura-123",
+            nome="Outro Docente Oferta",
+        )
+        self.client.force_login(self.secretaria)
+
+        response = self.client.post(
+            reverse("matriculas_ofertas"),
+            {
+                "acao": "criar_oferta",
+                "periodo": self.periodo.pk,
+                "disciplina": self.disciplina.pk,
+                "docente_responsavel": outro_docente.pk,
+                "docente_colaborador": "",
+                "modalidade": OfertaDisciplina.Modalidade.PRESENCIAL,
+                "vagas_regulares": "5",
+                "vagas_especiais": "0",
+                "dia_semana_1": EncontroOferta.DiaSemana.QUARTA,
+                "hora_inicio_1": "08:00",
+                "hora_fim_1": "10:00",
+                "dia_semana_2": "",
+                "hora_inicio_2": "",
+                "hora_fim_2": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            OfertaDisciplina.objects.filter(periodo=self.periodo, disciplina=self.disciplina).count(),
+            2,
+        )
+        response = self.client.get(reverse("matriculas_ofertas"), {"periodo": self.periodo.pk})
+        self.assertContains(response, "Docente Views")
+        self.assertContains(response, "Outro Docente Oferta")
+
+    def test_oferta_nao_permite_mesma_disciplina_periodo_e_docente(self):
+        oferta_duplicada = OfertaDisciplina(
+            periodo=self.periodo,
+            disciplina=self.disciplina,
+            docente_responsavel=self.docente,
+            vagas_regulares=1,
+            vagas_especiais=0,
+            criada_por=self.secretaria,
+        )
+
+        with self.assertRaises(ValidationError):
+            oferta_duplicada.full_clean()
+
     def test_exportacao_xlsx_da_oferta(self):
         solicitacao = SolicitacaoMatricula.objects.create(
             periodo=self.periodo,

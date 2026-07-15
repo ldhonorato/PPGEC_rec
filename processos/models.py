@@ -606,9 +606,12 @@ class OfertaDisciplina(models.Model):
     atualizado_em = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["periodo__nome", "disciplina__nome"]
+        ordering = ["periodo__nome", "disciplina__nome", "docente_responsavel__nome"]
         constraints = [
-            models.UniqueConstraint(fields=["periodo", "disciplina"], name="unique_oferta_disciplina_periodo"),
+            models.UniqueConstraint(
+                fields=["periodo", "disciplina", "docente_responsavel"],
+                name="unique_oferta_disciplina_periodo_docente",
+            ),
         ]
 
     def __str__(self) -> str:
