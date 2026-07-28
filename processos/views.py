@@ -11,12 +11,14 @@ from django.db.models import Count, Prefetch, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_time
 
 from .forms import (
     AlunoCadastroForm,
     AlunoComentarioForm,
+    AlunoCpfForm,
     AlunoDadosForm,
     AlunoDefesaForm,
     AlunoDepositoFinalForm,
@@ -1989,6 +1991,27 @@ def cadastro_aluno_sucesso_view(request):
 
 
 @login_required
+def aluno_informar_cpf_view(request):
+    if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
+        raise PermissionDenied("Acesso restrito a alunos.")
+    aluno = get_object_or_404(Aluno, pk=request.user.pk)
+    if request.method != "POST":
+        return redirect("home")
+
+    form = AlunoCpfForm(request.POST, aluno=aluno)
+    if form.is_valid():
+        aluno.cpf = form.cleaned_data["cpf"]
+        aluno.save(update_fields=["cpf"])
+        messages.success(request, "CPF cadastrado com sucesso.")
+    else:
+        messages.error(request, "Não foi possível cadastrar o CPF. " + " ".join(form["cpf"].errors))
+    next_url = request.POST.get("next", "")
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        next_url = reverse("home")
+    return redirect(next_url)
+
+
+@login_required
 def validar_cadastros_alunos_view(request):
     if not _has_gestao_access(request.user):
         raise PermissionDenied("Acesso restrito a secretaria.")
@@ -2150,6 +2173,8 @@ def aluno_detalhe_view(request, aluno_id):
                 aluno.nome = form.cleaned_data["nome"]
                 aluno.email = form.cleaned_data["email"]
                 aluno.matricula = form.cleaned_data["matricula"]
+                aluno.cpf = form.cleaned_data["cpf"]
+                aluno.genero = form.cleaned_data["genero"]
                 aluno.save()
                 _registrar_alteracao_aluno(
                     aluno=aluno,
@@ -2956,6 +2981,8 @@ def aluno_detalhe_view(request, aluno_id):
             "nome": aluno.nome,
             "email": aluno.email,
             "matricula": aluno.matricula,
+            "cpf": aluno.cpf,
+            "genero": aluno.genero,
         },
     )
     nova_trajetoria_form = TrajetoriaAcademicaForm(

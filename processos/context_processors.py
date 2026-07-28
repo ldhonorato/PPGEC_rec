@@ -321,6 +321,12 @@ def navegacao_lateral(request):
 
     has_gestao_access = _has_gestao_access(request.user)
     can_view_processos = _can_view_processos(request.user)
+    solicitar_cpf_aluno = False
+    if request.user.tipo_usuario == User.TipoUsuario.ALUNO:
+        try:
+            solicitar_cpf_aluno = not bool(request.user.aluno.cpf)
+        except Aluno.DoesNotExist:
+            pass
     return {
         "is_coordenador": _is_coordenador(request.user),
         "has_gestao_access": has_gestao_access,
@@ -333,4 +339,5 @@ def navegacao_lateral(request):
         "nav_can_view_caixa": _can_view_caixa(request.user),
         "nav_menu_sections": _menu_lateral_sections(request.user),
         "nav_side_menu_items": _menu_lateral_items(request.user),
+        "solicitar_cpf_aluno": solicitar_cpf_aluno,
     }

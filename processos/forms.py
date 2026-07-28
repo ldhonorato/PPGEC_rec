@@ -1135,6 +1135,12 @@ class AlunoDadosForm(AlunoComentarioForm):
     nome = forms.CharField(max_length=255, label="Nome")
     email = forms.EmailField(label="Email")
     matricula = forms.CharField(max_length=50, required=False, label="Matricula")
+    cpf = forms.CharField(max_length=14, required=False, label="CPF")
+    genero = forms.ChoiceField(
+        choices=(("", "---------"), *Aluno.Genero.choices),
+        required=False,
+        label="Gênero",
+    )
 
     def __init__(self, *args, aluno=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1149,12 +1155,47 @@ class AlunoDadosForm(AlunoComentarioForm):
             raise forms.ValidationError("Ja existe um usuario com este email.")
         return email
 
+    def clean_cpf(self):
+        cpf = "".join(char for char in (self.cleaned_data.get("cpf") or "") if char.isdigit())
+        if cpf and not validar_cpf_brasileiro(cpf):
+            raise forms.ValidationError("Informe um CPF válido.")
+        queryset = Aluno.objects.filter(cpf=cpf)
+        if self.aluno:
+            queryset = queryset.exclude(pk=self.aluno.pk)
+        if cpf and queryset.exists():
+            raise forms.ValidationError("Já existe um aluno com este CPF.")
+        return cpf or None
+
+
+class AlunoCpfForm(forms.Form):
+    cpf = forms.CharField(max_length=14, label="CPF")
+
+    def __init__(self, *args, aluno=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.aluno = aluno
+        self.fields["cpf"].widget.attrs.update(
+            {"inputmode": "numeric", "autocomplete": "off", "placeholder": "000.000.000-00"}
+        )
+
+    def clean_cpf(self):
+        cpf = "".join(char for char in self.cleaned_data["cpf"] if char.isdigit())
+        if not validar_cpf_brasileiro(cpf):
+            raise forms.ValidationError("Informe um CPF válido.")
+        if Aluno.objects.filter(cpf=cpf).exclude(pk=self.aluno.pk).exists():
+            raise forms.ValidationError("Este CPF já está cadastrado.")
+        return cpf
+
 
 class AlunoCadastroForm(forms.Form):
     POLOS_CADASTRO_ALUNO = ("POLI", "Caruaru", "Garanhuns", "Petrolina", "Fitec/SP")
 
     nome = forms.CharField(max_length=255, label="Nome completo")
     email = forms.EmailField(label="Email")
+    cpf = forms.CharField(max_length=14, label="CPF")
+    genero = forms.ChoiceField(
+        choices=(("", "---------"), *Aluno.Genero.choices),
+        label="Gênero",
+    )
     password1 = forms.CharField(label="Senha", widget=forms.PasswordInput)
     password2 = forms.CharField(label="Confirmar senha", widget=forms.PasswordInput)
     polo_atuacao = forms.ModelChoiceField(
@@ -1200,12 +1241,23 @@ class AlunoCadastroForm(forms.Form):
             nome__in=self.POLOS_CADASTRO_ALUNO,
             ativo=True,
         ).order_by("nome")
+        self.fields["cpf"].widget.attrs.update(
+            {"inputmode": "numeric", "autocomplete": "off", "placeholder": "000.000.000-00"}
+        )
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
         if User.objects.filter(email__iexact=email).exists():
             raise forms.ValidationError("Ja existe um usuario com este email.")
         return email
+
+    def clean_cpf(self):
+        cpf = "".join(char for char in self.cleaned_data["cpf"] if char.isdigit())
+        if not validar_cpf_brasileiro(cpf):
+            raise forms.ValidationError("Informe um CPF válido.")
+        if Aluno.objects.filter(cpf=cpf).exists():
+            raise forms.ValidationError("Este CPF já está cadastrado.")
+        return cpf
 
     def clean_ingresso(self):
         ingresso = self.cleaned_data["ingresso"].strip()
@@ -1256,6 +1308,8 @@ class AlunoCadastroForm(forms.Form):
             email=dados["email"],
             password=dados["password1"],
             nome=dados["nome"],
+            cpf=dados["cpf"],
+            genero=dados["genero"],
             status_aluno=Aluno.StatusAluno.EM_AVALIACAO,
             polo_atuacao=dados["polo_atuacao"],
             sexo_atribuido_nascimento=dados.get("sexo_atribuido_nascimento") or "",

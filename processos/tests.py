@@ -1936,6 +1936,22 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, reverse("password_reset"))
         self.assertContains(response, reverse("cadastro_aluno"))
 
+    def test_logout_sem_usuario_redireciona_para_login(self):
+        response = self.client.get(reverse("logout"))
+
+        self.assertRedirects(response, reverse("login"))
+
+    def test_logout_autenticado_continua_exigindo_post(self):
+        self.client.force_login(self.aluno)
+
+        response_get = self.client.get(reverse("logout"))
+        self.assertEqual(response_get.status_code, 405)
+        self.assertIn("_auth_user_id", self.client.session)
+
+        response_post = self.client.post(reverse("logout"))
+        self.assertRedirects(response_post, reverse("login"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+
     def test_cadastro_aluno_renderiza_identidade_acadflow(self):
         response = self.client.get(reverse("cadastro_aluno"))
 
@@ -1944,6 +1960,8 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "img/acadflow-logo.png")
         self.assertContains(response, "Email institucional")
         self.assertContains(response, "Polo do aluno")
+        self.assertContains(response, "CPF")
+        self.assertContains(response, "Gênero")
         self.assertContains(response, "Sexo atribuido ao nascer")
         self.assertContains(response, 'class="card login-card"')
 
@@ -1953,6 +1971,8 @@ class FrontendIdentityTests(TestCase):
             {
                 "nome": "Nova Aluna",
                 "email": "nova.aluna@example.com",
+                "cpf": "529.982.247-25",
+                "genero": Aluno.Genero.MULHER,
                 "password1": "senha-segura-123",
                 "password2": "senha-segura-123",
                 "polo_atuacao": self.polo.id,
@@ -1968,6 +1988,8 @@ class FrontendIdentityTests(TestCase):
         aluno = Aluno.objects.get(email="nova.aluna@example.com")
         self.assertEqual(aluno.status_aluno, Aluno.StatusAluno.EM_AVALIACAO)
         self.assertEqual(aluno.polo_atuacao_id, self.polo.id)
+        self.assertEqual(aluno.cpf, "52998224725")
+        self.assertEqual(aluno.genero, Aluno.Genero.MULHER)
         self.assertEqual(aluno.sexo_atribuido_nascimento, Aluno.SexoAtribuidoNascimento.FEMININO)
         self.assertTrue(aluno.is_active)
         trajetoria = aluno.trajetorias.get()
@@ -1985,6 +2007,58 @@ class FrontendIdentityTests(TestCase):
         self.assertNotContains(home, "Novo requerimento")
         self.assertNotContains(home, "Novo Processo")
         self.assertEqual(novo_processo.status_code, 403)
+
+    def test_aluno_sem_cpf_recebe_modal_e_pode_informar_cpf(self):
+        self.client.force_login(self.aluno)
+
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, 'id="modal-informar-cpf"')
+
+        response = self.client.post(
+            reverse("aluno_informar_cpf"),
+            {"cpf": "529.982.247-25", "next": reverse("home")},
+        )
+        self.assertRedirects(response, reverse("home"))
+        self.aluno.refresh_from_db()
+        self.assertEqual(self.aluno.cpf, "52998224725")
+
+        response = self.client.get(reverse("home"))
+        self.assertNotContains(response, 'id="modal-informar-cpf"')
+
+    def test_cpf_invalido_mantem_modal_pendente(self):
+        self.client.force_login(self.aluno)
+
+        response = self.client.post(
+            reverse("aluno_informar_cpf"),
+            {"cpf": "123.456.789-00", "next": reverse("home")},
+            follow=True,
+        )
+
+        self.aluno.refresh_from_db()
+        self.assertIsNone(self.aluno.cpf)
+        self.assertContains(response, 'id="modal-informar-cpf"')
+        self.assertContains(response, "Informe um CPF válido")
+
+    def test_dados_sensiveis_visiveis_apenas_para_gestao(self):
+        self.aluno.cpf = "529.982.247-25"
+        self.aluno.genero = Aluno.Genero.NAO_BINARIO
+        self.aluno.save()
+
+        self.client.force_login(self.aluno)
+        response = self.client.get(reverse("aluno_detalhe", args=[self.aluno.pk]))
+        self.assertNotContains(response, "52998224725")
+        self.assertNotContains(response, "Não binário")
+
+        secretaria = User.objects.create_user(
+            email="secretaria.frontend@example.com",
+            password="senha-segura-123",
+            nome="Secretaria Frontend",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.client.force_login(secretaria)
+        response = self.client.get(reverse("aluno_detalhe", args=[self.aluno.pk]))
+        self.assertContains(response, "52998224725")
+        self.assertContains(response, "Não binário")
 
     def test_esqueci_minha_senha_renderiza_identidade_acadflow(self):
         response = self.client.get(reverse("password_reset"))

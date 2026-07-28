@@ -93,6 +93,13 @@ class Aluno(User):
         MASCULINO = "MASCULINO", "Masculino"
         NAO_INFORMAR = "NAO_INFORMAR", "Prefiro nao informar"
 
+    class Genero(models.TextChoices):
+        MULHER = "MULHER", "Mulher"
+        HOMEM = "HOMEM", "Homem"
+        NAO_BINARIO = "NAO_BINARIO", "Não binário"
+        OUTRO = "OUTRO", "Outro"
+        NAO_INFORMAR = "NAO_INFORMAR", "Prefiro não informar"
+
     class StatusAluno(models.TextChoices):
         EM_AVALIACAO = "EM_AVALIACAO", "Em avaliacao"
         ATIVO = "ATIVO", "Ativo"
@@ -109,6 +116,8 @@ class Aluno(User):
         default=StatusAluno.ATIVO,
     )
     matricula = models.CharField(max_length=50, blank=True)
+    cpf = models.CharField(max_length=11, null=True, blank=True, unique=True)
+    genero = models.CharField(max_length=15, choices=Genero.choices, blank=True)
     sexo_atribuido_nascimento = models.CharField(
         max_length=15,
         choices=SexoAtribuidoNascimento.choices,
@@ -124,12 +133,15 @@ class Aluno(User):
 
         if self.tipo_usuario and self.tipo_usuario != User.TipoUsuario.ALUNO:
             errors["tipo_usuario"] = "Aluno deve ter tipo_usuario ALUNO."
+        if self.cpf and not validar_cpf_brasileiro(self.cpf):
+            errors["cpf"] = "Informe um CPF válido."
 
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.tipo_usuario = User.TipoUsuario.ALUNO
+        self.cpf = "".join(char for char in (self.cpf or "") if char.isdigit()) or None
         self.is_active = self.status_aluno in {
             self.StatusAluno.EM_AVALIACAO,
             self.StatusAluno.ATIVO,

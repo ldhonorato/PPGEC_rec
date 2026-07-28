@@ -81,6 +81,10 @@
             </div>
             <p class="aluno-kv"><strong>Email:</strong> {{ aluno.email }}</p>
             <p class="aluno-kv"><strong>Matricula:</strong> {{ aluno.matricula|default:"-" }}</p>
+            {% if can_manage_aluno %}
+                <p class="aluno-kv"><strong>CPF:</strong> {{ aluno.cpf|default:"-" }}</p>
+                <p class="aluno-kv"><strong>Gênero:</strong> {{ aluno.get_genero_display|default:"-" }}</p>
+            {% endif %}
             {% if trajetoria_atual %}
                 <ul class="info-list">
                     <li><span class="info-label">Status da trajetoria ativa</span><span><span class="badge badge-info">{{ trajetoria_atual.get_status_display }}</span></span></li>
@@ -369,6 +373,7 @@
         </section>
 </section>
 
+{% if can_manage_aluno %}
 <div id="modal-dados" class="modal-backdrop">
     <div class="modal-card">
         <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar dados do aluno</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
@@ -379,6 +384,8 @@
                 <div class="field"><label>Nome</label>{{ dados_form.nome }}</div>
                 <div class="field"><label>Email</label>{{ dados_form.email }}</div>
                 <div class="field"><label>Matricula</label>{{ dados_form.matricula }}</div>
+                <div class="field"><label>CPF</label>{{ dados_form.cpf }}{{ dados_form.cpf.errors }}</div>
+                <div class="field"><label>Gênero</label>{{ dados_form.genero }}{{ dados_form.genero.errors }}</div>
             </div>
             <label>Comentario</label>
             {{ dados_form.comentario }}
@@ -386,6 +393,7 @@
         </form>
     </div>
 </div>
+{% endif %}
 
 <div id="modal-nova-trajetoria" class="modal-backdrop">
     <div class="modal-card">

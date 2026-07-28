@@ -129,6 +129,23 @@
         </div>
     </main>
 </div>
+{% if solicitar_cpf_aluno %}
+<dialog id="modal-informar-cpf" class="modal-dialog" open>
+    <div class="modal-body">
+        <h2 class="section-title">Informe seu CPF</h2>
+        <p class="muted">Precisamos completar seus dados cadastrais. Digite um CPF válido para continuar.</p>
+        <form method="post" action="{% url 'aluno_informar_cpf' %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="field">
+                <label for="cpf-pendente">CPF</label>
+                <input id="cpf-pendente" name="cpf" maxlength="14" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" required autofocus>
+            </div>
+            <button class="btn" type="submit">Salvar CPF</button>
+        </form>
+    </div>
+</dialog>
+{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -20,20 +20,20 @@ from django.conf.urls.static import static
 from django.urls import path, reverse_lazy
 from django.contrib.auth.views import (
     LoginView,
-    LogoutView,
     PasswordResetCompleteView,
     PasswordResetConfirmView,
     PasswordResetDoneView,
     PasswordResetView,
 )
 from django.views.generic import RedirectView
-from ppgec.views import version_view
+from ppgec.views import SafeLogoutView, version_view
 
 from processos.views import (
     aluno_detalhe_view,
     alunos_view,
     aluno_documento_historico_view,
     aluno_documento_vinculo_view,
+    aluno_informar_cpf_view,
     caixa_processos_view,
     cadastro_aluno_sucesso_view,
     cadastro_aluno_view,
@@ -80,9 +80,10 @@ urlpatterns = [
     path("version/", version_view, name="version"),
     path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}img/acadflow-logo.png", permanent=True)),
     path("login/", LoginView.as_view(template_name="registration/login.html"), name="login"),
-    path("logout/", LogoutView.as_view(), name="logout"),
+    path("logout/", SafeLogoutView.as_view(), name="logout"),
     path("cadastro/aluno/", cadastro_aluno_view, name="cadastro_aluno"),
     path("cadastro/aluno/sucesso/", cadastro_aluno_sucesso_view, name="cadastro_aluno_sucesso"),
+    path("aluno/informar-cpf/", aluno_informar_cpf_view, name="aluno_informar_cpf"),
     path(
         "senha/esqueci/",
         PasswordResetView.as_view(

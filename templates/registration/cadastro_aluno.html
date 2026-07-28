@@ -29,6 +29,19 @@
             </div>
             <div class="grid-two">
                 <div class="field">
+                    <label for="{{ form.cpf.id_for_label }}">{{ form.cpf.label }}</label>
+                    {{ form.cpf }}
+                    {{ form.cpf.errors }}
+                </div>
+                <div class="field">
+                    <label for="{{ form.genero.id_for_label }}">{{ form.genero.label }}</label>
+                    {{ form.genero }}
+                    {{ form.genero.errors }}
+                </div>
+            </div>
+
+            <div class="grid-two">
+                <div class="field">
                     <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
                     {{ form.password1 }}
                     {{ form.password1.errors }}
