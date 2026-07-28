@@ -130,10 +130,11 @@
     </main>
 </div>
 {% if solicitar_cpf_aluno %}
-<dialog id="modal-informar-cpf" class="modal-dialog" open>
+<dialog id="modal-informar-cpf" class="modal-dialog cpf-pendente-modal">
     <div class="modal-body">
-        <h2 class="section-title">Informe seu CPF</h2>
-        <p class="muted">Precisamos completar seus dados cadastrais. Digite um CPF válido para continuar.</p>
+        <div class="cpf-pendente-icon" aria-hidden="true">!</div>
+        <h2 class="section-title">Complete seu cadastro</h2>
+        <p>Seu CPF ainda não foi informado. Você pode adicioná-lo agora ou fechar esta janela e continuar navegando.</p>
         <form method="post" action="{% url 'aluno_informar_cpf' %}">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -141,10 +142,23 @@
                 <label for="cpf-pendente">CPF</label>
                 <input id="cpf-pendente" name="cpf" maxlength="14" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" required autofocus>
             </div>
-            <button class="btn" type="submit">Salvar CPF</button>
+            <div class="form-actions">
+                <button class="btn btn-secondary" type="button" data-close-cpf-modal>Fechar</button>
+                <button class="btn" type="submit">Atualizar cadastro</button>
+            </div>
         </form>
     </div>
 </dialog>
+<script>
+    (function () {
+        const modal = document.getElementById("modal-informar-cpf");
+        if (!modal) return;
+        modal.showModal();
+        modal.querySelector("[data-close-cpf-modal]").addEventListener("click", function () {
+            modal.close();
+        });
+    })();
+</script>
 {% endif %}
 {% block scripts %}{% endblock %}
 </body>

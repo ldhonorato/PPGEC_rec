@@ -9,6 +9,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q, Sum
 from django.http import HttpResponse, JsonResponse
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -633,8 +634,7 @@ def _bool_label(valor: bool) -> str:
 
 
 def _trajetoria_ativa(aluno: Aluno) -> TrajetoriaAcademica:
-    trajetoria = aluno.trajetorias.filter(status=TrajetoriaAcademica.Status.ATIVA).order_by("-criado_em").first()
-    return trajetoria
+    return aluno.trajetoria_ativa()
 
 
 def _trajetoria_referencia_listagem(aluno: Aluno) -> TrajetoriaAcademica:
@@ -1232,6 +1232,7 @@ def matriculas_solicitacoes_view(request):
         return redirect(f"{reverse('matriculas_solicitacoes')}{periodo_param}")
 
     solicitacoes = SolicitacaoMatricula.objects.none()
+    solicitacoes_vinculo = SolicitacaoMatricula.objects.none()
     resumo_solicitacoes = {
         "matriculas_regulares": 0,
         "matriculas_especiais": 0,
@@ -1239,6 +1240,14 @@ def matriculas_solicitacoes_view(request):
         "espera_especiais": 0,
     }
     if periodo:
+        solicitacoes_vinculo = list(
+            SolicitacaoMatricula.objects.filter(
+                periodo=periodo,
+                tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
+            )
+            .select_related("aluno", "periodo")
+            .order_by("status", "aluno__nome")
+        )
         solicitacoes = (
             SolicitacaoMatricula.objects.filter(
                 periodo=periodo,
@@ -1303,6 +1312,7 @@ def matriculas_solicitacoes_view(request):
             "periodos": periodos,
             "periodo": periodo,
             "solicitacoes": solicitacoes,
+            "solicitacoes_vinculo": solicitacoes_vinculo,
             "resumo_solicitacoes": resumo_solicitacoes,
         },
     )
@@ -1990,6 +2000,31 @@ def cadastro_aluno_sucesso_view(request):
     return render(request, "registration/cadastro_aluno_sucesso.html")
 
 
+def _aprovar_cadastro_aluno(*, aluno, usuario):
+    aluno.trajetorias.filter(status=TrajetoriaAcademica.Status.ATIVA).update(
+        status=TrajetoriaAcademica.Status.CONCLUIDA,
+    )
+    trajetorias_em_homologacao = aluno.trajetorias.filter(
+        status=TrajetoriaAcademica.Status.EM_HOMOLOGACAO
+    )
+    trajetorias_em_homologacao.exclude(
+        nivel_curso=Aluno.NivelCurso.ALUNO_ESPECIAL
+    ).update(status=TrajetoriaAcademica.Status.ATIVA)
+    trajetorias_em_homologacao.filter(
+        nivel_curso=Aluno.NivelCurso.ALUNO_ESPECIAL
+    ).update(status=TrajetoriaAcademica.Status.CONCLUIDA)
+    aluno.status_aluno = Aluno.StatusAluno.ATIVO
+    aluno.save()
+    _registrar_alteracao_aluno(
+        aluno=aluno,
+        tipo=AlteracaoAluno.TipoAlteracao.STATUS,
+        valor_anterior="Em avaliacao",
+        valor_novo=aluno.get_status_aluno_display(),
+        comentario="Cadastro aprovado pela secretaria.",
+        alterado_por=usuario,
+    )
+
+
 @login_required
 def aluno_informar_cpf_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
@@ -2023,24 +2058,9 @@ def validar_cadastros_alunos_view(request):
             status_aluno=Aluno.StatusAluno.EM_AVALIACAO,
         )
         acao = request.POST.get("acao", "").strip()
-        trajetorias_em_homologacao = aluno.trajetorias.filter(
-            status=TrajetoriaAcademica.Status.EM_HOMOLOGACAO
-        )
+        trajetorias_em_homologacao = aluno.trajetorias.filter(status=TrajetoriaAcademica.Status.EM_HOMOLOGACAO)
         if acao == "aprovar":
-            aluno.trajetorias.filter(status=TrajetoriaAcademica.Status.ATIVA).update(
-                status=TrajetoriaAcademica.Status.CONCLUIDA,
-            )
-            trajetorias_em_homologacao.update(status=TrajetoriaAcademica.Status.ATIVA)
-            aluno.status_aluno = Aluno.StatusAluno.ATIVO
-            aluno.save()
-            _registrar_alteracao_aluno(
-                aluno=aluno,
-                tipo=AlteracaoAluno.TipoAlteracao.STATUS,
-                valor_anterior="Em avaliacao",
-                valor_novo=aluno.get_status_aluno_display(),
-                comentario="Cadastro aprovado pela secretaria.",
-                alterado_por=request.user,
-            )
+            _aprovar_cadastro_aluno(aluno=aluno, usuario=request.user)
             messages.success(request, f"Cadastro de {aluno.nome} aprovado.")
         elif acao == "reprovar":
             trajetorias_em_homologacao.update(status=TrajetoriaAcademica.Status.REMOVIDA)
@@ -2057,26 +2077,38 @@ def validar_cadastros_alunos_view(request):
             messages.success(request, f"Cadastro de {aluno.nome} reprovado.")
         else:
             messages.error(request, "Acao invalida para validacao de cadastro.")
-        return redirect("validar_cadastros_alunos")
+        polo_param = request.POST.get("polo", "").strip()
+        destino = reverse("validar_cadastros_alunos")
+        return redirect(f"{destino}?polo={polo_param}" if polo_param else destino)
 
-    alunos_pendentes = []
-    queryset = (
+    queryset_base = (
         Aluno.objects.filter(status_aluno=Aluno.StatusAluno.EM_AVALIACAO)
         .prefetch_related("trajetorias__orientador", "trajetorias__coorientador")
         .order_by("date_joined", "nome")
     )
-    for aluno in queryset:
+    total_pendentes = queryset_base.count()
+    polo_id = request.GET.get("polo", "").strip()
+    queryset = queryset_base
+    if polo_id:
+        queryset = queryset.filter(polo_atuacao_id=polo_id)
+    total_filtrado = queryset.count()
+    pagina = Paginator(queryset, 20).get_page(request.GET.get("page"))
+    for aluno in pagina.object_list:
         trajetoria_atual = aluno.trajetoria_ativa()
         if not trajetoria_atual:
             trajetoria_atual = aluno.trajetorias.order_by("-criado_em").first()
         aluno.trajetoria_atual = trajetoria_atual
-        alunos_pendentes.append(aluno)
 
     return render(
         request,
         "processos/validar_cadastros_alunos.html",
         {
-            "alunos_pendentes": alunos_pendentes,
+            "alunos_pendentes": pagina.object_list,
+            "page_obj": pagina,
+            "polos": Polo.objects.filter(ativo=True).order_by("nome"),
+            "filtro_polo": polo_id,
+            "total_pendentes": total_pendentes,
+            "total_filtrado": total_filtrado,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -2097,6 +2129,8 @@ def alunos_view(request):
     ingresso_inicio_raw = request.GET.get("ingresso_inicio", "").strip()
     ingresso_fim_raw = request.GET.get("ingresso_fim", "").strip()
     status = request.GET.get("status", "").strip().upper()
+    periodo_sem_matricula_id = request.GET.get("sem_matricula_periodo", "").strip()
+    periodo_sem_matricula = None
 
     if nome:
         queryset = queryset.filter(nome__icontains=nome)
@@ -2113,6 +2147,11 @@ def alunos_view(request):
 
     if status:
         queryset = queryset.filter(status_aluno=status)
+
+    if periodo_sem_matricula_id:
+        periodo_sem_matricula = get_object_or_404(PeriodoLetivo, pk=periodo_sem_matricula_id)
+        alunos_sem_matricula_ids = alunos_ativos_sem_matricula(periodo_sem_matricula).values("pk")
+        queryset = queryset.filter(pk__in=alunos_sem_matricula_ids)
 
     alunos = list(queryset.distinct())
     for aluno_item in alunos:
@@ -2131,6 +2170,10 @@ def alunos_view(request):
             "filtro_ingresso_inicio": ingresso_inicio_raw,
             "filtro_ingresso_fim": ingresso_fim_raw,
             "filtro_status": status,
+            "periodos_letivos": PeriodoLetivo.objects.order_by("-nome"),
+            "filtro_sem_matricula_periodo": periodo_sem_matricula_id,
+            "periodo_sem_matricula": periodo_sem_matricula,
+            "total_alunos_filtrados": len(alunos),
             "status_list": Aluno.StatusAluno.choices,
             "nivel_list": Aluno.NivelCurso.choices,
             "is_coordenador": _is_coordenador(request.user),
@@ -2175,6 +2218,8 @@ def aluno_detalhe_view(request, aluno_id):
                 aluno.matricula = form.cleaned_data["matricula"]
                 aluno.cpf = form.cleaned_data["cpf"]
                 aluno.genero = form.cleaned_data["genero"]
+                aluno.sexo_atribuido_nascimento = form.cleaned_data["sexo_atribuido_nascimento"]
+                aluno.polo_atuacao = form.cleaned_data["polo_atuacao"]
                 aluno.save()
                 _registrar_alteracao_aluno(
                     aluno=aluno,
@@ -2187,6 +2232,14 @@ def aluno_detalhe_view(request, aluno_id):
                 messages.success(request, "Dados do aluno atualizados.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
             messages.error(request, "Nao foi possivel atualizar os dados do aluno.")
+
+        elif acao == "aprovar_cadastro":
+            if aluno.status_aluno != Aluno.StatusAluno.EM_AVALIACAO:
+                messages.info(request, "O cadastro deste aluno já foi analisado.")
+            else:
+                _aprovar_cadastro_aluno(aluno=aluno, usuario=request.user)
+                messages.success(request, f"Cadastro de {aluno.nome} aprovado.")
+            return redirect("aluno_detalhe", aluno_id=aluno.id)
 
         elif acao == "nova_trajetoria":
             form = TrajetoriaAcademicaForm(request.POST)
@@ -2983,6 +3036,8 @@ def aluno_detalhe_view(request, aluno_id):
             "matricula": aluno.matricula,
             "cpf": aluno.cpf,
             "genero": aluno.genero,
+            "sexo_atribuido_nascimento": aluno.sexo_atribuido_nascimento,
+            "polo_atuacao": aluno.polo_atuacao,
         },
     )
     nova_trajetoria_form = TrajetoriaAcademicaForm(

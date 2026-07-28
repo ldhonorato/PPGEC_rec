@@ -408,6 +408,33 @@ class MatriculaViewsTests(TestCase):
         self.assertEqual(item.motivo_indeferimento, "Indeferida em teste.")
         self.assertEqual(solicitacao.status, SolicitacaoMatricula.Status.INDEFERIDA)
 
+    def test_gestao_visualiza_alunos_com_matricula_vinculo_nas_solicitacoes(self):
+        aluno_vinculo = Aluno.objects.create(
+            email="aluno.vinculo.solicitacoes@example.com",
+            password="senha-segura-123",
+            nome="Aluno com Matrícula Vínculo",
+            matricula="202600123",
+        )
+        solicitacao_vinculo = SolicitacaoMatricula.objects.create(
+            periodo=self.periodo,
+            aluno=aluno_vinculo,
+            tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
+            status=SolicitacaoMatricula.Status.SOLICITADA,
+            observacao_aluno="Manutenção de vínculo no semestre.",
+            solicitada_em=timezone.now(),
+        )
+        self.client.force_login(self.secretaria)
+
+        response = self.client.get(reverse("matriculas_solicitacoes"), {"periodo": self.periodo.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Matrículas vínculo")
+        self.assertContains(response, aluno_vinculo.nome)
+        self.assertContains(response, aluno_vinculo.email)
+        self.assertContains(response, aluno_vinculo.matricula)
+        self.assertContains(response, solicitacao_vinculo.observacao_aluno)
+        self.assertContains(response, reverse("matricula_minha_solicitacao", args=[solicitacao_vinculo.pk]))
+
     def test_ofertas_usa_periodo_mais_recente_e_permite_trocar_periodo(self):
         hoje = timezone.localdate()
         periodo_recente = PeriodoLetivo.objects.create(
@@ -440,6 +467,9 @@ class MatriculaViewsTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Oferta Recente")
+        self.assertContains(response, 'id="periodo"')
+        self.assertContains(response, 'addEventListener("change"')
+        self.assertNotContains(response, "Alterar período")
         self.assertNotContains(response, f"<strong>{self.disciplina.codigo} - {self.disciplina.nome}</strong>", html=True)
 
         response = self.client.get(reverse("matriculas_ofertas"), {"periodo": self.periodo.pk})
@@ -1023,6 +1053,66 @@ class AlunosViewTests(TestCase):
         self.assertTrue(aluno_pendente.is_active)
         self.assertEqual(trajetoria.status, TrajetoriaAcademica.Status.ATIVA)
 
+    def test_cadastros_pendentes_sao_paginados_filtrados_por_polo_e_contados(self):
+        polo_a = Polo.objects.create(nome="Polo Aprovação A")
+        polo_b = Polo.objects.create(nome="Polo Aprovação B")
+        for indice in range(21):
+            Aluno.objects.create_user(
+                email=f"pendente.paginado.{indice}@example.com",
+                password="senha-segura-123",
+                nome=f"Aluno Pendente {indice:02d}",
+                status_aluno=Aluno.StatusAluno.EM_AVALIACAO,
+                polo_atuacao=polo_a if indice < 20 else polo_b,
+            )
+        self.client.force_login(self.servidor)
+
+        response = self.client.get(reverse("validar_cadastros_alunos"))
+        self.assertEqual(response.context["total_pendentes"], 21)
+        self.assertEqual(len(response.context["alunos_pendentes"]), 20)
+        self.assertContains(response, "alunos aguardando aprovação")
+        self.assertContains(response, "Página 1 de 2")
+
+        response = self.client.get(reverse("validar_cadastros_alunos"), {"polo": polo_b.pk})
+        self.assertEqual(response.context["total_filtrado"], 1)
+        self.assertContains(response, "Aluno Pendente 20")
+        self.assertNotContains(response, "Aluno Pendente 00")
+
+    def test_aprova_cadastro_na_pagina_do_aluno_e_conclui_aluno_especial(self):
+        polo = Polo.objects.create(nome="Polo Cadastro Individual")
+        aluno_pendente = Aluno.objects.create_user(
+            email="especial.pendente@example.com",
+            password="senha-segura-123",
+            nome="Aluno Especial Pendente",
+            status_aluno=Aluno.StatusAluno.EM_AVALIACAO,
+            polo_atuacao=polo,
+            cpf="52998224725",
+            genero=Aluno.Genero.NAO_BINARIO,
+            sexo_atribuido_nascimento=Aluno.SexoAtribuidoNascimento.FEMININO,
+        )
+        trajetoria = criar_trajetoria(
+            aluno_pendente,
+            nivel_curso=Aluno.NivelCurso.ALUNO_ESPECIAL,
+            status=TrajetoriaAcademica.Status.EM_HOMOLOGACAO,
+        )
+        self.client.force_login(self.servidor)
+        url = reverse("aluno_detalhe", args=[aluno_pendente.pk])
+
+        response = self.client.get(url)
+        self.assertContains(response, "Aprovar Cadastro")
+        self.assertNotContains(response, '<p class="aluno-kv"><strong>CPF:</strong>', html=False)
+        self.assertNotContains(response, '<p class="aluno-kv"><strong>Gênero:</strong>', html=False)
+        self.assertContains(response, 'name="cpf"')
+        self.assertContains(response, 'name="genero"')
+        self.assertContains(response, 'name="sexo_atribuido_nascimento"')
+        self.assertContains(response, 'name="polo_atuacao"')
+
+        response = self.client.post(url, {"acao": "aprovar_cadastro"})
+        self.assertRedirects(response, url)
+        aluno_pendente.refresh_from_db()
+        trajetoria.refresh_from_db()
+        self.assertEqual(aluno_pendente.status_aluno, Aluno.StatusAluno.ATIVO)
+        self.assertEqual(trajetoria.status, TrajetoriaAcademica.Status.CONCLUIDA)
+
     def test_secretaria_reprova_cadastro_e_remove_trajetoria_em_homologacao(self):
         aluno_pendente = Aluno.objects.create_user(
             email="pendente.reprovado@example.com",
@@ -1338,6 +1428,48 @@ class AlunosViewTests(TestCase):
         alunos = list(response.context["alunos"])
         self.assertEqual(len(alunos), 1)
         self.assertEqual(alunos[0].id, self.aluno.id)
+
+    def test_filtra_alunos_com_trajetoria_ativa_sem_matricula_no_periodo(self):
+        hoje = timezone.localdate()
+        periodo = PeriodoLetivo.objects.create(
+            nome="2026.2",
+            prazo_cadastro_disciplinas=hoje - timedelta(days=30),
+            matricula_inicio=hoje - timedelta(days=29),
+            matricula_fim=hoje - timedelta(days=25),
+            modificacao_inicio=hoje - timedelta(days=24),
+            modificacao_fim=hoje - timedelta(days=20),
+            criado_por=self.servidor,
+        )
+        aluno_sem_matricula = Aluno.objects.create(
+            email="ativo.sem.matricula@example.com",
+            password="senha-segura-123",
+            nome="Ativo Sem Matrícula 2026.2",
+        )
+        criar_trajetoria(aluno_sem_matricula)
+        aluno_com_matricula = Aluno.objects.create(
+            email="ativo.com.matricula@example.com",
+            password="senha-segura-123",
+            nome="Ativo Com Matrícula 2026.2",
+        )
+        criar_trajetoria(aluno_com_matricula)
+        SolicitacaoMatricula.objects.create(
+            periodo=periodo,
+            aluno=aluno_com_matricula,
+            tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
+            status=SolicitacaoMatricula.Status.SOLICITADA,
+        )
+        self.client.force_login(self.servidor)
+
+        response = self.client.get(
+            reverse("coordenacao_alunos"),
+            {"sem_matricula_periodo": periodo.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sem matrícula no período")
+        self.assertContains(response, "trajetória ativa e sem matrícula registrada em")
+        self.assertContains(response, "Ativo Sem Matrícula 2026.2")
+        self.assertNotContains(response, "Ativo Com Matrícula 2026.2")
 
     def test_docente_nao_coordenador_nao_tem_acesso(self):
         self.client.force_login(self.docente)
@@ -1808,6 +1940,7 @@ class AlunosViewTests(TestCase):
         self.assertIsNone(trajetoria.data_defesa)
         self.assertFalse(trajetoria.deposito_versao_final)
         self.assertFalse(trajetoria.isQualificado)
+        self.assertEqual(trajetoria.status, TrajetoriaAcademica.Status.CONCLUIDA)
         self.assertFalse(trajetoria.reingressante)
 
     def test_posdoutorado_exige_relatorio_final_para_conclusao(self):
@@ -1963,6 +2096,8 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "CPF")
         self.assertContains(response, "Gênero")
         self.assertContains(response, "Sexo atribuido ao nascer")
+        self.assertContains(response, "informações opcionais")
+        self.assertContains(response, "tratadas de forma confidencial")
         self.assertContains(response, 'class="card login-card"')
 
     def test_cadastro_aluno_cria_conta_em_avaliacao(self):
@@ -2008,11 +2143,34 @@ class FrontendIdentityTests(TestCase):
         self.assertNotContains(home, "Novo Processo")
         self.assertEqual(novo_processo.status_code, 403)
 
+    def test_cadastro_aceita_genero_e_sexo_em_branco(self):
+        response = self.client.post(
+            reverse("cadastro_aluno"),
+            {
+                "nome": "Aluno Dados Opcionais",
+                "email": "dados.opcionais@example.com",
+                "cpf": "111.444.777-35",
+                "password1": "senha-segura-123",
+                "password2": "senha-segura-123",
+                "polo_atuacao": self.polo.id,
+                "nivel_curso": Aluno.NivelCurso.ALUNO_ESPECIAL,
+                "ingresso": "2026",
+                "tipo_coorientador": "NENHUM",
+            },
+        )
+
+        self.assertRedirects(response, reverse("cadastro_aluno_sucesso"))
+        aluno = Aluno.objects.get(email="dados.opcionais@example.com")
+        self.assertEqual(aluno.genero, "")
+        self.assertEqual(aluno.sexo_atribuido_nascimento, "")
+
     def test_aluno_sem_cpf_recebe_modal_e_pode_informar_cpf(self):
         self.client.force_login(self.aluno)
 
         response = self.client.get(reverse("home"))
         self.assertContains(response, 'id="modal-informar-cpf"')
+        self.assertContains(response, "Atualizar cadastro")
+        self.assertContains(response, "data-close-cpf-modal")
 
         response = self.client.post(
             reverse("aluno_informar_cpf"),
@@ -2039,7 +2197,7 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, 'id="modal-informar-cpf"')
         self.assertContains(response, "Informe um CPF válido")
 
-    def test_dados_sensiveis_visiveis_apenas_para_gestao(self):
+    def test_dados_sensiveis_aparecem_apenas_no_modal_de_gestao(self):
         self.aluno.cpf = "529.982.247-25"
         self.aluno.genero = Aluno.Genero.NAO_BINARIO
         self.aluno.save()
@@ -2057,6 +2215,8 @@ class FrontendIdentityTests(TestCase):
         )
         self.client.force_login(secretaria)
         response = self.client.get(reverse("aluno_detalhe", args=[self.aluno.pk]))
+        self.assertNotContains(response, '<p class="aluno-kv"><strong>CPF:</strong>', html=False)
+        self.assertNotContains(response, '<p class="aluno-kv"><strong>Gênero:</strong>', html=False)
         self.assertContains(response, "52998224725")
         self.assertContains(response, "Não binário")
 

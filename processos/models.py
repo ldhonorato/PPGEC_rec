@@ -154,7 +154,13 @@ class Aluno(User):
         return self.nome or self.email
 
     def trajetoria_ativa(self):
-        return self.trajetorias.filter(status=TrajetoriaAcademica.Status.ATIVA).order_by("-criado_em").first()
+        trajetoria = self.trajetorias.filter(status=TrajetoriaAcademica.Status.ATIVA).order_by("-criado_em").first()
+        if trajetoria:
+            return trajetoria
+        return self.trajetorias.filter(
+            nivel_curso=self.NivelCurso.ALUNO_ESPECIAL,
+            status=TrajetoriaAcademica.Status.CONCLUIDA,
+        ).order_by("-criado_em").first()
 
     @property
     def coorientador_display(self) -> str:
@@ -300,6 +306,8 @@ class TrajetoriaAcademica(models.Model):
         return "Data da defesa"
 
     def _normalizar_campos_por_nivel(self):
+        if self.nivel_curso == Aluno.NivelCurso.ALUNO_ESPECIAL and self.status == self.Status.ATIVA:
+            self.status = self.Status.CONCLUIDA
         if not self.usa_prazos_academicos:
             self.prazo_qualificacao = ""
             self.prazo_defesa = ""

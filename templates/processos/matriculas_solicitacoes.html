@@ -114,4 +114,42 @@
         <p class="muted">Nenhuma solicitação de matrícula em disciplinas registrada para este período.</p>
     {% endif %}
 </section>
+
+<section class="card" style="margin-top:1rem;">
+    <h2 class="section-title">
+        Matrículas vínculo
+        {% if periodo %} - {{ periodo.nome }}{% endif %}
+    </h2>
+    <p class="muted">
+        Alunos que solicitaram manutenção do vínculo sem matrícula em disciplinas neste período:
+        {{ solicitacoes_vinculo|length }}.
+    </p>
+    {% if solicitacoes_vinculo %}
+        <ul class="list">
+            {% for solicitacao in solicitacoes_vinculo %}
+                <li>
+                    <div class="actions-row">
+                        <div>
+                            <strong>{{ solicitacao.aluno.nome }}</strong>
+                            <span class="badge badge-info">{{ solicitacao.get_status_display }}</span>
+                            <small class="muted" style="display:block; margin-top:0.35rem;">
+                                {{ solicitacao.aluno.email }}
+                                {% if solicitacao.aluno.matricula %} | {{ solicitacao.aluno.matricula }}{% endif %} |
+                                Solicitada em {{ solicitacao.solicitada_em|date:"d/m/Y H:i"|default:"-" }}
+                            </small>
+                            {% if solicitacao.observacao_aluno %}
+                                <p class="muted">{{ solicitacao.observacao_aluno }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="calendar-nav">
+                            <a class="btn btn-secondary" href="{% url 'matricula_minha_solicitacao' solicitacao.pk %}">Detalhes</a>
+                        </div>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Nenhuma matrícula vínculo registrada para este período.</p>
+    {% endif %}
+</section>
 {% endblock %}

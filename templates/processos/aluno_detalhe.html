@@ -74,6 +74,13 @@
                 <h1 class="section-title" style="margin-bottom: 0;">{{ aluno.nome }}</h1>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     {% if can_manage_aluno %}
+                        {% if aluno.status_aluno == "EM_AVALIACAO" %}
+                            <form method="post" style="margin:0;">
+                                {% csrf_token %}
+                                <input type="hidden" name="acao" value="aprovar_cadastro">
+                                <button type="submit" class="btn">Aprovar Cadastro</button>
+                            </form>
+                        {% endif %}
                         <button type="button" class="btn btn-secondary" data-modal-open="modal-dados">Alterar dados</button>
                         <a class="btn btn-secondary" href="{% url 'coordenacao_alunos' %}">Voltar para alunos</a>
                     {% endif %}
@@ -81,10 +88,6 @@
             </div>
             <p class="aluno-kv"><strong>Email:</strong> {{ aluno.email }}</p>
             <p class="aluno-kv"><strong>Matricula:</strong> {{ aluno.matricula|default:"-" }}</p>
-            {% if can_manage_aluno %}
-                <p class="aluno-kv"><strong>CPF:</strong> {{ aluno.cpf|default:"-" }}</p>
-                <p class="aluno-kv"><strong>Gênero:</strong> {{ aluno.get_genero_display|default:"-" }}</p>
-            {% endif %}
             {% if trajetoria_atual %}
                 <ul class="info-list">
                     <li><span class="info-label">Status da trajetoria ativa</span><span><span class="badge badge-info">{{ trajetoria_atual.get_status_display }}</span></span></li>
@@ -386,6 +389,8 @@
                 <div class="field"><label>Matricula</label>{{ dados_form.matricula }}</div>
                 <div class="field"><label>CPF</label>{{ dados_form.cpf }}{{ dados_form.cpf.errors }}</div>
                 <div class="field"><label>Gênero</label>{{ dados_form.genero }}{{ dados_form.genero.errors }}</div>
+                <div class="field"><label>Sexo atribuído ao nascer</label>{{ dados_form.sexo_atribuido_nascimento }}{{ dados_form.sexo_atribuido_nascimento.errors }}</div>
+                <div class="field"><label>Polo</label>{{ dados_form.polo_atuacao }}{{ dados_form.polo_atuacao.errors }}</div>
             </div>
             <label>Comentario</label>
             {{ dados_form.comentario }}

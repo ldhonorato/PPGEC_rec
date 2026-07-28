@@ -27,30 +27,10 @@
                 {{ form.email }}
                 {{ form.email.errors }}
             </div>
-            <div class="grid-two">
-                <div class="field">
-                    <label for="{{ form.cpf.id_for_label }}">{{ form.cpf.label }}</label>
-                    {{ form.cpf }}
-                    {{ form.cpf.errors }}
-                </div>
-                <div class="field">
-                    <label for="{{ form.genero.id_for_label }}">{{ form.genero.label }}</label>
-                    {{ form.genero }}
-                    {{ form.genero.errors }}
-                </div>
-            </div>
-
-            <div class="grid-two">
-                <div class="field">
-                    <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
-                    {{ form.password1 }}
-                    {{ form.password1.errors }}
-                </div>
-                <div class="field">
-                    <label for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
-                    {{ form.password2 }}
-                    {{ form.password2.errors }}
-                </div>
+            <div class="field">
+                <label for="{{ form.cpf.id_for_label }}">{{ form.cpf.label }}</label>
+                {{ form.cpf }}
+                {{ form.cpf.errors }}
             </div>
 
             <div class="grid-two">
@@ -65,18 +45,32 @@
                     {{ form.ingresso.errors }}
                 </div>
             </div>
+            <div class="field">
+                <label for="{{ form.polo_atuacao.id_for_label }}">{{ form.polo_atuacao.label }}</label>
+                {{ form.polo_atuacao }}
+                {{ form.polo_atuacao.errors }}
+            </div>
             <div class="grid-two">
                 <div class="field">
-                    <label for="{{ form.polo_atuacao.id_for_label }}">{{ form.polo_atuacao.label }}</label>
-                    {{ form.polo_atuacao }}
-                    {{ form.polo_atuacao.errors }}
+                    <label for="{{ form.genero.id_for_label }}">
+                        {{ form.genero.label }} (opcional)
+                        <span class="field-tooltip" title="Informação opcional, coletada para fins estatísticos e tratada de forma confidencial." aria-label="Informação opcional, coletada para fins estatísticos e tratada de forma confidencial.">ⓘ</span>
+                    </label>
+                    {{ form.genero }}
+                    {{ form.genero.errors }}
                 </div>
                 <div class="field">
-                    <label for="{{ form.sexo_atribuido_nascimento.id_for_label }}">{{ form.sexo_atribuido_nascimento.label }}</label>
+                    <label for="{{ form.sexo_atribuido_nascimento.id_for_label }}">
+                        {{ form.sexo_atribuido_nascimento.label }} (opcional)
+                        <span class="field-tooltip" title="Informação opcional, coletada para fins estatísticos e tratada de forma confidencial." aria-label="Informação opcional, coletada para fins estatísticos e tratada de forma confidencial.">ⓘ</span>
+                    </label>
                     {{ form.sexo_atribuido_nascimento }}
                     {{ form.sexo_atribuido_nascimento.errors }}
                 </div>
             </div>
+            <p class="muted" style="margin-top:-0.25rem;">
+                Gênero e sexo são informações opcionais, coletadas exclusivamente para fins estatísticos e tratadas de forma confidencial.
+            </p>
 
             <div data-nivel-section="ORIENTACAO">
                 <div class="field">
@@ -112,6 +106,19 @@
                         {{ form.coorientador_externo_instituicao }}
                         {{ form.coorientador_externo_instituicao.errors }}
                     </div>
+                </div>
+            </div>
+
+            <div class="grid-two">
+                <div class="field">
+                    <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
+                    {{ form.password1 }}
+                    {{ form.password1.errors }}
+                </div>
+                <div class="field">
+                    <label for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
+                    {{ form.password2 }}
+                    {{ form.password2.errors }}
                 </div>
             </div>
 

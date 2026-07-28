@@ -43,6 +43,15 @@
                 <label for="id_ingresso_fim">Ingresso ate</label>
                 <input id="id_ingresso_fim" type="text" name="ingresso_fim" value="{{ filtro_ingresso_fim }}" placeholder="YYYY.1 ou YYYY.2">
             </div>
+            <div class="field">
+                <label for="id_sem_matricula_periodo">Sem matrícula no período</label>
+                <select id="id_sem_matricula_periodo" name="sem_matricula_periodo">
+                    <option value="">Não filtrar</option>
+                    {% for periodo in periodos_letivos %}
+                        <option value="{{ periodo.pk }}" {% if filtro_sem_matricula_periodo == periodo.pk|stringformat:"s" %}selected{% endif %}>{{ periodo.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
         <small class="muted">Formato de semestre: YYYY.1 ou YYYY.2 (ex.: 2025.1).</small><br>
         <button class="btn" type="submit">Filtrar</button>
@@ -50,6 +59,13 @@
 </section>
 
 <section class="card">
+    {% if periodo_sem_matricula %}
+        <div class="alert alert-info" style="margin-bottom:1rem;">
+            <strong>{{ total_alunos_filtrados }}</strong>
+            aluno{{ total_alunos_filtrados|pluralize }} com trajetória ativa e sem matrícula registrada em
+            <strong>{{ periodo_sem_matricula.nome }}</strong>.
+        </div>
+    {% endif %}
     {% if alunos %}
         <ul class="list">
             {% for aluno in alunos %}

@@ -3,6 +3,24 @@
 {% block content %}
 <section class="card">
     <h1 class="section-title">Validar cadastros de alunos</h1>
+    <p class="muted">
+        <strong>{{ total_pendentes }}</strong> aluno{{ total_pendentes|pluralize }} aguardando aprovação.
+        {% if filtro_polo %}Exibindo {{ total_filtrado }} no polo selecionado.{% endif %}
+    </p>
+    <form method="get" class="grid-two" style="margin-bottom:1rem;">
+        <div class="field">
+            <label for="polo">Polo</label>
+            <select id="polo" name="polo">
+                <option value="">Todos os polos</option>
+                {% for polo in polos %}
+                    <option value="{{ polo.pk }}" {% if filtro_polo == polo.pk|stringformat:"s" %}selected{% endif %}>{{ polo.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="field" style="justify-content:end;">
+            <button class="btn btn-secondary" type="submit">Filtrar</button>
+        </div>
+    </form>
     {% if alunos_pendentes %}
         <ul class="list">
             {% for aluno in alunos_pendentes %}
@@ -12,6 +30,7 @@
                             <strong>{{ aluno.nome }}</strong><br>
                             <small class="muted">
                                 {{ aluno.email }}
+                                {% if aluno.polo_atuacao %} | Polo: {{ aluno.polo_atuacao.nome }}{% endif %}
                                 {% if aluno.trajetoria_atual %}
                                     | {{ aluno.trajetoria_atual.get_nivel_curso_display }}
                                     | Ingresso: {{ aluno.trajetoria_atual.ingresso }}
@@ -26,12 +45,14 @@
                                 {% csrf_token %}
                                 <input type="hidden" name="aluno_id" value="{{ aluno.id }}">
                                 <input type="hidden" name="acao" value="aprovar">
+                                <input type="hidden" name="polo" value="{{ filtro_polo }}">
                                 <button class="btn" type="submit">Aprovar</button>
                             </form>
                             <form method="post">
                                 {% csrf_token %}
                                 <input type="hidden" name="aluno_id" value="{{ aluno.id }}">
                                 <input type="hidden" name="acao" value="reprovar">
+                                <input type="hidden" name="polo" value="{{ filtro_polo }}">
                                 <button class="btn btn-secondary" type="submit">Reprovar</button>
                             </form>
                         </div>
@@ -39,8 +60,19 @@
                 </li>
             {% endfor %}
         </ul>
+        {% if page_obj.paginator.num_pages > 1 %}
+            <nav class="calendar-nav" aria-label="Paginação dos cadastros" style="margin-top:1rem;">
+                {% if page_obj.has_previous %}
+                    <a class="btn btn-secondary" href="?polo={{ filtro_polo }}&page={{ page_obj.previous_page_number }}">Anterior</a>
+                {% endif %}
+                <span class="muted">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a class="btn btn-secondary" href="?polo={{ filtro_polo }}&page={{ page_obj.next_page_number }}">Próxima</a>
+                {% endif %}
+            </nav>
+        {% endif %}
     {% else %}
-        <p class="muted">Nao ha cadastros de alunos em avaliacao.</p>
+        <p class="muted">Não há cadastros de alunos em avaliação para o filtro selecionado.</p>
     {% endif %}
 </section>
 {% endblock %}

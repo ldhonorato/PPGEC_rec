@@ -1141,10 +1141,21 @@ class AlunoDadosForm(AlunoComentarioForm):
         required=False,
         label="Gênero",
     )
+    sexo_atribuido_nascimento = forms.ChoiceField(
+        choices=(("", "---------"), *Aluno.SexoAtribuidoNascimento.choices),
+        required=False,
+        label="Sexo atribuído ao nascer",
+    )
+    polo_atuacao = forms.ModelChoiceField(
+        queryset=Polo.objects.none(),
+        required=False,
+        label="Polo",
+    )
 
     def __init__(self, *args, aluno=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.aluno = aluno
+        self.fields["polo_atuacao"].queryset = Polo.objects.filter(ativo=True).order_by("nome")
 
     def clean_email(self):
         email = self.cleaned_data["email"]
@@ -1194,6 +1205,7 @@ class AlunoCadastroForm(forms.Form):
     cpf = forms.CharField(max_length=14, label="CPF")
     genero = forms.ChoiceField(
         choices=(("", "---------"), *Aluno.Genero.choices),
+        required=False,
         label="Gênero",
     )
     password1 = forms.CharField(label="Senha", widget=forms.PasswordInput)

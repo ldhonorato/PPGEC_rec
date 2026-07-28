@@ -300,6 +300,10 @@ input[type="checkbox"] {
     position: sticky;
     top: 24px;
     min-height: calc(100vh - 48px);
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
     padding: 34px 28px;
     border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
     background:
@@ -858,6 +862,40 @@ dialog::backdrop {
     padding: 1rem;
 }
 
+.cpf-pendente-modal {
+    width: min(520px, 92vw);
+    border: 2px solid var(--color-primary);
+    text-align: center;
+    box-shadow: 0 24px 70px rgba(8, 20, 38, 0.32);
+}
+
+.cpf-pendente-modal::backdrop {
+    background: rgba(8, 20, 38, 0.68);
+    backdrop-filter: blur(2px);
+}
+
+.cpf-pendente-modal .field {
+    text-align: left;
+}
+
+.cpf-pendente-icon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    margin: 0 auto 0.75rem;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: #ffffff;
+    font-size: 1.6rem;
+    font-weight: 900;
+}
+
+.field-tooltip {
+    cursor: help;
+    color: var(--color-primary);
+}
+
 .form-actions {
     display: flex;
     gap: 0.7rem;
@@ -1182,6 +1220,9 @@ dialog::backdrop {
     .sidebar {
         position: static;
         min-height: auto;
+        max-height: none;
+        overflow-y: visible;
+        scrollbar-gutter: auto;
         border-radius: var(--radius-lg);
     }
 

@@ -108,7 +108,7 @@
             <button class="btn" type="button" data-open-dialog="nova-oferta">Nova oferta</button>
         </div>
     </div>
-    <form method="get" class="grid-two" style="margin-top:1rem;">
+    <form method="get" class="grid-two" style="margin-top:1rem;" data-periodo-filter>
         <div class="field">
             <label for="periodo">Período letivo</label>
             <select id="periodo" name="periodo">
@@ -122,9 +122,6 @@
         {% if filtro_nao_conformes %}
             <input type="hidden" name="nao_conformes" value="1">
         {% endif %}
-        <div class="field" style="justify-content:end;">
-            <button class="btn btn-secondary" type="submit">Alterar período</button>
-        </div>
     </form>
 </section>
 
@@ -403,6 +400,9 @@
 
 {% block scripts %}
 <script>
+document.getElementById("periodo")?.addEventListener("change", (event) => {
+    event.currentTarget.form?.requestSubmit();
+});
 document.querySelectorAll("[data-open-dialog]").forEach((button) => {
     button.addEventListener("click", () => document.getElementById(button.dataset.openDialog)?.showModal());
 });
