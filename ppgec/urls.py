@@ -23,10 +23,9 @@ from django.contrib.auth.views import (
     PasswordResetCompleteView,
     PasswordResetConfirmView,
     PasswordResetDoneView,
-    PasswordResetView,
 )
 from django.views.generic import RedirectView
-from ppgec.views import SafeLogoutView, version_view
+from ppgec.views import AuditedPasswordResetView, SafeLogoutView, version_view
 
 from processos.views import (
     aluno_detalhe_view,
@@ -86,7 +85,7 @@ urlpatterns = [
     path("aluno/informar-cpf/", aluno_informar_cpf_view, name="aluno_informar_cpf"),
     path(
         "senha/esqueci/",
-        PasswordResetView.as_view(
+        AuditedPasswordResetView.as_view(
             template_name="registration/password_reset_form.html",
             email_template_name="registration/password_reset_email.txt",
             html_email_template_name="registration/password_reset_email.html",

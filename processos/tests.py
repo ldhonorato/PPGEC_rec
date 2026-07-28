@@ -2240,7 +2240,8 @@ class FrontendIdentityTests(TestCase):
             tipo_usuario=User.TipoUsuario.SERVIDOR,
         )
 
-        response = self.client.post(reverse("password_reset"), {"email": usuario.email})
+        with self.assertLogs("acadflow.password_reset", level="INFO") as logs:
+            response = self.client.post(reverse("password_reset"), {"email": usuario.email})
 
         self.assertRedirects(response, reverse("password_reset_done"))
         self.assertEqual(len(mail.outbox), 1)
@@ -2254,6 +2255,43 @@ class FrontendIdentityTests(TestCase):
         self.assertIn("AcadFlow - PPGEC", html)
         self.assertIn("Alterar senha", html)
         self.assertIn("/senha/redefinir/", html)
+        self.assertTrue(any("password_reset_requested" in mensagem for mensagem in logs.output))
+        self.assertTrue(any("password_reset_account_eligible" in mensagem for mensagem in logs.output))
+        self.assertTrue(any("password_reset_email_sent" in mensagem for mensagem in logs.output))
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_reset_registra_conta_com_senha_inutilizavel(self):
+        usuario = User.objects.create_user(
+            email="sem.senha.utilizavel@example.com",
+            password="senha-temporaria-123",
+            nome="Usuário sem senha utilizável",
+        )
+        usuario.set_unusable_password()
+        usuario.save(update_fields=["password"])
+
+        with self.assertLogs("acadflow.password_reset", level="INFO") as logs:
+            response = self.client.post(reverse("password_reset"), {"email": usuario.email})
+
+        self.assertRedirects(response, reverse("password_reset_done"))
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertTrue(any("password_reset_account_ineligible" in mensagem for mensagem in logs.output))
+        self.assertTrue(any("usable_password=False" in mensagem for mensagem in logs.output))
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend")
+    @patch("ppgec.views.EmailMultiAlternatives.send", side_effect=RuntimeError("SMTP indisponível"))
+    def test_reset_registra_falha_do_backend_de_email(self, _mock_send):
+        usuario = User.objects.create_user(
+            email="falha.smtp@example.com",
+            password="senha-segura-123",
+            nome="Usuário Falha SMTP",
+        )
+
+        with self.assertLogs("acadflow.password_reset", level="INFO") as logs:
+            response = self.client.post(reverse("password_reset"), {"email": usuario.email})
+
+        self.assertRedirects(response, reverse("password_reset_done"))
+        self.assertTrue(any("password_reset_email_attempt" in mensagem for mensagem in logs.output))
+        self.assertTrue(any("password_reset_email_failed" in mensagem for mensagem in logs.output))
 
     def test_home_renderiza_shell_e_dashboard_acadflow(self):
         self.client.force_login(self.docente)
