@@ -368,9 +368,12 @@ class MatriculaViewsTests(TestCase):
         response = self.client.get(reverse("matriculas_ofertas"), {"periodo": self.periodo.pk})
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Matrículas solicitadas: 2")
+        # A linha separava os campos por pipe, inclusive dentro dos parenteses
+        # ("(regulares: 1 | especiais: 1)"), o que tornava a contagem ilegivel.
+        # Os numeros conferidos aqui sao os mesmos; muda so como sao escritos.
+        self.assertContains(response, "Solicitadas: 2")
         self.assertContains(response, "Espera: 2")
-        self.assertContains(response, "regulares: 1 | especiais: 1", count=2)
+        self.assertContains(response, "1 regulares, 1 especiais", count=2)
 
     def test_gestao_indefere_item_de_matricula(self):
         solicitacao = SolicitacaoMatricula.objects.create(
@@ -4025,6 +4028,122 @@ class TodasAsTelasRenderizamTests(TestCase):
                         resposta.status_code, esperado,
                         f"{nome_rota} devolveu {resposta.status_code} para {perfil}",
                     )
+
+
+class PadraoVisualDosTemplatesTests(SimpleTestCase):
+    """Guarda os padroes que a revisao visual estabeleceu.
+
+    Cada um destes ja foi corrigido tela por tela e volta sozinho na proxima
+    tela nova, porque escrever "a | b | c" e mais rapido do que montar a
+    meta-linha. Como sao verificaveis no proprio texto do template, ficam aqui.
+
+    Nao e um teste de aparencia -- e de consistencia: o que ele impede e que
+    duas telas resolvam a mesma coisa de dois jeitos.
+    """
+
+    DIRETORIO = Path(settings.BASE_DIR) / "templates"
+
+    # Telas ainda nao revisadas, por perfil. A revisao vai por blocos -- aluno
+    # primeiro, depois docente, secretaria e ambientes -- e cada bloco esvazia a
+    # sua parte desta lista.
+    #
+    # A lista existe para que o teste proteja hoje o que ja foi feito, em vez de
+    # so poder entrar em vigor no fim. Um template novo nao esta aqui, entao
+    # nasce tendo que seguir o padrao.
+    PENDENTES_DE_REVISAO = {
+        # Docente
+        "menu_processos_pleno.html", "menu_meus_orientandos.html",
+        "menu_ciencias_manifestadas.html", "solicitacao_banca_form.html",
+        "solicitacao_banca_detalhe.html",
+        # Secretaria -- processos
+        "processos_lista.html", "setores_comissoes.html", "setor_comissao_form.html",
+        "solicitacoes_assinatura.html", "coordenacao_dashboard.html",
+        # Secretaria -- academico
+        "matriculas_periodos.html", "matriculas_solicitacoes.html",
+        "matricula_oferta_alunos.html", "matricula_oferta_planejamento_presencial.html",
+        "validar_cadastros_alunos.html",
+        # Ambientes
+        "disponibilidade_ambientes.html", "reservas_ambientes_feitas.html",
+        # Acesso
+        "cadastro_aluno.html",
+    }
+
+    def _templates(self):
+        for caminho in sorted(self.DIRETORIO.rglob("*.html")):
+            if caminho.name in self.PENDENTES_DE_REVISAO:
+                continue
+            yield caminho, caminho.read_text(encoding="utf-8")
+
+    def _sem_comentarios(self, texto):
+        """Comentarios explicam o que foi corrigido e costumam citar o defeito."""
+        return re.sub(r"{%\s*comment\s*%}.*?{%\s*endcomment\s*%}", "", texto, flags=re.S)
+
+    def _somente_texto_visivel(self, texto):
+        """Deixa so o que o usuario le.
+
+        Tira comentarios, <script>, <style>, o titulo da aba e toda a sintaxe do
+        Django. Sem isso, procurar "|" acha filtro de template ({{ x|date }}),
+        "||" de JavaScript e barra de CSS -- nada disso e separador de dado.
+        """
+        def apagar(match):
+            # Preserva as quebras de linha do trecho removido, senao o numero de
+            # linha reportado nao corresponde ao arquivo e o teste aponta para o
+            # lugar errado.
+            return "\n" * match.group(0).count("\n")
+
+        for padrao in (
+            r"{%\s*comment\s*%}.*?{%\s*endcomment\s*%}",
+            r"<script\b.*?</script>",
+            r"<style\b.*?</style>",
+            r"<!--.*?-->",
+            # "Pagina | Sistema" no <title> e convencao de aba, nao dado numa linha.
+            r"{%\s*block title\s*%}.*?{%\s*endblock\s*%}",
+            r"{{.*?}}",
+            r"{%.*?%}",
+        ):
+            texto = re.sub(padrao, apagar, texto, flags=re.S)
+        return texto
+
+    def test_nenhum_template_usa_bloco_style(self):
+        """CSS de tela vive no app.css.
+
+        Um <style> dentro do template so vale na pagina que o renderiza. A ficha
+        do aluno guardava assim o componente de modal, e a tela de ofertas
+        guardava a grade de horario -- ambos usados em mais de um lugar, ambos
+        invisiveis para quem procurasse a regra no app.css.
+        """
+        culpados = [
+            caminho.name
+            for caminho, texto in self._templates()
+            if "<style" in self._sem_comentarios(texto)
+        ]
+        self.assertEqual(culpados, [], f"templates com <style> proprio: {culpados}")
+
+    def test_nenhum_template_separa_dados_com_pipe(self):
+        """Metadados usam .meta-linha, nao "a | b | c".
+
+        Com pipe escrito na mao, um campo vazio deixa o separador solto na
+        linha, e cada template resolvia isso de um jeito -- ou nao resolvia.
+        """
+        culpados = []
+        for caminho, texto in self._templates():
+            for numero, linha in enumerate(self._somente_texto_visivel(texto).splitlines(), 1):
+                if "|" in linha:
+                    culpados.append(f"{caminho.name}:{numero}")
+        self.assertEqual(culpados, [], f"pipes separando dados: {culpados}")
+
+    def test_nenhum_template_carrega_anotacao_de_desenvolvimento(self):
+        """TODO/FIXME nao sao conteudo de tela.
+
+        A tela de documento de vinculo exibia ao aluno, como texto da pagina,
+        "TODO: disponibilizar emissao do documento de vinculo."
+        """
+        culpados = [
+            caminho.name
+            for caminho, texto in self._templates()
+            if re.search(r"\b(TODO|FIXME|XXX)\b", self._sem_comentarios(texto))
+        ]
+        self.assertEqual(culpados, [], f"templates com anotacao de desenvolvimento: {culpados}")
 
 
 class MenuMarcaItemAtivoTests(TestCase):

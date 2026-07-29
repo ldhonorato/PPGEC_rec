@@ -382,12 +382,28 @@ def _montar_horarios_semanais_ofertas(ofertas):
         total_minutos = max(fim_horario - inicio_horario, 60)
         pixels_por_minuto = 1.15
         altura_horario = max(int(total_minutos * pixels_por_minuto), 160)
+        # Altura de uma faixa de uma hora, em px, para o CSS desenhar as linhas
+        # divisorias. Vinha fixa em 69px no CSS (60 x 1.15), o que so casava com
+        # as marcas -- que sao posicionadas em % -- enquanto o piso de 160px nao
+        # entrasse. Num horario de uma hora so, a faixa mede 160px e as linhas
+        # continuavam a cada 69px, cruzando a grade fora das horas cheias.
+        altura_hora = altura_horario / (total_minutos / 60)
 
         marcas_hora = []
         hora_atual = inicio_horario
         while hora_atual <= fim_horario:
             topo = ((hora_atual - inicio_horario) / total_minutos) * 100
-            marcas_hora.append({"label": f"{hora_atual // 60:02d}:00", "top": f"{topo:.3f}%"})
+            marcas_hora.append(
+                {
+                    "label": f"{hora_atual // 60:02d}:00",
+                    "top": f"{topo:.3f}%",
+                    # A marca e centrada na linha da hora. Na ultima, que fica em
+                    # 100%, metade do texto caia fora da grade e era cortada pelo
+                    # arredondamento da borda -- o horario final aparecia pela
+                    # metade. Nela o rotulo sobe inteiro para dentro.
+                    "no_fim": hora_atual == fim_horario,
+                }
+            )
             hora_atual += 60
 
         dias_render = []
@@ -438,6 +454,7 @@ def _montar_horarios_semanais_ofertas(ofertas):
                 "dias": dias_render,
                 "marcas_hora": marcas_hora,
                 "altura_horario": altura_horario,
+                "altura_hora": f"{altura_hora:.2f}",
             }
         )
     return sorted(horarios_semanais, key=lambda item: item["periodo"].nome, reverse=True), dias
@@ -1213,6 +1230,16 @@ def matricula_solicitar_view(request, periodo_id=None):
                 form.add_error(None, exc)
         messages.error(request, "Não foi possível registrar a solicitação.")
 
+    # Grade semanal das disciplinas do periodo. A coordenacao e o docente ja
+    # enxergavam onde cada oferta cai na semana; o aluno, que e quem monta a
+    # propria grade, so via o dia e a hora escritos em cada disciplina e tinha
+    # que cruzar os choques de horario de cabeca.
+    horario_semanal = None
+    if periodo and form is not None:
+        ofertas_do_periodo = form.fields["ofertas"].queryset.prefetch_related("encontros")
+        horarios, _ = _montar_horarios_semanais_ofertas(ofertas_do_periodo)
+        horario_semanal = horarios[0] if horarios else None
+
     return render(
         request,
         "processos/matricula_solicitar.html",
@@ -1220,6 +1247,7 @@ def matricula_solicitar_view(request, periodo_id=None):
             "periodos_abertos": periodos_abertos,
             "proximo_periodo": proximo_periodo,
             "periodo": periodo,
+            "horario_semanal": horario_semanal,
             "form": form,
             "trajetoria_ativa": trajetoria_ativa,
             "pode_solicitar_matricula": pode_solicitar_matricula,
@@ -4551,7 +4579,7 @@ def aluno_documento_vinculo_view(request):
         "processos/aluno_documento_todo.html",
         {
             "titulo": "Documento de vínculo",
-            "descricao": "TODO: disponibilizar emissão do documento de vínculo.",
+            "descricao": "A emissão automática do documento de vínculo ainda será construída. Enquanto isso, solicite o documento à secretaria abrindo um processo.",
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -4573,7 +4601,8 @@ def aluno_documento_historico_view(request):
         "processos/aluno_documento_todo.html",
         {
             "titulo": "Documento de histórico",
-            "descricao": "TODO: disponibilizar emissão do histórico do aluno.",
+            "descricao": "A emissão do histórico escolar ainda será construída. "
+            "Enquanto isso, solicite o documento à secretaria abrindo um processo.",
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),

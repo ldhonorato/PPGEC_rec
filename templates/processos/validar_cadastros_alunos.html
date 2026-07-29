@@ -61,7 +61,7 @@
             {% endfor %}
         </ul>
         {% if page_obj.paginator.num_pages > 1 %}
-            <nav class="calendar-nav" aria-label="Paginação dos cadastros" style="margin-top:1rem;">
+            <nav class="calendar-nav form-filtros" aria-label="Paginação dos cadastros">
                 {% if page_obj.has_previous %}
                     <a class="btn btn-secondary" href="?polo={{ filtro_polo }}&page={{ page_obj.previous_page_number }}">Anterior</a>
                 {% endif %}

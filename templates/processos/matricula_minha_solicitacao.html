@@ -5,9 +5,10 @@
     <div class="actions-row">
         <div>
             <h1 class="section-title">Solicitação de Matrícula</h1>
-            <p class="muted">
-                {{ solicitacao.aluno.nome }} | Período {{ solicitacao.periodo.nome }} |
-                {{ solicitacao.get_tipo_matricula_display }}
+            <p class="meta-linha">
+                <span>{{ solicitacao.aluno.nome }}</span>
+                <span>Período {{ solicitacao.periodo.nome }}</span>
+                <span>{{ solicitacao.get_tipo_matricula_display }}</span>
             </p>
         </div>
         <span class="badge badge-info">{{ solicitacao.get_status_display }}</span>
@@ -22,22 +23,23 @@
                 <li>
                     <div class="actions-row">
                         <div>
-                            <strong>{{ item.oferta.disciplina.codigo }} - {{ item.oferta.disciplina.nome }}</strong>
+                            <strong>{{ item.oferta.disciplina.codigo }} — {{ item.oferta.disciplina.nome }}</strong>
                             <span class="badge {% if item.status == 'SOLICITADO' or item.status == 'HOMOLOGADO' %}badge-ok{% elif item.status == 'INDEFERIDO' or item.status == 'CANCELADO' %}badge-no{% else %}badge-info{% endif %}">
                                 {{ item.get_status_display }}
                             </span>
-                            <small class="muted" style="display:block; margin-top:0.35rem;">
-                                {{ item.oferta.docentes_display }} | {{ item.oferta.get_modalidade_display }}
-                            </small>
+                            <span class="meta-linha">
+                                <span>{{ item.oferta.docentes_display }}</span>
+                                <span>{{ item.oferta.get_modalidade_display }}</span>
+                            </span>
                             {% if item.oferta.encontros.all %}
-                                <ul class="availability-list" style="margin-top:0.55rem;">
+                                <ul class="availability-list lista-encontros">
                                     {% for encontro in item.oferta.encontros.all %}
                                         <li><strong>{{ encontro.get_dia_semana_display }}</strong> {{ encontro.hora_inicio|time:"H:i" }} - {{ encontro.hora_fim|time:"H:i" }}</li>
                                     {% endfor %}
                                 </ul>
                             {% endif %}
                             {% if item.motivo_indeferimento %}
-                                <p class="muted">Motivo: {{ item.motivo_indeferimento }}</p>
+                                <p class="item-observacao">Motivo: {{ item.motivo_indeferimento }}</p>
                             {% endif %}
                         </div>
                         <small class="muted">

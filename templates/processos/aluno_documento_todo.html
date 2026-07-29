@@ -1,8 +1,24 @@
 {% extends "base.html" %}
-{% block title %}{{ titulo }} | PPGEC{% endblock %}
+{% block title %}{{ titulo }}{% endblock %}
 {% block content %}
+{% comment %}
+Tela de funcionalidade ainda nao construida.
+
+Mostrava o titulo e, abaixo, o texto que a view passa em "descricao" -- que era
+literalmente "TODO: disponibilizar emissao do documento de vinculo.". Uma
+anotacao de desenvolvimento exibida ao aluno como se fosse conteudo da tela.
+
+Enquanto a emissao nao existe, a tela diz com todas as letras que ela nao esta
+disponivel e oferece o caminho que hoje resolve (abrir um processo), em vez de
+parecer uma pagina quebrada.
+{% endcomment %}
 <section class="card">
     <h1 class="section-title">{{ titulo }}</h1>
-    <p class="muted" style="margin: 0;">{{ descricao }}</p>
+    <div class="estado-vazio">
+        <svg aria-hidden="true"><use href="#i-documento-vinculo"></use></svg>
+        <p class="estado-vazio-titulo">Emissão ainda não disponível</p>
+        <p>{{ descricao }}</p>
+        <a class="btn btn-secondary" href="{% url 'novo_processo' %}">Abrir um processo</a>
+    </div>
 </section>
 {% endblock %}

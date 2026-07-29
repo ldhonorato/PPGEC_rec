@@ -13,7 +13,7 @@
             <a class="btn btn-secondary" href="{% url 'matriculas_ofertas' %}">Ver ofertas</a>
         {% endif %}
     </div>
-    <form method="get" class="grid-two" style="margin-top:1rem;">
+    <form method="get" class="grid-two form-filtros">
         <div class="field">
             <label for="periodo">Período letivo</label>
             <select id="periodo" name="periodo">
@@ -115,7 +115,7 @@
     {% endif %}
 </section>
 
-<section class="card" style="margin-top:1rem;">
+<section class="card">
     <h2 class="section-title">
         Matrículas vínculo
         {% if periodo %} - {{ periodo.nome }}{% endif %}

@@ -129,13 +129,13 @@ a mesma grade rotulada das demais telas de detalhe.
                                     </div>
                                 </li>
 
-                                <li id="lista-estagios-{{ trajetoria.id }}" style="display:none;">
-                                    <div style="grid-column:1/-1; display:flex; flex-direction:column; gap:0.75rem;">
+                                <li id="lista-estagios-{{ trajetoria.id }}" class="linha-expansivel" hidden>
+                                    <div class="pilha-estagios">
                                         {% for estagio in trajetoria.estagios_docencia.all|dictsort:"inicio" %}
-                                        <div class="card" style="box-shadow:none;">
-                                                <div style="display:flex; justify-content:space-between; gap:1rem;flex-wrap:wrap;">
+                                        <div class="cartao-interno">
+                                                <div class="secao-cabecalho">
                                                     <div>
-                                                        <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+                                                        <div class="trajetoria-titulo">
 
                                                         <strong>
                                                             {{ estagio.supervisor|default:"Sem supervisor" }}
@@ -147,7 +147,7 @@ a mesma grade rotulada das demais telas de detalhe.
 
                                                         </div>
 
-                                                        <small class="muted" style="display:block; margin-top:0.35rem;">
+                                                        <small class="nota-bloco">
                                                             {{ estagio.inicio|default:"—" }}
                                                             -
                                                             {{ estagio.termino|default:"—" }}
@@ -246,7 +246,7 @@ a mesma grade rotulada das demais telas de detalhe.
                             {% with resumo=card.resumo_horas_complementares %}
                             <div class="secao-cabecalho secao-cabecalho-interna">
                                 <h3 class="section-title">Horas complementares</h3>
-                                <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                                <div class="grupo-acoes">
                                     {% if resumo.norma %}
                                         <span class="badge badge-info">{{ resumo.norma.identificacao }}</span>
                                     {% endif %}
@@ -268,7 +268,7 @@ a mesma grade rotulada das demais telas de detalhe.
                                 <div><dt>Situação</dt><dd>{{ resumo.situacao }}</dd></div>
                             </dl>
 
-                            <h4 class="section-title" style="margin-top: 1rem;">Distribuição por grupo</h4>
+                            <h4 class="section-title titulo-interno">Distribuição por grupo</h4>
                             {% if resumo.grupos %}
                                 <ul class="list">
                                     {% for item in resumo.grupos %}
@@ -286,7 +286,7 @@ a mesma grade rotulada das demais telas de detalhe.
                                 <p class="estado-vazio-inline">Nenhuma norma de horas complementares vigente para esta trajetória.</p>
                             {% endif %}
 
-                            <h4 class="section-title" style="margin-top: 1rem;">Histórico de lançamentos</h4>
+                            <h4 class="section-title titulo-interno">Histórico de lançamentos</h4>
                             {% if resumo.lancamentos %}
                                 <ul class="list">
                                     {% for lancamento in resumo.lancamentos %}
@@ -333,8 +333,10 @@ a mesma grade rotulada das demais telas de detalhe.
                     {% for item in alteracoes_display %}
                         <li>
                             <strong>{{ item.trajetoria }}</strong>
-                            <p style="margin: 0.45rem 0 0 0;"><strong>Alteração:</strong> {{ item.alteracao }}</p>
-                            <p style="margin: 0.35rem 0 0 0;"><strong>Comentário:</strong> {{ item.obj.comentario }}</p>
+                            <dl class="dados-grid dados-grid-texto">
+                                <div><dt>Alteração</dt><dd>{{ item.alteracao }}</dd></div>
+                                <div><dt>Comentário</dt><dd>{{ item.obj.comentario }}</dd></div>
+                            </dl>
                             <p class="meta-linha">
                                 <span>{{ item.obj.alterado_por.nome }}</span>
                                 <span>{{ item.obj.criado_em|date:"d/m/Y H:i" }}</span>
@@ -380,7 +382,9 @@ a mesma grade rotulada das demais telas de detalhe.
             </div>
             <label>Comentário</label>
             {{ dados_form.comentario }}
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar dados</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar dados</button>
+            </div>
         </form>
     </div>
 </div>
@@ -445,7 +449,9 @@ faltava a da coordenacao.
 
             <label>Comentário</label>
             {{ nova_trajetoria_form.comentario }}
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Cadastrar trajetória</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Cadastrar trajetória</button>
+            </div>
         </form>
     </div>
 </div>
@@ -470,10 +476,12 @@ faltava a da coordenacao.
                     </div>
                 {% endfor %}
             </div>
-            <p class="muted" style="margin:0.45rem 0 0 0;">
+            <p class="item-observacao">
                 O comentário será registrado como observação administrativa da secretaria.
             </p>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar lançamento</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar lançamento</button>
+            </div>
         </form>
     </div>
 </div>
@@ -494,7 +502,9 @@ faltava a da coordenacao.
             </select>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar status</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar status</button>
+            </div>
         </form>
     </div>
 </div>
@@ -511,7 +521,9 @@ faltava a da coordenacao.
             {{ form.nivel_curso }}
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar nível</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar nível</button>
+            </div>
         </form>
     </div>
 </div>
@@ -528,7 +540,9 @@ faltava a da coordenacao.
             <input name="prazo_qualificacao" value="{{ trajetoria.prazo_qualificacao }}" placeholder="YYYY.1 ou YYYY.2">
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar prazo</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar prazo</button>
+            </div>
         </form>
     </div>
 </div>
@@ -545,7 +559,9 @@ faltava a da coordenacao.
             <input name="prazo_defesa" value="{{ trajetoria.prazo_defesa }}" placeholder="YYYY.1 ou YYYY.2">
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar prazo</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar prazo</button>
+            </div>
         </form>
     </div>
 </div>
@@ -561,7 +577,9 @@ faltava a da coordenacao.
             <label><input type="checkbox" name="reingressante" {% if trajetoria.reingressante %}checked{% endif %}> Reingressante</label>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar reingressante</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar reingressante</button>
+            </div>
         </form>
     </div>
 </div>
@@ -607,9 +625,11 @@ faltava a da coordenacao.
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
 
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">
+            <div class="form-actions">
+                <button class="btn" type="submit">
                 Criar estágio
             </button>
+            </div>
         </form>
     </div>
 </div>
@@ -677,11 +697,9 @@ faltava a da coordenacao.
                       rows="3"
                       required></textarea>
 
-            <button class="btn"
-                    type="submit"
-                    style="margin-top:0.55rem;">
-                Salvar alterações
-            </button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar alterações</button>
+            </div>
 
         </form>
 
@@ -700,7 +718,9 @@ faltava a da coordenacao.
             <label><input type="checkbox" name="isQualificado" {% if trajetoria.isQualificado %}checked{% endif %}> {{ trajetoria.qualificacao_label }} concluído</label>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar</button>
+            </div>
         </form>
     </div>
 </div>
@@ -717,7 +737,9 @@ faltava a da coordenacao.
             {{ form.orientador }}
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar orientador</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar orientador</button>
+            </div>
         </form>
     </div>
 </div>
@@ -746,7 +768,9 @@ faltava a da coordenacao.
             </div>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar coorientador</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar coorientador</button>
+            </div>
         </form>
     </div>
 </div>
@@ -765,7 +789,9 @@ faltava a da coordenacao.
             </div>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar {{ trajetoria.conclusao_label_lower }}</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar {{ trajetoria.conclusao_label_lower }}</button>
+            </div>
         </form>
     </div>
 </div>
@@ -781,7 +807,9 @@ faltava a da coordenacao.
             <label><input type="checkbox" name="deposito_versao_final" {% if trajetoria.deposito_versao_final %}checked{% endif %}> Depósito da versão final</label>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar depósito</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar depósito</button>
+            </div>
         </form>
     </div>
 </div>
@@ -804,7 +832,9 @@ faltava a da coordenacao.
             </div>
             <label>Autores</label>
             {{ publicacao_form.autores }}
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar publicação</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar publicação</button>
+            </div>
         </form>
     </div>
 </div>
@@ -835,7 +865,9 @@ faltava a da coordenacao.
             </div>
             <label>Autores</label>
             <textarea name="autores" rows="3">{{ publicacao.autores }}</textarea>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar publicação</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar publicação</button>
+            </div>
         </form>
     </div>
 </div>
@@ -859,7 +891,9 @@ faltava a da coordenacao.
                 <div class="field"><label>Carga horária</label>{{ disciplina_form.carga_horaria }}</div>
                 <div class="field"><label>Situação</label>{{ disciplina_form.situacao }}</div>
             </div>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar disciplina</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar disciplina</button>
+            </div>
         </form>
     </div>
 </div>
@@ -890,7 +924,9 @@ faltava a da coordenacao.
                     </select>
                 </div>
             </div>
-            <button class="btn" type="submit" style="margin-top: 0.55rem;">Salvar disciplina</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Salvar disciplina</button>
+            </div>
         </form>
     </div>
 </div>
@@ -968,26 +1004,22 @@ faltava a da coordenacao.
         });
     })();
 
-    document
-    .querySelectorAll("[data-toggle-estagios]")
-    .forEach((btn) => {
+    // O estado aberto/fechado vem do atributo hidden, nao de style.display.
+    // Antes o markup nascia com style="display:none" e este codigo comparava
+    // lista.style.display com "none" -- ao tirar o estilo inline do template a
+    // leitura passaria a devolver string vazia, e o primeiro clique fecharia
+    // algo que ja estava fechado, sem efeito visivel.
+    document.querySelectorAll("[data-toggle-estagios]").forEach((botao) => {
+        const lista = document.getElementById(`lista-estagios-${botao.dataset.toggleEstagios}`);
+        if (!lista) return;
 
-        btn.addEventListener("click", () => {
+        botao.setAttribute("aria-expanded", String(!lista.hidden));
+        botao.setAttribute("aria-controls", lista.id);
 
-            const id = btn.dataset.toggleEstagios;
-
-            const lista = document.getElementById(
-                `lista-estagios-${id}`
-            );
-
-            const aberto =
-                lista.style.display !== "none";
-
-            lista.style.display =
-                aberto ? "none" : "list-item";
-
+        botao.addEventListener("click", () => {
+            lista.hidden = !lista.hidden;
+            botao.setAttribute("aria-expanded", String(!lista.hidden));
         });
-
     });
 </script>
 {% endblock %}

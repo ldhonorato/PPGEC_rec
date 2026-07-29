@@ -3232,3 +3232,313 @@ dialog::backdrop {
     color: var(--color-text);
     border-color: var(--color-text-soft, var(--color-muted));
 }
+
+/* ==========================================================================
+   Grade de horario semanal
+
+   Estava num bloco <style> de matriculas_ofertas.html, com todos os seletores
+   presos a .matriculas-ofertas-page e as cores em hexadecimal solto
+   (#f7fbff, #fbfdff, #bdd4f3, #174d90). Como componente ela serve tambem a
+   tela de matricula do aluno, entao vem para ca sem prefixo de pagina e com os
+   tokens do tema.
+
+   Geometria: as marcas de hora e os eventos vem da view em porcentagem da
+   altura total; --altura-hora, tambem calculado la, diz de quanto em quanto
+   repetir a linha divisoria.
+   ========================================================================== */
+.grade-horario-envolvido {
+    margin-top: var(--espaco-5);
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.grade-horario {
+    display: grid;
+    grid-template-columns: 3.5rem repeat(6, minmax(6rem, 1fr));
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-surface);
+}
+
+.grade-horario-cabecalho {
+    min-height: 2.5rem;
+    display: flex;
+    align-items: center;
+    padding: var(--espaco-3) var(--espaco-3);
+    border-right: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface-soft);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.grade-horario-eixo {
+    position: relative;
+    border-right: 1px solid var(--color-border);
+    background: var(--color-surface-soft);
+}
+
+.grade-horario-marca {
+    position: absolute;
+    right: var(--espaco-2);
+    transform: translateY(-50%);
+    color: var(--color-muted);
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* A ultima marca fica em top:100%: centrada, metade dela cairia fora da grade
+   e seria cortada pelo overflow:hidden do contorno arredondado. */
+.grade-horario-marca.no-fim {
+    transform: translateY(-100%);
+}
+
+.grade-horario-dia {
+    position: relative;
+    min-width: 0;
+    border-right: 1px solid var(--color-border);
+    background: repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent calc(var(--altura-hora) - 1px),
+        var(--color-border) calc(var(--altura-hora) - 1px),
+        var(--color-border) var(--altura-hora)
+    );
+}
+
+.grade-horario-dia:last-child,
+.grade-horario-cabecalho:last-child {
+    border-right: 0;
+}
+
+.grade-horario-evento {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-height: 2rem;
+    padding: var(--espaco-2) var(--espaco-3);
+    border: 1px solid var(--color-primary);
+    border-left-width: 3px;
+    border-radius: var(--radius-sm);
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    line-height: 1.25;
+    overflow: hidden;
+}
+
+.grade-horario-evento strong {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.grade-horario-evento-nome {
+    font-weight: 500;
+}
+
+/* Horario e docente sao apoio: identificam o encontro, mas quem procura a
+   disciplina na grade procura pelo codigo e pelo nome. */
+.grade-horario-evento-meta {
+    color: var(--color-primary);
+    opacity: 0.75;
+    font-size: 0.6875rem;
+}
+
+@media (max-width: 700px) {
+    .grade-horario {
+        grid-template-columns: 3rem repeat(6, minmax(5rem, 1fr));
+    }
+}
+
+/* Item selecionavel de disciplina na solicitacao de matricula.
+
+   Usava .checkbox-field com align-items:flex-start inline. O bloco a direita
+   tem tres alturas (titulo, metadados, horarios), entao a caixa precisa alinhar
+   pelo topo -- centralizada, ela descia para o meio do paragrafo. */
+.opcao-disciplina {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--espaco-3);
+    cursor: pointer;
+}
+
+.opcao-disciplina input {
+    width: auto;
+    margin: 0.2rem 0 0;
+    flex: 0 0 auto;
+}
+
+.opcao-disciplina > span {
+    display: block;
+    min-width: 0;
+}
+
+.lista-encontros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espaco-2);
+    margin-top: var(--espaco-3);
+}
+
+/* Bloco que o usuario abre quando quer -- ementa de uma disciplina, detalhe
+   secundario de um registro.
+
+   Era um <details> cru: triangulo do navegador e o resumo em cinza de
+   paragrafo, sem parecer clicavel. Ganha marcador proprio, que gira ao abrir,
+   e o resumo passa a ler como acao. */
+.revelar {
+    margin-top: var(--espaco-4);
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--espaco-3);
+}
+
+.revelar > summary {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-2);
+    list-style: none;
+    cursor: pointer;
+    color: var(--color-primary);
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.revelar > summary::-webkit-details-marker {
+    display: none;
+}
+
+.revelar > summary::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg) translate(-0.1rem, -0.05rem);
+    transition: transform 0.15s ease;
+}
+
+.revelar[open] > summary::before {
+    transform: rotate(45deg) translate(0.05rem, -0.1rem);
+}
+
+.revelar > summary:hover {
+    text-decoration: underline;
+}
+
+.revelar > *:not(summary) {
+    margin-top: var(--espaco-4);
+}
+
+/* Variante da grade rotulada para valores longos (ementa, bibliografia): uma
+   coluna, para o texto nao ficar espremido numa celula estreita. */
+.dados-grid-texto {
+    grid-template-columns: 1fr;
+}
+
+.dados-grid-texto dd {
+    font-weight: 400;
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+
+/* Nota em bloco abaixo do titulo de um item: percentual presencial, aviso de
+   conformidade. Era <small class="muted"> com display:block e margem inline,
+   repetido em varias telas. */
+.nota-bloco {
+    display: block;
+    margin-top: var(--espaco-3);
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+}
+
+/* Formulario de filtro no topo de uma listagem (busca, tipo, status).
+
+   Cada tela repetia a margem em estilo inline, com valores diferentes --
+   0.8rem numa, 1rem noutra. A separacao do cabecalho e sempre a mesma coisa. */
+.form-filtros {
+    margin: var(--espaco-5) 0;
+}
+
+/* Linha da info-list que abre para mostrar uma lista inteira (os estagios de
+   docencia de uma trajetoria). Ocupa a largura toda da grade, nao uma celula. */
+.linha-expansivel > div {
+    grid-column: 1 / -1;
+}
+
+.pilha-estagios {
+    display: flex;
+    flex-direction: column;
+    gap: var(--espaco-4);
+}
+
+/* Cartao dentro de outro cartao. Usava .card com box-shadow:none inline; o
+   problema nao era so a sombra -- um cartao aninhado nao deve ter o mesmo peso
+   visual do que o contem. */
+.cartao-interno {
+    padding: var(--espaco-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-soft);
+}
+
+/* Titulo de terceiro nivel, dentro de uma sub-secao. */
+.titulo-interno {
+    margin-top: var(--espaco-5);
+}
+
+/* Cabecalho e corpo de um <dialog>.
+
+   O padding vinha inline, partido em dois blocos complementares
+   ("1rem 1rem 0 1rem" no titulo, "0 1rem 1rem 1rem" no formulario) para que o
+   formulario encostasse no titulo. Sao duas partes de um mesmo corpo. */
+.modal-cabecalho {
+    padding: var(--espaco-5) var(--espaco-5) 0;
+}
+
+.modal-formulario {
+    padding: 0 var(--espaco-5) var(--espaco-5);
+}
+
+/* Nota que introduz a lista logo abaixo dela. */
+.nota-antes-lista {
+    margin: 0 0 var(--espaco-4);
+}
+
+.nota-espacada {
+    margin: var(--espaco-3) 0;
+}
+
+/* Formulario de uma acao so, na mesma linha do campo (registrar ciencia,
+   devolver ao setor). Alinha pela base para o botao acompanhar o input. */
+.form-em-linha {
+    display: flex;
+    gap: var(--espaco-3);
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+/* Texto digitado por um usuario: preserva as quebras de linha originais. */
+.texto-preservado {
+    white-space: pre-wrap;
+}
+
+/* Documentos anexados antes de enviar o formulario, montados pelo JS. */
+.pilha-documentos {
+    display: grid;
+    gap: var(--espaco-4);
+    margin-bottom: var(--espaco-5);
+}
+
+.pilha-documentos:empty {
+    display: none;
+}
+
+/* Lista de atividades logo abaixo de uma grade de dados, no mesmo cartao. */
+.activity-list-apos-dados {
+    margin-top: var(--espaco-5);
+}

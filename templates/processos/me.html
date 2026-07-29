@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}/me | PPGEC{% endblock %}
+{% block title %}Meu perfil{% endblock %}
 {% block content %}
 <section class="grid-two">
     <article class="card">
@@ -47,7 +47,7 @@
     </article>
 </section>
 
-<section class="grid-two" style="margin-top: 1rem;">
+<section class="grid-two">
     <article class="card">
         <h2 class="section-title">Setores e comissões atuais</h2>
         {% if participacoes_ativas %}
@@ -56,10 +56,10 @@
                     <li>
                         <strong>{{ participacao.setor.nome }}</strong>
                         <br>
-                        <small class="muted">
-                            Desde {{ participacao.data_entrada|date:"d/m/Y" }}
-                            {% if participacao.designado_por %} | Designado por {{ participacao.designado_por.nome }}{% endif %}
-                        </small>
+                        <span class="meta-linha">
+                            <span>Desde {{ participacao.data_entrada|date:"d/m/Y" }}</span>
+                            {% if participacao.designado_por %}<span>Designado por {{ participacao.designado_por.nome }}</span>{% endif %}
+                        </span>
                     </li>
                 {% endfor %}
             </ul>
@@ -80,10 +80,10 @@
                     <li>
                         <strong>{{ participacao.setor.nome }}</strong>
                         <br>
-                        <small class="muted">
-                            {{ participacao.data_entrada|date:"d/m/Y" }} a {{ participacao.data_saida|date:"d/m/Y" }}
-                            {% if participacao.designado_por %} | Designado por {{ participacao.designado_por.nome }}{% endif %}
-                        </small>
+                        <span class="meta-linha">
+                            <span>{{ participacao.data_entrada|date:"d/m/Y" }} a {{ participacao.data_saida|date:"d/m/Y" }}</span>
+                            {% if participacao.designado_por %}<span>Designado por {{ participacao.designado_por.nome }}</span>{% endif %}
+                        </span>
                     </li>
                 {% endfor %}
             </ul>

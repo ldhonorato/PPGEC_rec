@@ -117,11 +117,19 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
     <article class="card">
         <h2 class="section-title">Situação de matrícula</h2>
         {% if aluno_matricula_atual %}
-            <p class="aluno-kv"><strong>Período:</strong> {{ aluno_matricula_atual.periodo.nome }}</p>
-            <p class="aluno-kv"><strong>Tipo:</strong> {{ aluno_matricula_atual.get_tipo_matricula_display }} | {{ aluno_matricula_atual.get_tipo_aluno_display }}</p>
-            <p class="aluno-kv"><strong>Status:</strong> <span class="badge badge-info">{{ aluno_matricula_atual.get_status_display }}</span></p>
+            {% comment %}
+            .aluno-kv era uma classe do bloco <style> da ficha do aluno, que nunca
+            valeu aqui -- estas linhas sempre foram paragrafos sem estilo nenhum.
+            Passam a usar a mesma grade rotulada das telas de detalhe.
+            {% endcomment %}
+            <dl class="dados-grid">
+                <div><dt>Período</dt><dd>{{ aluno_matricula_atual.periodo.nome }}</dd></div>
+                <div><dt>Tipo</dt><dd>{{ aluno_matricula_atual.get_tipo_matricula_display }}</dd></div>
+                <div><dt>Vínculo</dt><dd>{{ aluno_matricula_atual.get_tipo_aluno_display }}</dd></div>
+                <div><dt>Status</dt><dd><span class="badge badge-info">{{ aluno_matricula_atual.get_status_display }}</span></dd></div>
+            </dl>
             {% if aluno_matricula_atual.itens.all %}
-                <ul class="activity-list" style="margin-top:0.7rem;">
+                <ul class="activity-list activity-list-apos-dados">
                     {% for item in aluno_matricula_atual.itens.all|slice:":4" %}
                         <li>
                             <svg class="soft-icon {% if item.status == "SOLICITADO" or item.status == "HOMOLOGADO" %}is-ok{% else %}is-aviso{% endif %}" aria-hidden="true"><use href="#i-{% if item.status == "SOLICITADO" or item.status == "HOMOLOGADO" %}checado{% else %}pendente{% endif %}"></use></svg>
@@ -144,12 +152,18 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
     <article class="card">
         <h2 class="section-title">Trajetória acadêmica mais recente</h2>
         {% if aluno_trajetoria_recente %}
-            <p class="aluno-kv"><strong>Nível:</strong> {{ aluno_trajetoria_recente.get_nivel_curso_display }}</p>
-            <p class="aluno-kv"><strong>Ingresso:</strong> {{ aluno_trajetoria_recente.ingresso|default:"-" }}</p>
-            <p class="aluno-kv"><strong>Status:</strong> <span class="badge badge-info">{{ aluno_trajetoria_recente.get_status_display }}</span></p>
-            <p class="aluno-kv"><strong>Orientador:</strong> {{ aluno_trajetoria_recente.orientador.nome|default:"-" }}</p>
+            <dl class="dados-grid">
+                <div><dt>Nível</dt><dd>{{ aluno_trajetoria_recente.get_nivel_curso_display }}</dd></div>
+                <div><dt>Ingresso</dt><dd>{{ aluno_trajetoria_recente.ingresso|default:"—" }}</dd></div>
+                <div><dt>Status</dt><dd><span class="badge badge-info">{{ aluno_trajetoria_recente.get_status_display }}</span></dd></div>
+                <div><dt>Orientador</dt><dd>{{ aluno_trajetoria_recente.orientador.nome|default:"—" }}</dd></div>
+            </dl>
         {% else %}
-            <p class="muted">Nenhuma trajetória acadêmica registrada.</p>
+            <div class="estado-vazio">
+                <svg aria-hidden="true"><use href="#i-trajetoria"></use></svg>
+                <p class="estado-vazio-titulo">Nenhuma trajetória registrada</p>
+                <p>A coordenação cadastra sua trajetória após a validação do vínculo.</p>
+            </div>
         {% endif %}
     </article>
 </section>
@@ -296,10 +310,10 @@ nada para o usuario fazer ali.
                     <strong>{{ solicitacao.get_tipo_documento_display }} - {{ solicitacao.referencia_documento }}</strong>
                     <a class="btn" href="{% url 'solicitacao_assinatura_detalhe' solicitacao.id %}">Atender assinatura</a>
                 </div>
-                <small class="muted">
-                    Solicitado por: {{ solicitacao.criado_por.nome }} |
-                    Em: {{ solicitacao.criado_em|date:"d/m/Y H:i" }}
-                </small>
+                <span class="meta-linha">
+                    <span>{{ solicitacao.criado_por.nome }}</span>
+                    <span>{{ solicitacao.criado_em|date:"d/m/Y H:i" }}</span>
+                </span>
             </li>
         {% endfor %}
     </ul>
@@ -316,10 +330,10 @@ nada para o usuario fazer ali.
                     <strong>{{ manifestacao.processo.numero }} - {{ manifestacao.processo.assunto }}</strong>
                     <a class="btn" href="{% url 'processo_detalhe' manifestacao.processo.id %}">Analisar ciência</a>
                 </div>
-                <small class="muted">
-                    Solicitado por: {{ manifestacao.solicitado_por.nome }} |
-                    Em: {{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}
-                </small>
+                <span class="meta-linha">
+                    <span>{{ manifestacao.solicitado_por.nome }}</span>
+                    <span>{{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}</span>
+                </span>
             </li>
         {% endfor %}
     </ul>
