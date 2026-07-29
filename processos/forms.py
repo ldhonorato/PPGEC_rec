@@ -322,7 +322,7 @@ def _validar_pdf_upload(arquivo):
     if nome.suffix.lower() != ".pdf":
         raise forms.ValidationError("Envie um arquivo PDF.")
     if arquivo.size > MAX_ASSINATURA_UPLOAD_SIZE:
-        raise forms.ValidationError("O PDF deve ter no maximo 10 MB.")
+        raise forms.ValidationError("O PDF deve ter no máximo 10 MB.")
 
 
 class SolicitacaoAssinaturaForm(forms.ModelForm):
@@ -427,7 +427,7 @@ class DisponibilidadeSalaLoteForm(forms.Form):
         widget=forms.CheckboxSelectMultiple,
     )
     hora_inicio = forms.TimeField(
-        label="Hora de inicio",
+        label="Hora de início",
         widget=forms.TimeInput(attrs={"type": "time"}),
     )
     hora_fim = forms.TimeField(
@@ -440,7 +440,7 @@ class DisponibilidadeSalaLoteForm(forms.Form):
         hora_inicio = cleaned_data.get("hora_inicio")
         hora_fim = cleaned_data.get("hora_fim")
         if hora_inicio and hora_fim and hora_fim <= hora_inicio:
-            self.add_error("hora_fim", "O horario final deve ser posterior ao horario inicial.")
+            self.add_error("hora_fim", "O horário final deve ser posterior ao horário inicial.")
         return cleaned_data
 
     def save(self, sala):
@@ -459,7 +459,7 @@ class DisponibilidadeSalaLoteForm(forms.Form):
 
 class SolicitacaoBancaForm(forms.ModelForm):
     aluno = forms.ModelChoiceField(queryset=Aluno.objects.none(), label="Aluno")
-    trajetoria = forms.ModelChoiceField(queryset=TrajetoriaAcademica.objects.none(), label="Trajetoria academica")
+    trajetoria = forms.ModelChoiceField(queryset=TrajetoriaAcademica.objects.none(), label="Trajetória acadêmica")
 
     class Meta:
         model = SolicitacaoBanca
@@ -522,7 +522,7 @@ class SolicitacaoBancaForm(forms.ModelForm):
         for papel, label in MembroBanca.Papel.choices:
             self.fields[f"membro_{papel}_nome"] = forms.CharField(label=f"{label} - Nome", required=False)
             self.fields[f"membro_{papel}_instituicao"] = forms.CharField(
-                label=f"{label} - Instituicao/IES",
+                label=f"{label} - Instituição/IES",
                 required=False,
             )
             self.fields[f"membro_{papel}_cpf"] = forms.CharField(label=f"{label} - CPF", required=False)
@@ -541,19 +541,19 @@ class SolicitacaoBancaForm(forms.ModelForm):
         tipo_defesa = cleaned_data.get("tipo_defesa")
 
         if aluno and trajetoria and trajetoria.aluno_id != aluno.id:
-            self.add_error("trajetoria", "A trajetoria selecionada nao pertence ao aluno.")
+            self.add_error("trajetoria", "A trajetória selecionada não pertence ao aluno.")
         if trajetoria and self.docente:
             docente_vinculado = trajetoria.orientador_id == self.docente.id or trajetoria.coorientador_id == self.docente.id
             if not docente_vinculado:
-                self.add_error("trajetoria", "Selecione uma trajetoria sob sua orientacao ou coorientacao.")
+                self.add_error("trajetoria", "Selecione uma trajetória sob sua orientação ou coorientação.")
         if trajetoria and tipo_defesa:
             if tipo_defesa == SolicitacaoBanca.TipoDefesa.DEFESA_MESTRADO and trajetoria.nivel_curso != Aluno.NivelCurso.MESTRADO:
-                self.add_error("tipo_defesa", "Defesa de Mestrado exige trajetoria de mestrado.")
+                self.add_error("tipo_defesa", "Defesa de Mestrado exige trajetória de mestrado.")
             if tipo_defesa in {
                 SolicitacaoBanca.TipoDefesa.QUALIFICACAO_DOUTORADO,
                 SolicitacaoBanca.TipoDefesa.DEFESA_DOUTORADO,
             } and trajetoria.nivel_curso != Aluno.NivelCurso.DOUTORADO:
-                self.add_error("tipo_defesa", "Solicitacao de doutorado exige trajetoria de doutorado.")
+                self.add_error("tipo_defesa", "Solicitação de doutorado exige trajetória de doutorado.")
 
         if self.finalizar:
             self._validar_campos_obrigatorios_finalizacao(cleaned_data)
@@ -574,11 +574,11 @@ class SolicitacaoBancaForm(forms.ModelForm):
         ]:
             value = cleaned_data.get(field_name)
             if value is None or (isinstance(value, str) and not value.strip()):
-                self.add_error(field_name, "Campo obrigatorio para finalizar.")
+                self.add_error(field_name, "Campo obrigatório para finalizar.")
         if not cleaned_data.get("requisitos_cumpridos"):
             self.add_error("requisitos_cumpridos", "Confirme que o discente cumpre os requisitos.")
         if not cleaned_data.get("ciencia_recomendacao_mpf"):
-            self.add_error("ciencia_recomendacao_mpf", "Confirme a ciencia para finalizar.")
+            self.add_error("ciencia_recomendacao_mpf", "Confirme a ciência para finalizar.")
 
     def _validar_membros_finalizacao(self, cleaned_data, tipo_defesa):
         for papel in MembroBanca.papeis_para_tipo(tipo_defesa):
@@ -592,17 +592,17 @@ class SolicitacaoBancaForm(forms.ModelForm):
             if not nome:
                 self.add_error(f"{prefixo}_nome", "Informe o nome.")
             if MembroBanca.exige_instituicao(papel) and not instituicao:
-                self.add_error(f"{prefixo}_instituicao", "Informe a instituicao/IES.")
+                self.add_error(f"{prefixo}_instituicao", "Informe a instituição/IES.")
             if MembroBanca.exige_cpf(tipo_defesa, papel) and not cpf:
                 self.add_error(f"{prefixo}_cpf", "Informe o CPF.")
             elif cpf and not validar_cpf_brasileiro(cpf):
-                self.add_error(f"{prefixo}_cpf", "Informe um CPF valido.")
+                self.add_error(f"{prefixo}_cpf", "Informe um CPF válido.")
 
     def _validar_cpfs_informados(self, cleaned_data):
         for papel, _label in MembroBanca.Papel.choices:
             cpf = (cleaned_data.get(f"membro_{papel}_cpf") or "").strip()
             if cpf and not validar_cpf_brasileiro(cpf):
-                self.add_error(f"membro_{papel}_cpf", "Informe um CPF valido.")
+                self.add_error(f"membro_{papel}_cpf", "Informe um CPF válido.")
 
     def save(self, commit=True, *, docente=None, status=SolicitacaoBanca.Status.RASCUNHO):
         solicitacao = super().save(commit=False)
@@ -646,11 +646,11 @@ class ReservaAmbienteForm(forms.Form):
     tipo = forms.ChoiceField(choices=ReservaAmbiente.TipoReserva.choices, label="Tipo de reserva")
     titulo = forms.CharField(max_length=255, required=False, label="Titulo")
     data_inicio = forms.DateField(
-        label="Data de inicio",
+        label="Data de início",
         widget=forms.DateInput(attrs={"type": "date"}),
     )
     hora_inicio = forms.TimeField(
-        label="Hora de inicio",
+        label="Hora de início",
         widget=forms.TimeInput(attrs={"type": "time"}),
     )
     hora_fim = forms.TimeField(
@@ -659,7 +659,7 @@ class ReservaAmbienteForm(forms.Form):
     )
     recorrencia = forms.ChoiceField(
         choices=(
-            (RECORRENCIA_NENHUMA, "Nao repetir"),
+            (RECORRENCIA_NENHUMA, "Não repetir"),
             (RECORRENCIA_DIARIA, "Diaria"),
             (RECORRENCIA_SEMANAL, "Semanal"),
             (RECORRENCIA_MENSAL, "Mensal"),
@@ -670,7 +670,7 @@ class ReservaAmbienteForm(forms.Form):
         required=False,
         min_value=1,
         max_value=6,
-        label="Duracao da recorrencia em meses",
+        label="Duração da recorrência em meses",
         widget=forms.NumberInput(attrs={"min": "1", "max": "6"}),
     )
 
@@ -709,7 +709,7 @@ class ReservaAmbienteForm(forms.Form):
             cleaned_data["fim"] = fim
 
         if hora_inicio and hora_fim and hora_fim <= hora_inicio:
-            self.add_error("hora_fim", "A hora de fim deve ser posterior a hora de inicio no mesmo dia.")
+            self.add_error("hora_fim", "A hora de fim deve ser posterior a hora de início no mesmo dia.")
         if recorrencia != self.RECORRENCIA_NENHUMA:
             if not duracao_recorrencia_meses:
                 self.add_error("duracao_recorrencia_meses", "Informe por quantos meses repetir.")
@@ -735,7 +735,7 @@ class DocumentoCadastroForm(forms.Form):
     arquivo = forms.FileField(
         required=True,
         label="Arquivo do documento",
-        help_text="PDF, Office ou imagem. Tamanho maximo: 5 MB.",
+        help_text="PDF, Office ou imagem. Tamanho máximo: 5 MB.",
         widget=forms.ClearableFileInput(attrs={"accept": DOCUMENTO_UPLOAD_ACCEPT}),
     )
     restricao_tipo = forms.ChoiceField(
@@ -747,12 +747,12 @@ class DocumentoCadastroForm(forms.Form):
     def clean_arquivo(self):
         arquivo = self.cleaned_data["arquivo"]
         if arquivo.size > MAX_DOCUMENTO_UPLOAD_SIZE:
-            raise forms.ValidationError("O arquivo deve ter no maximo 5 MB.")
+            raise forms.ValidationError("O arquivo deve ter no máximo 5 MB.")
 
         extensao = Path(arquivo.name).suffix.lower()
         if extensao not in ALLOWED_DOCUMENTO_EXTENSIONS:
             raise forms.ValidationError(
-                "Formato nao permitido. Envie PDF, arquivos Office ou imagens."
+                "Formato não permitido. Envie PDF, arquivos Office ou imagens."
             )
 
         return arquivo
@@ -814,7 +814,7 @@ class ProcessoAberturaForm(forms.ModelForm):
 class SolicitarCienteOrientadorForm(forms.Form):
     mensagem_solicitacao = forms.CharField(
         required=False,
-        label="Observacao da solicitacao",
+        label="Observação da solicitação",
         widget=forms.Textarea(attrs={"rows": 3}),
     )
 
@@ -822,13 +822,13 @@ class SolicitarCienteOrientadorForm(forms.Form):
 class ManifestarCienteOrientadorForm(forms.Form):
     mensagem_manifestacao = forms.CharField(
         required=False,
-        label="Mensagem da manifestacao",
+        label="Mensagem da manifestação",
         widget=forms.Textarea(attrs={"rows": 3}),
     )
 
 
 class ComentarioProcessoForm(forms.Form):
-    anonimo = forms.BooleanField(required=False, label="Comentario anonimo")
+    anonimo = forms.BooleanField(required=False, label="Comentário anônimo")
     texto = forms.CharField(
         label="Comentario",
         widget=forms.Textarea(attrs={"rows": 4}),
@@ -838,7 +838,7 @@ class ComentarioProcessoForm(forms.Form):
 class LancamentoHorasComplementaresForm(forms.ModelForm):
     trajetoria = forms.ModelChoiceField(
         queryset=TrajetoriaAcademica.objects.none(),
-        label="Trajetoria academica",
+        label="Trajetória acadêmica",
     )
     processo_origem = forms.ModelChoiceField(
         queryset=Processo.objects.none(),
@@ -848,7 +848,7 @@ class LancamentoHorasComplementaresForm(forms.ModelForm):
     retificar_lancamento = forms.ModelChoiceField(
         queryset=LancamentoHorasComplementares.objects.none(),
         required=False,
-        label="Retifica lancamento",
+        label="Retifica lançamento",
     )
 
     class Meta:
@@ -942,17 +942,17 @@ class LancamentoHorasComplementaresForm(forms.ModelForm):
         horas_aprovadas = cleaned_data.get("horas_aprovadas")
         retificado = cleaned_data.get("retificar_lancamento")
         if not trajetoria:
-            self.add_error("trajetoria", "Selecione a trajetoria academica.")
+            self.add_error("trajetoria", "Selecione a trajetória acadêmica.")
             return cleaned_data
         norma = LancamentoHorasComplementares.norma_para_trajetoria(trajetoria)
         if not norma:
-            raise forms.ValidationError("Nao ha norma vigente de horas complementares para o nivel do discente.")
+            raise forms.ValidationError("Não há norma vigente de horas complementares para o nível do discente.")
         if not processo_origem and not (cleaned_data.get("justificativa_sem_processo") or "").strip():
-            self.add_error("processo_origem", "Informe o processo de origem ou justifique o lancamento sem processo.")
+            self.add_error("processo_origem", "Informe o processo de origem ou justifique o lançamento sem processo.")
         if processo_origem and processo_origem.usuario_criado_por_id != trajetoria.aluno_id:
-            self.add_error("processo_origem", "O processo de origem deve pertencer ao discente da trajetoria.")
+            self.add_error("processo_origem", "O processo de origem deve pertencer ao discente da trajetória.")
         if tipo and tipo.norma_id != norma.id:
-            self.add_error("tipo_atividade", "Selecione uma atividade da norma vigente da trajetoria.")
+            self.add_error("tipo_atividade", "Selecione uma atividade da norma vigente da trajetória.")
         if tipo and quantidade:
             calculadas = quantidade * tipo.horas_por_unidade
             self.horas_calculadas = calculadas
@@ -981,9 +981,9 @@ class LancamentoHorasComplementaresForm(forms.ModelForm):
             self.maximo_aprovavel = maximo
             if maximo is not None and horas_aprovadas is not None and horas_aprovadas > maximo:
                 if not cleaned_data.get("excepcional_autorizado"):
-                    self.add_error("horas_aprovadas", f"O maximo aprovavel pelas regras vigentes e {maximo}h.")
+                    self.add_error("horas_aprovadas", f"O máximo aprovável pelas regras vigentes e {maximo}h.")
                 elif not (cleaned_data.get("justificativa_excepcional") or "").strip():
-                    self.add_error("justificativa_excepcional", "Justifique a aprovacao excepcional acima do limite.")
+                    self.add_error("justificativa_excepcional", "Justifique a aprovação excepcional acima do limite.")
             if horas_aprovadas is not None and horas_aprovadas != calculadas:
                 if not (cleaned_data.get("observacoes_secretaria") or "").strip():
                     self.add_error("observacoes_secretaria", "Justifique a diferenca entre horas calculadas e aprovadas.")
@@ -1057,11 +1057,11 @@ class HorasComplementaresAdministrativoForm(forms.Form):
         excepcional = cleaned_data.get("excepcional_autorizado") or False
 
         if not self.trajetoria:
-            raise forms.ValidationError("Trajetoria academica nao encontrada.")
+            raise forms.ValidationError("Trajetória acadêmica não encontrada.")
         if not self.norma:
-            raise forms.ValidationError("Nao ha norma vigente de horas complementares para esta trajetoria.")
+            raise forms.ValidationError("Não há norma vigente de horas complementares para esta trajetória.")
         if tipo and tipo.norma_id != self.norma.id:
-            self.add_error("tipo_atividade", "Selecione uma atividade da norma vigente da trajetoria.")
+            self.add_error("tipo_atividade", "Selecione uma atividade da norma vigente da trajetória.")
         if not (tipo and horas):
             return cleaned_data
 
@@ -1071,7 +1071,7 @@ class HorasComplementaresAdministrativoForm(forms.Form):
             tipo_atividade=tipo,
             norma=tipo.norma,
             grupo_limite=tipo.grupo_limite,
-            descricao=comentario[:255] or "Lancamento administrativo de horas complementares",
+            descricao=comentario[:255] or "Lançamento administrativo de horas complementares",
             quantidade=quantidade,
             unidade_quantidade=tipo.unidade_calculo,
             horas_solicitadas=horas,
@@ -1085,7 +1085,7 @@ class HorasComplementaresAdministrativoForm(forms.Form):
         )
         maximo = lancamento.maximo_aprovavel()
         if maximo is not None and horas > maximo and not excepcional:
-            self.add_error("horas_aprovadas", f"O maximo aprovavel pelas regras vigentes e {maximo}h.")
+            self.add_error("horas_aprovadas", f"O máximo aprovável pelas regras vigentes e {maximo}h.")
         return cleaned_data
 
     def save(self):
@@ -1099,7 +1099,7 @@ class HorasComplementaresAdministrativoForm(forms.Form):
             tipo_atividade=tipo,
             norma=tipo.norma,
             grupo_limite=tipo.grupo_limite,
-            descricao=comentario[:255] or "Lancamento administrativo de horas complementares",
+            descricao=comentario[:255] or "Lançamento administrativo de horas complementares",
             quantidade=quantidade,
             unidade_quantidade=tipo.unidade_calculo,
             horas_solicitadas=horas,
@@ -1115,14 +1115,14 @@ class HorasComplementaresAdministrativoForm(forms.Form):
 
 class FinalizarProcessoForm(forms.Form):
     termo_finalizacao = forms.CharField(
-        label="Termo de finalizacao",
+        label="Termo de finalização",
         widget=forms.Textarea(attrs={"rows": 5}),
     )
 
 
 class AlunoComentarioForm(forms.Form):
     comentario = forms.CharField(
-        label="Comentario da alteracao",
+        label="Comentário da alteração",
         widget=forms.Textarea(attrs={"rows": 3}),
     )
 
@@ -1163,7 +1163,7 @@ class AlunoDadosForm(AlunoComentarioForm):
         if self.aluno:
             queryset = queryset.exclude(pk=self.aluno.pk)
         if queryset.exists():
-            raise forms.ValidationError("Ja existe um usuario com este email.")
+            raise forms.ValidationError("Já existe um usuário com este email.")
         return email
 
     def clean_cpf(self):
@@ -1217,7 +1217,7 @@ class AlunoCadastroForm(forms.Form):
     sexo_atribuido_nascimento = forms.ChoiceField(
         choices=(("", "---------"), *Aluno.SexoAtribuidoNascimento.choices),
         required=False,
-        label="Sexo atribuido ao nascer",
+        label="Sexo atribuído ao nascer",
     )
     nivel_curso = forms.ChoiceField(choices=Aluno.NivelCurso.choices, label="Tipo de curso")
     ingresso = forms.CharField(label="Ingresso (ano ou semestre)", max_length=6)
@@ -1244,7 +1244,7 @@ class AlunoCadastroForm(forms.Form):
     coorientador_externo_instituicao = forms.CharField(
         max_length=255,
         required=False,
-        label="Instituicao do coorientador externo",
+        label="Instituição do coorientador externo",
     )
 
     def __init__(self, *args, **kwargs):
@@ -1260,7 +1260,7 @@ class AlunoCadastroForm(forms.Form):
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
         if User.objects.filter(email__iexact=email).exists():
-            raise forms.ValidationError("Ja existe um usuario com este email.")
+            raise forms.ValidationError("Já existe um usuário com este email.")
         return email
 
     def clean_cpf(self):
@@ -1289,7 +1289,7 @@ class AlunoCadastroForm(forms.Form):
         externo_nome = (cleaned_data.get("coorientador_externo_nome") or "").strip()
 
         if password1 and password2 and password1 != password2:
-            self.add_error("password2", "As senhas nao conferem.")
+            self.add_error("password2", "As senhas não conferem.")
         if password1:
             try:
                 password_validation.validate_password(password1)
@@ -1375,7 +1375,7 @@ class AlunoIniciarDoutoradoForm(AlunoComentarioForm):
         max_length=6,
     )
     prazo_qualificacao = forms.CharField(
-        label="Prazo de qualificacao (YYYY.1 ou YYYY.2)",
+        label="Prazo de qualificação (YYYY.1 ou YYYY.2)",
         max_length=6,
     )
     prazo_defesa = forms.CharField(
@@ -1390,7 +1390,7 @@ class AlunoIniciarDoutoradoForm(AlunoComentarioForm):
 
 
 class AlunoDefesaForm(AlunoComentarioForm):
-    numero_defesa = forms.CharField(label="Numero da defesa", max_length=80)
+    numero_defesa = forms.CharField(label="Número da defesa", max_length=80)
     data_defesa = forms.DateField(
         label="Data da defesa",
         widget=forms.DateInput(attrs={"type": "date"}),
@@ -1398,7 +1398,7 @@ class AlunoDefesaForm(AlunoComentarioForm):
 
 
 class AlunoDepositoFinalForm(AlunoComentarioForm):
-    deposito_versao_final = forms.BooleanField(required=False, label="Deposito da versao final")
+    deposito_versao_final = forms.BooleanField(required=False, label="Depósito da versão final")
 
 
 class AlunoOrientadorForm(AlunoComentarioForm):
@@ -1442,7 +1442,7 @@ class AlunoCoorientadorForm(AlunoComentarioForm):
     coorientador_externo_instituicao = forms.CharField(
         max_length=255,
         required=False,
-        label="Instituicao do coorientador externo",
+        label="Instituição do coorientador externo",
     )
 
     def clean(self):
@@ -1474,12 +1474,12 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
 
     trajetoria_id = forms.IntegerField(required=False, widget=forms.HiddenInput)
     nivel_curso = forms.ChoiceField(choices=Aluno.NivelCurso.choices, label="Nivel")
-    status = forms.ChoiceField(choices=TrajetoriaAcademica.Status.choices, label="Status da trajetoria")
+    status = forms.ChoiceField(choices=TrajetoriaAcademica.Status.choices, label="Status da trajetória")
     ingresso = forms.CharField(label="Ingresso (YYYY.1 ou YYYY.2)", max_length=6)
     prazo_qualificacao = forms.CharField(label="Prazo", max_length=6, required=False)
     prazo_defesa = forms.CharField(label="Prazo de defesa", max_length=6, required=False)
     reingressante = forms.BooleanField(required=False, label="Reingressante")
-    isQualificado = forms.BooleanField(required=False, label="Projeto/qualificacao concluido")
+    isQualificado = forms.BooleanField(required=False, label="Projeto/qualificação concluído")
     orientador = forms.ModelChoiceField(
         queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE).order_by("nome"),
         required=False,
@@ -1496,11 +1496,11 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
     coorientador_externo_instituicao = forms.CharField(
         max_length=255,
         required=False,
-        label="Instituicao do coorientador externo",
+        label="Instituição do coorientador externo",
     )
-    numero_defesa = forms.CharField(max_length=80, required=False, label="Numero da defesa")
+    numero_defesa = forms.CharField(max_length=80, required=False, label="Número da defesa")
     data_defesa = forms.DateField(required=False, label="Data da defesa", widget=forms.DateInput(attrs={"type": "date"}))
-    deposito_versao_final = forms.BooleanField(required=False, label="Deposito da versao final")
+    deposito_versao_final = forms.BooleanField(required=False, label="Depósito da versão final")
 
     def clean(self):
         cleaned_data = super().clean()
@@ -1520,7 +1520,7 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
             Aluno.NivelCurso.DOUTORADO,
             Aluno.NivelCurso.POSDOUTORADO,
         }
-        conclusao_label = "relatorio final" if nivel_curso == Aluno.NivelCurso.POSDOUTORADO else "defesa"
+        conclusao_label = "relatório final" if nivel_curso == Aluno.NivelCurso.POSDOUTORADO else "defesa"
 
         if not usa_orientacao:
             cleaned_data["prazo_qualificacao"] = ""
@@ -1547,7 +1547,7 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
             self.add_error("coorientador_externo_nome", "Informe o nome do coorientador externo.")
         if status == TrajetoriaAcademica.Status.CONCLUIDA and usa_conclusao:
             if not numero_defesa:
-                self.add_error("numero_defesa", f"Informe o numero do {conclusao_label}.")
+                self.add_error("numero_defesa", f"Informe o número do {conclusao_label}.")
             if not data_defesa:
                 self.add_error("data_defesa", f"Informe a data do {conclusao_label}.")
 

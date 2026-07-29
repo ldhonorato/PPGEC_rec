@@ -269,19 +269,19 @@ def _menu_lateral_sections(user):
                 "A",
                 children=[
                     _menu_item(
-                        "Nova solicitacao",
+                        "Nova solicitação",
                         "/assinaturas/nova/",
                         ["nova_solicitacao_assinatura"],
                         "N",
                     ),
                     _menu_item(
-                        "Pendencias de assinatura",
+                        "Pendências de assinatura",
                         "/assinaturas/pendentes/",
                         ["pendencias_assinatura"],
                         "P",
                     ),
                     _menu_item(
-                        "Solicitacoes feitas",
+                        "Solicitações feitas",
                         "/assinaturas/",
                         ["solicitacoes_assinatura"],
                         "S",

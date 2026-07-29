@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Dashboard | Coordenacao{% endblock %}
+{% block title %}Dashboard | Coordenação{% endblock %}
 {% block content %}
 <section class="card">
     <h1 class="section-title">Dashboard de docentes e orientandos</h1>
@@ -51,7 +51,7 @@
                         {% for trajetoria in docente.trajetorias_orientadas_ativas %}
                             <li>
                                 <strong><a class="text-link" href="{% url 'aluno_detalhe' trajetoria.aluno.id %}">{{ trajetoria.aluno.nome }}</a></strong>:
-                                <span class="muted">{{ trajetoria.aluno.email }} | {{ trajetoria.get_nivel_curso_display }}{% if trajetoria.aluno.matricula %} | Matricula: {{ trajetoria.aluno.matricula }}{% endif %}</span>
+                                <span class="muted">{{ trajetoria.aluno.email }} | {{ trajetoria.get_nivel_curso_display }}{% if trajetoria.aluno.matricula %} | Matrícula: {{ trajetoria.aluno.matricula }}{% endif %}</span>
                             </li>
                         {% endfor %}
                     </ul>
@@ -61,7 +61,7 @@
                         {% for trajetoria in docente.trajetorias_coorientadas_ativas %}
                             <li>
                                 <strong><a class="text-link" href="{% url 'aluno_detalhe' trajetoria.aluno.id %}">{{ trajetoria.aluno.nome }}</a></strong>:
-                                <span class="muted">Coorientando | {{ trajetoria.aluno.email }} | {{ trajetoria.get_nivel_curso_display }}{% if trajetoria.aluno.matricula %} | Matricula: {{ trajetoria.aluno.matricula }}{% endif %}</span>
+                                <span class="muted">Coorientando | {{ trajetoria.aluno.email }} | {{ trajetoria.get_nivel_curso_display }}{% if trajetoria.aluno.matricula %} | Matrícula: {{ trajetoria.aluno.matricula }}{% endif %}</span>
                             </li>
                         {% endfor %}
                     </ul>

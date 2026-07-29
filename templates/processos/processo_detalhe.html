@@ -13,18 +13,18 @@
     </p>
     <p style="margin: 0.35rem 0;"><strong>Criado por:</strong> {{ processo.usuario_criado_por.nome }} ({{ processo.usuario_criado_por.email }})</p>
     <p style="margin: 0.35rem 0;"><strong>Criado em:</strong> {{ processo.data_criacao|date:"d/m/Y H:i" }}</p>
-    <p style="margin: 0.35rem 0;"><strong>Ultima atualizacao:</strong> {{ processo.atualizado_em|date:"d/m/Y H:i" }}</p>
+    <p style="margin: 0.35rem 0;"><strong>Última atualização:</strong> {{ processo.atualizado_em|date:"d/m/Y H:i" }}</p>
     {% if processo.finalizado_em %}
         <p style="margin: 0.35rem 0;"><strong>Finalizado em:</strong> {{ processo.finalizado_em|date:"d/m/Y H:i" }}</p>
         {% if processo.termo_finalizacao %}
-            <p style="margin: 0.35rem 0;"><strong>Termo de finalizacao:</strong> {{ processo.termo_finalizacao }}</p>
+            <p style="margin: 0.35rem 0;"><strong>Termo de finalização:</strong> {{ processo.termo_finalizacao }}</p>
         {% endif %}
     {% endif %}
     {% if processo.observacoes_internas %}
-        <p style="margin: 0.35rem 0;"><strong>Observacoes internas:</strong> {{ processo.observacoes_internas }}</p>
+        <p style="margin: 0.35rem 0;"><strong>Observações internas:</strong> {{ processo.observacoes_internas }}</p>
     {% endif %}
     <div style="margin-top: 0.8rem;">
-        <strong>Descricao</strong>
+        <strong>Descrição</strong>
         <p style="margin: 0.4rem 0 0 0; white-space: pre-wrap;">{{ processo.descricao }}</p>
     </div>
 </section>
@@ -190,7 +190,7 @@
 {% elif not can_comment_pleno %}
 <section class="card" style="margin-bottom: 1rem;">
     <p class="muted" style="margin: 0;">
-        Voce nao tem permissao para adicionar documento ou encaminhar neste processo.
+        Você não tem permissão para adicionar documento ou encaminhar neste processo.
     </p>
 </section>
 {% endif %}
@@ -246,9 +246,9 @@
 <section class="card" style="margin-bottom: 1rem;">
     <h2 class="section-title">Ciente do orientador</h2>
     {% if orientador_responsavel %}
-        <p class="muted" style="margin: 0 0 0.7rem 0;">Orientador responsavel: {{ orientador_responsavel.nome }} ({{ orientador_responsavel.email }})</p>
+        <p class="muted" style="margin: 0 0 0.7rem 0;">Orientador responsável: {{ orientador_responsavel.nome }} ({{ orientador_responsavel.email }})</p>
     {% else %}
-        <p class="muted" style="margin: 0 0 0.7rem 0;">Nao ha orientador vinculado ao requerente deste processo.</p>
+        <p class="muted" style="margin: 0 0 0.7rem 0;">Não há orientador vinculado ao requerente deste processo.</p>
     {% endif %}
 
     {% if processo.manifestacoes.all %}
@@ -257,22 +257,22 @@
                 <li>
                     <strong>{{ manifestacao.get_tipo_display }}</strong> - {{ manifestacao.get_status_display }}<br>
                     <small class="muted">
-                        Responsavel: {{ manifestacao.responsavel.nome }} |
+                        Responsável: {{ manifestacao.responsavel.nome }} |
                         Solicitado por: {{ manifestacao.solicitado_por.nome }} |
                         Solicitado em: {{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}
                         {% if manifestacao.data_manifestacao %}| Manifestado em: {{ manifestacao.data_manifestacao|date:"d/m/Y H:i" }}{% endif %}
                     </small>
                     {% if manifestacao.mensagem_solicitacao %}
-                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Solicitacao: {{ manifestacao.mensagem_solicitacao }}</small></p>
+                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Solicitação: {{ manifestacao.mensagem_solicitacao }}</small></p>
                     {% endif %}
                     {% if manifestacao.mensagem_manifestacao %}
-                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Manifestacao: {{ manifestacao.mensagem_manifestacao }}</small></p>
+                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Manifestação: {{ manifestacao.mensagem_manifestacao }}</small></p>
                     {% endif %}
                 </li>
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhuma solicitacao de ciente registrada.</p>
+        <p class="muted">Nenhuma solicitação de ciente registrada.</p>
     {% endif %}
 </section>
 
@@ -420,7 +420,7 @@
         {% endfor %}
         <div style="display: flex; gap: 0.7rem; justify-content: flex-end;">
             <button type="button" class="btn btn-secondary" id="btn-fechar-modal-finalizar">Cancelar</button>
-            <button type="submit" class="btn">Confirmar finalizacao</button>
+            <button type="submit" class="btn">Confirmar finalização</button>
         </div>
     </form>
 </dialog>
@@ -438,7 +438,7 @@
                         Enviado por: {{ documento.enviado_por.nome }} |
                         Data: {{ documento.data_envio|date:"d/m/Y H:i" }}
                         {% if documento.tipo_documento %}| Tipo: {{ documento.get_tipo_documento_display }}{% endif %}
-                        {% if documento.restrito %}| Restricao: {{ documento.get_restricao_tipo_display }}{% endif %}
+                        {% if documento.restrito %}| Restrição: {{ documento.get_restricao_tipo_display }}{% endif %}
                     </small>
                     {% if documento.texto %}
                         <p style="margin: 0.4rem 0 0 0;">{{ documento.texto }}</p>
@@ -478,13 +478,13 @@
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nao ha documentos vinculados.</p>
+        <p class="muted">Não há documentos vinculados.</p>
     {% endif %}
 </section>
 
 {% if can_comment_pleno %}
 <section class="card" style="margin-bottom: 1rem;">
-    <h2 class="section-title">Comentarios do Pleno</h2>
+    <h2 class="section-title">Comentários do Pleno</h2>
     <form method="post" style="margin-bottom: 1rem;">
         {% csrf_token %}
         <input type="hidden" name="adicionar_comentario" value="1">
@@ -495,7 +495,7 @@
                 {{ field.errors }}
             </div>
         {% endfor %}
-        <button type="submit" class="btn">Adicionar comentario</button>
+        <button type="submit" class="btn">Adicionar comentário</button>
     </form>
 
     {% if processo.comentarios.all %}
@@ -504,7 +504,7 @@
                 <li>
                     <small class="muted">
                         {% if comentario.anonimo %}
-                            Comentario anonimo
+                            Comentário anônimo
                         {% else %}
                             {{ comentario.autor.nome }}
                         {% endif %}
@@ -515,13 +515,13 @@
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhum comentario registrado para este processo.</p>
+        <p class="muted">Nenhum comentário registrado para este processo.</p>
     {% endif %}
 </section>
 {% endif %}
 
 <section class="card">
-    <h2 class="section-title">Historico do processo</h2>
+    <h2 class="section-title">Histórico do processo</h2>
     <ul class="list">
         <li>
             <strong>Abertura do processo</strong><br>
@@ -533,7 +533,7 @@
         </li>
         {% for tramitacao in tramitacoes_historico %}
             <li>
-                <strong>Tramitacao em {{ tramitacao.data_encaminhamento|date:"d/m/Y H:i" }}</strong><br>
+                <strong>Tramitação em {{ tramitacao.data_encaminhamento|date:"d/m/Y H:i" }}</strong><br>
                 <small class="muted">
                     De: {% if tramitacao.setor_origem %}{{ tramitacao.setor_origem.nome }}{% else %}-{% endif %} |
                     Para: {{ tramitacao.setor_destino.nome }} |
@@ -546,12 +546,12 @@
             </li>
         {% empty %}
             <li>
-                <small class="muted">Ainda nao ha tramitacoes registradas.</small>
+                <small class="muted">Ainda não há tramitações registradas.</small>
             </li>
         {% endfor %}
         {% if processo.finalizado_em %}
             <li>
-                <strong>Finalizacao em {{ processo.finalizado_em|date:"d/m/Y H:i" }}</strong><br>
+                <strong>Finalização em {{ processo.finalizado_em|date:"d/m/Y H:i" }}</strong><br>
                 <small class="muted">Status final: {{ processo.get_status_display }}</small>
                 {% if processo.termo_finalizacao %}
                     <p style="margin: 0.4rem 0 0 0; white-space: pre-wrap;">{{ processo.termo_finalizacao }}</p>
@@ -563,7 +563,7 @@
 {% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo or can_registrar_horas_complementares %}
 <dialog id="modal-remocao-arquivo" class="modal-dialog">
     <div style="padding: 1rem 1rem 0 1rem;">
-        <h2 class="section-title">Confirmar remocao de arquivo</h2>
+        <h2 class="section-title">Confirmar remoção de arquivo</h2>
         <p class="muted" id="texto-remocao-documento" style="margin: 0.4rem 0 0 0;"></p>
     </div>
     <form method="post" style="padding: 0 1rem 1rem 1rem;" id="form-remocao-arquivo">
@@ -571,12 +571,12 @@
         <input type="hidden" name="remover_arquivo_documento" value="1">
         <input type="hidden" name="documento_id" id="input-documento-id-remocao">
         <div class="field">
-            <label for="id_motivo_remocao">Motivo da remocao</label>
+            <label for="id_motivo_remocao">Motivo da remoção</label>
             <textarea id="id_motivo_remocao" name="motivo_remocao" rows="4" required></textarea>
         </div>
         <div style="display: flex; gap: 0.7rem; justify-content: flex-end;">
             <button type="button" class="btn btn-secondary" id="btn-cancelar-remocao">Cancelar</button>
-            <button type="submit" class="btn">Confirmar remocao</button>
+            <button type="submit" class="btn">Confirmar remoção</button>
         </div>
     </form>
 </dialog>

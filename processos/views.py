@@ -543,7 +543,7 @@ def _trajetoria_campo_historico(trajetoria: TrajetoriaAcademica, campo: str) -> 
     if campo == "defesa":
         return "Defesa", _defesa_display(trajetoria)
     if campo == "deposito_versao_final":
-        return "Deposito final", _bool_label(trajetoria.deposito_versao_final)
+        return "Depósito final", _bool_label(trajetoria.deposito_versao_final)
     return "Alteracao", "-"
 
 
@@ -584,10 +584,10 @@ def _campo_alteracao_label(campo: str) -> str:
         "nome": "Nome",
         "email": "Email",
         "matricula": "Matricula",
-        "Deposito final": "Deposito final",
+        "Depósito final": "Depósito final",
     }
     if campo.lower().startswith("prazo "):
-        return "Prazo de qualificacao/projeto"
+        return "Prazo de qualificação/projeto"
     return labels.get(campo, campo.replace("_", " ").capitalize())
 
 
@@ -613,14 +613,14 @@ def _alteracao_aluno_display(alteracao: AlteracaoAluno) -> dict:
 
     if len(alteracoes) == 1:
         campo, _valor_anterior, valor_novo = alteracoes[0]
-        texto_alteracao = f"Alteracao no {campo} ({valor_novo})"
+        texto_alteracao = f"Alteração no {campo} ({valor_novo})"
     elif alteracoes:
         texto_alteracao = "; ".join(
             f"{campo}: {valor_anterior} -> {valor_novo}"
             for campo, valor_anterior, valor_novo in alteracoes
         )
     else:
-        texto_alteracao = "Alteracao registrada"
+        texto_alteracao = "Alteração registrada"
 
     return {
         "obj": alteracao,
@@ -704,7 +704,7 @@ def _menu_lateral_home(user):
         items = [
             {"label": "Meus Processos", "href": "/menu/meus-processos/"},
             {"label": "Processos dos orientandos", "href": "/menu/processos-orientandos/"},
-            {"label": "Ciencias manifestadas", "href": "/menu/ciencias-manifestadas/"},
+            {"label": "Ciências manifestadas", "href": "/menu/ciencias-manifestadas/"},
             {"label": "Meus Orientandos", "href": "/menu/meus-orientandos/"},
         ]
         if _is_membro_setor_nome(user, "Colegiando PPGEC (Pleno)"):
@@ -1744,7 +1744,7 @@ def setores_comissoes_view(request):
     setor_id = request.GET.get("editar") if can_edit_setores else None
     if request.method == "POST":
         if not can_edit_setores:
-            raise PermissionDenied("Apenas coordenadores podem alterar setores e comissoes.")
+            raise PermissionDenied("Apenas coordenadores podem alterar setores e comissões.")
         setor_id = request.POST.get("setor_id")
     if setor_id:
         setor_editado = get_object_or_404(Setor, pk=setor_id)
@@ -1757,12 +1757,12 @@ def setores_comissoes_view(request):
                 data_saida__isnull=True,
             )
             membro.encerrar()
-            messages.success(request, "Participacao encerrada.")
+            messages.success(request, "Participação encerrada.")
             return redirect("setores_comissoes")
 
         form = SetorComissaoForm(request.POST, instance=setor_editado)
         if not setor_editado:
-            raise PermissionDenied("Use a pagina Criar Comissao para cadastrar novas comissoes.")
+            raise PermissionDenied("Use a página Criar Comissão para cadastrar novas comissões.")
         if form.is_valid():
             setor = form.save(commit=False)
             setor.save()
@@ -1781,9 +1781,9 @@ def setores_comissoes_view(request):
                     designado_por=request.user,
                 )
 
-            messages.success(request, "Setor/comissao salvo com sucesso.")
+            messages.success(request, "Setor/comissão salvo com sucesso.")
             return redirect("setores_comissoes")
-        messages.error(request, "Nao foi possivel salvar o setor/comissao.")
+        messages.error(request, "Não foi possível salvar o setor/comissão.")
     else:
         initial = {}
         if setor_editado:
@@ -1855,9 +1855,9 @@ def criar_comissao_view(request):
                     designado_por=request.user,
                 )
 
-            messages.success(request, "Comissao criada com sucesso.")
+            messages.success(request, "Comissão criada com sucesso.")
             return redirect("setores_comissoes")
-        messages.error(request, "Nao foi possivel criar a comissao.")
+        messages.error(request, "Não foi possível criar a comissão.")
     else:
         form = SetorComissaoForm()
 
@@ -2018,7 +2018,7 @@ def _aprovar_cadastro_aluno(*, aluno, usuario):
     _registrar_alteracao_aluno(
         aluno=aluno,
         tipo=AlteracaoAluno.TipoAlteracao.STATUS,
-        valor_anterior="Em avaliacao",
+        valor_anterior="Em avaliação",
         valor_novo=aluno.get_status_aluno_display(),
         comentario="Cadastro aprovado pela secretaria.",
         alterado_por=usuario,
@@ -2069,14 +2069,14 @@ def validar_cadastros_alunos_view(request):
             _registrar_alteracao_aluno(
                 aluno=aluno,
                 tipo=AlteracaoAluno.TipoAlteracao.STATUS,
-                valor_anterior="Em avaliacao",
+                valor_anterior="Em avaliação",
                 valor_novo=aluno.get_status_aluno_display(),
                 comentario="Cadastro reprovado pela secretaria.",
                 alterado_por=request.user,
             )
             messages.success(request, f"Cadastro de {aluno.nome} reprovado.")
         else:
-            messages.error(request, "Acao invalida para validacao de cadastro.")
+            messages.error(request, "Ação inválida para validação de cadastro.")
         polo_param = request.POST.get("polo", "").strip()
         destino = reverse("validar_cadastros_alunos")
         return redirect(f"{destino}?polo={polo_param}" if polo_param else destino)
@@ -2207,7 +2207,7 @@ def aluno_detalhe_view(request, aluno_id):
     if request.method == "POST":
         acao = request.POST.get("acao", "").strip()
         if not can_manage_aluno and acao not in {"salvar_publicacao"}:
-            raise PermissionDenied("Apenas publicacoes podem ser alteradas pelo aluno.")
+            raise PermissionDenied("Apenas publicações podem ser alteradas pelo aluno.")
 
         if acao == "alterar_dados":
             form = AlunoDadosForm(request.POST, aluno=aluno)
@@ -2231,7 +2231,7 @@ def aluno_detalhe_view(request, aluno_id):
                 )
                 messages.success(request, "Dados do aluno atualizados.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
-            messages.error(request, "Nao foi possivel atualizar os dados do aluno.")
+            messages.error(request, "Não foi possível atualizar os dados do aluno.")
 
         elif acao == "aprovar_cadastro":
             if aluno.status_aluno != Aluno.StatusAluno.EM_AVALIACAO:
@@ -2275,13 +2275,13 @@ def aluno_detalhe_view(request, aluno_id):
                     trajetoria,
                     AlteracaoAluno.TipoAlteracao.TRAJETORIA,
                     "-",
-                    f"Criada trajetoria {trajetoria.get_nivel_curso_display()}",
+                    f"Criada trajetória {trajetoria.get_nivel_curso_display()}",
                     dados["comentario"],
                     request.user,
                 )
-                messages.success(request, "Trajetoria academica cadastrada.")
+                messages.success(request, "Trajetória acadêmica cadastrada.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
-            messages.error(request, "Nao foi possivel cadastrar a trajetoria academica.")
+            messages.error(request, "Não foi possível cadastrar a trajetória acadêmica.")
 
         elif acao == "editar_trajetoria":
             trajetoria = get_object_or_404(TrajetoriaAcademica, pk=request.POST.get("trajetoria_id"), aluno=aluno)
@@ -2345,9 +2345,9 @@ def aluno_detalhe_view(request, aluno_id):
                     dados["comentario"],
                     request.user,
                 )
-                messages.success(request, "Trajetoria academica atualizada.")
+                messages.success(request, "Trajetória acadêmica atualizada.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
-            messages.error(request, "Nao foi possivel atualizar a trajetoria academica.")
+            messages.error(request, "Não foi possível atualizar a trajetória acadêmica.")
 
         elif acao == "iniciar_doutorado":
             form = AlunoIniciarDoutoradoForm(request.POST)
@@ -2381,14 +2381,14 @@ def aluno_detalhe_view(request, aluno_id):
                     messages.success(request, "Doutorado iniciado.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
             else:
-                messages.error(request, "Nao foi possivel iniciar o doutorado.")
+                messages.error(request, "Não foi possível iniciar o doutorado.")
 
         elif acao == "alterar_trajetoria_campo":
             trajetoria = get_object_or_404(TrajetoriaAcademica, pk=request.POST.get("trajetoria_id"), aluno=aluno)
             campo = request.POST.get("campo", "").strip()
             comentario = request.POST.get("comentario", "").strip()
             if not comentario:
-                messages.error(request, "Informe um comentario para registrar a alteracao.")
+                messages.error(request, "Informe um comentário para registrar a alteração.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
 
             tipo = AlteracaoAluno.TipoAlteracao.TRAJETORIA
@@ -2478,7 +2478,7 @@ def aluno_detalhe_view(request, aluno_id):
                 trajetoria.deposito_versao_final = "deposito_versao_final" in request.POST
                 novo = "Sim" if trajetoria.deposito_versao_final else "Nao"
             else:
-                messages.error(request, "Campo de trajetoria invalido.")
+                messages.error(request, "Campo de trajetória inválido.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
 
             try:
@@ -2488,7 +2488,7 @@ def aluno_detalhe_view(request, aluno_id):
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
 
             _registrar_alteracao_trajetoria(trajetoria, tipo, anterior, novo, comentario, request.user)
-            messages.success(request, "Trajetoria academica atualizada.")
+            messages.success(request, "Trajetória acadêmica atualizada.")
             return redirect("aluno_detalhe", aluno_id=aluno.id)
 
         elif acao == "alterar_status":
@@ -2508,7 +2508,7 @@ def aluno_detalhe_view(request, aluno_id):
                 )
                 messages.success(request, "Status do aluno atualizado.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
-            messages.error(request, "Nao foi possivel alterar o status do aluno.")
+            messages.error(request, "Não foi possível alterar o status do aluno.")
 
         elif acao == "alterar_dados":
             form = AlunoDadosForm(request.POST, aluno=aluno)
@@ -2533,13 +2533,13 @@ def aluno_detalhe_view(request, aluno_id):
                     messages.success(request, "Dados do aluno atualizados.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
             else:
-                messages.error(request, "Nao foi possivel atualizar os dados do aluno.")
+                messages.error(request, "Não foi possível atualizar os dados do aluno.")
 
         elif acao == "editar_trajetoria":
             form = TrajetoriaAcademicaForm(request.POST)
             trajetoria = aluno.trajetorias.filter(id=request.POST.get("trajetoria_id")).first()
             if not trajetoria:
-                messages.error(request, "Trajetoria academica nao encontrada.")
+                messages.error(request, "Trajetória acadêmica não encontrada.")
             elif form.is_valid():
                 anterior = _trajetoria_label(trajetoria)
                 trajetoria.nivel_curso = form.cleaned_data["nivel_curso"]
@@ -2582,10 +2582,10 @@ def aluno_detalhe_view(request, aluno_id):
                         comentario=form.cleaned_data["comentario"],
                         alterado_por=request.user,
                     )
-                    messages.success(request, "Trajetoria academica atualizada.")
+                    messages.success(request, "Trajetória acadêmica atualizada.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
             else:
-                messages.error(request, "Nao foi possivel atualizar a trajetoria academica.")
+                messages.error(request, "Não foi possível atualizar a trajetória acadêmica.")
 
         elif acao == "nova_trajetoria":
             form = TrajetoriaAcademicaForm(request.POST)
@@ -2624,24 +2624,24 @@ def aluno_detalhe_view(request, aluno_id):
                     _registrar_alteracao_aluno(
                         aluno=aluno,
                         tipo=AlteracaoAluno.TipoAlteracao.TRAJETORIA,
-                        valor_anterior="Sem trajetoria",
+                        valor_anterior="Sem trajetória",
                         valor_novo=_trajetoria_label(trajetoria),
                         comentario=form.cleaned_data["comentario"],
                         alterado_por=request.user,
                     )
-                    messages.success(request, "Nova trajetoria academica cadastrada.")
+                    messages.success(request, "Nova trajetória acadêmica cadastrada.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
             else:
-                messages.error(request, "Nao foi possivel cadastrar a trajetoria academica.")
+                messages.error(request, "Não foi possível cadastrar a trajetória acadêmica.")
 
         elif acao == "alterar_trajetoria_campo":
             trajetoria = aluno.trajetorias.filter(id=request.POST.get("trajetoria_id")).first()
             campo = request.POST.get("campo", "").strip()
             comentario = request.POST.get("comentario", "").strip()
             if not trajetoria:
-                messages.error(request, "Trajetoria academica nao encontrada.")
+                messages.error(request, "Trajetória acadêmica não encontrada.")
             elif not comentario:
-                messages.error(request, "Informe um comentario para registrar a alteracao.")
+                messages.error(request, "Informe um comentário para registrar a alteração.")
             else:
                 campo_historico, valor_anterior = _trajetoria_campo_historico(trajetoria, campo)
                 try:
@@ -2654,7 +2654,7 @@ def aluno_detalhe_view(request, aluno_id):
                         nivel = request.POST.get("nivel_curso", "").strip()
                         niveis_validos = dict(Aluno.NivelCurso.choices)
                         if nivel not in niveis_validos:
-                            raise ValidationError("Nivel de curso invalido.")
+                            raise ValidationError("Nível de curso inválido.")
                         trajetoria.nivel_curso = nivel
                     elif campo == "prazo_qualificacao":
                         valor = request.POST.get("prazo_qualificacao", "").strip()
@@ -2706,7 +2706,7 @@ def aluno_detalhe_view(request, aluno_id):
                                 "",
                             ).strip()
                         elif tipo_coorientador != TrajetoriaAcademicaForm.TipoCoorientador.NENHUM:
-                            raise ValidationError("Tipo de coorientador invalido.")
+                            raise ValidationError("Tipo de coorientador inválido.")
                     elif campo == "defesa":
                         trajetoria.numero_defesa = request.POST.get("numero_defesa", "").strip()
                         data_defesa = request.POST.get("data_defesa", "").strip()
@@ -2716,7 +2716,7 @@ def aluno_detalhe_view(request, aluno_id):
                     elif campo == "deposito_versao_final":
                         trajetoria.deposito_versao_final = request.POST.get("deposito_versao_final") == "on"
                     else:
-                        raise ValidationError("Campo de trajetoria invalido.")
+                        raise ValidationError("Campo de trajetória inválido.")
 
                     trajetoria.save()
                 except ValidationError as exc:
@@ -2738,7 +2738,7 @@ def aluno_detalhe_view(request, aluno_id):
                         comentario=comentario,
                         alterado_por=request.user,
                     )
-                    messages.success(request, "Informacao da trajetoria atualizada.")
+                    messages.success(request, "Informação da trajetória atualizada.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
 
         
@@ -2826,9 +2826,9 @@ def aluno_detalhe_view(request, aluno_id):
                     comentario=form.cleaned_data["comentario"],
                     alterado_por=request.user,
                 )
-                messages.success(request, "Qualificacao do aluno atualizada.")
+                messages.success(request, "Qualificação do aluno atualizada.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
-            messages.error(request, "Nao foi possivel atualizar a qualificacao.")
+            messages.error(request, "Não foi possível atualizar a qualificação.")
 
         elif acao == "alterar_prazo_qualificacao":
             form = AlunoPrazoForm(request.POST)
@@ -2848,9 +2848,9 @@ def aluno_detalhe_view(request, aluno_id):
                         comentario=form.cleaned_data["comentario"],
                         alterado_por=request.user,
                     )
-                    messages.success(request, "Prazo de qualificacao atualizado.")
+                    messages.success(request, "Prazo de qualificação atualizado.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
-            messages.error(request, "Nao foi possivel atualizar o prazo de qualificacao.")
+            messages.error(request, "Não foi possível atualizar o prazo de qualificação.")
 
         elif acao == "alterar_prazo_defesa":
             form = AlunoPrazoForm(request.POST)
@@ -2872,7 +2872,7 @@ def aluno_detalhe_view(request, aluno_id):
                     )
                     messages.success(request, "Prazo de defesa atualizado.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
-            messages.error(request, "Nao foi possivel atualizar o prazo de defesa.")
+            messages.error(request, "Não foi possível atualizar o prazo de defesa.")
 
         elif acao == "registrar_defesa":
             form = AlunoDefesaForm(request.POST)
@@ -2895,7 +2895,7 @@ def aluno_detalhe_view(request, aluno_id):
                 )
                 messages.success(request, "Defesa registrada com sucesso.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
-            messages.error(request, "Nao foi possivel registrar a defesa.")
+            messages.error(request, "Não foi possível registrar a defesa.")
 
         elif acao == "registrar_deposito_final":
             form = AlunoDepositoFinalForm(request.POST)
@@ -2914,13 +2914,13 @@ def aluno_detalhe_view(request, aluno_id):
                         comentario=form.cleaned_data["comentario"],
                         alterado_por=request.user,
                     )
-                    messages.success(request, "Registro de deposito da versao final atualizado.")
+                    messages.success(request, "Registro de depósito da versão final atualizado.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
-            messages.error(request, "Nao foi possivel atualizar o deposito da versao final.")
+            messages.error(request, "Não foi possível atualizar o depósito da versão final.")
 
         elif acao == "salvar_publicacao":
             if not can_edit_publicacoes:
-                raise PermissionDenied("Voce nao pode alterar publicacoes desta trajetoria.")
+                raise PermissionDenied("Você não pode alterar publicações desta trajetória.")
             trajetoria = get_object_or_404(TrajetoriaAcademica, pk=request.POST.get("trajetoria_id"), aluno=aluno)
             publicacao_id = request.POST.get("publicacao_id")
             publicacao = None
@@ -2933,13 +2933,13 @@ def aluno_detalhe_view(request, aluno_id):
                 if not publicacao.pk:
                     publicacao.criado_por = request.user
                 publicacao.save()
-                messages.success(request, "Publicacao salva.")
+                messages.success(request, "Publicação salva.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
-            messages.error(request, "Nao foi possivel salvar a publicacao.")
+            messages.error(request, "Não foi possível salvar a publicação.")
 
         elif acao == "salvar_disciplina":
             if not can_edit_disciplinas:
-                raise PermissionDenied("Apenas coordenacao e secretaria podem alterar disciplinas.")
+                raise PermissionDenied("Apenas coordenação e secretaria podem alterar disciplinas.")
             trajetoria = get_object_or_404(TrajetoriaAcademica, pk=request.POST.get("trajetoria_id"), aluno=aluno)
             disciplina_id = request.POST.get("disciplina_id")
             disciplina = None
@@ -2952,11 +2952,11 @@ def aluno_detalhe_view(request, aluno_id):
                 disciplina.save()
                 messages.success(request, "Disciplina salva.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
-            messages.error(request, "Nao foi possivel salvar a disciplina.")
+            messages.error(request, "Não foi possível salvar a disciplina.")
 
         elif acao == "registrar_horas_complementares":
             if not can_manage_aluno:
-                raise PermissionDenied("Apenas coordenacao e secretaria podem registrar horas complementares.")
+                raise PermissionDenied("Apenas coordenação e secretaria podem registrar horas complementares.")
             trajetoria = get_object_or_404(TrajetoriaAcademica, pk=request.POST.get("trajetoria_id"), aluno=aluno)
             form = HorasComplementaresAdministrativoForm(
                 request.POST,
@@ -2966,7 +2966,7 @@ def aluno_detalhe_view(request, aluno_id):
             if form.is_valid():
                 lancamento = form.save()
                 if lancamento.substitui_lancamento_id:
-                    valor_anterior = f"Retificado lancamento {lancamento.substitui_lancamento_id}"
+                    valor_anterior = f"Retificado lançamento {lancamento.substitui_lancamento_id}"
                 else:
                     valor_anterior = "-"
                 _registrar_alteracao_aluno(
@@ -2981,10 +2981,10 @@ def aluno_detalhe_view(request, aluno_id):
                     comentario=lancamento.observacoes_secretaria
                     or lancamento.referencia_decisao
                     or lancamento.justificativa_sem_processo
-                    or "Lancamento registrado.",
+                    or "Lançamento registrado.",
                     alterado_por=request.user,
                 )
-                messages.success(request, "Lancamento de horas complementares registrado.")
+                messages.success(request, "Lançamento de horas complementares registrado.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
             for errors in form.errors.values():
                 for error in errors:
@@ -3186,7 +3186,7 @@ def processo_detalhe_view(request, processo_id):
         id=processo_id,
     )
     if not _can_view_processo_detalhe(request.user, processo):
-        raise PermissionDenied("Acesso restrito ao dono do processo ou perfis de gestao.")
+        raise PermissionDenied("Acesso restrito ao dono do processo ou perfis de gestão.")
 
     nomes_setores_caixa = _nomes_setores_caixa(request.user)
     can_manage_in_caixa = _can_manage_caixa_actions(request.user, processo)
@@ -3253,7 +3253,7 @@ def processo_detalhe_view(request, processo_id):
     if request.method == "POST":
         if "registrar_horas_complementares" in request.POST:
             if not can_registrar_horas_complementares:
-                raise PermissionDenied("Voce nao pode registrar horas complementares neste processo.")
+                raise PermissionDenied("Você não pode registrar horas complementares neste processo.")
             horas_complementares_form = LancamentoHorasComplementaresForm(
                 request.POST,
                 aluno=aluno_horas_complementares,
@@ -3263,7 +3263,7 @@ def processo_detalhe_view(request, processo_id):
             if horas_complementares_form.is_valid():
                 lancamento = horas_complementares_form.save()
                 if lancamento.substitui_lancamento_id:
-                    valor_anterior = f"Retificado lancamento {lancamento.substitui_lancamento_id}"
+                    valor_anterior = f"Retificado lançamento {lancamento.substitui_lancamento_id}"
                 else:
                     valor_anterior = "-"
                 _registrar_alteracao_aluno(
@@ -3271,16 +3271,16 @@ def processo_detalhe_view(request, processo_id):
                     tipo=AlteracaoAluno.TipoAlteracao.HORAS_COMPLEMENTARES,
                     valor_anterior=valor_anterior,
                     valor_novo=f"{lancamento.tipo_atividade.nome}: {lancamento.horas_aprovadas}h aprovadas",
-                    comentario=lancamento.observacoes_secretaria or lancamento.referencia_decisao or "Lancamento registrado.",
+                    comentario=lancamento.observacoes_secretaria or lancamento.referencia_decisao or "Lançamento registrado.",
                     alterado_por=request.user,
                 )
-                messages.success(request, "Lancamento de horas complementares registrado.")
+                messages.success(request, "Lançamento de horas complementares registrado.")
                 return redirect("processo_detalhe", processo_id=processo.id)
             open_horas_modal = True
 
         elif "cancelar_horas_complementares" in request.POST:
             if not can_registrar_horas_complementares:
-                raise PermissionDenied("Voce nao pode cancelar lancamentos neste processo.")
+                raise PermissionDenied("Você não pode cancelar lançamentos neste processo.")
             lancamento = get_object_or_404(
                 LancamentoHorasComplementares,
                 pk=request.POST.get("lancamento_id"),
@@ -3297,11 +3297,11 @@ def processo_detalhe_view(request, processo_id):
                     aluno=aluno_horas_complementares,
                     tipo=AlteracaoAluno.TipoAlteracao.HORAS_COMPLEMENTARES,
                     valor_anterior=f"{lancamento.tipo_atividade.nome}: {lancamento.horas_aprovadas}h",
-                    valor_novo="Lancamento cancelado",
+                    valor_novo="Lançamento cancelado",
                     comentario=justificativa,
                     alterado_por=request.user,
                 )
-                messages.success(request, "Lancamento cancelado.")
+                messages.success(request, "Lançamento cancelado.")
                 return redirect("processo_detalhe", processo_id=processo.id)
 
         elif "acao_rapida" in request.POST and can_manage_in_caixa:
@@ -3335,7 +3335,7 @@ def processo_detalhe_view(request, processo_id):
 
         elif "adicionar_documento" in request.POST:
             if not can_add_documento:
-                raise PermissionDenied("Voce nao pode adicionar documento neste processo.")
+                raise PermissionDenied("Você não pode adicionar documento neste processo.")
             documento_form = DocumentoCadastroForm(request.POST, request.FILES)
             if can_manage_in_caixa:
                 encaminhamento_form = EncaminhamentoForm(current_setor_id=processo.setor_atual_id)
@@ -3358,7 +3358,7 @@ def processo_detalhe_view(request, processo_id):
 
         elif "solicitar_ciente_orientador" in request.POST:
             if not can_solicitar_ciente:
-                raise PermissionDenied("Voce nao pode solicitar ciente do orientador neste processo.")
+                raise PermissionDenied("Você não pode solicitar ciente do orientador neste processo.")
             solicitar_ciente_form = SolicitarCienteOrientadorForm(request.POST)
             if solicitar_ciente_form.is_valid():
                 try:
@@ -3369,14 +3369,14 @@ def processo_detalhe_view(request, processo_id):
                 except ValidationError as exc:
                     messages.error(request, str(exc))
                 else:
-                    messages.success(request, "Solicitacao de ciente do orientador registrada.")
+                    messages.success(request, "Solicitação de ciente do orientador registrada.")
                     send_email_solicitacao_ciencia.delay(manifestacao.id)
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_ciente_modal = True
 
         elif "manifestar_ciente_orientador" in request.POST:
             if not can_manifestar_ciente:
-                raise PermissionDenied("Voce nao pode se manifestar neste ciente.")
+                raise PermissionDenied("Você não pode se manifestar neste ciente.")
             manifestar_ciente_form = ManifestarCienteOrientadorForm(request.POST)
             acao = (request.POST.get("acao_ciente") or "").strip().lower()
             if manifestar_ciente_form.is_valid():
@@ -3391,7 +3391,7 @@ def processo_detalhe_view(request, processo_id):
                 except ValidationError as exc:
                     messages.error(request, str(exc))
                 else:
-                    messages.success(request, "Manifestacao registrada com sucesso.")
+                    messages.success(request, "Manifestação registrada com sucesso.")
 
                     processo.refresh_from_db()
                     status_atual_texto = processo.get_status_display()
@@ -3409,7 +3409,7 @@ def processo_detalhe_view(request, processo_id):
 
         elif "encaminhar_processo" in request.POST:
             if not can_encaminhar_processo:
-                raise PermissionDenied("Voce nao pode encaminhar este processo.")
+                raise PermissionDenied("Você não pode encaminhar este processo.")
             documento_form = DocumentoCadastroForm()
             if can_manage_in_caixa:
                 encaminhamento_form = EncaminhamentoForm(
@@ -3466,7 +3466,7 @@ def processo_detalhe_view(request, processo_id):
 
         elif "finalizar_processo" in request.POST:
             if not can_finalizar_processo:
-                raise PermissionDenied("Voce nao pode finalizar este processo.")
+                raise PermissionDenied("Você não pode finalizar este processo.")
             finalizar_form = FinalizarProcessoForm(request.POST)
             documento_form = DocumentoCadastroForm()
             if can_manage_in_caixa:
@@ -3504,13 +3504,13 @@ def processo_detalhe_view(request, processo_id):
             motivo_remocao = (request.POST.get("motivo_remocao") or "").strip()
             documento = processo.documentos.filter(id=documento_id).first()
             if not documento:
-                messages.error(request, "Documento nao encontrado para remocao.")
+                messages.error(request, "Documento não encontrado para remoção.")
             else:
                 pode_remover = (
                     request.user.id == documento.enviado_por_id or _can_manage_restricted_docs(request.user)
                 )
                 if not pode_remover:
-                    raise PermissionDenied("Voce nao tem permissao para remover este arquivo.")
+                    raise PermissionDenied("Você não tem permissão para remover este arquivo.")
                 try:
                     documento.remover_arquivo(removido_por=request.user, motivo=motivo_remocao)
                 except ValidationError as exc:
@@ -3539,7 +3539,7 @@ def processo_detalhe_view(request, processo_id):
                     }:
                         processo.status = Processo.StatusProcesso.EM_DEBATE
                         processo.save(update_fields=["status", "atualizado_em"])
-                messages.success(request, "Comentario adicionado. Processo marcado como Em Debate.")
+                messages.success(request, "Comentário adicionado. Processo marcado como Em Debate.")
                 return redirect("processo_detalhe", processo_id=processo.id)
 
         else:
@@ -3729,7 +3729,7 @@ def novo_processo_view(request):
             if not setor_secretaria:
                 messages.error(
                     request,
-                    "Setor inicial 'Secretaria PPGEC' nao encontrado. Contate o administrador.",
+                    "Setor inicial 'Secretaria PPGEC' não encontrado. Contate o administrador.",
                 )
             else:
                 processo = form.save(commit=False)
@@ -3757,7 +3757,7 @@ def novo_processo_view(request):
             for documento_form in documentos_forms:
                 for errors in documento_form.errors.values():
                     for error in errors:
-                        messages.error(request, f"Documento invalido: {error}")
+                        messages.error(request, f"Documento inválido: {error}")
     else:
         form = ProcessoAberturaForm(user=request.user)
 
@@ -3990,17 +3990,17 @@ def reservas_ambientes_feitas_view(request):
     exclusao_form = ReservaAmbienteExclusaoForm()
     if request.method == "POST":
         if request.POST.get("acao") != "excluir_reserva":
-            raise PermissionDenied("Acao invalida.")
+            raise PermissionDenied("Ação inválida.")
         reserva = get_object_or_404(ReservaAmbiente, pk=request.POST.get("reserva_id"))
         if not _can_excluir_reserva_ambiente(request.user, reserva):
-            raise PermissionDenied("Apenas a coordenacao ou o docente da reserva pode exclui-la.")
+            raise PermissionDenied("Apenas a coordenação ou o docente da reserva pode exclui-la.")
         exclusao_form = ReservaAmbienteExclusaoForm(request.POST)
         if exclusao_form.is_valid():
             reservas_excluidas = list(_reservas_para_exclusao(reserva))
             for reserva_excluida in reservas_excluidas:
                 reserva_excluida.excluir(usuario=request.user, justificativa=exclusao_form.cleaned_data["justificativa"])
             if len(reservas_excluidas) == 1:
-                messages.success(request, "Reserva marcada como excluida.")
+                messages.success(request, "Reserva marcada como excluída.")
             else:
                 messages.success(request, f"{len(reservas_excluidas)} reservas marcadas como excluidas.")
             return redirect("reservas_ambientes_feitas")
@@ -4081,7 +4081,7 @@ def salas_ambientes_view(request):
                 sala__in=salas_base,
             )
             disponibilidade.delete()
-            messages.success(request, "Horario removido com sucesso.")
+            messages.success(request, "Horário removido com sucesso.")
             return redirect("salas_ambientes")
 
     salas = salas_base.select_related("polo").prefetch_related("disponibilidades").order_by("polo__nome", "nome")
@@ -4152,14 +4152,14 @@ def _criar_processo_para_solicitacao_banca(solicitacao):
 
     setor_secretaria = Setor.objects.filter(nome="Secretaria PPGEC", ativo=True).first()
     if not setor_secretaria:
-        raise ValidationError("Setor inicial 'Secretaria PPGEC' nao encontrado. Contate o administrador.")
+        raise ValidationError("Setor inicial 'Secretaria PPGEC' não encontrado. Contate o administrador.")
 
     processo = Processo.objects.create(
         usuario_criado_por=solicitacao.docente,
         tipo=solicitacao.tipo_defesa,
         assunto=f"{solicitacao.get_tipo_defesa_display()} - {solicitacao.aluno.nome}",
         descricao=(
-            "Processo gerado automaticamente a partir da solicitacao de banca "
+            "Processo gerado automaticamente a partir da solicitação de banca "
             f"finalizada em {timezone.localtime(solicitacao.finalizado_em):%d/%m/%Y %H:%M}."
         ),
         setor_atual=setor_secretaria,
@@ -4173,7 +4173,7 @@ def _criar_processo_para_solicitacao_banca(solicitacao):
 @login_required
 def solicitacoes_assinatura_view(request):
     if not _can_view_assinaturas(request.user) and not _has_gestao_access(request.user):
-        raise PermissionDenied("Acesso restrito a solicitacoes de assinatura.")
+        raise PermissionDenied("Acesso restrito a solicitações de assinatura.")
 
     queryset = SolicitacaoAssinatura.objects.select_related(
         "criado_por",
@@ -4197,7 +4197,7 @@ def solicitacoes_assinatura_view(request):
         request,
         "processos/solicitacoes_assinatura.html",
         {
-            "page_title": "Solicitacoes de Assinatura",
+            "page_title": "Solicitações de Assinatura",
             "page_description": "Acompanhe assinaturas em documentos do SEI ou PDFs.",
             "solicitacoes": queryset,
             "status_filtro": status,
@@ -4216,14 +4216,14 @@ def solicitacoes_assinatura_view(request):
 def pendencias_assinatura_view(request):
     pendencias = _assinaturas_pendentes_queryset(request.user)
     if not pendencias.exists() and not _has_gestao_access(request.user) and not _is_docente(request.user):
-        raise PermissionDenied("Acesso restrito a pendencias de assinatura.")
+        raise PermissionDenied("Acesso restrito a pendências de assinatura.")
 
     return render(
         request,
         "processos/solicitacoes_assinatura.html",
         {
-            "page_title": "Pendencias de Assinatura",
-            "page_description": "Assinaturas pendentes destinadas a voce.",
+            "page_title": "Pendências de Assinatura",
+            "page_description": "Assinaturas pendentes destinadas a você.",
             "solicitacoes": pendencias,
             "status_filtro": SolicitacaoAssinatura.Status.PENDENTE,
             "status_choices": SolicitacaoAssinatura.Status.choices,
@@ -4240,7 +4240,7 @@ def pendencias_assinatura_view(request):
 @login_required
 def nova_solicitacao_assinatura_view(request):
     if not _has_gestao_access(request.user):
-        raise PermissionDenied("Acesso restrito a secretaria e coordenacao.")
+        raise PermissionDenied("Acesso restrito a secretaria e coordenação.")
 
     if request.method == "POST":
         form = SolicitacaoAssinaturaForm(request.POST, request.FILES)
@@ -4250,7 +4250,7 @@ def nova_solicitacao_assinatura_view(request):
             solicitacao.status = SolicitacaoAssinatura.Status.PENDENTE
             solicitacao.save()
             send_email_solicitacao_assinatura.delay(solicitacao.id)
-            messages.success(request, "Solicitacao de assinatura enviada.")
+            messages.success(request, "Solicitação de assinatura enviada.")
             return redirect("solicitacoes_assinatura")
     else:
         form = SolicitacaoAssinaturaForm()
@@ -4276,12 +4276,12 @@ def solicitacao_assinatura_detalhe_view(request, solicitacao_id):
         pk=solicitacao_id,
     )
     if not _can_view_solicitacao_assinatura(request.user, solicitacao):
-        raise PermissionDenied("Voce nao pode visualizar esta solicitacao de assinatura.")
+        raise PermissionDenied("Você não pode visualizar esta solicitação de assinatura.")
 
     can_atender = _can_atender_solicitacao_assinatura(request.user, solicitacao)
     if request.method == "POST":
         if not can_atender:
-            raise PermissionDenied("Voce nao pode atender esta solicitacao de assinatura.")
+            raise PermissionDenied("Você não pode atender esta solicitação de assinatura.")
         form = AtenderSolicitacaoAssinaturaForm(
             request.POST,
             request.FILES,
@@ -4295,7 +4295,7 @@ def solicitacao_assinatura_detalhe_view(request, solicitacao_id):
                 documento_assinado=form.cleaned_data.get("documento_assinado_pdf"),
                 observacao=form.cleaned_data.get("observacao_assinatura"),
             )
-            messages.success(request, "Solicitacao de assinatura concluida.")
+            messages.success(request, "Solicitação de assinatura concluída.")
             return redirect("solicitacao_assinatura_detalhe", solicitacao_id=solicitacao.id)
     else:
         form = AtenderSolicitacaoAssinaturaForm(instance=solicitacao, solicitacao=solicitacao)
@@ -4370,10 +4370,10 @@ def solicitacao_banca_nova_view(request):
                 send_email_novo_processo_secretaria.delay(processo_criado.id)
                 messages.success(
                     request,
-                    f"Solicitacao de banca finalizada e processo {processo_criado.numero} aberto com sucesso.",
+                    f"Solicitação de banca finalizada e processo {processo_criado.numero} aberto com sucesso.",
                 )
             else:
-                messages.success(request, "Solicitacao de banca finalizada." if finalizar else "Rascunho salvo.")
+                messages.success(request, "Solicitação de banca finalizada." if finalizar else "Rascunho salvo.")
             return redirect("solicitacao_banca_detalhe", solicitacao_id=solicitacao.id)
 
     return render(request, "processos/solicitacao_banca_form.html", _solicitacao_banca_context(form, request))
@@ -4433,10 +4433,10 @@ def solicitacao_banca_detalhe_view(request, solicitacao_id):
                 send_email_novo_processo_secretaria.delay(processo_criado.id)
                 messages.success(
                     request,
-                    f"Solicitacao de banca finalizada e processo {processo_criado.numero} aberto com sucesso.",
+                    f"Solicitação de banca finalizada e processo {processo_criado.numero} aberto com sucesso.",
                 )
             else:
-                messages.success(request, "Solicitacao de banca finalizada." if finalizar else "Rascunho salvo.")
+                messages.success(request, "Solicitação de banca finalizada." if finalizar else "Rascunho salvo.")
             return redirect("solicitacao_banca_detalhe", solicitacao_id=solicitacao.id)
 
     return render(
@@ -4455,7 +4455,7 @@ def aluno_documento_vinculo_view(request):
         "processos/aluno_documento_todo.html",
         {
             "titulo": "Documento de vínculo",
-            "descricao": "TODO: disponibilizar emissao do documento de vinculo.",
+            "descricao": "TODO: disponibilizar emissão do documento de vínculo.",
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -4477,7 +4477,7 @@ def aluno_documento_historico_view(request):
         "processos/aluno_documento_todo.html",
         {
             "titulo": "Documento de histórico",
-            "descricao": "TODO: disponibilizar emissao do historico do aluno.",
+            "descricao": "TODO: disponibilizar emissão do histórico do aluno.",
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -4493,7 +4493,7 @@ def aluno_documento_historico_view(request):
 @login_required
 def menu_meus_processos_view(request):
     if request.user.tipo_usuario == User.TipoUsuario.SERVIDOR:
-        raise PermissionDenied("Perfil SERVIDOR nao possui meus processos.")
+        raise PermissionDenied("Perfil SERVIDOR não possui meus processos.")
 
     meus_processos = (
         Processo.objects.select_related("setor_atual")

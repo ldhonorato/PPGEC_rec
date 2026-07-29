@@ -1,26 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Inicio | AcadFlow{% endblock %}
+{% block title %}Início | AcadFlow{% endblock %}
 {% block content %}
 <section class="card hero-card">
     <div class="hero-mark" aria-hidden="true"></div>
     <div class="hero-content">
         <p class="hero-kicker">Bem-vindo ao</p>
         <h1 class="hero-title">Acad<span>Flow</span></h1>
-        <p class="hero-subtitle">Sistema de Gestao Academica do PPGEC</p>
+        <p class="hero-subtitle">Sistema de Gestão Acadêmica do PPGEC</p>
         <p class="hero-copy">
-            Utilize o menu lateral para acessar as funcionalidades disponiveis para o seu perfil.
+            Utilize o menu lateral para acessar as funcionalidades disponíveis para o seu perfil.
         </p>
     </div>
 </section>
 
-<h2 class="overview-title">Visao geral</h2>
-<section class="metric-grid" aria-label="Visao geral">
+<h2 class="overview-title">Visão geral</h2>
+<section class="metric-grid" aria-label="Visão geral">
     {% if user.tipo_usuario == "DOCENTE" %}
         <article class="card metric-card">
             <span class="metric-icon">P</span>
             <div>
                 <p class="metric-value">{{ meus_processos_requerente|length }}</p>
-                <p class="metric-label">Pendencias</p>
+                <p class="metric-label">Pendências</p>
             </div>
             <a class="metric-link" href="{% url 'menu_meus_processos' %}">Ver todos -></a>
         </article>
@@ -44,7 +44,7 @@
             <span class="metric-icon">M</span>
             <div>
                 <p class="metric-value">{% if cientes_pendentes_orientador %}{{ cientes_pendentes_orientador|length }}{% else %}0{% endif %}</p>
-                <p class="metric-label">Ciencias pendentes</p>
+                <p class="metric-label">Ciências pendentes</p>
             </div>
             <a class="metric-link" href="{% url 'menu_ciencias_manifestadas' %}">Ver todos -></a>
         </article>
@@ -61,7 +61,7 @@
             <span class="metric-icon">P</span>
             <div>
                 <p class="metric-value">{{ meus_processos_requerente|length }}</p>
-                <p class="metric-label">Pendencias</p>
+                <p class="metric-label">Pendências</p>
             </div>
             <a class="metric-link" href="{% url 'menu_meus_processos' %}">Ver todos -></a>
         </article>
@@ -77,7 +77,7 @@
             <span class="metric-icon">V</span>
             <div>
                 <p class="metric-value">1</p>
-                <p class="metric-label">Documento de vinculo</p>
+                <p class="metric-label">Documento de vínculo</p>
             </div>
             <a class="metric-link" href="{% url 'aluno_documento_vinculo' %}">Acessar -></a>
         </article>
@@ -220,7 +220,7 @@
                     <li>
                         <span class="soft-icon">!</span>
                         <span>
-                            <strong>{{ processo.numero }}</strong> aguarda acao do requerente
+                            <strong>{{ processo.numero }}</strong> aguarda ação do requerente
                         </span>
                         <time>{{ processo.atualizado_em|date:"d/m/Y" }}</time>
                     </li>
@@ -230,7 +230,7 @@
                     <li>
                         <span class="soft-icon">C</span>
                         <span>
-                            Ciencia pendente no processo <strong>{{ manifestacao.processo.numero }}</strong>
+                            Ciência pendente no processo <strong>{{ manifestacao.processo.numero }}</strong>
                         </span>
                         <time>{{ manifestacao.data_solicitacao|date:"d/m/Y" }}</time>
                     </li>
@@ -256,7 +256,7 @@
     </article>
 
     <article class="card">
-        <h2 class="section-title">Acesso rapido</h2>
+        <h2 class="section-title">Acesso rápido</h2>
         <div class="quick-list">
             {% if can_add_processo %}
                 <a href="{% url 'novo_processo' %}">
@@ -287,9 +287,9 @@
             <li>
                 <div class="item-row">
                     <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
-                    <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Resolver pendencia</a>
+                    <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Resolver pendência</a>
                 </div>
-                <small class="muted">Este processo esta no setor Requerente e pode exigir envio de documentacao.</small>
+                <small class="muted">Este processo está no setor Requerente e pode exigir envio de documentação.</small>
             </li>
         {% endfor %}
     </ul>
@@ -318,13 +318,13 @@
 
 {% if user.tipo_usuario == "DOCENTE" and cientes_pendentes_orientador %}
 <section class="card panel alert-info">
-    <h2 class="section-title">Pedidos de ciencia pendentes</h2>
+    <h2 class="section-title">Pedidos de ciência pendentes</h2>
     <ul class="list">
         {% for manifestacao in cientes_pendentes_orientador %}
             <li>
                 <div class="item-row">
                     <strong>{{ manifestacao.processo.numero }} - {{ manifestacao.processo.assunto }}</strong>
-                    <a class="btn" href="{% url 'processo_detalhe' manifestacao.processo.id %}">Analisar ciencia</a>
+                    <a class="btn" href="{% url 'processo_detalhe' manifestacao.processo.id %}">Analisar ciência</a>
                 </div>
                 <small class="muted">
                     Solicitado por: {{ manifestacao.solicitado_por.nome }} |

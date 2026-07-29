@@ -23,7 +23,7 @@
         <div class="grid-two">
             <div class="field">
                 <label for="reserva-q">Buscar</label>
-                <input id="reserva-q" type="search" name="q" value="{{ filtros_reservas.q }}" placeholder="Sala, polo, docente ou titulo">
+                <input id="reserva-q" type="search" name="q" value="{{ filtros_reservas.q }}" placeholder="Sala, polo, docente ou título">
             </div>
             <div class="field">
                 <label for="reserva-polo">Polo</label>
@@ -108,8 +108,8 @@
                     </div>
                     <small class="muted">
                         Docente: {{ reserva.docente.nome }} |
-                        Inicio: {{ reserva.inicio|date:"d/m/Y H:i" }} |
-                        Termino: {{ reserva.fim|date:"d/m/Y H:i" }}
+                        Início: {{ reserva.inicio|date:"d/m/Y H:i" }} |
+                        Término: {{ reserva.fim|date:"d/m/Y H:i" }}
                         {% if reserva.recorrente %}| Recorrente{% endif %}
                     </small>
                     {% if reserva.titulo %}

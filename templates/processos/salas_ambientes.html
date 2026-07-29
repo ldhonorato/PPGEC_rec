@@ -6,11 +6,11 @@
         <div>
             <h1 class="section-title">Cadastro de Salas</h1>
             {% if polo %}
-                <p class="muted">Cadastro de salas e horarios gerais de disponibilidade do polo {{ polo.nome }}.</p>
+                <p class="muted">Cadastro de salas e horários gerais de disponibilidade do polo {{ polo.nome }}.</p>
             {% elif can_choose_polo %}
-                <p class="muted">Cadastro de salas e horarios gerais de disponibilidade dos polos.</p>
+                <p class="muted">Cadastro de salas e horários gerais de disponibilidade dos polos.</p>
             {% else %}
-                <p class="muted">Seu usuario ainda nao possui polo de atuacao definido.</p>
+                <p class="muted">Seu usuário ainda não possui polo de atuação definido.</p>
             {% endif %}
         </div>
         <div class="calendar-nav">
@@ -89,7 +89,7 @@
                             {% endfor %}
                         </ul>
                     {% else %}
-                        <p class="muted">Sem horarios gerais cadastrados.</p>
+                        <p class="muted">Sem horários gerais cadastrados.</p>
                     {% endif %}
                 </li>
             {% endfor %}
@@ -176,7 +176,7 @@
 
                         <div class="grid-two time-grid">
                             <div class="field">
-                                <label for="disp-{{ sala.pk }}-hora-inicio">Hora de inicio</label>
+                                <label for="disp-{{ sala.pk }}-hora-inicio">Hora de início</label>
                                 <input id="disp-{{ sala.pk }}-hora-inicio" type="time" name="disp-hora_inicio" required>
                             </div>
                             <div class="field">
@@ -189,13 +189,13 @@
                         </div>
 
                         <div class="form-actions">
-                            <button class="btn" type="submit">Adicionar horario</button>
+                            <button class="btn" type="submit">Adicionar horário</button>
                         </div>
                     </form>
                 </div>
 
                 <div class="card room-modal-card availability-edit-list">
-                    <h3>Horarios cadastrados</h3>
+                    <h3>Horários cadastrados</h3>
                     {% if sala.disponibilidades.all %}
                         <ul class="availability-list">
                             {% for disponibilidade in sala.disponibilidades.all %}
@@ -212,7 +212,7 @@
                             {% endfor %}
                         </ul>
                     {% else %}
-                        <p class="muted">Sem horarios gerais cadastrados.</p>
+                        <p class="muted">Sem horários gerais cadastrados.</p>
                     {% endif %}
                 </div>
             </div>

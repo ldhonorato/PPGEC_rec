@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Ciencias | PPGEC{% endblock %}
+{% block title %}Ciências | PPGEC{% endblock %}
 {% block content %}
 <section class="card">
-    <h1 class="section-title">Ciencias</h1>
+    <h1 class="section-title">Ciências</h1>
 
-    <h2 class="section-title">Pendencias de ciencia</h2>
+    <h2 class="section-title">Pendências de ciência</h2>
     {% if ciencias_pendentes %}
         <ul class="list">
             {% for manifestacao in ciencias_pendentes %}
                 <li>
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
                         <strong>{{ manifestacao.processo.numero }} - {{ manifestacao.processo.assunto }}</strong>
-                        <a class="btn" href="{% url 'processo_detalhe' manifestacao.processo.id %}">Manifestar ciencia</a>
+                        <a class="btn" href="{% url 'processo_detalhe' manifestacao.processo.id %}">Manifestar ciência</a>
                     </div>
                     <small class="muted">
                         Status: {{ manifestacao.get_status_display }} |
@@ -19,16 +19,16 @@
                         Solicitado em: {{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}
                     </small>
                     {% if manifestacao.mensagem_solicitacao %}
-                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Solicitacao: {{ manifestacao.mensagem_solicitacao }}</small></p>
+                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Solicitação: {{ manifestacao.mensagem_solicitacao }}</small></p>
                     {% endif %}
                 </li>
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhuma ciencia pendente.</p>
+        <p class="muted">Nenhuma ciência pendente.</p>
     {% endif %}
 
-    <h2 class="section-title">Ciencias ja manifestadas</h2>
+    <h2 class="section-title">Ciências já manifestadas</h2>
     {% if ciencias_manifestadas %}
         <ul class="list">
             {% for manifestacao in ciencias_manifestadas %}
@@ -44,13 +44,13 @@
                         {% if manifestacao.data_manifestacao %}| Manifestado em: {{ manifestacao.data_manifestacao|date:"d/m/Y H:i" }}{% endif %}
                     </small>
                     {% if manifestacao.mensagem_manifestacao %}
-                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Manifestacao: {{ manifestacao.mensagem_manifestacao }}</small></p>
+                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Manifestação: {{ manifestacao.mensagem_manifestacao }}</small></p>
                     {% endif %}
                 </li>
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhuma ciencia manifestada encontrada.</p>
+        <p class="muted">Nenhuma ciência manifestada encontrada.</p>
     {% endif %}
 </section>
 {% endblock %}

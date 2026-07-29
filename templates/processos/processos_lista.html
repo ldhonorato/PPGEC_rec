@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Processos | Coordenacao{% endblock %}
+{% block title %}Processos | Coordenação{% endblock %}
 {% block content %}
 <section class="card" style="margin-bottom: 1rem;">
     <h1 class="section-title">Processos</h1>
@@ -7,7 +7,7 @@
         <div class="grid-two">
             <div class="field">
                 <label for="id_q">Busca</label>
-                <input id="id_q" type="text" name="q" value="{{ filtro_q }}" placeholder="numero, assunto, descricao ou usuario">
+                <input id="id_q" type="text" name="q" value="{{ filtro_q }}" placeholder="número, assunto, descrição ou usuário">
             </div>
             <div class="field">
                 <label for="id_setor">Setor</label>
@@ -57,7 +57,7 @@
                         <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
                     </div>
                     <small class="muted">
-                        Usuario: {{ processo.usuario_criado_por.nome }} |
+                        Usuário: {{ processo.usuario_criado_por.nome }} |
                         Tipo: {{ processo.get_tipo_display }} |
                         Status: {{ processo.get_status_display }} |
                         Setor: {{ processo.setor_atual.nome }} |

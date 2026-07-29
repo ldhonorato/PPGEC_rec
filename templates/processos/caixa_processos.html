@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Caixa de processos | Coordenacao{% endblock %}
+{% block title %}Caixa de processos | Coordenação{% endblock %}
 {% block content %}
 <section class="card">
     <h1 class="section-title">Caixa de processos</h1>
@@ -23,13 +23,13 @@
             class="btn {% if status_caixa == 'EM_ANALISE' %}{% else %}btn-secondary{% endif %}"
             href="?{% if selected_caixa %}caixa={{ selected_caixa }}&{% endif %}status_caixa=EM_ANALISE"
         >
-            Em analise
+            Em análise
         </a>
         <a
             class="btn {% if status_caixa == 'AGUARDANDO_CIENCIA' %}{% else %}btn-secondary{% endif %}"
             href="?{% if selected_caixa %}caixa={{ selected_caixa }}&{% endif %}status_caixa=AGUARDANDO_CIENCIA"
         >
-            Aguardando ciencia
+            Aguardando ciência
         </a>
     </div>
 
@@ -42,7 +42,7 @@
                         <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
                     </div>
                     <small class="muted">
-                        Usuario: {{ processo.usuario_criado_por.nome }} |
+                        Usuário: {{ processo.usuario_criado_por.nome }} |
                         Status: {{ processo.get_status_display }} |
                         Setor: {{ processo.setor_atual.nome }}
                     </small>
@@ -50,7 +50,7 @@
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nao ha processos na caixa dos setores {{ nomes_setores_caixa_texto }}.</p>
+        <p class="muted">Não há processos na caixa dos setores {{ nomes_setores_caixa_texto }}.</p>
     {% endif %}
 </section>
 {% endblock %}

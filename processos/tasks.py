@@ -499,7 +499,7 @@ def send_email_solicitacao_assinatura(self, solicitacao_id: int):
             "setor",
         ).get(pk=solicitacao_id)
     except SolicitacaoAssinatura.DoesNotExist:
-        logger.error("Solicitacao de assinatura %s nao encontrada", solicitacao_id)
+        logger.error("Solicitação de assinatura %s não encontrada", solicitacao_id)
         return
 
     recipients = set()
@@ -519,13 +519,13 @@ def send_email_solicitacao_assinatura(self, solicitacao_id: int):
     try:
         for recipient in recipients:
             _send_email(
-                subject=f"[PPGEC] Solicitacao de assinatura - {solicitacao.referencia_documento}",
+                subject=f"[PPGEC] Solicitação de assinatura - {solicitacao.referencia_documento}",
                 template_name="emails/assinatura/solicitacao_assinatura.html",
                 contexto=contexto,
                 recipient=recipient,
             )
     except Exception as exc:
-        logger.exception("Falha ao enviar e-mail de solicitacao de assinatura")
+        logger.exception("Falha ao enviar e-mail de solicitação de assinatura")
         raise self.retry(exc=exc)
 
 # # AGENDAMENTOS E VARREDURAS AUTOMÁTICAS (CELERY BEAT)====================================
