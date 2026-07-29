@@ -204,6 +204,27 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Nome dos arquivos estaticos com hash do conteudo (app.a1b2c3d4.css).
+#
+# Sem isso o CSS era servido sempre como /static/css/app.css: o navegador
+# guardava a versao antiga e continuava usando depois do deploy, misturando
+# marcacao nova com estilo velho. Com o hash, qualquer alteracao gera uma URL
+# nova e o cache nunca fica desatualizado.
+#
+# O WhiteNoise complementa: serve os arquivos com hash como imutaveis por um
+# ano e mantem prazo curto nos demais. Tambem gera versoes comprimidas.
+#
+# Em DEBUG=True o Django ignora o hash e serve o caminho direto, entao o
+# desenvolvimento nao depende de rodar collectstatic a cada alteracao.
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "ppgec.storage.EstaticosComHash",
+    },
+}
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 

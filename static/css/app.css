@@ -1581,6 +1581,8 @@ dialog::backdrop {
     display: none;
     align-items: center;
     justify-content: center;
+    /* Sem isto o flex do container espreme a altura do botao (38px viravam 21). */
+    flex: 0 0 auto;
     width: 38px;
     height: 38px;
     margin: -38px 0 0;

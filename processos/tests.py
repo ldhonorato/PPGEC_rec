@@ -9,6 +9,7 @@ from zipfile import ZipFile
 
 from django.conf import settings
 from django.core import mail
+from django.templatetags.static import static
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
@@ -2068,7 +2069,9 @@ class FrontendIdentityTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "AcadFlow")
-        self.assertContains(response, "css/app.css")
+        # resolve pelo mesmo caminho do template: com collectstatic o nome
+        # ganha o hash do conteudo (css/app.<hash>.css)
+        self.assertContains(response, static("css/app.css"))
         self.assertContains(response, "img/acadflow-wordmark")
         self.assertContains(response, 'rel="icon"')
         self.assertContains(response, "auth-shell")
