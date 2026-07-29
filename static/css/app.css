@@ -513,6 +513,11 @@ input[type="checkbox"] {
 .sidebar-scroll {
     flex: 1 1 auto;
     min-height: 0;
+    /* O respiro nas pontas existe para o esmaecimento cair sobre espaco vazio.
+       Sem ele, ao rolar ate o fim o ultimo item terminava exatamente na borda
+       e seus 16px finais ficavam apagados -- o esmaecimento passava a comer
+       conteudo em vez de apenas sinalizar o corte. */
+    padding: 10px 0 20px;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
@@ -545,10 +550,9 @@ input[type="checkbox"] {
     text-transform: uppercase;
 }
 
-/* Afasta o primeiro rotulo do esmaecimento superior, senao ele nasce
-   meio apagado nos perfis cujo menu nem chega a rolar. */
+/* O respiro do topo ja vem do padding do .sidebar-scroll. */
 .sidebar-scroll > .sidebar-label:first-child {
-    margin-top: 8px;
+    margin-top: 0;
 }
 
 /* Folga entre itens: com 2px o realce do hover encostava na pastilha do item
@@ -1703,6 +1707,11 @@ dialog::backdrop {
 .campo textarea {
     width: 100%;
     min-height: 44px;
+    /* A regra generica de input tem margin-top: 0.3rem para separar do rotulo.
+       Aqui quem cuida disso e o gap do .campo, e a margem sobrando deixava o
+       container 4,8px mais alto que o input -- o que desalinhava o botao de
+       revelar senha, centrado em relacao ao container. */
+    margin-top: 0;
     padding: 0.6rem 0.8rem;
     color: var(--color-text);
     background: var(--color-surface);
@@ -1759,9 +1768,15 @@ dialog::backdrop {
     gap: 0 1rem;
 }
 
-/* Botao de revelar a senha, dentro do proprio campo. */
+/* Botao de revelar a senha, dentro do proprio campo.
+
+   O flex existe para o container ter exatamente a altura do input. Como
+   bloco comum ele ganhava ~5px de entrelinha acima (input e inline-block e
+   assenta na linha de base), e o botao, centrado em 50% do container, ficava
+   2,4px acima do centro do campo. */
 .campo-senha {
     position: relative;
+    display: flex;
 }
 
 .campo-senha input {
