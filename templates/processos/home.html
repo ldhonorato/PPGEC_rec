@@ -179,7 +179,16 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
             <dt>Seminários</dt>
             <dd>{{ aluno_checklist_integralizacao.horas_complementares }}h</dd>
         </div>
+        <div class="resumo-destaque">
+            <dt>Integralização</dt>
+            <dd>{{ aluno_checklist_integralizacao.itens_cumpridos }} de {{ aluno_checklist_integralizacao.itens_total }} etapas</dd>
+        </div>
     </dl>
+
+    <div class="barra-progresso barra-progresso-larga"
+         role="img" aria-label="{{ aluno_checklist_integralizacao.percentual_concluido }} por cento das etapas concluídas">
+        <span style="width: {{ aluno_checklist_integralizacao.percentual_concluido }}%"></span>
+    </div>
     <div class="checklist-grid">
         {% for grupo in aluno_checklist_integralizacao.grupos %}
             <article>
@@ -213,6 +222,12 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
 {% endif %}
 {% endif %}
 
+{% comment %}
+So aparece quando ha atividade. Antes ocupava um cartao inteiro para dizer
+"nenhuma atividade pendente" -- que e justamente a situacao em que nao ha
+nada para o usuario fazer ali.
+{% endcomment %}
+{% if meus_processos_requerente or cientes_pendentes_orientador or assinaturas_pendentes %}
 <section class="card">
         <div class="actions-row">
             <h2 class="section-title">Atividades recentes</h2>
@@ -249,15 +264,10 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
                         <time>{{ solicitacao.criado_em|date:"d/m/Y" }}</time>
                     </li>
                 {% endfor %}
-            {% else %}
-                <li>
-                    <svg class="soft-icon is-ok" aria-hidden="true"><use href="#i-checado"></use></svg>
-                    <span>Nenhuma atividade pendente para o seu perfil.</span>
-                    <time>Hoje</time>
-                </li>
             {% endif %}
         </ul>
 </section>
+{% endif %}
 
 {% if can_add_processo and meus_processos_requerente %}
 <section class="card panel alert-danger">

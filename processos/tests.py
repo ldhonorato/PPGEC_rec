@@ -3899,3 +3899,84 @@ class MensagemDeAcessoNegadoTests(TestCase):
             resposta = self.client.get(reverse("menu_processos_pleno"))
 
         self.assertContains(resposta, "Colegiado", status_code=403)
+
+
+class TodasAsTelasRenderizamTests(TestCase):
+    """Abre cada tela com cada perfil e verifica que ela responde.
+
+    Existe porque a suite passou verde com /menu/meus-processos/ quebrada: uma
+    conversao de template deixou marcacao orfa e a pagina levantava
+    TemplateSyntaxError. Nenhum teste abria aquela URL -- o defeito so
+    apareceu quando um usuario tentou usar o sistema.
+
+    Nao verifica conteudo, so que a tela nao explode e que o codigo de resposta
+    e o esperado para aquele perfil. E a rede de seguranca mais rasa possivel,
+    e teria pego aquele caso.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        senha = "senha-segura-123"
+        cls.aluno = Aluno.objects.create_user(
+            email="aluno.telas@example.com", password=senha, nome="Aluno Telas",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026C0001",
+        )
+        cls.docente = Docente.objects.create_user(
+            email="docente.telas@example.com", password=senha, nome="Docente Telas",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        cls.servidor = User.objects.create_user(
+            email="servidor.telas@example.com", password=senha, nome="Servidor Telas",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        TrajetoriaAcademica.objects.create(
+            aluno=cls.aluno, orientador=cls.docente, nivel_curso="MESTRADO",
+            ingresso="2026.1", status=TrajetoriaAcademica.Status.ATIVA,
+        )
+
+    # (rota, perfis que devem receber 200)
+    TELAS = [
+        ("home", {"aluno", "docente", "servidor"}),
+        ("me", {"aluno", "docente", "servidor"}),
+        ("menu_meus_processos", {"aluno", "docente"}),
+        ("novo_processo", {"aluno", "docente"}),
+        ("matriculas_minhas", {"aluno"}),
+        ("matricula_solicitar", {"aluno"}),
+        ("aluno_documento_vinculo", {"aluno"}),
+        ("menu_meus_orientandos", {"docente"}),
+        ("menu_processos_orientandos", {"docente"}),
+        ("menu_ciencias_manifestadas", {"docente"}),
+        ("solicitacoes_banca", {"docente"}),
+        ("solicitacao_banca_nova", {"docente"}),
+        ("reservas_ambientes", {"docente", "servidor"}),
+        ("disponibilidade_ambientes", {"docente", "servidor"}),
+        ("reservas_ambientes_feitas", {"docente", "servidor"}),
+        ("salas_ambientes", {"servidor"}),
+        ("coordenacao_dashboard", {"servidor"}),
+        ("coordenacao_alunos", {"servidor"}),
+        ("validar_cadastros_alunos", {"servidor"}),
+        ("coordenacao_processos", {"servidor"}),
+        ("coordenacao_caixa_processos", {"servidor"}),
+        ("setores_comissoes", {"servidor"}),
+        ("solicitacoes_assinatura", {"docente", "servidor"}),
+        ("nova_solicitacao_assinatura", {"servidor"}),
+        ("pendencias_assinatura", {"docente", "servidor"}),
+        ("matriculas_periodos", {"servidor"}),
+        ("matriculas_solicitacoes", {"servidor"}),
+        ("matriculas_disciplinas", {"servidor"}),
+        ("matriculas_ofertas", {"docente", "servidor"}),
+    ]
+
+    def test_toda_tela_responde_para_todo_perfil(self):
+        usuarios = {"aluno": self.aluno, "docente": self.docente, "servidor": self.servidor}
+
+        for nome_rota, perfis_com_acesso in self.TELAS:
+            for perfil, usuario in usuarios.items():
+                with self.subTest(tela=nome_rota, perfil=perfil):
+                    self.client.force_login(usuario)
+                    resposta = self.client.get(reverse(nome_rota))
+                    esperado = 200 if perfil in perfis_com_acesso else 403
+                    self.assertEqual(
+                        resposta.status_code, esperado,
+                        f"{nome_rota} devolveu {resposta.status_code} para {perfil}",
+                    )

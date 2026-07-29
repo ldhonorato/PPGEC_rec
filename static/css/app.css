@@ -2572,6 +2572,15 @@ dialog::backdrop {
 }
 
 /* Barra de progresso. Estava escrita em style inline dentro do template. */
+/* Progresso geral da integralizacao, no cabecalho do checklist. */
+.resumo-destaque dd {
+    color: var(--color-primary);
+}
+
+.barra-progresso-larga {
+    margin-bottom: var(--espaco-5);
+}
+
 .barra-progresso {
     height: 0.5rem;
     border-radius: 999px;

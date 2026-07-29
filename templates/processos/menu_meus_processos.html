@@ -50,12 +50,5 @@
     </form>
 
     {% include "includes/tabela_processos.html" with processos=meus_processos mostrar_tipo=True mostrar_setor=True mostrar_prazo=True vazio_titulo="Nenhum processo encontrado" vazio_texto="Você ainda não abriu processos, ou nenhum corresponde aos filtros." %}
-                    </small>
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p class="muted">Nenhum processo encontrado.</p>
-    {% endif %}
 </section>
 {% endblock %}

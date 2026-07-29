@@ -1606,6 +1606,11 @@ def _checklist_integralizacao_trajetoria(trajetoria: TrajetoriaAcademica):
     else:
         return None
 
+    # Progresso geral. Sem ele o aluno precisa contar item por item para saber
+    # onde esta: sao 8 linhas, quase todas "Pendente" no comeco do curso.
+    itens_com_marca = [item for grupo in grupos for item in grupo.get("itens", [])]
+    cumpridos = sum(1 for item in itens_com_marca if item.get("cumprido"))
+
     return {
         "titulo": titulo,
         "trajetoria": trajetoria,
@@ -1613,6 +1618,9 @@ def _checklist_integralizacao_trajetoria(trajetoria: TrajetoriaAcademica):
         "horas_complementares": horas_complementares,
         "total_publicacoes": total_publicacoes,
         "grupos": grupos,
+        "itens_cumpridos": cumpridos,
+        "itens_total": len(itens_com_marca),
+        "percentual_concluido": round(100 * cumpridos / len(itens_com_marca)) if itens_com_marca else 0,
     }
 
 
