@@ -108,7 +108,9 @@ def _menu_item(label, href, url_names, icon, children=None):
 def _menu_lateral_sections(user):
     sections = []
 
-    principal_items = []
+    # Inicio abre a secao em todos os perfis. Antes so se chegava a tela inicial
+    # clicando na logo da barra superior, o que nao e um destino obvio.
+    principal_items = [_menu_item("Início", "/", ["home"], "inicio")]
     if user.tipo_usuario != User.TipoUsuario.SERVIDOR:
         principal_items.append(_menu_item("Meus Processos", "/menu/meus-processos/", ["menu_meus_processos"], "meus-processos"))
         if _can_add_processo(user):

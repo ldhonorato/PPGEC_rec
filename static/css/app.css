@@ -18,8 +18,28 @@
     --radius-md: 12px;
     --radius-lg: 18px;
     --radius-xl: 24px;
-    --sidebar-width: 290px;
-    --topbar-height: 96px;
+    --sidebar-width: 268px;
+    --topbar-height: 64px;
+
+    --font-sans: "Inter var", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    /* Escala de peso. A interface usava 800/900 em quase tudo, o que deixava
+       tudo com o mesmo destaque -- e nada com destaque de fato. */
+    --peso-normal: 400;
+    --peso-medio: 500;
+    --peso-forte: 600;
+    --peso-titulo: 650;
+}
+
+/* Inter variavel, subconjunto latino (71KB), servida pelo WhiteNoise.
+   Antes a fonte era declarada mas nao existia no projeto: a plataforma caia
+   em Arial. Licenca SIL OFL em static/fonts/Inter-LICENSE.txt.
+   Um unico arquivo cobre os pesos 100-900 -- nao ha requisicao por peso. */
+@font-face {
+    font-family: "Inter var";
+    src: url("../fonts/inter-latin-variable.woff2") format("woff2-variations");
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
 }
 
 * {
@@ -28,16 +48,29 @@
 
 html {
     min-height: 100%;
+    -webkit-text-size-adjust: 100%;
 }
 
 body {
     min-height: 100%;
     margin: 0;
-    font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.55;
     color: var(--color-text);
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(245, 247, 251, 0.95)),
-        var(--color-bg);
+    background: var(--color-bg);
+    /* opsz ajusta o desenho da letra ao tamanho; cv11 usa o "1" com base,
+       tnum alinha numeros em colunas (util nas listagens e tabelas). */
+    font-optical-sizing: auto;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4 {
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -0.014em;
 }
 
 [hidden] {
@@ -61,62 +94,124 @@ input[type="checkbox"] {
 }
 
 .container {
-    width: min(1540px, calc(100vw - 48px));
+    width: 100%;
+    max-width: 1540px;
     margin: 0 auto;
+    padding: 0 24px;
 }
 
+/* ==========================================================================
+   Casca da aplicacao
+   Duas colunas: barra lateral em altura total e coluna de conteudo. A barra
+   superior vive dentro da coluna de conteudo, nao acima de tudo -- assim a
+   lateral usa a tela inteira e as duas barras tem papeis distintos:
+   lateral = identidade e navegacao, superior = alertas e conta.
+   ========================================================================== */
+
 .app-shell {
+    display: flex;
+    align-items: flex-start;
+    min-height: 100vh;
+}
+
+.app-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
     min-height: 100vh;
 }
 
 .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    flex: 0 0 auto;
     height: var(--topbar-height);
-    background: rgba(255, 255, 255, 0.96);
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: saturate(180%) blur(12px);
     border-bottom: 1px solid var(--color-border);
 }
 
 .topbar-content {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 24px;
+    gap: 16px;
     height: 100%;
+    max-width: 1540px;
+    margin: 0 auto;
+    padding: 0 24px;
 }
 
-.brand {
+.topbar-acoes {
     display: flex;
     align-items: center;
-    gap: 14px;
-    min-width: 230px;
-    text-decoration: none;
+    gap: 12px;
+    margin-left: auto;
 }
 
-.brand-logo {
-    width: 200px;
-    max-width: 24vw;
+/* Logo so aparece na barra superior no mobile, onde a lateral esta fechada. */
+.brand-mobile {
+    display: none;
+    align-items: center;
+}
+
+.brand-mobile img {
+    width: 132px;
     height: auto;
     display: block;
 }
 
+/* Alerta de processos atrasados. Em zero fica neutro: antes ficava sempre
+   vermelho com borda de alerta, ocupando o ponto de maior destaque da tela
+   para nao comunicar nada. */
 .overdue-link {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    min-height: 46px;
-    padding: 0.6rem 1rem;
-    border: 1px solid #f5c2ca;
-    border-radius: var(--radius-sm);
+    gap: 7px;
+    min-height: 36px;
+    padding: 0.34rem 0.75rem;
+    border: 1px solid #f3c6cd;
+    border-radius: 999px;
     color: var(--color-danger);
     background: #fff5f6;
-    font-weight: 800;
+    font-size: 0.83rem;
+    font-weight: 500;
     text-decoration: none;
+    transition: background-color 0.14s ease, border-color 0.14s ease;
+}
+
+.overdue-link strong {
+    font-weight: 650;
+}
+
+.overdue-link .nav-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.overdue-link.is-vazio {
+    border-color: var(--color-border);
+    color: var(--color-muted);
+    background: transparent;
+}
+
+.overdue-link.is-vazio .nav-icon {
+    display: none;
 }
 
 .overdue-link:hover,
 .overdue-link:focus-visible {
     border-color: var(--color-danger);
+    background: #ffeaee;
     outline: none;
+}
+
+.overdue-link.is-vazio:hover,
+.overdue-link.is-vazio:focus-visible {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
 }
 
 .nav-btn,
@@ -131,7 +226,7 @@ input[type="checkbox"] {
     padding: 0.62rem 1rem;
     background: var(--color-primary);
     color: #ffffff;
-    font-weight: 700;
+    font-weight: 560;
     font-size: 0.95rem;
     line-height: 1;
     text-decoration: none;
@@ -166,12 +261,11 @@ input[type="checkbox"] {
 .user-chip {
     display: flex;
     align-items: center;
-    gap: 12px;
-    min-width: 220px;
-    justify-content: flex-end;
-    padding: 0.35rem 0.45rem;
-    border-radius: var(--radius-sm);
+    gap: 9px;
+    padding: 0.28rem 0.4rem;
+    border-radius: 999px;
     cursor: pointer;
+    transition: background-color 0.14s ease;
 }
 
 .user-chip:hover,
@@ -179,25 +273,34 @@ input[type="checkbox"] {
     background: var(--color-primary-soft);
 }
 
+.user-chip:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
+
 .avatar {
-    width: 42px;
-    height: 42px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     display: inline-grid;
     place-items: center;
     background: linear-gradient(135deg, var(--color-accent), #73d8b3);
     color: #ffffff;
-    font-weight: 800;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
 }
 
 .user-meta {
     display: grid;
-    gap: 2px;
+    gap: 1px;
     min-width: 0;
+    line-height: 1.25;
 }
 
 .user-name {
-    font-weight: 800;
+    font-size: 0.85rem;
+    font-weight: 560;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -205,7 +308,26 @@ input[type="checkbox"] {
 
 .user-role {
     color: var(--color-muted);
-    font-size: 0.86rem;
+    font-size: 0.75rem;
+}
+
+.user-chevron {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    color: var(--color-muted);
+    transition: transform 0.16s ease;
+}
+
+.user-menu[open] .user-chevron {
+    transform: rotate(180deg);
+}
+
+.user-menu-panel .nav-icon {
+    width: 17px;
+    height: 17px;
+    margin-right: 9px;
+    color: var(--color-muted);
 }
 
 .user-menu-panel {
@@ -232,7 +354,7 @@ input[type="checkbox"] {
     border-radius: var(--radius-sm);
     color: var(--color-text);
     background: transparent;
-    font-weight: 800;
+    font-weight: 600;
     text-align: left;
     text-decoration: none;
     cursor: pointer;
@@ -281,14 +403,8 @@ input[type="checkbox"] {
 }
 
 .main-area {
+    flex: 1 1 auto;
     padding: 26px 0 38px;
-}
-
-.layout {
-    display: grid;
-    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-    gap: 28px;
-    align-items: start;
 }
 
 .content-area {
@@ -304,17 +420,18 @@ input[type="checkbox"] {
 
 .sidebar {
     position: sticky;
-    top: 24px;
+    top: 0;
     display: flex;
     flex-direction: column;
-    max-height: calc(100dvh - 48px);
-    padding: 22px 14px 14px;
-    border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+    flex: 0 0 var(--sidebar-width);
+    width: var(--sidebar-width);
+    height: 100vh;
+    height: 100dvh;
+    padding: 18px 12px 14px;
     background:
-        radial-gradient(circle at 20% 4%, rgba(88, 201, 141, 0.16), transparent 38%),
+        radial-gradient(circle at 20% 3%, rgba(88, 201, 141, 0.15), transparent 40%),
         linear-gradient(180deg, #063a78 0%, #002b63 100%);
     color: #ffffff;
-    box-shadow: 0 22px 44px rgba(0, 47, 105, 0.22);
 }
 
 .sidebar-program {
@@ -322,26 +439,39 @@ input[type="checkbox"] {
     align-items: flex-start;
     gap: 10px;
     flex: 0 0 auto;
-    padding: 0 8px 16px;
-    margin-bottom: 8px;
+    padding: 0 6px 14px;
+    margin-bottom: 4px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
 
-.sidebar-program-texto {
+.sidebar-brand {
     display: grid;
-    gap: 3px;
+    gap: 7px;
     min-width: 0;
+    text-decoration: none;
+    border-radius: var(--radius-sm);
 }
 
-.sidebar-program strong {
-    font-size: 1.15rem;
-    letter-spacing: 0.02em;
+.sidebar-brand:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 4px;
 }
 
-.sidebar-program span {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.76rem;
-    line-height: 1.35;
+/* A logo e escura (feita para fundo claro); o filtro a torna monocromatica
+   clara sobre o azul da barra sem precisar de um segundo arquivo. */
+.sidebar-brand-logo {
+    width: 148px;
+    height: auto;
+    display: block;
+    filter: brightness(0) invert(1);
+    opacity: 0.95;
+}
+
+.sidebar-programa {
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 0.7rem;
+    line-height: 1.4;
+    letter-spacing: 0.005em;
 }
 
 /* Faixa rolavel. A mascara cria um esmaecimento nas bordas quando ha
@@ -375,7 +505,7 @@ input[type="checkbox"] {
     padding: 0 8px;
     color: rgba(255, 255, 255, 0.55);
     font-size: 0.68rem;
-    font-weight: 800;
+    font-weight: 600;
     letter-spacing: 0.09em;
     text-transform: uppercase;
 }
@@ -447,7 +577,7 @@ input[type="checkbox"] {
    depender de cor sozinha (o icone e o peso da fonte tambem mudam). */
 .side-link.is-active {
     color: var(--color-primary);
-    font-weight: 800;
+    font-weight: 600;
     background: #ffffff;
     box-shadow: 0 6px 16px rgba(0, 20, 50, 0.22);
 }
@@ -509,16 +639,7 @@ input[type="checkbox"] {
 
 /* --- Rodape de conta --- */
 
-.side-form {
-    margin: 0;
-}
 
-.sidebar-footer {
-    flex: 0 0 auto;
-    margin-top: 8px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.14);
-}
 
 /* --- Gaveta no mobile --- */
 
@@ -719,7 +840,7 @@ textarea:focus {
 label {
     color: var(--color-text);
     font-size: 0.92rem;
-    font-weight: 800;
+    font-weight: 600;
 }
 
 .field {
@@ -761,7 +882,7 @@ label {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     background: #ffffff;
-    font-weight: 700;
+    font-weight: 560;
 }
 
 .check-chip input {
@@ -846,7 +967,7 @@ label {
 
 .info-label {
     color: var(--color-muted);
-    font-weight: 800;
+    font-weight: 600;
 }
 
 .calendar-shell {
@@ -917,7 +1038,7 @@ label {
     padding: 0.34rem 0.38rem;
     border-radius: var(--radius-sm);
     font-size: 0.76rem;
-    font-weight: 700;
+    font-weight: 560;
     line-height: 1.25;
     overflow-wrap: anywhere;
 }
@@ -1003,7 +1124,7 @@ dialog::backdrop {
     background: var(--color-primary);
     color: #ffffff;
     font-size: 1.6rem;
-    font-weight: 900;
+    font-weight: 650;
 }
 
 .field-tooltip {
@@ -1085,7 +1206,7 @@ dialog::backdrop {
 .hero-kicker {
     margin: 0 0 6px;
     font-size: 1.55rem;
-    font-weight: 800;
+    font-weight: 600;
 }
 
 .hero-title {
@@ -1101,7 +1222,7 @@ dialog::backdrop {
 
 .hero-subtitle {
     margin: 18px 0 6px;
-    font-weight: 800;
+    font-weight: 600;
 }
 
 .hero-copy {
@@ -1154,7 +1275,7 @@ dialog::backdrop {
     border-radius: 50%;
     color: var(--metric-color, var(--color-primary));
     background: var(--metric-bg, var(--color-primary-soft));
-    font-weight: 900;
+    font-weight: 650;
 }
 
 .metric-value {
@@ -1162,19 +1283,19 @@ dialog::backdrop {
     color: var(--metric-color, var(--color-primary));
     font-size: 2.2rem;
     line-height: 1;
-    font-weight: 900;
+    font-weight: 650;
 }
 
 .metric-label {
     margin: 5px 0 0;
-    font-weight: 700;
+    font-weight: 560;
 }
 
 .metric-link {
     grid-column: 2;
     color: var(--color-primary);
     font-size: 0.85rem;
-    font-weight: 900;
+    font-weight: 650;
     text-decoration: none;
 }
 
@@ -1218,12 +1339,12 @@ dialog::backdrop {
     border-radius: 50%;
     background: var(--color-primary-soft);
     color: var(--color-primary);
-    font-weight: 900;
+    font-weight: 650;
 }
 
 .text-link {
     color: var(--color-primary);
-    font-weight: 900;
+    font-weight: 650;
     text-decoration: none;
 }
 
@@ -1258,7 +1379,7 @@ dialog::backdrop {
 
 .form-footer-link a {
     color: var(--color-primary);
-    font-weight: 800;
+    font-weight: 600;
     text-decoration: none;
 }
 
@@ -1272,7 +1393,7 @@ dialog::backdrop {
     padding: 0.22rem 0.58rem;
     border-radius: 999px;
     font-size: 0.82rem;
-    font-weight: 800;
+    font-weight: 600;
     border: 1px solid transparent;
 }
 
@@ -1320,7 +1441,7 @@ dialog::backdrop {
     margin: 0 0 0.5rem;
     color: var(--color-primary);
     font-size: 4rem;
-    font-weight: 800;
+    font-weight: 600;
     line-height: 1;
     letter-spacing: -0.02em;
 }
@@ -1338,28 +1459,13 @@ dialog::backdrop {
 }
 
 @media (max-width: 1120px) {
-    .topbar {
-        height: auto;
-    }
-
+    .container,
     .topbar-content {
-        flex-wrap: wrap;
-        padding: 14px 0;
+        padding: 0 18px;
     }
-
-    .brand,
-    .user-chip {
-        min-width: 0;
-    }
-
 }
 
 @media (max-width: 920px) {
-    .container {
-        width: min(100% - 28px, 760px);
-    }
-
-    .layout,
     .dashboard-grid,
     .hero-card {
         grid-template-columns: 1fr;
@@ -1373,16 +1479,17 @@ dialog::backdrop {
         display: inline-flex;
     }
 
+    .brand-mobile {
+        display: flex;
+    }
+
     .sidebar {
         position: fixed;
         top: 0;
         left: 0;
         z-index: 60;
+        flex-basis: auto;
         width: min(86vw, 320px);
-        height: 100dvh;
-        max-height: none;
-        padding-top: 18px;
-        border-radius: 0;
         transform: translateX(-100%);
         transition: transform 0.24s ease;
         visibility: hidden;
@@ -1433,12 +1540,27 @@ dialog::backdrop {
 }
 
 @media (max-width: 640px) {
-    .brand-logo {
-        width: 170px;
-        max-width: 60vw;
+    .brand-mobile img {
+        width: 112px;
     }
 
-    .user-meta {
+    .user-meta,
+    .user-chevron {
+        display: none;
+    }
+
+    /* Em tela estreita o alerta vira so o numero: o rotulo quebrava em duas
+       linhas e esticava a barra superior. */
+    .overdue-link span {
+        display: none;
+    }
+
+    .overdue-link {
+        gap: 5px;
+        padding: 0.34rem 0.6rem;
+    }
+
+    .overdue-link.is-vazio {
         display: none;
     }
 

@@ -2308,7 +2308,7 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "Acad<span>Flow</span>", html=True)
         self.assertContains(response, 'class="sidebar"')
         self.assertContains(response, 'class="metric-grid"')
-        self.assertContains(response, 'class="overdue-link"')
+        self.assertContains(response, "overdue-link")
         self.assertContains(response, 'class="user-menu"')
         self.assertContains(response, "Meus Processos")
         self.assertNotContains(response, "Processos no Pleno")
@@ -2341,7 +2341,7 @@ class FrontendIdentityTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Novo requerimento")
         self.assertContains(response, "Consultar processos")
-        self.assertContains(response, "Programa de Pós-Graduação")
+        self.assertContains(response, "Pós-Graduação em Engenharia de Computação")
 
     def test_home_servidor_exibe_menu_completo_de_reservas(self):
         servidor = User.objects.create_user(
@@ -2498,7 +2498,8 @@ class ProcessoPrazoTests(TestCase):
         self.client.force_login(self.servidor)
         home = self.client.get(reverse("home"))
         self.assertContains(home, "1")
-        self.assertContains(home, "processos atrasados")
+        self.assertContains(home, "processo atrasado")
+        self.assertNotContains(home, "1 processos atrasados")
 
         response = self.client.get(reverse("coordenacao_processos"), {"atrasados": "1"})
         self.assertEqual(response.status_code, 200)
