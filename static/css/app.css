@@ -1189,6 +1189,39 @@ dialog::backdrop {
     background: #f7fbff;
 }
 
+.error-page {
+    display: flex;
+    justify-content: center;
+    padding: 3rem 0;
+}
+
+.error-card {
+    max-width: 520px;
+    padding: 2.5rem;
+    text-align: center;
+}
+
+.error-code {
+    margin: 0 0 0.5rem;
+    color: var(--color-primary);
+    font-size: 4rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+.error-message {
+    margin: 0 0 1.75rem;
+    line-height: 1.6;
+}
+
+.error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+}
+
 @media (max-width: 1120px) {
     .topbar {
         height: auto;

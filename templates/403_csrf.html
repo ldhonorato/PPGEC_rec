@@ -1,0 +1,17 @@
+{% extends "errors/base_error.html" %}
+
+{% block title %}Sessão expirada · AcadFlow{% endblock %}
+
+{% block error_code %}403{% endblock %}
+
+{% block error_heading %}Sua sessão expirou{% endblock %}
+
+{% block error_message %}
+Por segurança, o formulário enviado não pôde ser validado — normalmente isso
+acontece quando a página ficou aberta por muito tempo. Entre novamente e
+refaça o envio.
+{% endblock %}
+
+{% block error_actions %}
+<a class="btn btn-secondary" href="{% url 'login' %}">Entrar novamente</a>
+{% endblock %}

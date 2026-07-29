@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% comment %}
+Base das páginas de erro (400/403/404/500).
+
+Atenção: o handler de erro 500 do Django renderiza o template SEM request e SEM
+context processors. Por isso esta página não pode depender de `user`, do menu
+lateral nem de nenhuma variável de contexto — apenas de tags estáticas
+({% templatetag openblock %} url {% templatetag closeblock %},
+{% templatetag openblock %} static {% templatetag closeblock %}), que funcionam
+em qualquer cenário.
+{% endcomment %}
+
+{% block content %}
+<div class="error-page">
+    <div class="card error-card">
+        <p class="error-code">{% block error_code %}{% endblock %}</p>
+        <h1 class="section-title">{% block error_heading %}{% endblock %}</h1>
+        <p class="muted error-message">{% block error_message %}{% endblock %}</p>
+        <div class="error-actions">
+            <a class="btn" href="{% url 'home' %}">Ir para o início</a>
+            {% block error_actions %}{% endblock %}
+        </div>
+    </div>
+</div>
+{% endblock %}
