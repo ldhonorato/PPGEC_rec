@@ -14,114 +14,94 @@
 </section>
 
 <h2 class="overview-title">Visão geral</h2>
+{% comment %}
+Visao geral. Cada cartao mostra uma contagem real e leva ao lugar onde ela
+pode ser trabalhada.
+
+Antes os cartoes da gestao traziam "1" fixo em todos os quatro, e o do aluno
+usava "+" e "-" como se fossem valores -- eram atalhos disfarcados de metrica.
+Numero que nao significa nada ensina a ignorar os numeros da tela, inclusive
+os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
+{% endcomment %}
 <section class="metric-grid" aria-label="Visão geral">
     {% if user.tipo_usuario == "DOCENTE" %}
-        <article class="card metric-card">
-            <span class="metric-icon">P</span>
-            <div>
-                <p class="metric-value">{{ meus_processos_requerente|length }}</p>
-                <p class="metric-label">Pendências</p>
-            </div>
-            <a class="metric-link" href="{% url 'menu_meus_processos' %}">Ver todos -></a>
-        </article>
-        <article class="card metric-card is-green">
-            <span class="metric-icon">O</span>
-            <div>
-                <p class="metric-value">{% if orientandos %}{{ orientandos|length }}{% else %}0{% endif %}</p>
-                <p class="metric-label">Orientandos</p>
-            </div>
-            <a class="metric-link" href="{% url 'menu_meus_orientandos' %}">Ver todos -></a>
-        </article>
-        <article class="card metric-card is-purple">
-            <span class="metric-icon">C</span>
-            <div>
-                <p class="metric-value">{% if processos_orientandos %}{{ processos_orientandos|length }}{% else %}0{% endif %}</p>
-                <p class="metric-label">Processos dos orientandos</p>
-            </div>
-            <a class="metric-link" href="{% url 'menu_processos_orientandos' %}">Ver todos -></a>
-        </article>
-        <article class="card metric-card is-orange">
-            <span class="metric-icon">M</span>
-            <div>
-                <p class="metric-value">{% if cientes_pendentes_orientador %}{{ cientes_pendentes_orientador|length }}{% else %}0{% endif %}</p>
-                <p class="metric-label">Ciências pendentes</p>
-            </div>
-            <a class="metric-link" href="{% url 'menu_ciencias_manifestadas' %}">Ver todos -></a>
-        </article>
-        <article class="card metric-card">
-            <span class="metric-icon">A</span>
-            <div>
-                <p class="metric-value">{% if assinaturas_pendentes %}{{ assinaturas_pendentes|length }}{% else %}0{% endif %}</p>
-                <p class="metric-label">Assinaturas pendentes</p>
-            </div>
-            <a class="metric-link" href="{% url 'solicitacoes_assinatura' %}">Ver todos -></a>
-        </article>
+        <a class="card metric-card" href="{% url 'menu_meus_processos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-meus-processos"></use></svg>
+            <p class="metric-value">{{ meus_processos_requerente|length }}</p>
+            <p class="metric-label">Processos que você abriu</p>
+        </a>
+        <a class="card metric-card is-green" href="{% url 'menu_meus_orientandos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-orientandos"></use></svg>
+            <p class="metric-value">{{ orientandos|length|default:"0" }}</p>
+            <p class="metric-label">Orientandos ativos</p>
+        </a>
+        <a class="card metric-card is-purple" href="{% url 'menu_processos_orientandos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-processos-orientandos"></use></svg>
+            <p class="metric-value">{{ processos_orientandos|length|default:"0" }}</p>
+            <p class="metric-label">Processos dos orientandos</p>
+        </a>
+        <a class="card metric-card {% if cientes_pendentes_orientador %}is-alerta{% else %}is-orange{% endif %}"
+           href="{% url 'menu_ciencias_manifestadas' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-ciencias"></use></svg>
+            <p class="metric-value">{{ cientes_pendentes_orientador|length|default:"0" }}</p>
+            <p class="metric-label">Ciências aguardando você</p>
+        </a>
+        <a class="card metric-card" href="{% url 'solicitacoes_assinatura' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-assinaturas"></use></svg>
+            <p class="metric-value">{{ assinaturas_pendentes|length|default:"0" }}</p>
+            <p class="metric-label">Assinaturas pendentes</p>
+        </a>
+
     {% elif user.tipo_usuario == "ALUNO" %}
-        <article class="card metric-card">
-            <span class="metric-icon">P</span>
-            <div>
-                <p class="metric-value">{{ meus_processos_requerente|length }}</p>
-                <p class="metric-label">Pendências</p>
-            </div>
-            <a class="metric-link" href="{% url 'menu_meus_processos' %}">Ver todos -></a>
-        </article>
-        <article class="card metric-card is-green">
-            <span class="metric-icon">N</span>
-            <div>
-                <p class="metric-value">+</p>
-                <p class="metric-label">Novo processo</p>
-            </div>
-            <a class="metric-link" href="{% url 'novo_processo' %}">Abrir -></a>
-        </article>
-        <article class="card metric-card is-purple">
-            <span class="metric-icon">V</span>
-            <div>
-                <p class="metric-value">1</p>
-                <p class="metric-label">Documento de vínculo</p>
-            </div>
-            <a class="metric-link" href="{% url 'aluno_documento_vinculo' %}">Acessar -></a>
-        </article>
-        <article class="card metric-card is-orange">
-            <span class="metric-icon">M</span>
-            <div>
-                <p class="metric-value">{% if aluno_matricula_atual %}{{ aluno_matricula_atual.get_status_display }}{% else %}-{% endif %}</p>
-                <p class="metric-label">Matrícula atual</p>
-            </div>
-            <a class="metric-link" href="{% url 'matriculas_minhas' %}">Ver -></a>
-        </article>
+        <a class="card metric-card" href="{% url 'menu_meus_processos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-meus-processos"></use></svg>
+            <p class="metric-value">{{ meus_processos_requerente|length }}</p>
+            <p class="metric-label">Processos em andamento</p>
+        </a>
+        {% comment %}
+        Matricula nao e contagem: o dado util e a situacao. O cartao mostra o
+        proprio status em vez de um numero inventado.
+        {% endcomment %}
+        <a class="card metric-card is-green metric-card-texto" href="{% url 'matriculas_minhas' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-matricula"></use></svg>
+            <p class="metric-value">{% if aluno_matricula_atual %}{{ aluno_matricula_atual.get_status_display }}{% else %}Sem solicitação{% endif %}</p>
+            <p class="metric-label">Matrícula do período</p>
+        </a>
+        <a class="card metric-card is-purple metric-card-texto" href="{% url 'aluno_documento_vinculo' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-documento-vinculo"></use></svg>
+            <p class="metric-value">Emitir</p>
+            <p class="metric-label">Documento de vínculo</p>
+        </a>
+        {% if can_add_processo %}
+            <a class="card metric-card is-orange metric-card-texto" href="{% url 'novo_processo' %}">
+                <svg class="metric-icon" aria-hidden="true"><use href="#i-novo-processo"></use></svg>
+                <p class="metric-value">Abrir</p>
+                <p class="metric-label">Novo requerimento</p>
+            </a>
+        {% endif %}
+
     {% else %}
-        <article class="card metric-card">
-            <span class="metric-icon">D</span>
-            <div>
-                <p class="metric-value">1</p>
-                <p class="metric-label">Dashboard</p>
-            </div>
-            <a class="metric-link" href="{% url 'coordenacao_dashboard' %}">Acessar -></a>
-        </article>
-        <article class="card metric-card is-green">
-            <span class="metric-icon">A</span>
-            <div>
-                <p class="metric-value">1</p>
-                <p class="metric-label">Alunos</p>
-            </div>
-            <a class="metric-link" href="{% url 'coordenacao_alunos' %}">Acessar -></a>
-        </article>
-        <article class="card metric-card is-purple">
-            <span class="metric-icon">P</span>
-            <div>
-                <p class="metric-value">1</p>
-                <p class="metric-label">Processos</p>
-            </div>
-            <a class="metric-link" href="{% url 'coordenacao_processos' %}">Acessar -></a>
-        </article>
-        <article class="card metric-card is-orange">
-            <span class="metric-icon">C</span>
-            <div>
-                <p class="metric-value">1</p>
-                <p class="metric-label">Caixa de processos</p>
-            </div>
-            <a class="metric-link" href="{% url 'coordenacao_caixa_processos' %}">Acessar -></a>
-        </article>
+        <a class="card metric-card" href="{% url 'coordenacao_alunos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-alunos"></use></svg>
+            <p class="metric-value">{{ gestao_metricas.alunos_ativos }}</p>
+            <p class="metric-label">Alunos com trajetória ativa</p>
+        </a>
+        <a class="card metric-card is-green" href="{% url 'coordenacao_processos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-todos-processos"></use></svg>
+            <p class="metric-value">{{ gestao_metricas.processos_abertos }}</p>
+            <p class="metric-label">Processos em aberto</p>
+        </a>
+        <a class="card metric-card is-purple" href="{% url 'coordenacao_caixa_processos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-caixa"></use></svg>
+            <p class="metric-value">{{ gestao_metricas.na_caixa }}</p>
+            <p class="metric-label">Na caixa do seu setor</p>
+        </a>
+        <a class="card metric-card {% if gestao_metricas.cadastros_a_validar %}is-alerta{% else %}is-orange{% endif %}"
+           href="{% url 'validar_cadastros_alunos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-validar"></use></svg>
+            <p class="metric-value">{{ gestao_metricas.cadastros_a_validar }}</p>
+            <p class="metric-label">Cadastros a validar</p>
+        </a>
     {% endif %}
 </section>
 

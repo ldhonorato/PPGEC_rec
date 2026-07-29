@@ -1371,12 +1371,28 @@ dialog::backdrop {
     margin-bottom: 20px;
 }
 
+/* O cartao inteiro virou link: antes so o "Ver todos ->" no rodape levava a
+   algum lugar, e era o menor alvo do cartao. */
 .metric-card {
     display: grid;
-    grid-template-columns: 54px minmax(0, 1fr);
-    gap: 14px;
-    align-items: center;
-    min-height: 134px;
+    grid-template-rows: auto auto auto;
+    justify-items: start;
+    gap: 0.35rem;
+    min-height: 128px;
+    padding: 1.1rem;
+    text-decoration: none;
+    transition: border-color 0.14s ease, transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+.metric-card:hover,
+.metric-card:focus-visible {
+    border-color: var(--metric-color, var(--color-primary));
+    transform: translateY(-2px);
+    outline: none;
+}
+
+.metric-card:focus-visible {
+    box-shadow: 0 0 0 3px rgba(0, 72, 154, 0.16);
 }
 
 .metric-card.is-green {
@@ -1395,34 +1411,52 @@ dialog::backdrop {
 }
 
 .metric-icon {
-    width: 54px;
-    height: 54px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    margin-bottom: 0.25rem;
+    padding: 7px;
+    border-radius: var(--radius-sm);
     color: var(--metric-color, var(--color-primary));
     background: var(--metric-bg, var(--color-primary-soft));
-    font-weight: 650;
 }
 
 .metric-value {
     margin: 0;
     color: var(--metric-color, var(--color-primary));
-    font-size: 2.2rem;
-    line-height: 1;
+    font-size: 1.9rem;
+    line-height: 1.05;
     font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+/* Cartao cujo valor e palavra, nao numero ("Deferida", "Emitir"). O tamanho
+   de numero deixaria a palavra maior que o proprio rotulo. */
+.metric-card-texto .metric-value {
+    font-size: 1.15rem;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+}
+
+/* Contagem que pede acao: so ganha o tom de alerta quando ha algo pendente.
+   Em zero fica igual aos demais -- vermelho permanente vira paisagem. */
+.metric-card.is-alerta {
+    --metric-color: var(--color-danger);
+    --metric-bg: #fff0f1;
+    border-color: #f3c6cd;
 }
 
 .metric-label {
+    color: var(--color-muted);
     margin: 5px 0 0;
     font-weight: 560;
 }
 
+/* Mantida para outros usos da home; nos cartoes o link agora e o cartao. */
 .metric-link {
-    grid-column: 2;
     color: var(--color-primary);
     font-size: 0.85rem;
-    font-weight: 650;
+    font-weight: 600;
     text-decoration: none;
 }
 

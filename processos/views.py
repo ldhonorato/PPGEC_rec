@@ -1694,6 +1694,27 @@ def home_view(request):
         context["processos_orientandos"] = processos_orientandos
         context["cientes_pendentes_orientador"] = cientes_pendentes_orientador
 
+    if has_gestao_access:
+        # Os quatro cartoes da visao geral da gestao exibiam "1" fixo -- nao
+        # eram metricas, eram atalhos com um numero inventado. Um numero que
+        # nao significa nada ensina o usuario a ignorar todos os numeros da
+        # tela, inclusive os verdadeiros.
+        setores_do_usuario = _setores_caixa(request.user)
+        context["gestao_metricas"] = {
+            "alunos_ativos": Aluno.objects.filter(
+                trajetorias__status=TrajetoriaAcademica.Status.ATIVA
+            ).distinct().count(),
+            "processos_abertos": Processo.objects.exclude(
+                status=Processo.StatusProcesso.FINALIZADO
+            ).count(),
+            "na_caixa": Processo.objects.filter(
+                setor_atual__in=setores_do_usuario
+            ).exclude(status=Processo.StatusProcesso.FINALIZADO).count(),
+            "cadastros_a_validar": Aluno.objects.filter(
+                status_aluno=Aluno.StatusAluno.EM_AVALIACAO
+            ).count(),
+        }
+
     if request.user.tipo_usuario == User.TipoUsuario.ALUNO:
         aluno = getattr(request.user, "aluno", None)
         trajetoria_recente = None
