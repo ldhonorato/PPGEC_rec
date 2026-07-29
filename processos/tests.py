@@ -830,8 +830,9 @@ class MatriculaViewsTests(TestCase):
         self.assertEqual(aula.hora_inicio, time(10, 0))
         self.assertEqual(aula.hora_fim, time(12, 30))
         self.assertEqual(aula.carga_horaria_minutos, 150)
-        self.assertEqual(aula.reserva.inicio.time(), time(10, 0))
-        self.assertEqual(aula.reserva.fim.time(), time(12, 30))
+        # A reserva e gravada em UTC; compara no fuso local, como faz a aplicacao.
+        self.assertEqual(timezone.localtime(aula.reserva.inicio).time(), time(10, 0))
+        self.assertEqual(timezone.localtime(aula.reserva.fim).time(), time(12, 30))
         mock_email.assert_called_once_with(self.oferta.pk, self.docente.pk)
 
     @patch("processos.views.send_email_alunos_sem_matricula.delay")
