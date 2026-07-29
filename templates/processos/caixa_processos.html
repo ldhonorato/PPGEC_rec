@@ -17,7 +17,7 @@
             </div>
         </form>
     {% endif %}
-    <p class="muted">Mostra todos os processos cujo setor atual e {{ nomes_setores_caixa_texto }}.</p>
+    <p class="muted">Mostra todos os processos cujo setor atual é {{ nomes_setores_caixa_texto }}.</p>
     <div style="display: flex; gap: 0.6rem; margin: 0.8rem 0 1rem 0; flex-wrap: wrap;">
         <a
             class="btn {% if status_caixa == 'EM_ANALISE' %}{% else %}btn-secondary{% endif %}"
@@ -34,21 +34,7 @@
     </div>
 
     {% if processos %}
-        <ul class="list">
-            {% for processo in processos %}
-                <li>
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
-                        <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
-                        <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
-                    </div>
-                    <small class="muted">
-                        Usuário: {{ processo.usuario_criado_por.nome }} |
-                        Status: {{ processo.get_status_display }} |
-                        Setor: {{ processo.setor_atual.nome }}
-                    </small>
-                </li>
-            {% endfor %}
-        </ul>
+        {% include "includes/tabela_processos.html" with coluna_pessoa="Requerente" mostrar_setor=True mostrar_prazo=True vazio_titulo="Nada aguardando neste setor" vazio_texto="Quando um processo for encaminhado para cá, ele aparece nesta lista." %}
     {% else %}
         <p class="muted">Não há processos na caixa dos setores {{ nomes_setores_caixa_texto }}.</p>
     {% endif %}

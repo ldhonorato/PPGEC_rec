@@ -41,42 +41,69 @@
 </dialog>
 
 <section class="card">
-    <h2 class="section-title">Disciplinas cadastradas</h2>
+    <div class="lista-cabecalho">
+        <h2 class="section-title">Disciplinas cadastradas</h2>
+        {% if disciplinas %}
+            <span class="lista-contagem">{{ disciplinas|length }} disciplina{{ disciplinas|length|pluralize }}</span>
+        {% endif %}
+    </div>
+
+    {% comment %}
+    Ementa e pre-requisitos sao textos longos e nao entram como coluna: com 47
+    linhas eles esticariam a tabela e atrapalhariam justamente o que a tabela
+    resolve, que e varrer codigo, creditos e carga horaria. A ementa aparece
+    resumida sob o nome, e o texto completo dos dois esta no formulario de
+    edicao, a um clique.
+    {% endcomment %}
     {% if disciplinas %}
-        <ul class="list">
-            {% for disciplina in disciplinas %}
-                <li>
-                    <div class="actions-row">
-                        <div>
-                            <strong>{{ disciplina.codigo }} - {{ disciplina.nome }}</strong>
-                            {% if disciplina.ativa %}
-                                <span class="badge badge-ok">Ativa</span>
-                            {% else %}
-                                <span class="badge badge-no">Inativa</span>
-                            {% endif %}
-                            <small class="muted" style="display:block; margin-top:0.35rem;">
-                                Tipo: {{ disciplina.tipo|default:"-" }} |
-                                Créditos: {{ disciplina.creditos|default:"-" }} |
-                                Carga horária: {{ disciplina.carga_horaria|default:"-" }}
-                            </small>
-                            {% if disciplina.pre_requisitos %}
-                                <small class="muted" style="display:block; margin-top:0.35rem;">
-                                    Pré-requisitos: {{ disciplina.pre_requisitos|truncatechars:140 }}
-                                </small>
-                            {% endif %}
-                            {% if disciplina.ementa %}
-                                <small class="muted" style="display:block; margin-top:0.35rem;">
-                                    Ementa: {{ disciplina.ementa|truncatechars:180 }}
-                                </small>
-                            {% endif %}
-                        </div>
-                        <button class="btn btn-secondary" type="button" data-open-dialog="editar-disciplina-{{ disciplina.pk }}">Editar</button>
-                    </div>
-                </li>
-            {% endfor %}
-        </ul>
+        <div class="tabela-envolvido">
+            <table class="tabela">
+                <thead>
+                    <tr>
+                        <th scope="col">Código</th>
+                        <th scope="col">Disciplina</th>
+                        <th scope="col">Tipo</th>
+                        <th scope="col">Créditos</th>
+                        <th scope="col">Carga horária</th>
+                        <th scope="col">Situação</th>
+                        <th scope="col"><span class="apenas-leitor">Ações</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for disciplina in disciplinas %}
+                        <tr>
+                            <td class="celula-numero celula-apoio">{{ disciplina.codigo }}</td>
+                            <td class="celula-principal">
+                                {{ disciplina.nome }}
+                                {% if disciplina.ementa %}
+                                    <span class="celula-secundaria">{{ disciplina.ementa|truncatechars:90 }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="celula-apoio">{{ disciplina.tipo|default:"—" }}</td>
+                            <td class="celula-numero celula-apoio">{{ disciplina.creditos|default:"—" }}</td>
+                            <td class="celula-numero celula-apoio">{{ disciplina.carga_horaria|default:"—" }}</td>
+                            <td>
+                                {% if disciplina.ativa %}
+                                    <span class="badge badge-ok">Ativa</span>
+                                {% else %}
+                                    <span class="badge badge-info">Inativa</span>
+                                {% endif %}
+                            </td>
+                            <td class="celula-acoes">
+                                <button class="btn btn-secondary btn-compact" type="button"
+                                        data-open-dialog="editar-disciplina-{{ disciplina.pk }}">Editar</button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     {% else %}
-        <p class="muted">Nenhuma disciplina cadastrada.</p>
+        <div class="estado-vazio">
+            <svg aria-hidden="true"><use href="#i-disciplinas"></use></svg>
+            <p class="estado-vazio-titulo">Nenhuma disciplina cadastrada</p>
+            <p>Use o formulário acima para cadastrar a primeira disciplina do catálogo.</p>
+        </div>
     {% endif %}
 </section>
 

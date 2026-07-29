@@ -1,0 +1,70 @@
+{% load acadflow %}
+{% comment %}
+Tabela de processos, compartilhada pelas telas que listam processos.
+
+Quatro telas repetiam a mesma marcacao com pequenas variacoes de coluna --
+caixa do setor, meus processos, processos dos orientandos e a listagem geral.
+Reunir aqui evita que elas voltem a divergir a cada ajuste.
+
+Parametros (todos opcionais, exceto processos):
+
+  processos          iteravel de Processo
+  coluna_pessoa      rotulo da coluna de pessoa; omitido, a coluna nao aparece
+                     ("Requerente" na visao da secretaria, "Aluno" na do
+                     orientador)
+  mostrar_tipo       inclui a coluna Tipo
+  mostrar_setor      inclui a coluna Setor atual
+  mostrar_prazo      inclui a coluna Prazo
+  vazio_titulo       titulo do estado vazio
+  vazio_texto        texto de apoio do estado vazio
+{% endcomment %}
+{% if processos %}
+    <div class="tabela-envolvido">
+        <table class="tabela">
+            <thead>
+                <tr>
+                    <th scope="col">Processo</th>
+                    {% if coluna_pessoa %}<th scope="col">{{ coluna_pessoa }}</th>{% endif %}
+                    {% if mostrar_tipo %}<th scope="col">Tipo</th>{% endif %}
+                    {% if mostrar_setor %}<th scope="col">Setor atual</th>{% endif %}
+                    {% if mostrar_prazo %}<th scope="col">Prazo</th>{% endif %}
+                    <th scope="col">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for processo in processos %}
+                    <tr>
+                        <td class="celula-principal">
+                            <a href="{% url 'processo_detalhe' processo.id %}">{{ processo.assunto }}</a>
+                            <span class="celula-secundaria celula-numero">{{ processo.numero }}</span>
+                        </td>
+                        {% if coluna_pessoa %}
+                            <td class="celula-apoio">{{ processo.usuario_criado_por.nome }}</td>
+                        {% endif %}
+                        {% if mostrar_tipo %}
+                            <td class="celula-apoio">{{ processo.get_tipo_display }}</td>
+                        {% endif %}
+                        {% if mostrar_setor %}
+                            <td class="celula-apoio">{{ processo.setor_atual.nome|default:"—" }}</td>
+                        {% endif %}
+                        {% if mostrar_prazo %}
+                            <td class="celula-numero {% if processo.esta_atrasado %}celula-atrasada{% else %}celula-apoio{% endif %}">
+                                {{ processo.prazo_limite|date:"d/m/Y"|default:"—" }}
+                                {% if processo.esta_atrasado %}<span class="celula-secundaria">Atrasado</span>{% endif %}
+                            </td>
+                        {% endif %}
+                        <td>
+                            <span class="badge badge-{{ processo.status|status_processo_tom }}">{{ processo.get_status_display }}</span>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <div class="estado-vazio">
+        <svg aria-hidden="true"><use href="#i-meus-processos"></use></svg>
+        <p class="estado-vazio-titulo">{{ vazio_titulo|default:"Nenhum processo encontrado" }}</p>
+        {% if vazio_texto %}<p>{{ vazio_texto }}</p>{% endif %}
+    </div>
+{% endif %}

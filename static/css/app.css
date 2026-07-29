@@ -2390,6 +2390,21 @@ dialog::backdrop {
     white-space: nowrap;
 }
 
+/* Visivel so para leitor de tela. Serve para o cabecalho da coluna de acoes:
+   a coluna precisa de nome na estrutura da tabela, mas o rotulo na tela nao
+   acrescenta nada -- os botoes se explicam. */
+.apenas-leitor {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* Cabecalho da listagem: titulo, contagem e acao principal na mesma faixa. */
 .lista-cabecalho {
     display: flex;
