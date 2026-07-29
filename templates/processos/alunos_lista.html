@@ -66,26 +66,55 @@
             <strong>{{ periodo_sem_matricula.nome }}</strong>.
         </div>
     {% endif %}
+    <div class="lista-cabecalho">
+        <h2 class="section-title">Alunos cadastrados</h2>
+        {% if alunos %}
+            <span class="lista-contagem">{{ alunos|length }} aluno{{ alunos|length|pluralize }}</span>
+        {% endif %}
+    </div>
+
     {% if alunos %}
-        <ul class="list">
-            {% for aluno in alunos %}
-                <li>
-                    <strong><a class="text-link" href="{% url 'aluno_detalhe' aluno.id %}">{{ aluno.nome }}</a></strong><br>
-                    <small class="muted">
-                        {{ aluno.email }}
-                        {% if aluno.matricula %} | Matrícula: {{ aluno.matricula }}{% endif %}
-                        {% if aluno.trajetoria_atual %}
-                            | Nível: {{ aluno.trajetoria_atual.get_nivel_curso_display }}
-                            | Trajetória: {{ aluno.trajetoria_atual.get_status_display }}
-                            | Ingresso: {{ aluno.trajetoria_atual.ingresso }}
-                            {% if aluno.trajetoria_atual.orientador %} | Orientador: {{ aluno.trajetoria_atual.orientador.nome }}{% endif %}
-                        {% endif %}
-                    </small>
-                </li>
-            {% endfor %}
-        </ul>
+        <div class="tabela-envolvido">
+            <table class="tabela">
+                <thead>
+                    <tr>
+                        <th scope="col">Aluno</th>
+                        <th scope="col">Matrícula</th>
+                        <th scope="col">Nível</th>
+                        <th scope="col">Ingresso</th>
+                        <th scope="col">Orientador</th>
+                        <th scope="col">Trajetória</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for aluno in alunos %}
+                        <tr>
+                            <td class="celula-principal">
+                                <a href="{% url 'aluno_detalhe' aluno.id %}">{{ aluno.nome }}</a>
+                                <span class="celula-secundaria">{{ aluno.email }}</span>
+                            </td>
+                            <td class="celula-numero celula-apoio">{{ aluno.matricula|default:"—" }}</td>
+                            <td class="celula-apoio">{{ aluno.trajetoria_atual.get_nivel_curso_display|default:"—" }}</td>
+                            <td class="celula-numero celula-apoio">{{ aluno.trajetoria_atual.ingresso|default:"—" }}</td>
+                            <td class="celula-apoio">{{ aluno.trajetoria_atual.orientador.nome|default:"—" }}</td>
+                            <td>
+                                {% if aluno.trajetoria_atual %}
+                                    <span class="badge badge-{% if aluno.trajetoria_atual.status == "ATIVA" %}ok{% else %}info{% endif %}">{{ aluno.trajetoria_atual.get_status_display }}</span>
+                                {% else %}
+                                    <span class="celula-apoio">Sem trajetória</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     {% else %}
-        <p class="muted">Nenhum aluno encontrado com os filtros informados.</p>
+        <div class="estado-vazio">
+            <svg aria-hidden="true"><use href="#i-alunos"></use></svg>
+            <p class="estado-vazio-titulo">Nenhum aluno encontrado</p>
+            <p>Nenhum aluno corresponde aos filtros informados. Ajuste os critérios acima.</p>
+        </div>
     {% endif %}
 </section>
 {% endblock %}

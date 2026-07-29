@@ -2085,6 +2085,13 @@ dialog::backdrop {
     border-color: #c9dcf5;
 }
 
+/* "Aguardando algo de fora" -- nem concluido, nem problema: pendente. */
+.badge-aviso {
+    background: #fff6e9;
+    color: #92510a;
+    border-color: #f7ddb8;
+}
+
 .alert-danger {
     border-color: #fac7cf;
     background: #fff5f6;
@@ -2260,6 +2267,176 @@ dialog::backdrop {
     .weekday-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* ==========================================================================
+   Tabela de listagem
+
+   Substitui o padrao de "frase com pipes" que estava em 97 linhas da
+   interface -- cada registro era uma frase do tipo
+   "email | Matricula: X | Nivel: Y | Trajetoria: Z | Ingresso: W | Orientador: V".
+   Sem cabecalho de coluna nao ha como escanear uma informacao especifica nem
+   comparar registros; o olho tem que reler a frase inteira a cada linha.
+
+   O invólucro rola na horizontal em tela estreita, para a pagina nunca rolar
+   de lado -- so a tabela.
+   ========================================================================== */
+
+.tabela-envolvido {
+    overflow-x: auto;
+    margin: 0 -0.35rem;
+    padding: 0 0.35rem;
+}
+
+.tabela {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+/* Sem position: sticky de proposito. O invólucro tem overflow-x, o que faz
+   dele um contexto de rolagem: o cabecalho grudaria nele, e nao na janela,
+   descendo var(--topbar-height) e cobrindo a primeira linha. Com paginacao a
+   tabela nao fica alta o bastante para justificar a complicacao. */
+.tabela thead th {
+    padding: 0.5rem 0.7rem;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.tabela tbody td {
+    padding: 0.62rem 0.7rem;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: middle;
+}
+
+.tabela tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.tabela tbody tr {
+    transition: background-color 0.12s ease;
+}
+
+.tabela tbody tr:hover {
+    background: var(--color-surface-soft);
+}
+
+/* O nome/numero do registro e o link; a linha inteira nao vira clicavel por
+   JS de proposito -- isso quebraria selecao de texto, abrir em nova aba e a
+   navegacao por teclado. */
+.tabela .celula-principal {
+    font-weight: 560;
+}
+
+.tabela .celula-principal a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.tabela .celula-principal a:hover,
+.tabela .celula-principal a:focus-visible {
+    text-decoration: underline;
+}
+
+.tabela .celula-apoio {
+    color: var(--color-muted);
+}
+
+/* Prazo vencido: a data em si ja e o alerta, sem precisar de um badge extra
+   competindo com o de status na mesma linha. */
+.tabela .celula-atrasada {
+    color: var(--color-danger);
+    font-weight: 560;
+}
+
+.tabela .celula-atrasada .celula-secundaria {
+    color: var(--color-danger);
+    opacity: 0.85;
+}
+
+/* Dado de apoio do registro (e-mail, setor) sob o nome, em vez de virar mais
+   uma coluna: mantem a tabela estreita sem esconder a informacao. */
+.tabela .celula-secundaria {
+    display: block;
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    font-weight: 400;
+}
+
+/* Badge dentro de tabela acompanha a escala menor da linha. */
+.tabela .badge {
+    font-size: 0.74rem;
+    font-weight: 560;
+    padding: 0.14rem 0.5rem;
+}
+
+/* Numeros, matriculas e datas alinham em coluna com algarismos de mesma
+   largura -- fica possivel comparar de relance. */
+.tabela .celula-numero {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.tabela .celula-acoes {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* Cabecalho da listagem: titulo, contagem e acao principal na mesma faixa. */
+.lista-cabecalho {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.9rem;
+}
+
+.lista-cabecalho h1,
+.lista-cabecalho h2 {
+    margin: 0;
+}
+
+.lista-contagem {
+    color: var(--color-muted);
+    font-size: 0.83rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Estado vazio: antes era um <p> solto com o texto em cinza. */
+.estado-vazio {
+    display: grid;
+    justify-items: center;
+    gap: 0.3rem;
+    padding: 2.5rem 1rem;
+    text-align: center;
+}
+
+.estado-vazio svg {
+    width: 30px;
+    height: 30px;
+    margin-bottom: 0.2rem;
+    color: #b6c2d4;
+}
+
+.estado-vazio p {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.9rem;
+}
+
+.estado-vazio .estado-vazio-titulo {
+    color: var(--color-text);
+    font-size: 0.95rem;
+    font-weight: 560;
 }
 
 /* ==========================================================================

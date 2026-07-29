@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load acadflow %}
 {% block title %}Processos | Coordenação{% endblock %}
 {% block content %}
 <section class="card" style="margin-bottom: 1rem;">
@@ -48,27 +49,56 @@
 </section>
 
 <section class="card">
+    <div class="lista-cabecalho">
+        <h2 class="section-title">Processos encontrados</h2>
+        {% if processos %}
+            <span class="lista-contagem">{{ processos|length }} processo{{ processos|length|pluralize }}</span>
+        {% endif %}
+    </div>
+
     {% if processos %}
-        <ul class="list">
-            {% for processo in processos %}
-                <li>
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
-                        <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
-                        <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
-                    </div>
-                    <small class="muted">
-                        Usuário: {{ processo.usuario_criado_por.nome }} |
-                        Tipo: {{ processo.get_tipo_display }} |
-                        Status: {{ processo.get_status_display }} |
-                        Setor: {{ processo.setor_atual.nome }} |
-                        Prazo: {{ processo.prazo_limite|date:"d/m/Y"|default:"-" }}
-                        {% if processo.esta_atrasado %}| <span class="badge badge-no">Atrasado</span>{% endif %}
-                    </small>
-                </li>
-            {% endfor %}
-        </ul>
+        <div class="tabela-envolvido">
+            <table class="tabela">
+                <thead>
+                    <tr>
+                        <th scope="col">Processo</th>
+                        <th scope="col">Requerente</th>
+                        <th scope="col">Tipo</th>
+                        <th scope="col">Setor atual</th>
+                        <th scope="col">Prazo</th>
+                        <th scope="col">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for processo in processos %}
+                        <tr>
+                            <td class="celula-principal">
+                                <a href="{% url 'processo_detalhe' processo.id %}">{{ processo.assunto }}</a>
+                                <span class="celula-secundaria celula-numero">{{ processo.numero }}</span>
+                            </td>
+                            <td class="celula-apoio">{{ processo.usuario_criado_por.nome }}</td>
+                            <td class="celula-apoio">{{ processo.get_tipo_display }}</td>
+                            <td class="celula-apoio">{{ processo.setor_atual.nome|default:"—" }}</td>
+                            <td class="celula-numero {% if processo.esta_atrasado %}celula-atrasada{% else %}celula-apoio{% endif %}">
+                                {{ processo.prazo_limite|date:"d/m/Y"|default:"—" }}
+                                {% if processo.esta_atrasado %}
+                                    <span class="celula-secundaria">Atrasado</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ processo.status|status_processo_tom }}">{{ processo.get_status_display }}</span>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     {% else %}
-        <p class="muted">Nenhum processo encontrado com os filtros informados.</p>
+        <div class="estado-vazio">
+            <svg aria-hidden="true"><use href="#i-meus-processos"></use></svg>
+            <p class="estado-vazio-titulo">Nenhum processo encontrado</p>
+            <p>Nenhum processo corresponde aos filtros informados. Ajuste os critérios acima.</p>
+        </div>
     {% endif %}
 </section>
 {% endblock %}

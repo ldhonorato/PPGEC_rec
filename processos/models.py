@@ -209,7 +209,7 @@ class TrajetoriaAcademica(models.Model):
     class Status(models.TextChoices):
         EM_HOMOLOGACAO = "EM_HOMOLOGACAO", "Em homologação"
         ATIVA = "ATIVA", "Ativa"
-        CONCLUIDA = "CONCLUIDA", "Concluida"
+        CONCLUIDA = "CONCLUIDA", "Concluída"
         DESLIGADA = "DESLIGADA", "Desligada"
         TRANCADA = "TRANCADA", "Trancado"
         REMOVIDA = "REMOVIDA", "Removida"
@@ -936,7 +936,7 @@ class ItemSolicitacaoMatricula(models.Model):
 class AlteracaoAluno(models.Model):
     class TipoAlteracao(models.TextChoices):
         STATUS = "STATUS", "Status"
-        QUALIFICACAO = "QUALIFICACAO", "Qualificacao"
+        QUALIFICACAO = "QUALIFICACAO", "Qualificação"
         HORAS_COMPLEMENTARES = "HORAS_COMPLEMENTARES", "Horas complementares"
         DEFESA = "DEFESA", "Defesa"
         DEPOSITO_FINAL = "DEPOSITO_FINAL", "Depósito versão final"
@@ -2286,7 +2286,7 @@ class DisponibilidadeSala(models.Model):
         QUARTA = 2, "Quarta-feira"
         QUINTA = 3, "Quinta-feira"
         SEXTA = 4, "Sexta-feira"
-        SABADO = 5, "Sabado"
+        SABADO = 5, "Sábado"
         DOMINGO = 6, "Domingo"
 
     sala = models.ForeignKey(Sala, on_delete=models.CASCADE, related_name="disponibilidades")

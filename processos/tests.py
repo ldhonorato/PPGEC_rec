@@ -1657,11 +1657,15 @@ class AlunosViewTests(TestCase):
         self.assertEqual(len(alunos), 1)
         self.assertEqual(alunos[0].id, aluno_concluido.id)
         self.assertEqual(alunos[0].trajetoria_atual.status, TrajetoriaAcademica.Status.CONCLUIDA)
-        self.assertContains(response, "Matrícula: 2025A0002")
-        self.assertContains(response, "Nível: Doutorado")
-        self.assertContains(response, "Ingresso: 2025.1")
-        self.assertContains(response, "Orientador: Orientador")
-        self.assertNotContains(response, "Status: Concluído")
+        # A listagem virou tabela: os rotulos ficam no cabecalho das colunas e a
+        # linha carrega so os valores. O que o teste prova continua o mesmo --
+        # sem trajetoria ativa, os dados vem da ultima concluida.
+        self.assertContains(response, "Aluno Concluído")
+        self.assertContains(response, "2025A0002")
+        self.assertContains(response, "Doutorado")
+        self.assertContains(response, "2025.1")
+        self.assertContains(response, "Concluída")
+        # dados de outras secoes nao vazam para a listagem
         self.assertNotContains(response, "Prazo defesa")
         self.assertNotContains(response, "Qualifica")
         self.assertNotContains(response, "Coorientador:")
