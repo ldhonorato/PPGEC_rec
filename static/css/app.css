@@ -105,9 +105,13 @@ body {
 
    O letter-spacing negativo so vale nos tamanhos grandes: em texto pequeno
    ele atrapalha a leitura em vez de ajudar. */
+/* Sem color aqui de proposito: o titulo herda a cor do contexto. Fixar
+   var(--color-text) nesta regra deixava escuro qualquer titulo sobre fundo
+   escuro -- foi o que aconteceu com a chamada do painel de acesso, que ficou
+   quase invisivel sobre o azul. Quem precisa da cor de texto e a
+   .section-title, que so aparece sobre cartao claro. */
 h1, h2, h3, h4 {
     margin: 0 0 0.6rem;
-    color: var(--color-text);
     font-weight: 600;
     line-height: 1.3;
 }
@@ -1602,6 +1606,7 @@ dialog::backdrop {
 }
 
 .auth-chamada {
+    color: inherit;
     max-width: 17ch;
     margin: 0 0 1.75rem;
     font-size: clamp(1.65rem, 2.4vw, 2.2rem);
