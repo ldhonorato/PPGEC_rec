@@ -2411,6 +2411,71 @@ dialog::backdrop {
     font-variant-numeric: tabular-nums;
 }
 
+/* Navegacao entre paginas. So aparece com mais de uma pagina -- um "1 de 1"
+   e ruido. Sem numeros de pagina clicaveis de proposito: com filtro aplicado,
+   saltar para a pagina 7 raramente e o que se quer, e a fileira de numeros
+   ocupa espaco proporcional ao total de paginas. */
+.paginacao {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.paginacao-passo {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 36px;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-primary);
+    font-size: 0.85rem;
+    font-weight: 560;
+    text-decoration: none;
+    transition: background-color 0.14s ease, border-color 0.14s ease;
+}
+
+.paginacao-passo svg {
+    width: 16px;
+    height: 16px;
+}
+
+.paginacao-passo:hover,
+.paginacao-passo:focus-visible {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+    outline: none;
+}
+
+/* Extremo da lista: o passo continua ocupando o lugar, para os botoes nao
+   pularem de posicao entre uma pagina e outra. */
+.paginacao-passo.is-inativo {
+    color: #a8b3c4;
+    background: transparent;
+    cursor: default;
+}
+
+.paginacao-posicao {
+    color: var(--color-muted);
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.paginacao-posicao strong {
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+.paginacao-total {
+    color: #90a0b5;
+}
+
 /* Estado vazio: antes era um <p> solto com o texto em cinza. */
 .estado-vazio {
     display: grid;

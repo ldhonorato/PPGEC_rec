@@ -9,7 +9,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q, Sum
 from django.http import HttpResponse, JsonResponse
-from django.core.paginator import Paginator
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -134,6 +134,29 @@ def _parse_date_input(value):
         return datetime.strptime(value, "%d/%m/%Y").date()
     except ValueError:
         return None
+
+
+ITENS_POR_PAGINA = 25
+
+
+def _paginar(request, queryset, por_pagina=None):
+    """Recorta a listagem na pagina pedida em ?page=.
+
+    Devolve o objeto Page, que serve tanto para iterar as linhas quanto para o
+    include includes/paginacao.html montar a navegacao.
+
+    Pagina invalida (fora do intervalo ou nao numerica) cai na primeira em vez
+    de levantar erro: o parametro vem da URL e pode chegar editado a mao ou
+    apontando para uma pagina que sumiu depois de um filtro.
+    """
+    # A constante e lida aqui dentro, e nao como valor padrao do argumento:
+    # valor padrao e resolvido na definicao da funcao, o que congelaria o
+    # numero e impediria qualquer sobrescrita depois -- inclusive nos testes.
+    paginador = Paginator(queryset, por_pagina or ITENS_POR_PAGINA)
+    try:
+        return paginador.page(int(request.GET.get("page", 1)))
+    except (ValueError, TypeError, EmptyPage, PageNotAnInteger):
+        return paginador.page(1)
 
 
 def _is_docente(user):
@@ -1953,11 +1976,13 @@ def processos_view(request):
             | Q(descricao__icontains=termo)
             | Q(usuario_criado_por__nome__icontains=termo)
         )
+    pagina = _paginar(request, queryset)
     return render(
         request,
         "processos/processos_lista.html",
         {
-            "processos": queryset,
+            "processos": pagina.object_list,
+            "pagina": pagina,
             "tipos": Processo.TipoProcesso.choices,
             "status_list": Processo.StatusProcesso.choices,
             "setores": Setor.objects.order_by("nome"),
@@ -2153,7 +2178,11 @@ def alunos_view(request):
         alunos_sem_matricula_ids = alunos_ativos_sem_matricula(periodo_sem_matricula).values("pk")
         queryset = queryset.filter(pk__in=alunos_sem_matricula_ids)
 
-    alunos = list(queryset.distinct())
+    # Pagina antes de anotar a trajetoria: a anotacao faz uma consulta por
+    # aluno, entao rodar sobre a lista inteira custaria N consultas para exibir
+    # 25 linhas.
+    pagina = _paginar(request, queryset.distinct().order_by("nome"))
+    alunos = list(pagina.object_list)
     for aluno_item in alunos:
         trajetoria_atual = aluno_item.trajetoria_ativa()
         if not trajetoria_atual:
@@ -2165,6 +2194,7 @@ def alunos_view(request):
         "processos/alunos_lista.html",
         {
             "alunos": alunos,
+            "pagina": pagina,
             "filtro_nome": nome,
             "filtro_nivel": nivel,
             "filtro_ingresso_inicio": ingresso_inicio_raw,
@@ -2173,7 +2203,7 @@ def alunos_view(request):
             "periodos_letivos": PeriodoLetivo.objects.order_by("-nome"),
             "filtro_sem_matricula_periodo": periodo_sem_matricula_id,
             "periodo_sem_matricula": periodo_sem_matricula,
-            "total_alunos_filtrados": len(alunos),
+            "total_alunos_filtrados": pagina.paginator.count,
             "status_list": Aluno.StatusAluno.choices,
             "nivel_list": Aluno.NivelCurso.choices,
             "is_coordenador": _is_coordenador(request.user),

@@ -3711,3 +3711,81 @@ class TemplatesSintaxeTests(SimpleTestCase):
             if repetidos:
                 infracoes.append(f"{caminho.relative_to(settings.BASE_DIR)}: {sorted(repetidos)}")
         self.assertEqual(infracoes, [], "nomes de bloco repetidos:\n  " + "\n  ".join(infracoes))
+
+
+class PaginacaoListagensTests(TestCase):
+    """Paginacao das listagens de gestao.
+
+    Com poucos registros a navegacao nem aparece, entao os testes reduzem o
+    tamanho da pagina para exercitar o comportamento real: preservar filtros
+    ao trocar de pagina, tolerar page invalido e contar o total do filtro --
+    nao o tamanho da pagina.
+    """
+
+    def setUp(self):
+        self.servidor = User.objects.create_user(
+            email="servidor.paginacao@example.com", password="senha-segura-123",
+            nome="Servidor Paginacao", tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.setor = Setor.objects.create(nome="Setor Paginacao")
+        for i in range(12):
+            Processo.objects.create(
+                numero=f"202607-99{i:04d}",
+                usuario_criado_por=self.servidor,
+                tipo=Processo.TipoProcesso.OUTRO,
+                assunto=("Alvo do filtro" if i < 4 else f"Processo comum {i}"),
+                descricao="Descricao",
+                status_inicial="ABERTO",
+                status=Processo.StatusProcesso.EM_ANALISE,
+                setor_atual=self.setor,
+            )
+        self.client.force_login(self.servidor)
+        # a seed da migracao 0003 ja deixa processos no banco de teste, entao o
+        # total nao e so o que este setUp criou
+        self.total = Processo.objects.count()
+
+    def _pagina(self, resposta):
+        return resposta.context["pagina"]
+
+    @patch("processos.views.ITENS_POR_PAGINA", 5)
+    def test_divide_em_paginas_e_conta_o_total(self):
+        resposta = self.client.get(reverse("coordenacao_processos"))
+        pagina = self._pagina(resposta)
+
+        self.assertGreater(self.total, 5, "o cenario precisa de mais de uma pagina")
+        self.assertEqual(pagina.number, 1)
+        self.assertEqual(pagina.paginator.num_pages, -(-self.total // 5))
+        self.assertEqual(pagina.paginator.count, self.total)
+        self.assertEqual(len(pagina.object_list), 5)
+        # a contagem exibida e do total filtrado, nao das 5 linhas da pagina
+        self.assertContains(resposta, f"{self.total} processos")
+
+    @patch("processos.views.ITENS_POR_PAGINA", 5)
+    def test_filtro_sobrevive_a_troca_de_pagina(self):
+        """O erro classico e o filtro sumir ao clicar em "proxima"."""
+        primeira = self.client.get(reverse("coordenacao_processos"), {"q": "Alvo do filtro"})
+        self.assertEqual(self._pagina(primeira).paginator.count, 4)
+
+        segunda = self.client.get(reverse("coordenacao_processos"), {"q": "Alvo do filtro", "page": 1})
+        self.assertEqual(self._pagina(segunda).paginator.count, 4)
+        # o link de paginacao carrega o filtro junto
+        self.assertNotContains(segunda, 'href="?page=')
+
+    @patch("processos.views.ITENS_POR_PAGINA", 5)
+    def test_pagina_invalida_cai_na_primeira(self):
+        """page vem da URL: pode chegar editada a mao ou apontando para uma
+        pagina que sumiu depois de um filtro."""
+        for valor in ["99", "abc", "0", "-3", ""]:
+            with self.subTest(page=valor):
+                resposta = self.client.get(reverse("coordenacao_processos"), {"page": valor})
+                self.assertEqual(resposta.status_code, 200)
+                self.assertEqual(self._pagina(resposta).number, 1)
+
+    @patch("processos.views.ITENS_POR_PAGINA", 5)
+    def test_navegacao_so_aparece_com_mais_de_uma_pagina(self):
+        com_varias = self.client.get(reverse("coordenacao_processos"))
+        self.assertContains(com_varias, "paginacao-passo")
+
+        uma_so = self.client.get(reverse("coordenacao_processos"), {"q": "Alvo do filtro"})
+        self.assertEqual(self._pagina(uma_so).paginator.num_pages, 1)
+        self.assertNotContains(uma_so, "paginacao-passo")

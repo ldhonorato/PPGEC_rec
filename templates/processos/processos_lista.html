@@ -52,7 +52,7 @@
     <div class="lista-cabecalho">
         <h2 class="section-title">Processos encontrados</h2>
         {% if processos %}
-            <span class="lista-contagem">{{ processos|length }} processo{{ processos|length|pluralize }}</span>
+            <span class="lista-contagem">{{ pagina.paginator.count }} processo{{ pagina.paginator.count|pluralize }}</span>
         {% endif %}
     </div>
 
@@ -93,6 +93,7 @@
                 </tbody>
             </table>
         </div>
+        {% include "includes/paginacao.html" %}
     {% else %}
         <div class="estado-vazio">
             <svg aria-hidden="true"><use href="#i-meus-processos"></use></svg>

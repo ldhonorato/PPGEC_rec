@@ -69,7 +69,7 @@
     <div class="lista-cabecalho">
         <h2 class="section-title">Alunos cadastrados</h2>
         {% if alunos %}
-            <span class="lista-contagem">{{ alunos|length }} aluno{{ alunos|length|pluralize }}</span>
+            <span class="lista-contagem">{{ pagina.paginator.count }} aluno{{ pagina.paginator.count|pluralize }}</span>
         {% endif %}
     </div>
 
@@ -109,6 +109,7 @@
                 </tbody>
             </table>
         </div>
+        {% include "includes/paginacao.html" %}
     {% else %}
         <div class="estado-vazio">
             <svg aria-hidden="true"><use href="#i-alunos"></use></svg>

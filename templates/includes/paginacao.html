@@ -1,0 +1,46 @@
+{% comment %}
+Navegacao entre paginas de uma listagem.
+
+Espera no contexto:
+  pagina  -- objeto Page do django.core.paginator
+
+Nao renderiza nada quando ha uma pagina so -- um paginador de "1 de 1" e
+ruido. A contagem total fica no cabecalho da listagem, nao aqui.
+
+O {% templatetag openblock %} querystring {% templatetag closeblock %}
+(Django 5.1+) reescreve a URL atual trocando apenas o parametro page, entao
+os filtros aplicados sobrevivem a troca de pagina -- que era o erro classico
+de paginar formulario de busca.
+{% endcomment %}
+{% if pagina.paginator.num_pages > 1 %}
+<nav class="paginacao" aria-label="Paginação da listagem">
+    {% if pagina.has_previous %}
+        <a class="paginacao-passo" href="{% querystring page=pagina.previous_page_number %}" rel="prev">
+            <svg aria-hidden="true"><use href="#i-voltar"></use></svg>
+            Anterior
+        </a>
+    {% else %}
+        <span class="paginacao-passo is-inativo" aria-hidden="true">
+            <svg><use href="#i-voltar"></use></svg>
+            Anterior
+        </span>
+    {% endif %}
+
+    <span class="paginacao-posicao">
+        Página <strong>{{ pagina.number }}</strong> de {{ pagina.paginator.num_pages }}
+        <span class="paginacao-total">· {{ pagina.paginator.count }} no total</span>
+    </span>
+
+    {% if pagina.has_next %}
+        <a class="paginacao-passo" href="{% querystring page=pagina.next_page_number %}" rel="next">
+            Próxima
+            <svg aria-hidden="true"><use href="#i-avancar"></use></svg>
+        </a>
+    {% else %}
+        <span class="paginacao-passo is-inativo" aria-hidden="true">
+            Próxima
+            <svg><use href="#i-avancar"></use></svg>
+        </span>
+    {% endif %}
+</nav>
+{% endif %}
