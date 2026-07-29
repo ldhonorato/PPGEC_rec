@@ -54,8 +54,8 @@ class User(AbstractUser):
     first_name = None
     last_name = None
 
-    nome = models.CharField(max_length=255)
-    email = models.EmailField(unique=True)
+    nome = models.CharField(max_length=255, verbose_name="Nome completo")
+    email = models.EmailField(unique=True, verbose_name="E-mail")
     polo_atuacao = models.ForeignKey(
         "Polo",
         on_delete=models.SET_NULL,

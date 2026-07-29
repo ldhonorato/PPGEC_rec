@@ -8,7 +8,7 @@
             {% if periodo %}
                 <p class="muted">Período {{ periodo.nome }} - {{ periodo.status_atual_display }}.</p>
             {% else %}
-                <p class="muted">Não há período aberto para matrícula ou modificação.</p>
+                <p class="muted">Nenhum período com matrícula aberta no momento.</p>
                 {% if proximo_periodo %}
                     <p class="muted">
                         Próximo período previsto: {{ proximo_periodo.nome }},
