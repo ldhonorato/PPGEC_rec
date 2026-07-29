@@ -104,6 +104,7 @@ DESCRICOES_MENU = {
     "Meus Processos": "Processos que você abriu",
     "Novo Processo": "Abrir um novo requerimento",
     "Caixa de Processos": "Aguardando análise do seu setor",
+    "Processos": "Buscar em todos os processos",
     "Processos no Pleno": "Em debate no colegiado",
     "Processos dos Orientandos": "Acompanhar seus orientandos",
     # Aluno
@@ -259,6 +260,15 @@ def _menu_lateral_sections(user):
                 )
             )
         coordenacao_items.extend([
+            # A listagem geral nao tinha entrada no menu: so se chegava nela pelo
+            # badge de atrasados da barra superior (ja filtrado) ou por um card da
+            # home. E a unica tela com busca por numero, assunto e descricao.
+            _menu_item(
+                "Processos",
+                "/coordenacao/processos/",
+                ["coordenacao_processos"],
+                "todos-processos",
+            ),
             _menu_item("Dashboard", "/coordenacao/dashboard/", ["coordenacao_dashboard"], "dashboard"),
             _menu_item(
                 "Matrículas",
