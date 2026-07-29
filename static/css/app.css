@@ -1459,11 +1459,44 @@ dialog::backdrop {
     text-decoration: none;
 }
 
+/* Duas colunas de mesmo peso e mesma altura. Antes eram 2fr/1fr com altura
+   propria cada uma: o cartao largo com pouco conteudo ficava com uma area
+   morta grande, e a fileira terminava em degrau. */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--espaco-4);
+    align-items: stretch;
+}
+
+/* Grid interno do checklist de integralizacao.
+
+   O gap padrao deixava o "Pendente" da coluna esquerda quase encostando no
+   titulo da direita -- sem separacao, os dois blocos liam como um so. Alem do
+   respiro maior, a segunda coluna ganha um fio, que e o que de fato divide. */
+.checklist-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(240px, 1fr);
+    gap: var(--espaco-5) var(--espaco-7);
     align-items: start;
+}
+
+.checklist-grid > *:nth-child(even) {
+    padding-left: var(--espaco-6);
+    border-left: 1px solid var(--color-border);
+}
+
+@media (max-width: 920px) {
+    .checklist-grid {
+        grid-template-columns: 1fr;
+        gap: var(--espaco-5);
+    }
+
+    /* Em coluna unica o fio a esquerda nao divide nada -- vira so um risco. */
+    .checklist-grid > *:nth-child(even) {
+        padding-left: 0;
+        border-left: 0;
+    }
 }
 
 .activity-list,

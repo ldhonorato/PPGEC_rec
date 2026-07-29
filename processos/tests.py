@@ -2353,12 +2353,19 @@ class FrontendIdentityTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_home_aluno_mantem_acesso_rapido_para_novo_processo(self):
+        """A home do aluno leva a abrir processo e a consultar os existentes.
+
+        O bloco "Acesso rapido" foi removido: os tres atalhos dele repetiam o
+        menu lateral, e ficavam 420px abaixo da dobra. Os caminhos seguem na
+        tela, pelos cartoes da visao geral -- por isso a verificacao e pelo
+        destino, nao pelo rotulo que existia no bloco antigo.
+        """
         self.client.force_login(self.aluno)
         response = self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Novo requerimento")
-        self.assertContains(response, "Consultar processos")
+        self.assertContains(response, reverse("novo_processo"))
+        self.assertContains(response, reverse("menu_meus_processos"))
         self.assertContains(response, "Pós-Graduação em Engenharia de Computação")
 
     def test_home_servidor_exibe_menu_completo_de_reservas(self):

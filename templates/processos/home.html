@@ -180,7 +180,7 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
             <dd>{{ aluno_checklist_integralizacao.horas_complementares }}h</dd>
         </div>
     </dl>
-    <div class="dashboard-grid">
+    <div class="checklist-grid">
         {% for grupo in aluno_checklist_integralizacao.grupos %}
             <article>
                 <h3 class="section-title">{{ grupo.titulo }}</h3>
@@ -213,8 +213,7 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
 {% endif %}
 {% endif %}
 
-<section class="dashboard-grid">
-    <article class="card">
+<section class="card">
         <div class="actions-row">
             <h2 class="section-title">Atividades recentes</h2>
             <a class="text-link" href="{% url 'menu_meus_processos' %}">Ver todas</a>
@@ -258,30 +257,6 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
                 </li>
             {% endif %}
         </ul>
-    </article>
-
-    <article class="card">
-        <h2 class="section-title">Acesso rápido</h2>
-        <div class="quick-list">
-            {% if can_add_processo %}
-                <a href="{% url 'novo_processo' %}">
-                    <svg class="soft-icon" aria-hidden="true"><use href="#i-novo-processo"></use></svg>
-                    <strong>Novo requerimento</strong>
-                    <svg class="quick-seta" aria-hidden="true"><use href="#i-avancar"></use></svg>
-                </a>
-            {% endif %}
-            <a href="{% url 'menu_meus_processos' %}">
-                <svg class="soft-icon" aria-hidden="true"><use href="#i-meus-processos"></use></svg>
-                <strong>Consultar processos</strong>
-                <svg class="quick-seta" aria-hidden="true"><use href="#i-avancar"></use></svg>
-            </a>
-            <a href="{% url 'me' %}">
-                <svg class="soft-icon" aria-hidden="true"><use href="#i-perfil"></use></svg>
-                <strong>Meu perfil</strong>
-                <svg class="quick-seta" aria-hidden="true"><use href="#i-avancar"></use></svg>
-            </a>
-        </div>
-    </article>
 </section>
 
 {% if can_add_processo and meus_processos_requerente %}
