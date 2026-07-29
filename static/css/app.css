@@ -2192,3 +2192,144 @@ dialog::backdrop {
         grid-template-columns: 1fr;
     }
 }
+
+/* ==========================================================================
+   Transicoes entre telas
+
+   Usa a View Transitions API entre documentos: o navegador tira um retrato da
+   pagina que sai, outro da que entra, e interpola os dois. Nao ha JS nem
+   roteamento no cliente -- continua sendo navegacao comum, com URL, botao
+   voltar e recarregamento normais.
+
+   Onde nao ha suporte (Firefox, Safari antigo) a navegacao acontece direto,
+   sem animacao e sem nada quebrado. O bloco @supports ao final da secao dá a
+   esses navegadores uma entrada simples de conteudo.
+
+   ATENCAO: o @view-transition precisa ficar no nivel superior da folha. Dentro
+   de um @media ele ate e parseado (vira um CSSViewTransitionRule valido), mas
+   nao tem efeito nenhum -- e a falha e silenciosa. Por isso o respeito a
+   prefers-reduced-motion vem depois, zerando as animacoes, e nao envolvendo
+   este bloco num @media.
+   ========================================================================== */
+
+@view-transition {
+    navigation: auto;
+}
+
+/* Elementos nomeados sao capturados em separado e animados por conta propria,
+   em vez de entrarem no retrato geral da pagina. */
+.auth-institucional {
+    view-transition-name: painel-acesso;
+}
+
+.auth-formulario {
+    view-transition-name: form-acesso;
+}
+
+/* Molduras da aplicacao trocam sem cross-fade: sao praticamente iguais entre
+   as telas, e o cross-fade so produziria um piscar sutil. */
+::view-transition-old(painel-acesso) {
+    display: none;
+}
+
+::view-transition-new(painel-acesso) {
+    animation: none;
+}
+
+/* Conteudo: o antigo recua e some, o novo sobe e aparece. Entrada mais longa
+   que a saida para a tela nova parecer chegando, nao empurrada. */
+::view-transition-old(form-acesso) {
+    animation: tela-sai 130ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+::view-transition-new(form-acesso) {
+    animation: tela-entra 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 200ms;
+}
+
+/* Abertura de submenu. Fechamento nao e animavel sem JS: o <details> remove o
+   conteudo do fluxo imediatamente. */
+.side-submenu[open] > .side-submenu-lista {
+    animation: submenu-abre 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tela-sai {
+    to {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+}
+
+@keyframes tela-entra {
+    from {
+        opacity: 0;
+        transform: translateY(9px);
+    }
+}
+
+@keyframes pastilha-assenta {
+    from {
+        background-color: rgba(255, 255, 255, 0);
+        box-shadow: none;
+        transform: translateX(-6px);
+    }
+}
+
+@keyframes submenu-abre {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+}
+
+/* Entrada do conteudo a cada carregamento.
+
+   Nas telas autenticadas e daqui que vem o movimento ao trocar de tela: a
+   transicao entre documentos nao dispara nelas (dispara nas telas de acesso,
+   com a mesma folha de estilo e a mesma regra -- nao identifiquei o motivo da
+   diferenca). Como isto e uma animacao CSS comum no carregamento, funciona em
+   qualquer navegador, inclusive nos que nao tem View Transitions.
+
+   .content-area nao tem view-transition-name justamente para nao concorrer com
+   esta animacao onde a transicao entre documentos funcionar. */
+@media (prefers-reduced-motion: no-preference) {
+    .content-area {
+        animation: tela-entra 240ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* A pastilha do item ativo se assenta ao carregar, marcando onde a
+       navegacao parou. Um pouco mais lenta que o conteudo, para o olho chegar
+       nela depois de reconhecer a tela. */
+    .side-link.is-active {
+        animation: pastilha-assenta 340ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Nas telas de acesso a coluna do formulario ja e animada pela transicao
+       entre documentos; o cartao so anima onde nao ha suporte. */
+    @supports not (view-transition-name: none) {
+        .auth-cartao {
+            animation: tela-entra 260ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+    }
+}
+
+/* Quem pede menos movimento no sistema: a troca de tela continua acontecendo,
+   mas sem deslocamento nem fade -- corta direto. */
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+        animation: none !important;
+    }
+
+    .side-submenu[open] > .side-submenu-lista,
+    .side-link.is-active,
+    .content-area,
+    .auth-cartao {
+        animation: none !important;
+    }
+}
