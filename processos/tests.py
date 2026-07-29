@@ -2069,11 +2069,15 @@ class FrontendIdentityTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "AcadFlow")
         self.assertContains(response, "css/app.css")
-        self.assertContains(response, "img/acadflow-logo.png")
+        self.assertContains(response, "img/acadflow-wordmark")
         self.assertContains(response, 'rel="icon"')
-        self.assertContains(response, 'class="card login-card"')
+        self.assertContains(response, "auth-shell")
+        self.assertContains(response, "auth-cartao")
         self.assertContains(response, reverse("password_reset"))
         self.assertContains(response, reverse("cadastro_aluno"))
+        # rodape institucional presente em todas as telas
+        self.assertContains(response, "Todos os direitos reservados ao PPGEC")
+        self.assertContains(response, f"v{settings.APP_VERSION}")
 
     def test_logout_sem_usuario_redireciona_para_login(self):
         response = self.client.get(reverse("logout"))
@@ -2095,16 +2099,19 @@ class FrontendIdentityTests(TestCase):
         response = self.client.get(reverse("cadastro_aluno"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Cadastro de aluno")
-        self.assertContains(response, "img/acadflow-logo.png")
-        self.assertContains(response, "Email institucional")
+        self.assertContains(response, "cadastro de aluno")
+        self.assertContains(response, "img/acadflow-wordmark")
+        self.assertContains(response, "e-mail institucional")
         self.assertContains(response, "Polo do aluno")
         self.assertContains(response, "CPF")
         self.assertContains(response, "Gênero")
         self.assertContains(response, "Sexo atribuído ao nascer")
-        self.assertContains(response, "informações opcionais")
-        self.assertContains(response, "tratadas de forma confidencial")
-        self.assertContains(response, 'class="card login-card"')
+        # os dados estatisticos seguem marcados como opcionais e com o aviso
+        # de confidencialidade, agora no cabecalho do proprio grupo de campos
+        self.assertContains(response, "Dados estatísticos")
+        self.assertContains(response, "opcional")
+        self.assertContains(response, "tratados de forma confidencial")
+        self.assertContains(response, "auth-shell")
 
     def test_cadastro_aluno_cria_conta_em_avaliacao(self):
         response = self.client.post(
@@ -2231,8 +2238,9 @@ class FrontendIdentityTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Recuperar senha")
-        self.assertContains(response, "img/acadflow-logo.png")
-        self.assertContains(response, 'class="card login-card"')
+        self.assertContains(response, "img/acadflow-wordmark")
+        self.assertContains(response, "auth-shell")
+        self.assertContains(response, "Todos os direitos reservados ao PPGEC")
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -3658,3 +3666,41 @@ class MenuLateralIconesTests(SimpleTestCase):
             "nome de icone deve ser minusculo com hifens (ex.: novo-processo):\n  "
             + "\n  ".join(sorted(fora_do_padrao)),
         )
+
+
+class TemplatesSintaxeTests(SimpleTestCase):
+    """Guardas de sintaxe que o Django nao acusa como erro."""
+
+    @staticmethod
+    def _templates():
+        return sorted(Path(settings.BASE_DIR).joinpath("templates").rglob("*.html"))
+
+    def test_comentario_de_uma_linha_nao_abre_sem_fechar(self):
+        """{# ... #} e sempre de uma linha so.
+
+        Se abrir numa linha e fechar em outra, o Django nao acusa erro: o texto
+        do "comentario" e renderizado na pagina. Dentro de um container flex ele
+        ainda vira um item de layout e desloca a tela inteira. Use
+        {% templatetag openblock %} comment {% templatetag closeblock %} para
+        varias linhas.
+        """
+        infracoes = []
+        for caminho in self._templates():
+            for numero, linha in enumerate(caminho.read_text(encoding="utf-8").split("\n"), 1):
+                if "{#" in linha and "#}" not in linha:
+                    relativo = caminho.relative_to(settings.BASE_DIR)
+                    infracoes.append(f"{relativo}:{numero}: {linha.strip()[:70]}")
+        self.assertEqual(
+            infracoes, [],
+            "comentario {# #} aberto sem fechar na mesma linha:\n  " + "\n  ".join(infracoes),
+        )
+
+    def test_nome_de_bloco_nao_se_repete_no_mesmo_template(self):
+        """Bloco repetido derruba o template com TemplateSyntaxError."""
+        infracoes = []
+        for caminho in self._templates():
+            nomes = re.findall(r"{%\s*block\s+([\w-]+)\s*%}", caminho.read_text(encoding="utf-8"))
+            repetidos = {n for n in nomes if nomes.count(n) > 1}
+            if repetidos:
+                infracoes.append(f"{caminho.relative_to(settings.BASE_DIR)}: {sorted(repetidos)}")
+        self.assertEqual(infracoes, [], "nomes de bloco repetidos:\n  " + "\n  ".join(infracoes))

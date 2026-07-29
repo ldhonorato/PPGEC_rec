@@ -1,17 +1,18 @@
-{% extends "base.html" %}
-{% load static %}
+{% extends "registration/base_auth.html" %}
 {% block title %}Cadastro enviado | AcadFlow{% endblock %}
-{% block content %}
-<section class="login-page">
-    <article class="card login-card">
-        <div class="login-brand">
-            <img src="{% static 'img/acadflow-logo.png' %}" alt="AcadFlow">
-            <div>
-                <h1 class="section-title">Cadastro enviado</h1>
-                <p class="muted">Seu cadastro foi recebido e ficara em avaliação pela secretaria.</p>
-            </div>
-        </div>
-        <a class="btn btn-full" href="{% url 'login' %}">Voltar para o login</a>
-    </article>
-</section>
+
+{% block auth_titulo %}Cadastro enviado{% endblock %}
+
+{% block auth_conteudo %}
+<div class="auth-estado auth-estado-ok">
+    <span class="auth-estado-icone" aria-hidden="true">
+        <svg><use href="#i-checado"></use></svg>
+    </span>
+    <p>Recebemos seu cadastro. Ele passará por avaliação da secretaria do PPGEC.</p>
+    <p class="auth-apoio">
+        Você receberá um e-mail assim que a análise for concluída. Só será possível
+        entrar na plataforma após a aprovação.
+    </p>
+</div>
+<a class="btn btn-full" href="{% url 'login' %}">Voltar para o login</a>
 {% endblock %}

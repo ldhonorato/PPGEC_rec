@@ -74,9 +74,28 @@ X_FRAME_OPTIONS = os.getenv("X_FRAME_OPTIONS", "DENY")
 if env_bool("USE_X_FORWARDED_PROTO", not DEBUG):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-APP_VERSION = os.getenv("APP_VERSION", "local")
+def _versao_do_arquivo():
+    """Le o arquivo VERSION da raiz do projeto.
+
+    E a fonte da verdade da versao em desenvolvimento e a referencia para
+    quem le o repositorio. Em producao a esteira sobrescreve via APP_VERSION
+    (veja .github/workflows/build-web-image.yml), entao a variavel de
+    ambiente tem precedencia.
+    """
+    arquivo = BASE_DIR / "VERSION"
+    try:
+        return arquivo.read_text(encoding="utf-8").strip() or "0.0.0"
+    except OSError:
+        return "0.0.0"
+
+
+APP_VERSION = os.getenv("APP_VERSION") or _versao_do_arquivo()
 APP_REVISION = os.getenv("APP_REVISION", "unknown")
 APP_BUILD_RUN_ID = os.getenv("APP_BUILD_RUN_ID", "local")
+
+# Exibido no rodape de todas as telas.
+APP_ORGANIZACAO = "PPGEC · UPE"
+APP_COPYRIGHT = "Todos os direitos reservados ao PPGEC · UPE"
 
 
 # Application definition
@@ -114,6 +133,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'ppgec.context_processors.rodape_institucional',
                 'processos.context_processors.processos_atrasados',
                 'processos.context_processors.navegacao_lateral',
             ],

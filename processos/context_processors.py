@@ -95,9 +95,55 @@ def _has_assinaturas_access(user):
     ).exists()
 
 
+# Descricao curta exibida abaixo do rotulo no menu lateral. Fica num mapa por
+# rotulo em vez de argumento em cada _menu_item para manter as chamadas legiveis
+# e o texto todo num lugar so -- e o tipo de conteudo que se revisa em conjunto.
+DESCRICOES_MENU = {
+    "Início": "Visão geral do seu perfil",
+    # Processos
+    "Meus Processos": "Processos que você abriu",
+    "Novo Processo": "Abrir um novo requerimento",
+    "Caixa de Processos": "Aguardando análise do seu setor",
+    "Processos no Pleno": "Em debate no colegiado",
+    "Processos dos Orientandos": "Acompanhar seus orientandos",
+    # Aluno
+    "Matrícula": "Suas solicitações do período",
+    "Documento de Vínculo": "Comprovante de vínculo",
+    "Minha Trajetória": "Créditos, prazos e integralização",
+    # Ambientes
+    "Reserva de Ambiente": "Salas e horários do programa",
+    "Nova reserva de ambiente": "Reservar sala para uma data",
+    "Disponibilidade semanal": "Grade de ocupação das salas",
+    "Reservas feitas": "Suas reservas registradas",
+    "Cadastro de Salas": "Ambientes disponíveis para reserva",
+    # Docente
+    "Ofertas de Disciplinas": "Turmas que você leciona",
+    "Ciências": "Ciências solicitadas a você",
+    "Meus Orientandos": "Alunos sob sua orientação",
+    "Solicitação de Banca": "Qualificação e defesa",
+    # Gestao
+    "Dashboard": "Indicadores do programa",
+    "Matrículas": "Períodos, turmas e solicitações",
+    "Períodos letivos": "Calendário e prazos do semestre",
+    "Solicitações": "Pedidos de matrícula dos alunos",
+    "Disciplinas": "Catálogo e ementários",
+    "Ofertas de disciplinas": "Turmas abertas no período",
+    "Alunos": "Cadastro e trajetória dos alunos",
+    "Validar Cadastros": "Cadastros aguardando aprovação",
+    "Setores e Comissões": "Estrutura de tramitação",
+    "Criar Comissão": "Montar uma nova comissão",
+    # Assinaturas
+    "Assinaturas": "Solicitações de assinatura",
+    "Nova solicitação": "Pedir assinatura de um documento",
+    "Pendências de assinatura": "Documentos aguardando você",
+    "Solicitações feitas": "Pedidos que você enviou",
+}
+
+
 def _menu_item(label, href, url_names, icon, children=None):
     return {
         "label": label,
+        "descricao": DESCRICOES_MENU.get(label, ""),
         "href": href,
         "url_names": url_names,
         "icon": icon,

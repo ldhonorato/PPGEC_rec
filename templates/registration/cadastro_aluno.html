@@ -1,135 +1,189 @@
-{% extends "base.html" %}
-{% load static %}
-{% block title %}Cadastro de aluno | AcadFlow{% endblock %}
-{% block content %}
-<section class="login-page">
-    <article class="card login-card">
-        <div class="login-brand">
-            <img src="{% static 'img/acadflow-logo.png' %}" alt="AcadFlow">
-            <div>
-                <h1 class="section-title">Cadastro de aluno</h1>
-                <p class="muted">Preencha seus dados para avaliação da secretaria.</p>
+{% extends "registration/base_auth.html" %}
+{% block title %}Criar cadastro | AcadFlow{% endblock %}
+
+{% block auth_largura %}auth-cartao-largo{% endblock %}
+
+{% block auth_titulo %}Criar cadastro de aluno{% endblock %}
+{% block auth_subtitulo %}
+    <p class="auth-apoio">
+        O cadastro passa por avaliação da secretaria antes de liberar o acesso.
+        Campos marcados com <span class="obrigatorio-marca">*</span> são obrigatórios.
+    </p>
+{% endblock %}
+
+{% block auth_conteudo %}
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="auth-alerta" role="alert">
+            <svg aria-hidden="true"><use href="#i-alerta"></use></svg>
+            <div>{% for erro in form.non_field_errors %}<p>{{ erro }}</p>{% endfor %}</div>
+        </div>
+    {% endif %}
+
+    {% comment %}
+    Formulario agrupado em blocos tematicos. Antes era uma sequencia unica de 14
+    campos sem separacao: o usuario nao tinha como saber onde uma etapa terminava
+    e a seguinte comecava.
+    {% endcomment %}
+
+    <fieldset class="campo-grupo">
+        <legend>Identificação</legend>
+
+        <div class="campo{% if form.nome.errors %} tem-erro{% endif %}">
+            <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }} <span class="obrigatorio-marca">*</span></label>
+            {{ form.nome }}
+            {% for erro in form.nome.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+        </div>
+
+        <div class="campo-linha">
+            <div class="campo{% if form.email.errors %} tem-erro{% endif %}">
+                <label for="{{ form.email.id_for_label }}">E-mail <span class="obrigatorio-marca">*</span></label>
+                {{ form.email }}
+                <p class="campo-ajuda">Prefira o e-mail institucional. Será seu login.</p>
+                {% for erro in form.email.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+            </div>
+            <div class="campo{% if form.cpf.errors %} tem-erro{% endif %}">
+                <label for="{{ form.cpf.id_for_label }}">{{ form.cpf.label }} <span class="obrigatorio-marca">*</span></label>
+                {{ form.cpf }}
+                {% for erro in form.cpf.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset class="campo-grupo">
+        <legend>Vínculo com o programa</legend>
+
+        <div class="campo-linha">
+            <div class="campo{% if form.nivel_curso.errors %} tem-erro{% endif %}">
+                <label for="{{ form.nivel_curso.id_for_label }}">{{ form.nivel_curso.label }} <span class="obrigatorio-marca">*</span></label>
+                {{ form.nivel_curso }}
+                {% for erro in form.nivel_curso.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+            </div>
+            <div class="campo{% if form.ingresso.errors %} tem-erro{% endif %}">
+                <label for="{{ form.ingresso.id_for_label }}">{{ form.ingresso.label }} <span class="obrigatorio-marca">*</span></label>
+                {{ form.ingresso }}
+                {% for erro in form.ingresso.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
             </div>
         </div>
 
-        <form method="post">
-            {% csrf_token %}
-            {% if form.non_field_errors %}
-                <ul class="errorlist">{{ form.non_field_errors }}</ul>
-            {% endif %}
-            <div class="field">
-                <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
-                {{ form.nome }}
-                {{ form.nome.errors }}
-            </div>
-            <div class="field">
-                <label for="{{ form.email.id_for_label }}">Email institucional, preferencialmente</label>
-                {{ form.email }}
-                {{ form.email.errors }}
-            </div>
-            <div class="field">
-                <label for="{{ form.cpf.id_for_label }}">{{ form.cpf.label }}</label>
-                {{ form.cpf }}
-                {{ form.cpf.errors }}
-            </div>
+        <div class="campo{% if form.polo_atuacao.errors %} tem-erro{% endif %}">
+            <label for="{{ form.polo_atuacao.id_for_label }}">{{ form.polo_atuacao.label }}</label>
+            {{ form.polo_atuacao }}
+            {% for erro in form.polo_atuacao.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+        </div>
+    </fieldset>
 
-            <div class="grid-two">
-                <div class="field">
-                    <label for="{{ form.nivel_curso.id_for_label }}">{{ form.nivel_curso.label }}</label>
-                    {{ form.nivel_curso }}
-                    {{ form.nivel_curso.errors }}
-                </div>
-                <div class="field">
-                    <label for="{{ form.ingresso.id_for_label }}">{{ form.ingresso.label }}</label>
-                    {{ form.ingresso }}
-                    {{ form.ingresso.errors }}
-                </div>
-            </div>
-            <div class="field">
-                <label for="{{ form.polo_atuacao.id_for_label }}">{{ form.polo_atuacao.label }}</label>
-                {{ form.polo_atuacao }}
-                {{ form.polo_atuacao.errors }}
-            </div>
-            <div class="grid-two">
-                <div class="field">
-                    <label for="{{ form.genero.id_for_label }}">
-                        {{ form.genero.label }} (opcional)
-                        <span class="field-tooltip" title="Informação opcional, coletada para fins estatísticos e tratada de forma confidencial." aria-label="Informação opcional, coletada para fins estatísticos e tratada de forma confidencial.">ⓘ</span>
-                    </label>
-                    {{ form.genero }}
-                    {{ form.genero.errors }}
-                </div>
-                <div class="field">
-                    <label for="{{ form.sexo_atribuido_nascimento.id_for_label }}">
-                        {{ form.sexo_atribuido_nascimento.label }} (opcional)
-                        <span class="field-tooltip" title="Informação opcional, coletada para fins estatísticos e tratada de forma confidencial." aria-label="Informação opcional, coletada para fins estatísticos e tratada de forma confidencial.">ⓘ</span>
-                    </label>
-                    {{ form.sexo_atribuido_nascimento }}
-                    {{ form.sexo_atribuido_nascimento.errors }}
-                </div>
-            </div>
-            <p class="muted" style="margin-top:-0.25rem;">
-                Gênero e sexo são informações opcionais, coletadas exclusivamente para fins estatísticos e tratadas de forma confidencial.
-            </p>
+    <fieldset class="campo-grupo" data-nivel-section="ORIENTACAO">
+        <legend>Orientação</legend>
 
-            <div data-nivel-section="ORIENTACAO">
-                <div class="field">
-                    <label for="{{ form.orientador.id_for_label }}">{{ form.orientador.label }}</label>
-                    {{ form.orientador }}
-                    {{ form.orientador.errors }}
+        <div class="campo{% if form.orientador.errors %} tem-erro{% endif %}">
+            <label for="{{ form.orientador.id_for_label }}">{{ form.orientador.label }}</label>
+            {{ form.orientador }}
+            {% for erro in form.orientador.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+        </div>
+
+        <div class="campo{% if form.tipo_coorientador.errors %} tem-erro{% endif %}">
+            <label for="{{ form.tipo_coorientador.id_for_label }}">{{ form.tipo_coorientador.label }}</label>
+            {{ form.tipo_coorientador }}
+            {% for erro in form.tipo_coorientador.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+        </div>
+
+        <div data-coorientador-section="CADASTRADO">
+            <div class="campo{% if form.coorientador.errors %} tem-erro{% endif %}">
+                <label for="{{ form.coorientador.id_for_label }}">{{ form.coorientador.label }}</label>
+                {{ form.coorientador }}
+                {% for erro in form.coorientador.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+            </div>
+        </div>
+
+        <div data-coorientador-section="EXTERNO">
+            <div class="campo{% if form.coorientador_externo_nome.errors %} tem-erro{% endif %}">
+                <label for="{{ form.coorientador_externo_nome.id_for_label }}">{{ form.coorientador_externo_nome.label }}</label>
+                {{ form.coorientador_externo_nome }}
+                {% for erro in form.coorientador_externo_nome.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+            </div>
+            <div class="campo-linha">
+                <div class="campo{% if form.coorientador_externo_email.errors %} tem-erro{% endif %}">
+                    <label for="{{ form.coorientador_externo_email.id_for_label }}">{{ form.coorientador_externo_email.label }}</label>
+                    {{ form.coorientador_externo_email }}
+                    {% for erro in form.coorientador_externo_email.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
                 </div>
-                <div class="field">
-                    <label for="{{ form.tipo_coorientador.id_for_label }}">{{ form.tipo_coorientador.label }}</label>
-                    {{ form.tipo_coorientador }}
-                    {{ form.tipo_coorientador.errors }}
-                </div>
-                <div data-coorientador-section="CADASTRADO">
-                    <div class="field">
-                        <label for="{{ form.coorientador.id_for_label }}">{{ form.coorientador.label }}</label>
-                        {{ form.coorientador }}
-                        {{ form.coorientador.errors }}
-                    </div>
-                </div>
-                <div data-coorientador-section="EXTERNO">
-                    <div class="field">
-                        <label for="{{ form.coorientador_externo_nome.id_for_label }}">{{ form.coorientador_externo_nome.label }}</label>
-                        {{ form.coorientador_externo_nome }}
-                        {{ form.coorientador_externo_nome.errors }}
-                    </div>
-                    <div class="field">
-                        <label for="{{ form.coorientador_externo_email.id_for_label }}">{{ form.coorientador_externo_email.label }}</label>
-                        {{ form.coorientador_externo_email }}
-                        {{ form.coorientador_externo_email.errors }}
-                    </div>
-                    <div class="field">
-                        <label for="{{ form.coorientador_externo_instituicao.id_for_label }}">{{ form.coorientador_externo_instituicao.label }}</label>
-                        {{ form.coorientador_externo_instituicao }}
-                        {{ form.coorientador_externo_instituicao.errors }}
-                    </div>
+                <div class="campo{% if form.coorientador_externo_instituicao.errors %} tem-erro{% endif %}">
+                    <label for="{{ form.coorientador_externo_instituicao.id_for_label }}">{{ form.coorientador_externo_instituicao.label }}</label>
+                    {{ form.coorientador_externo_instituicao }}
+                    {% for erro in form.coorientador_externo_instituicao.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
                 </div>
             </div>
+        </div>
+    </fieldset>
 
-            <div class="grid-two">
-                <div class="field">
-                    <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
+    <fieldset class="campo-grupo">
+        <legend>Senha de acesso</legend>
+
+        <div class="campo-linha">
+            <div class="campo{% if form.password1.errors %} tem-erro{% endif %}">
+                <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }} <span class="obrigatorio-marca">*</span></label>
+                <div class="campo-senha">
                     {{ form.password1 }}
-                    {{ form.password1.errors }}
+                    <button type="button" class="campo-senha-alternar" data-alternar-senha
+                            aria-label="Mostrar senha" aria-pressed="false">
+                        <svg aria-hidden="true"><use href="#i-olho"></use></svg>
+                    </button>
                 </div>
-                <div class="field">
-                    <label for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
-                    {{ form.password2 }}
-                    {{ form.password2.errors }}
-                </div>
+                {% if form.password1.help_text %}
+                    <div class="campo-ajuda">{{ form.password1.help_text|safe }}</div>
+                {% endif %}
+                {% for erro in form.password1.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
             </div>
+            <div class="campo{% if form.password2.errors %} tem-erro{% endif %}">
+                <label for="{{ form.password2.id_for_label }}">{{ form.password2.label }} <span class="obrigatorio-marca">*</span></label>
+                <div class="campo-senha">
+                    {{ form.password2 }}
+                    <button type="button" class="campo-senha-alternar" data-alternar-senha
+                            aria-label="Mostrar senha" aria-pressed="false">
+                        <svg aria-hidden="true"><use href="#i-olho"></use></svg>
+                    </button>
+                </div>
+                {% for erro in form.password2.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+            </div>
+        </div>
+    </fieldset>
 
-            <button type="submit" class="btn btn-full">Enviar cadastro</button>
-            <p class="form-footer-link">
-                <a href="{% url 'login' %}">Voltar para o login</a>
-            </p>
-        </form>
-    </article>
-</section>
+    <fieldset class="campo-grupo">
+        <legend>Dados estatísticos <span class="legend-opcional">opcional</span></legend>
+        <p class="campo-ajuda campo-ajuda-grupo">
+            Coletados para fins estatísticos e tratados de forma confidencial.
+            Deixar em branco não afeta seu cadastro.
+        </p>
 
+        <div class="campo-linha">
+            <div class="campo{% if form.genero.errors %} tem-erro{% endif %}">
+                <label for="{{ form.genero.id_for_label }}">{{ form.genero.label }}</label>
+                {{ form.genero }}
+                {% for erro in form.genero.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+            </div>
+            <div class="campo{% if form.sexo_atribuido_nascimento.errors %} tem-erro{% endif %}">
+                <label for="{{ form.sexo_atribuido_nascimento.id_for_label }}">{{ form.sexo_atribuido_nascimento.label }}</label>
+                {{ form.sexo_atribuido_nascimento }}
+                {% for erro in form.sexo_atribuido_nascimento.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+            </div>
+        </div>
+    </fieldset>
+
+    <button type="submit" class="btn btn-full">Enviar cadastro</button>
+</form>
+{% endblock %}
+
+{% block auth_rodape %}
+<p class="auth-secundario">
+    Já tem cadastro?
+    <a href="{% url 'login' %}">Entrar</a>
+</p>
+{% endblock %}
+
+{% block scripts %}
 <script>
     (function () {
         const nivel = document.querySelector("select[name='nivel_curso']");

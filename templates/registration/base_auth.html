@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block body_classe %}pagina-auth{% endblock %}
+
+{% comment %}
+Base das telas de acesso: login, cadastro de aluno e recuperacao de senha.
+
+Estrutura em duas colunas no desktop -- painel institucional a esquerda e
+formulario a direita -- e coluna unica no mobile, onde o painel encolhe para
+uma faixa com a marca. Antes cada tela repetia o mesmo cartao centralizado com
+a marca duplicada dentro dele, sem hierarquia entre titulo, campos e acoes.
+
+Blocos disponiveis:
+  auth_titulo     -- <h1> do formulario (obrigatorio)
+  auth_subtitulo  -- linha de apoio abaixo do titulo
+  auth_conteudo   -- formulario ou mensagem (obrigatorio)
+  auth_rodape     -- links secundarios ao pe do cartao
+  auth_largura    -- classe extra no cartao (use "auth-cartao-largo" em
+                     formularios de varias colunas, como o cadastro)
+{% endcomment %}
+
+{% block content %}
+<div class="auth-shell">
+    <aside class="auth-institucional">
+        <div class="auth-institucional-topo">
+            <img class="auth-logo" src="{% static 'img/acadflow-wordmark-branco.png' %}" alt="AcadFlow">
+            <p class="auth-programa">Programa de Pós-Graduação em Engenharia de Computação</p>
+        </div>
+
+        <div class="auth-institucional-meio">
+            <h2 class="auth-chamada">Gestão acadêmica do PPGEC em um só lugar</h2>
+            <ul class="auth-lista">
+                <li>
+                    <svg aria-hidden="true"><use href="#i-meus-processos"></use></svg>
+                    <span>Abertura e acompanhamento de processos</span>
+                </li>
+                <li>
+                    <svg aria-hidden="true"><use href="#i-matriculas"></use></svg>
+                    <span>Matrículas, disciplinas e períodos letivos</span>
+                </li>
+                <li>
+                    <svg aria-hidden="true"><use href="#i-trajetoria"></use></svg>
+                    <span>Trajetória acadêmica e integralização</span>
+                </li>
+            </ul>
+        </div>
+
+        <p class="auth-institucional-rodape">
+            <span>v{{ app_versao }}</span>
+            <span>{{ app_copyright }}</span>
+        </p>
+    </aside>
+
+    <main class="auth-formulario">
+        <div class="auth-cartao {% block auth_largura %}{% endblock %}">
+            <header class="auth-cabecalho">
+                <h1>{% block auth_titulo %}{% endblock %}</h1>
+                {% block auth_subtitulo %}{% endblock %}
+            </header>
+
+            {% block auth_conteudo %}{% endblock %}
+
+            {% block auth_rodape %}{% endblock %}
+        </div>
+
+        {% comment %}
+        No mobile o painel institucional encolhe e some, entao o aviso legal
+        precisa aparecer tambem aqui embaixo.
+        {% endcomment %}
+        <p class="auth-rodape-mobile">
+            v{{ app_versao }} · {{ app_copyright }}
+        </p>
+    </main>
+</div>
+{% endblock %}

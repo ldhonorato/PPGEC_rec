@@ -18,8 +18,11 @@
     --radius-md: 12px;
     --radius-lg: 18px;
     --radius-xl: 24px;
-    --sidebar-width: 268px;
+    --sidebar-width: 276px;
     --topbar-height: 64px;
+    /* Recuo horizontal comum a logo, rotulos de secao e itens do menu, para
+       que os tres fiquem no mesmo eixo vertical. */
+    --recuo-lateral: 10px;
 
     --font-sans: "Inter var", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     /* Escala de peso. A interface usava 800/900 em quase tudo, o que deixava
@@ -439,14 +442,14 @@ input[type="checkbox"] {
     align-items: flex-start;
     gap: 10px;
     flex: 0 0 auto;
-    padding: 0 6px 14px;
-    margin-bottom: 4px;
+    padding: 0 var(--recuo-lateral) 14px;
+    margin-bottom: 2px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .sidebar-brand {
     display: grid;
-    gap: 7px;
+    gap: 8px;
     min-width: 0;
     text-decoration: none;
     border-radius: var(--radius-sm);
@@ -457,14 +460,15 @@ input[type="checkbox"] {
     outline-offset: 4px;
 }
 
-/* A logo e escura (feita para fundo claro); o filtro a torna monocromatica
-   clara sobre o azul da barra sem precisar de um segundo arquivo. */
+/* Versao branca da marca, ja recortada. O arquivo original tem um halo
+   difuso que ocupa 78% da area -- ele empurrava a logo para dentro (quebrando
+   o alinhamento com os icones do menu) e, com filtro CSS, virava uma nevoa
+   branca sobre o azul. */
 .sidebar-brand-logo {
-    width: 148px;
+    width: 138px;
     height: auto;
     display: block;
-    filter: brightness(0) invert(1);
-    opacity: 0.95;
+    opacity: 0.96;
 }
 
 .sidebar-programa {
@@ -472,6 +476,35 @@ input[type="checkbox"] {
     font-size: 0.7rem;
     line-height: 1.4;
     letter-spacing: 0.005em;
+}
+
+/* Versao e aviso de direitos, presentes em todas as telas. Discreto por
+   padrao; a versao ganha contraste ao passar o mouse porque e o dado que
+   alguem procura de fato (para reportar um problema, por exemplo). */
+.sidebar-rodape {
+    flex: 0 0 auto;
+    display: grid;
+    gap: 1px;
+    margin: 6px 0 0;
+    padding: 10px var(--recuo-lateral) 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.38);
+    font-size: 0.67rem;
+    line-height: 1.45;
+}
+
+.sidebar-rodape a {
+    color: rgba(255, 255, 255, 0.55);
+    font-variant-numeric: tabular-nums;
+    text-decoration: none;
+    justify-self: start;
+}
+
+.sidebar-rodape a:hover,
+.sidebar-rodape a:focus-visible {
+    color: #ffffff;
+    outline: none;
+    text-decoration: underline;
 }
 
 /* Faixa rolavel. A mascara cria um esmaecimento nas bordas quando ha
@@ -500,25 +533,29 @@ input[type="checkbox"] {
     background: rgba(255, 255, 255, 0.42);
 }
 
+/* Todos os elementos da barra usam o mesmo recuo horizontal, entao a logo, os
+   rotulos de secao e os icones do menu ficam alinhados no mesmo eixo. */
 .sidebar-label {
-    margin: 16px 0 6px;
-    padding: 0 8px;
-    color: rgba(255, 255, 255, 0.55);
-    font-size: 0.68rem;
+    margin: 18px 0 6px;
+    padding: 0 var(--recuo-lateral);
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.67rem;
     font-weight: 600;
-    letter-spacing: 0.09em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
 }
 
 /* Afasta o primeiro rotulo do esmaecimento superior, senao ele nasce
    meio apagado nos perfis cujo menu nem chega a rolar. */
 .sidebar-scroll > .sidebar-label:first-child {
-    margin-top: 10px;
+    margin-top: 8px;
 }
 
+/* Folga entre itens: com 2px o realce do hover encostava na pastilha do item
+   ativo e os dois liam como um bloco unico. */
 .side-menu {
     display: grid;
-    gap: 2px;
+    gap: 6px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -529,13 +566,10 @@ input[type="checkbox"] {
     align-items: center;
     gap: 11px;
     width: 100%;
-    min-height: 40px;
-    padding: 0.42rem 0.6rem;
-    color: rgba(255, 255, 255, 0.88);
+    min-height: 42px;
+    padding: 0.4rem var(--recuo-lateral);
+    color: rgba(255, 255, 255, 0.9);
     font-family: inherit;
-    font-size: 0.875rem;
-    font-weight: 600;
-    line-height: 1.25;
     text-align: left;
     text-decoration: none;
     background: transparent;
@@ -545,15 +579,36 @@ input[type="checkbox"] {
     transition: background-color 0.14s ease, color 0.14s ease;
 }
 
-.side-label {
+.side-texto {
+    display: grid;
+    gap: 1px;
     min-width: 0;
+}
+
+.side-label {
+    font-size: 0.855rem;
+    font-weight: 560;
+    line-height: 1.3;
+}
+
+/* A descricao diz o que ha no destino sem obrigar o usuario a entrar para
+   descobrir. Fica subordinada ao rotulo: menor, mais clara e sem peso. */
+.side-descricao {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.715rem;
+    font-weight: 400;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 0.14s ease;
 }
 
 .side-icon {
     width: 19px;
     height: 19px;
     flex: 0 0 auto;
-    color: rgba(255, 255, 255, 0.62);
+    color: rgba(255, 255, 255, 0.6);
     transition: color 0.14s ease;
 }
 
@@ -584,6 +639,20 @@ input[type="checkbox"] {
 
 .side-link.is-active .side-icon {
     color: var(--color-accent-strong);
+}
+
+/* Sem isto a descricao do item ativo fica branca sobre a pastilha branca. */
+.side-link.is-active .side-descricao {
+    color: var(--color-muted);
+}
+
+.side-link:hover .side-descricao,
+.side-link:focus-visible .side-descricao {
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.side-link.is-active:hover .side-descricao {
+    color: var(--color-muted);
 }
 
 /* --- Submenus --- */
@@ -1348,44 +1417,464 @@ dialog::backdrop {
     text-decoration: none;
 }
 
-.login-page {
-    min-height: calc(100vh - 52px);
+/* ==========================================================================
+   Telas de acesso (login, cadastro, recuperacao de senha)
+   Duas colunas: painel institucional fixo e coluna do formulario. Antes eram
+   cartoes centralizados repetindo a marca dentro do proprio cartao, sem
+   hierarquia entre titulo, campos e acoes.
+   ========================================================================== */
+
+/* As telas de acesso ocupam a janela inteira, sem a caixa central e os
+   respiros que o base.html aplica ao conteudo autenticado. */
+.pagina-auth .app-shell {
+    display: block;
+}
+
+.pagina-auth .main-area {
+    padding: 0;
+}
+
+.pagina-auth .container {
+    max-width: none;
+    padding: 0;
+}
+
+.auth-shell {
     display: grid;
-    place-items: center;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    min-height: 100vh;
+    min-height: 100dvh;
 }
 
-.login-card {
-    width: min(520px, 100%);
-    padding: 2rem;
+.auth-institucional {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 2.5rem;
+    padding: 3rem 3.25rem;
+    background:
+        radial-gradient(circle at 22% 12%, rgba(88, 201, 141, 0.2), transparent 45%),
+        linear-gradient(160deg, #063a78 0%, #002b63 100%);
+    color: #ffffff;
 }
 
-.login-brand {
-    display: grid;
-    justify-items: center;
-    gap: 12px;
-    margin-bottom: 1.4rem;
-    text-align: center;
-}
-
-.login-brand img {
-    width: min(310px, 100%);
+.auth-logo {
+    width: 168px;
     height: auto;
+    display: block;
 }
 
-.form-footer-link {
-    margin: 1rem 0 0 0;
+.auth-programa {
+    max-width: 24ch;
+    margin: 0.9rem 0 0;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.auth-chamada {
+    max-width: 17ch;
+    margin: 0 0 1.75rem;
+    font-size: clamp(1.65rem, 2.4vw, 2.2rem);
+    font-weight: 650;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+.auth-lista {
+    display: grid;
+    gap: 0.85rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.auth-lista li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.88rem;
+}
+
+.auth-lista svg {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    color: var(--color-accent);
+}
+
+.auth-institucional-rodape {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 0.72rem;
+}
+
+.auth-institucional-rodape span:first-child {
+    font-variant-numeric: tabular-nums;
+}
+
+.auth-formulario {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 3rem 2rem;
+    background: var(--color-surface);
+    overflow-y: auto;
+}
+
+.auth-cartao {
+    width: min(400px, 100%);
+}
+
+.auth-cartao-largo {
+    width: min(620px, 100%);
+}
+
+.auth-cabecalho {
+    margin-bottom: 1.6rem;
+}
+
+.auth-cabecalho h1 {
+    margin: 0;
+    font-size: 1.65rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+}
+
+.auth-apoio {
+    margin: 0.45rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.885rem;
+    line-height: 1.55;
+}
+
+.auth-rodape-mobile {
+    display: none;
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.72rem;
     text-align: center;
 }
 
-.form-footer-link a {
+/* --- Campos --- */
+
+/* align-content: start impede que as linhas internas estiquem quando o campo
+   vizinho da mesma .campo-linha tem texto de ajuda -- sem isso os dois inputs
+   ficam em alturas diferentes. */
+.campo {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+    margin-bottom: 1.05rem;
+}
+
+.campo label {
+    color: var(--color-text);
+    font-size: 0.845rem;
+    font-weight: 560;
+}
+
+.campo-cabecalho {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.campo-link {
     color: var(--color-primary);
-    font-weight: 600;
+    font-size: 0.79rem;
+    font-weight: 500;
     text-decoration: none;
 }
 
-.form-footer-link a:hover,
-.form-footer-link a:focus-visible {
+.campo-link:hover,
+.campo-link:focus-visible {
     text-decoration: underline;
+}
+
+.campo input,
+.campo select,
+.campo textarea {
+    width: 100%;
+    min-height: 44px;
+    padding: 0.6rem 0.8rem;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: 0.925rem;
+    transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.campo input::placeholder {
+    color: #9aa6b8;
+}
+
+.campo input:focus,
+.campo select:focus,
+.campo textarea:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(0, 72, 154, 0.14);
+    outline: none;
+}
+
+.campo.tem-erro input,
+.campo.tem-erro select,
+.campo.tem-erro textarea {
+    border-color: var(--color-danger);
+}
+
+.campo.tem-erro input:focus,
+.campo.tem-erro select:focus {
+    box-shadow: 0 0 0 3px rgba(180, 35, 54, 0.14);
+}
+
+.campo-erro {
+    margin: 0;
+    color: var(--color-danger);
+    font-size: 0.79rem;
+}
+
+.campo-ajuda {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.775rem;
+    line-height: 1.45;
+}
+
+.campo-ajuda ul {
+    margin: 0.2rem 0 0;
+    padding-left: 1.1rem;
+}
+
+.campo-linha {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 1rem;
+}
+
+/* Botao de revelar a senha, dentro do proprio campo. */
+.campo-senha {
+    position: relative;
+}
+
+.campo-senha input {
+    padding-right: 2.9rem;
+}
+
+.campo-senha-alternar {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    color: var(--color-muted);
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.campo-senha-alternar svg {
+    width: 19px;
+    height: 19px;
+}
+
+.campo-senha-alternar:hover {
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+}
+
+.campo-senha-alternar:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
+
+/* --- Agrupamento de campos --- */
+
+.campo-grupo {
+    margin: 0 0 1.5rem;
+    padding: 0;
+    border: 0;
+}
+
+.campo-grupo legend {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 0.85rem;
+    padding: 0 0 0.5rem;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.legend-opcional {
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    font-size: 0.66rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: none;
+}
+
+.campo-ajuda-grupo {
+    margin: -0.35rem 0 0.9rem;
+}
+
+.obrigatorio-marca {
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
+/* --- Alertas e estados --- */
+
+.auth-alerta {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 1.1rem;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid #f3c6cd;
+    border-radius: var(--radius-sm);
+    background: #fff5f6;
+    color: var(--color-danger);
+    font-size: 0.855rem;
+    line-height: 1.5;
+}
+
+.auth-alerta svg {
+    width: 19px;
+    height: 19px;
+    flex: 0 0 auto;
+    margin-top: 1px;
+}
+
+.auth-alerta p {
+    margin: 0;
+}
+
+.auth-estado {
+    margin-bottom: 1.5rem;
+}
+
+.auth-estado p {
+    margin: 0 0 0.5rem;
+    line-height: 1.6;
+}
+
+.auth-estado-icone {
+    display: inline-grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+    border-radius: 50%;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+}
+
+.auth-estado-icone svg {
+    width: 24px;
+    height: 24px;
+}
+
+.auth-estado-ok .auth-estado-icone {
+    background: #e8f7ef;
+    color: var(--color-accent-strong);
+}
+
+.auth-estado-erro .auth-estado-icone {
+    background: #fff5f6;
+    color: var(--color-danger);
+}
+
+/* --- Links secundarios --- */
+
+.auth-secundario {
+    margin: 1.4rem 0 0;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.865rem;
+    text-align: center;
+}
+
+.auth-secundario a {
+    color: var(--color-primary);
+    font-weight: 560;
+    text-decoration: none;
+}
+
+.auth-secundario a:hover,
+.auth-secundario a:focus-visible {
+    text-decoration: underline;
+}
+
+.auth-voltar {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.auth-voltar svg {
+    width: 17px;
+    height: 17px;
+}
+
+@media (max-width: 900px) {
+    .auth-shell {
+        grid-template-columns: 1fr;
+        min-height: 0;
+    }
+
+    /* No mobile o painel institucional vira uma faixa de identificacao: mantem
+       a marca e o programa, dispensa a chamada e a lista de recursos. */
+    .auth-institucional {
+        gap: 0;
+        padding: 1.75rem 1.5rem 1.5rem;
+    }
+
+    .auth-institucional-meio,
+    .auth-institucional-rodape {
+        display: none;
+    }
+
+    .auth-logo {
+        width: 142px;
+    }
+
+    .auth-formulario {
+        justify-content: flex-start;
+        padding: 2rem 1.5rem 2.5rem;
+    }
+
+    .auth-rodape-mobile {
+        display: block;
+    }
+}
+
+@media (max-width: 560px) {
+    .campo-linha {
+        grid-template-columns: 1fr;
+    }
 }
 
 .badge {

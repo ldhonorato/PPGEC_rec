@@ -1,40 +1,56 @@
-{% extends "base.html" %}
-{% load static %}
-{% block title %}Login | AcadFlow{% endblock %}
-{% block content %}
-<section class="login-page">
-    <article class="card login-card">
-        <div class="login-brand">
-            <img src="{% static 'img/acadflow-logo.png' %}" alt="AcadFlow">
-            <div>
-                <h1 class="section-title">Acesso ao Sistema</h1>
-                <p class="muted">Use seu email institucional e senha.</p>
-            </div>
-        </div>
+{% extends "registration/base_auth.html" %}
+{% block title %}Entrar | AcadFlow{% endblock %}
 
-        <form method="post">
-            {% csrf_token %}
-            {% if form.non_field_errors %}
-                <ul class="errorlist">{{ form.non_field_errors }}</ul>
-            {% endif %}
-            <div class="field">
-                <label for="{{ form.username.id_for_label }}">Email</label>
-                {{ form.username }}
-                {{ form.username.errors }}
-            </div>
-            <div class="field">
-                <label for="{{ form.password.id_for_label }}">Senha</label>
-                {{ form.password }}
-                {{ form.password.errors }}
-            </div>
-            <button type="submit" class="btn btn-full">Entrar</button>
-            <p class="form-footer-link">
-                <a href="{% url 'password_reset' %}">Esqueci minha senha</a>
-            </p>
-            <p class="form-footer-link">
-                <a href="{% url 'cadastro_aluno' %}">Criar cadastro de aluno</a>
-            </p>
-        </form>
-    </article>
-</section>
+{% block auth_titulo %}Entrar{% endblock %}
+{% block auth_subtitulo %}
+    <p class="auth-apoio">Use seu e-mail institucional e senha.</p>
+{% endblock %}
+
+{% block auth_conteudo %}
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="auth-alerta" role="alert">
+            <svg aria-hidden="true"><use href="#i-alerta"></use></svg>
+            <div>{% for erro in form.non_field_errors %}<p>{{ erro }}</p>{% endfor %}</div>
+        </div>
+    {% endif %}
+
+    <div class="campo{% if form.username.errors %} tem-erro{% endif %}">
+        <label for="{{ form.username.id_for_label }}">E-mail</label>
+        <input type="email" name="{{ form.username.html_name }}"
+               id="{{ form.username.id_for_label }}"
+               value="{{ form.username.value|default:'' }}"
+               autocomplete="username" inputmode="email" spellcheck="false"
+               placeholder="nome@upe.br" required autofocus>
+        {% for erro in form.username.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+    </div>
+
+    <div class="campo{% if form.password.errors %} tem-erro{% endif %}">
+        <div class="campo-cabecalho">
+            <label for="{{ form.password.id_for_label }}">Senha</label>
+            <a class="campo-link" href="{% url 'password_reset' %}">Esqueci minha senha</a>
+        </div>
+        <div class="campo-senha">
+            <input type="password" name="{{ form.password.html_name }}"
+                   id="{{ form.password.id_for_label }}"
+                   autocomplete="current-password" required>
+            <button type="button" class="campo-senha-alternar" data-alternar-senha
+                    aria-label="Mostrar senha" aria-pressed="false">
+                <svg aria-hidden="true"><use href="#i-olho"></use></svg>
+            </button>
+        </div>
+        {% for erro in form.password.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+    </div>
+
+    <button type="submit" class="btn btn-full">Entrar</button>
+</form>
+{% endblock %}
+
+{% block auth_rodape %}
+<p class="auth-secundario">
+    Ainda não tem cadastro?
+    <a href="{% url 'cadastro_aluno' %}">Criar cadastro de aluno</a>
+</p>
 {% endblock %}
