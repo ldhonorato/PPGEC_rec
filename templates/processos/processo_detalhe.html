@@ -1,32 +1,88 @@
 {% extends "base.html" %}
+{% load acadflow %}
 {% block title %}Processo {{ processo.numero }}{% endblock %}
 {% block content %}
+{% comment %}
+Cabecalho do processo.
+
+Antes eram onze paragrafos "Rotulo: valor" empilhados, todos com o mesmo
+peso e o mesmo estilo inline -- o assunto do processo, que e o que
+identifica de que se trata, aparecia como o segundo de onze itens iguais.
+
+Agora o assunto e o titulo, o numero e o status ficam junto dele, e os
+demais dados viram uma grade rotulada. Quem abre a tela quer saber, nesta
+ordem: do que se trata, em que pe esta, com quem esta e ate quando.
+{% endcomment %}
 <section class="card">
-    <h1 class="section-title">Processo {{ processo.numero }}</h1>
-    <p style="margin: 0.35rem 0;"><strong>Assunto:</strong> {{ processo.assunto }}</p>
-    <p style="margin: 0.35rem 0;"><strong>Tipo:</strong> {{ processo.get_tipo_display }}</p>
-    <p style="margin: 0.35rem 0;"><strong>Status:</strong> {{ processo.get_status_display }}</p>
-    <p style="margin: 0.35rem 0;"><strong>Setor atual:</strong> {{ processo.setor_atual.nome }}</p>
-    <p style="margin: 0.35rem 0;">
-        <strong>Prazo limite:</strong> {{ processo.prazo_limite|date:"d/m/Y"|default:"-" }}
-        {% if processo.esta_atrasado %}<span class="badge badge-no">Atrasado</span>{% endif %}
-    </p>
-    <p style="margin: 0.35rem 0;"><strong>Criado por:</strong> {{ processo.usuario_criado_por.nome }} ({{ processo.usuario_criado_por.email }})</p>
-    <p style="margin: 0.35rem 0;"><strong>Criado em:</strong> {{ processo.data_criacao|date:"d/m/Y H:i" }}</p>
-    <p style="margin: 0.35rem 0;"><strong>Última atualização:</strong> {{ processo.atualizado_em|date:"d/m/Y H:i" }}</p>
-    {% if processo.finalizado_em %}
-        <p style="margin: 0.35rem 0;"><strong>Finalizado em:</strong> {{ processo.finalizado_em|date:"d/m/Y H:i" }}</p>
-        {% if processo.termo_finalizacao %}
-            <p style="margin: 0.35rem 0;"><strong>Termo de finalização:</strong> {{ processo.termo_finalizacao }}</p>
-        {% endif %}
-    {% endif %}
-    {% if processo.observacoes_internas %}
-        <p style="margin: 0.35rem 0;"><strong>Observações internas:</strong> {{ processo.observacoes_internas }}</p>
-    {% endif %}
-    <div style="margin-top: 0.8rem;">
-        <strong>Descrição</strong>
-        <p style="margin: 0.4rem 0 0 0; white-space: pre-wrap;">{{ processo.descricao }}</p>
+    <div class="processo-cabecalho">
+        <div>
+            <h1 class="section-title">{{ processo.assunto }}</h1>
+            <p class="processo-identificacao">
+                <span class="celula-numero">{{ processo.numero }}</span>
+                <span>·</span>
+                <span>{{ processo.get_tipo_display }}</span>
+            </p>
+        </div>
+        <span class="badge badge-{{ processo.status|status_processo_tom }}">{{ processo.get_status_display }}</span>
     </div>
+
+    <dl class="dados-grid">
+        <div>
+            <dt>Setor atual</dt>
+            <dd>{{ processo.setor_atual.nome|default:"—" }}</dd>
+        </div>
+        <div{% if processo.esta_atrasado %} class="dado-alerta"{% endif %}>
+            <dt>Prazo limite</dt>
+            <dd>
+                {{ processo.prazo_limite|date:"d/m/Y"|default:"—" }}
+                {% if processo.esta_atrasado %}<span class="dado-nota">Atrasado</span>{% endif %}
+            </dd>
+        </div>
+        <div>
+            <dt>Requerente</dt>
+            <dd>
+                {{ processo.usuario_criado_por.nome }}
+                <span class="dado-nota">{{ processo.usuario_criado_por.email }}</span>
+            </dd>
+        </div>
+        <div>
+            <dt>Aberto em</dt>
+            <dd>{{ processo.data_criacao|date:"d/m/Y H:i" }}</dd>
+        </div>
+        <div>
+            <dt>Última atualização</dt>
+            <dd>{{ processo.atualizado_em|date:"d/m/Y H:i" }}</dd>
+        </div>
+        {% if processo.finalizado_em %}
+            <div>
+                <dt>Finalizado em</dt>
+                <dd>{{ processo.finalizado_em|date:"d/m/Y H:i" }}</dd>
+            </div>
+        {% endif %}
+    </dl>
+
+    <div class="processo-texto">
+        <h2 class="section-title">Descrição</h2>
+        <p>{{ processo.descricao }}</p>
+    </div>
+
+    {% if processo.termo_finalizacao %}
+        <div class="processo-texto">
+            <h2 class="section-title">Termo de finalização</h2>
+            <p>{{ processo.termo_finalizacao }}</p>
+        </div>
+    {% endif %}
+
+    {% comment %}
+    Observacoes internas nao sao do requerente: sao anotacoes da secretaria.
+    Ficavam misturadas aos demais dados, sem indicar que tem outro publico.
+    {% endcomment %}
+    {% if processo.observacoes_internas %}
+        <div class="processo-texto processo-interno">
+            <h2 class="section-title">Observações internas</h2>
+            <p>{{ processo.observacoes_internas }}</p>
+        </div>
+    {% endif %}
 </section>
 
 {% if solicitacoes_banca_display %}
@@ -161,29 +217,37 @@
 
 {% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo or can_registrar_horas_complementares %}
 <section class="card">
-    <h2 class="section-title">Acoes</h2>
-    <div style="display: flex; gap: 0.7rem; flex-wrap: wrap;">
-        {% if can_registrar_horas_complementares %}
-            <button type="button" class="btn" id="btn-abrir-modal-horas">Registrar horas complementares</button>
-        {% endif %}
-        {% if can_add_documento %}
-            <button type="button" class="btn" id="btn-abrir-modal-documento">Adicionar documento</button>
-        {% endif %}
+    <h2 class="section-title">Ações</h2>
+    {% comment %}
+    Hierarquia das acoes: encaminhar (ou devolver) e o que faz o processo
+    andar, entao e a unica em destaque. As demais ficam secundarias, e
+    finalizar -- que encerra o processo e nao tem volta -- se separa das
+    outras por uma divisoria, para nao ser clicada por engano ao lado das
+    acoes do dia a dia. Antes as cinco tinham o mesmo peso visual.
+    {% endcomment %}
+    <div class="acoes-processo">
         {% if can_encaminhar_processo %}
             {% if can_manage_requerente %}
-                <button type="button" class="btn" id="btn-abrir-modal-encaminhar">Devolver processo</button>
+                <button type="button" class="btn" id="btn-abrir-modal-encaminhar">Devolver ao requerente</button>
             {% else %}
                 <button type="button" class="btn" id="btn-abrir-modal-encaminhar">Encaminhar processo</button>
             {% endif %}
         {% endif %}
-        {% if can_solicitar_ciente %}
-            <button type="button" class="btn" id="btn-abrir-modal-ciente">Solicitar ciente do orientador</button>
-        {% endif %}
         {% if can_manifestar_ciente %}
             <button type="button" class="btn" id="btn-abrir-modal-ciente">Manifestar ciente do orientador</button>
         {% endif %}
+        {% if can_solicitar_ciente %}
+            <button type="button" class="btn btn-secondary" id="btn-abrir-modal-ciente">Solicitar ciente do orientador</button>
+        {% endif %}
+        {% if can_add_documento %}
+            <button type="button" class="btn btn-secondary" id="btn-abrir-modal-documento">Adicionar documento</button>
+        {% endif %}
+        {% if can_registrar_horas_complementares %}
+            <button type="button" class="btn btn-secondary" id="btn-abrir-modal-horas">Registrar horas complementares</button>
+        {% endif %}
         {% if can_finalizar_processo %}
-            <button type="button" class="btn btn-secondary" id="btn-abrir-modal-finalizar">Finalizar processo</button>
+            <span class="acoes-divisoria" aria-hidden="true"></span>
+            <button type="button" class="btn btn-encerrar" id="btn-abrir-modal-finalizar">Finalizar processo</button>
         {% endif %}
     </div>
 </section>
@@ -478,7 +542,11 @@
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Não há documentos vinculados.</p>
+        <div class="estado-vazio">
+            <svg aria-hidden="true"><use href="#i-meus-processos"></use></svg>
+            <p class="estado-vazio-titulo">Nenhum documento anexado</p>
+            <p>Anexos enviados pelo requerente ou pela secretaria aparecem aqui.</p>
+        </div>
     {% endif %}
 </section>
 
@@ -522,43 +590,46 @@
 
 <section class="card">
     <h2 class="section-title">Histórico do processo</h2>
-    <ul class="list">
-        <li>
-            <strong>Abertura do processo</strong><br>
-            <small class="muted">
-                Data: {{ processo.data_criacao|date:"d/m/Y H:i" }} |
-                Criado por: {{ processo.usuario_criado_por.nome }} |
-                Status inicial: {{ processo.get_status_inicial_display|default:"-" }}
-            </small>
-        </li>
+    {% comment %}
+    Linha do tempo. Antes cada evento era uma frase com pipes ("Data: X |
+    Criado por: Y | Status inicial: Z"), sem indicar sequencia -- em um
+    processo que tramita entre setores, a ordem e justamente o que se quer ler.
+    {% endcomment %}
+    <ol class="linha-tempo">
         {% for tramitacao in tramitacoes_historico %}
             <li>
-                <strong>Tramitação em {{ tramitacao.data_encaminhamento|date:"d/m/Y H:i" }}</strong><br>
-                <small class="muted">
-                    De: {% if tramitacao.setor_origem %}{{ tramitacao.setor_origem.nome }}{% else %}-{% endif %} |
-                    Para: {{ tramitacao.setor_destino.nome }} |
-                    Por: {{ tramitacao.encaminhado_por.nome }}
-                    {% if tramitacao.status_resultante %}| Status resultante: {{ tramitacao.get_status_resultante_display }}{% endif %}
-                </small>
-                {% if tramitacao.observacao %}
-                    <p style="margin: 0.4rem 0 0 0;">{{ tramitacao.observacao }}</p>
-                {% endif %}
-            </li>
-        {% empty %}
-            <li>
-                <small class="muted">Ainda não há tramitações registradas.</small>
+                <div class="linha-tempo-marca" aria-hidden="true"></div>
+                <div class="linha-tempo-conteudo">
+                    <p class="linha-tempo-titulo">
+                        {{ tramitacao.setor_origem.nome|default:"Requerente" }}
+                        <svg class="linha-tempo-seta" aria-hidden="true"><use href="#i-avancar"></use></svg>
+                        {{ tramitacao.setor_destino.nome }}
+                    </p>
+                    <p class="linha-tempo-meta">
+                        {{ tramitacao.data_encaminhamento|date:"d/m/Y H:i" }} · por {{ tramitacao.encaminhado_por.nome }}
+                        {% if tramitacao.status_resultante %}
+                            · <span class="badge badge-{{ tramitacao.status_resultante|status_processo_tom }}">{{ tramitacao.get_status_resultante_display }}</span>
+                        {% endif %}
+                    </p>
+                    {% if tramitacao.observacao %}
+                        <p class="linha-tempo-observacao">{{ tramitacao.observacao }}</p>
+                    {% endif %}
+                </div>
             </li>
         {% endfor %}
-        {% if processo.finalizado_em %}
-            <li>
-                <strong>Finalização em {{ processo.finalizado_em|date:"d/m/Y H:i" }}</strong><br>
-                <small class="muted">Status final: {{ processo.get_status_display }}</small>
-                {% if processo.termo_finalizacao %}
-                    <p style="margin: 0.4rem 0 0 0; white-space: pre-wrap;">{{ processo.termo_finalizacao }}</p>
-                {% endif %}
-            </li>
-        {% endif %}
-    </ul>
+        <li>
+            <div class="linha-tempo-marca is-inicio" aria-hidden="true"></div>
+            <div class="linha-tempo-conteudo">
+                <p class="linha-tempo-titulo">Processo aberto</p>
+                <p class="linha-tempo-meta">
+                    {{ processo.data_criacao|date:"d/m/Y H:i" }} · por {{ processo.usuario_criado_por.nome }}
+                    {% if processo.status_inicial %}
+                        · <span class="badge badge-{{ processo.status_inicial|status_processo_tom }}">{{ processo.get_status_inicial_display }}</span>
+                    {% endif %}
+                </p>
+            </div>
+        </li>
+    </ol>
 </section>
 {% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo or can_registrar_horas_complementares %}
 <dialog id="modal-remocao-arquivo" class="modal-dialog">

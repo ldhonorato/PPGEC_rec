@@ -2593,6 +2593,205 @@ dialog::backdrop {
     font-variant-numeric: tabular-nums;
 }
 
+/* Cabecalho de registro: titulo, identificacao e situacao na mesma faixa. */
+.processo-cabecalho {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--espaco-4);
+    flex-wrap: wrap;
+    margin-bottom: var(--espaco-4);
+}
+
+.processo-cabecalho h1 {
+    margin: 0;
+}
+
+.processo-identificacao {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.3rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.86rem;
+}
+
+/* Grade de dados rotulados. Substitui sequencias de "<strong>Rotulo:</strong>
+   valor" empilhadas: em coluna unica, onze linhas iguais nao tem hierarquia e
+   obrigam a ler tudo para achar um dado. */
+.dados-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: var(--espaco-4) var(--espaco-5);
+    margin: 0 0 var(--espaco-5);
+    padding-bottom: var(--espaco-4);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.dados-grid dt {
+    color: var(--color-muted);
+    font-size: 0.73rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.dados-grid dd {
+    margin: 0.2rem 0 0;
+    font-size: 0.92rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.dados-grid .dado-nota {
+    display: block;
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    font-weight: 400;
+    font-variant-numeric: normal;
+}
+
+.dados-grid .dado-alerta dd {
+    color: var(--color-danger);
+}
+
+.dados-grid .dado-alerta .dado-nota {
+    color: var(--color-danger);
+}
+
+/* Bloco de texto corrido dentro do registro (descricao, termo, observacoes).
+   pre-wrap preserva as quebras que o requerente digitou. */
+.processo-texto + .processo-texto {
+    margin-top: var(--espaco-5);
+}
+
+.processo-texto p {
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+/* Anotacao de uso interno: nao e do requerente, e da secretaria. Ficava
+   misturada aos demais dados, sem indicar que tem outro publico. */
+.processo-interno {
+    padding: var(--espaco-4);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-soft);
+    border: 1px dashed var(--color-border);
+}
+
+/* Linha do tempo de tramitacao.
+
+   Cada evento era uma frase com pipes, sem indicar sequencia. Num processo
+   que anda entre setores, a ordem e justamente o que se quer ler -- o fio
+   vertical e as marcas dao essa leitura de relance. Ordem decrescente: o
+   ultimo movimento no topo, que e onde o processo esta agora. */
+.linha-tempo {
+    display: grid;
+    gap: var(--espaco-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.linha-tempo li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr);
+    gap: var(--espaco-4);
+}
+
+/* O fio liga uma marca a seguinte; o ultimo item nao tem proximo. */
+.linha-tempo li:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 16px;
+    bottom: calc(-1 * var(--espaco-5));
+    width: 1px;
+    background: var(--color-border);
+}
+
+.linha-tempo-marca {
+    width: 11px;
+    height: 11px;
+    margin-top: 5px;
+    border-radius: 50%;
+    border: 2px solid var(--color-primary);
+    background: var(--color-surface);
+}
+
+/* A abertura do processo fecha a linha: marca preenchida, nao vazada. */
+.linha-tempo-marca.is-inicio {
+    background: var(--color-primary);
+}
+
+.linha-tempo-titulo {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin: 0;
+    font-size: 0.93rem;
+    font-weight: 560;
+}
+
+.linha-tempo-seta {
+    width: 15px;
+    height: 15px;
+    color: var(--color-muted);
+}
+
+.linha-tempo-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin: 0.25rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.81rem;
+}
+
+.linha-tempo-observacao {
+    margin: 0.5rem 0 0;
+    padding: 0.55rem 0.75rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-soft);
+    font-size: 0.87rem;
+    white-space: pre-wrap;
+}
+
+/* Fileira de acoes do processo. */
+.acoes-processo {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.acoes-divisoria {
+    width: 1px;
+    height: 26px;
+    margin: 0 0.35rem;
+    background: var(--color-border);
+}
+
+/* Acao que encerra o processo. Nao e destrutiva a ponto de pedir vermelho
+   cheio, mas nao pode parecer mais uma acao do dia a dia: fica em contorno,
+   depois da divisoria. */
+.btn-encerrar {
+    color: var(--color-danger);
+    background: transparent;
+    border-color: #f3c6cd;
+    box-shadow: none;
+}
+
+.btn-encerrar:hover,
+.btn-encerrar:focus-visible {
+    color: var(--color-danger);
+    background: #fff5f6;
+    border-color: var(--color-danger);
+}
+
 /* Barra de progresso. Estava escrita em style inline dentro do template. */
 /* Progresso geral da integralizacao, no cabecalho do checklist. */
 .resumo-destaque dd {
