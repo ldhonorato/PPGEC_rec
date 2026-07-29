@@ -155,11 +155,28 @@ def _menu_item(label, href, url_names, icon, children=None):
 def _menu_lateral_sections(user):
     sections = []
 
+    # Telas de detalhe (um processo, um aluno) nao tem entrada propria no menu: sao
+    # destinos de uma listagem. Sem declarar o url_name na listagem que leva ate elas,
+    # abrir um processo apagava a barra inteira -- nenhum item ficava marcado e o
+    # usuario perdia a referencia de onde estava.
+    #
+    # Cada detalhe pertence a UM item por perfil, senao dois acendem ao mesmo tempo.
+    # Quem tem gestao chega no processo/aluno pelas listagens da Coordenacao; quem nao
+    # tem, chega pelas telas pessoais. O criterio abaixo divide por esse acesso.
+    tem_gestao = _has_gestao_access(user)
+
     # Inicio abre a secao em todos os perfis. Antes so se chegava a tela inicial
     # clicando na logo da barra superior, o que nao e um destino obvio.
     principal_items = [_menu_item("Início", "/", ["home"], "inicio")]
     if user.tipo_usuario != User.TipoUsuario.SERVIDOR:
-        principal_items.append(_menu_item("Meus Processos", "/menu/meus-processos/", ["menu_meus_processos"], "meus-processos"))
+        principal_items.append(
+            _menu_item(
+                "Meus Processos",
+                "/menu/meus-processos/",
+                ["menu_meus_processos"] if tem_gestao else ["menu_meus_processos", "processo_detalhe"],
+                "meus-processos",
+            )
+        )
         if _can_add_processo(user):
             principal_items.append(_menu_item("Novo Processo", "/processos/novo/", ["novo_processo"], "novo-processo"))
     if user.tipo_usuario == User.TipoUsuario.ALUNO:
@@ -216,7 +233,9 @@ def _menu_lateral_sections(user):
             _menu_item(
                 "Assinaturas",
                 "/assinaturas/pendentes/",
-                ["pendencias_assinatura", "solicitacao_assinatura_detalhe"],
+                # solicitacoes_assinatura (/assinaturas/) tambem responde para quem
+                # so tem acesso de assinatura, e nao acendia item nenhum.
+                ["pendencias_assinatura", "solicitacoes_assinatura", "solicitacao_assinatura_detalhe"],
                 "assinaturas",
             )
         )
@@ -227,7 +246,14 @@ def _menu_lateral_sections(user):
         docente_items = [
             _menu_item("Ofertas de Disciplinas", "/gestao/matriculas/ofertas/", ["matriculas_ofertas"], "ofertas"),
             _menu_item("Ciências", "/menu/ciencias-manifestadas/", ["menu_ciencias_manifestadas"], "ciencias"),
-            _menu_item("Meus Orientandos", "/menu/meus-orientandos/", ["menu_meus_orientandos"], "orientandos"),
+            _menu_item(
+                "Meus Orientandos",
+                "/menu/meus-orientandos/",
+                # O orientador passou a poder abrir a trajetoria do orientando; sem
+                # aluno_detalhe aqui, essa tela nao acendia nada para o docente.
+                ["menu_meus_orientandos"] if tem_gestao else ["menu_meus_orientandos", "aluno_detalhe"],
+                "orientandos",
+            ),
             _menu_item(
                 "Solicitação de Banca",
                 "/bancas/",
@@ -266,7 +292,7 @@ def _menu_lateral_sections(user):
             _menu_item(
                 "Processos",
                 "/coordenacao/processos/",
-                ["coordenacao_processos"],
+                ["coordenacao_processos", "processo_detalhe"],
                 "todos-processos",
             ),
             _menu_item("Dashboard", "/coordenacao/dashboard/", ["coordenacao_dashboard"], "dashboard"),
@@ -280,6 +306,7 @@ def _menu_lateral_sections(user):
                     "matriculas_ofertas",
                     "matricula_oferta_alunos",
                     "matricula_oferta_exportar",
+                    "matricula_oferta_planejamento_presencial",
                 ],
                 "matriculas",
                 children=[
@@ -294,7 +321,12 @@ def _menu_lateral_sections(user):
                     _menu_item(
                         "Ofertas de disciplinas",
                         "/gestao/matriculas/ofertas/",
-                        ["matriculas_ofertas", "matricula_oferta_alunos", "matricula_oferta_exportar"],
+                        [
+                            "matriculas_ofertas",
+                            "matricula_oferta_alunos",
+                            "matricula_oferta_exportar",
+                            "matricula_oferta_planejamento_presencial",
+                        ],
                         "ofertas",
                     ),
                 ],

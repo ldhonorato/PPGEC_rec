@@ -3147,6 +3147,14 @@ def aluno_detalhe_view(request, aluno_id):
         "processos/aluno_detalhe.html",
         {
             "aluno": aluno,
+            # A mesma tela atende tres leitores com expectativas diferentes: o
+            # proprio aluno (que a acessa como "Minha Trajetoria"), o orientador
+            # e a coordenacao. Sem saber quem esta lendo, o template tratava
+            # todos como coordenacao -- o aluno via o proprio nome como se fosse
+            # uma ficha de terceiro, com titulo "Aluno | Coordenacao" na aba e um
+            # "Voltar para alunos" que leva a uma listagem proibida para ele.
+            "is_self_aluno": is_self_aluno,
+            "is_orientador_do_aluno": is_orientador_do_aluno,
             "trajetoria_atual": trajetoria_atual,
             "trajetoria_cards": trajetoria_cards,
             "processos_aluno": processos_aluno,

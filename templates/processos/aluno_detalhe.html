@@ -1,109 +1,81 @@
 {% extends "base.html" %}
-{% block title %}Aluno | Coordenação{% endblock %}
+{% block title %}{% if is_self_aluno %}Minha Trajetória{% else %}{{ aluno.nome }} | Alunos{% endif %}{% endblock %}
 {% block content %}
-<style>
-    .aluno-kv { margin: 0.45rem 0; }
-    .info-list {
-        margin: 0.65rem 0 0 0;
-        padding: 0;
-        list-style: none;
-        display: grid;
-        gap: 0.35rem;
-    }
-    .info-list li {
-        display: grid;
-        grid-template-columns: 185px minmax(0, 1fr) auto;
-        gap: 0.7rem;
-        align-items: center;
-    }
-    .info-label {
-        color: var(--color-muted);
-        font-weight: 800;
-    }
-    .section-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.7rem;
-        flex-wrap: wrap;
-        margin-bottom: 0.65rem;
-    }
-    .modal-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(8, 20, 38, 0.48);
-        display: none;
-        align-items: center;
-        justify-content: center;
-        z-index: 50;
-        padding: 1rem;
-    }
-    .modal-backdrop.open { display: flex; }
-    .modal-card {
-        width: min(720px, 96vw);
-        max-height: 92vh;
-        overflow: auto;
-        background: #ffffff;
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-lg);
-        padding: 1rem;
-        box-shadow: var(--shadow-card);
-    }
-    .modal-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.6rem;
-        margin-bottom: 0.7rem;
-    }
-    .modal-close {
-        border: 1px solid var(--color-border);
-        background: #ffffff;
-        border-radius: var(--radius-sm);
-        padding: 0.35rem 0.55rem;
-        cursor: pointer;
-    }
-    @media (max-width: 900px) {
-        .info-list li { grid-template-columns: 1fr; gap: 0.1rem; }
-    }
-</style>
+{% comment %}
+Cabecalho da ficha do aluno.
 
+Antes: um h1 com o nome, dois paragrafos "Rotulo: valor" soltos (email e
+matricula) e uma lista de quatro itens com rotulo em negrito -- tres formatos
+diferentes para o mesmo tipo de informacao, na mesma caixa. O nome do proprio
+aluno logado aparecia como cabecalho de uma ficha de terceiro.
+
+Agora: o nome e o titulo, o nivel e o status da trajetoria ativa ficam junto
+dele (e o que identifica em que ponto do curso a pessoa esta), e o resto vira
+a mesma grade rotulada das demais telas de detalhe.
+{% endcomment %}
 <section>
         <section id="dados-aluno" class="card">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
-                <h1 class="section-title" style="margin-bottom: 0;">{{ aluno.nome }}</h1>
-                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    {% if can_manage_aluno %}
-                        {% if aluno.status_aluno == "EM_AVALIACAO" %}
-                            <form method="post" style="margin:0;">
-                                {% csrf_token %}
-                                <input type="hidden" name="acao" value="aprovar_cadastro">
-                                <button type="submit" class="btn">Aprovar Cadastro</button>
-                            </form>
-                        {% endif %}
-                        <button type="button" class="btn btn-secondary" data-modal-open="modal-dados">Alterar dados</button>
-                        <a class="btn btn-secondary" href="{% url 'coordenacao_alunos' %}">Voltar para alunos</a>
-                    {% endif %}
+            <div class="processo-cabecalho">
+                <div>
+                    <h1 class="section-title">{% if is_self_aluno %}Minha trajetória{% else %}{{ aluno.nome }}{% endif %}</h1>
+                    <p class="processo-identificacao">
+                        {% if aluno.matricula %}<span class="celula-numero">{{ aluno.matricula }}</span><span>·</span>{% endif %}
+                        <span>{% if trajetoria_atual %}{{ trajetoria_atual.get_nivel_curso_display }}{% else %}Sem trajetória ativa{% endif %}</span>
+                    </p>
                 </div>
+                {% if trajetoria_atual %}
+                    <span class="badge badge-info">{{ trajetoria_atual.get_status_display }}</span>
+                {% endif %}
             </div>
-            <p class="aluno-kv"><strong>Email:</strong> {{ aluno.email }}</p>
-            <p class="aluno-kv"><strong>Matrícula:</strong> {{ aluno.matricula|default:"-" }}</p>
-            {% if trajetoria_atual %}
-                <ul class="info-list">
-                    <li><span class="info-label">Status da trajetória ativa</span><span><span class="badge badge-info">{{ trajetoria_atual.get_status_display }}</span></span></li>
-                    <li><span class="info-label">Trajetória ativa</span><span>{{ trajetoria_atual.get_nivel_curso_display }}</span></li>
-                    <li><span class="info-label">Ingresso</span><span>{{ trajetoria_atual.ingresso|default:"-" }}</span></li>
-                    <li><span class="info-label">Orientador</span><span>{% if trajetoria_atual.orientador %}{{ trajetoria_atual.orientador.nome }}{% else %}-{% endif %}</span></li>
-                </ul>
-            {% else %}
-                <p class="muted">Este aluno ainda não possui trajetória acadêmica ativa.</p>
+
+            <dl class="dados-grid">
+                {% if not is_self_aluno %}<div><dt>Nome</dt><dd>{{ aluno.nome }}</dd></div>{% endif %}
+                <div><dt>E-mail</dt><dd>{{ aluno.email }}</dd></div>
+                <div><dt>Matrícula</dt><dd>{{ aluno.matricula|default:"—" }}</dd></div>
+                {% if trajetoria_atual %}
+                    <div><dt>Ingresso</dt><dd>{{ trajetoria_atual.ingresso|default:"—" }}</dd></div>
+                    <div><dt>Orientador</dt><dd>{{ trajetoria_atual.orientador.nome|default:"—" }}</dd></div>
+                {% endif %}
+            </dl>
+
+            {% if not trajetoria_atual %}
+                <p class="muted">
+                    {% if is_self_aluno %}
+                        Você ainda não possui trajetória acadêmica ativa. A coordenação cadastra a trajetória após a validação do seu vínculo.
+                    {% else %}
+                        Este aluno ainda não possui trajetória acadêmica ativa.
+                    {% endif %}
+                </p>
+            {% endif %}
+
+            {% if can_manage_aluno %}
+                <div class="acoes-cabecalho">
+                    {% if aluno.status_aluno == "EM_AVALIACAO" %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="aprovar_cadastro">
+                            <button type="submit" class="btn">Aprovar cadastro</button>
+                        </form>
+                    {% endif %}
+                    <button type="button" class="btn btn-secondary" data-modal-open="modal-dados">Alterar dados</button>
+                    <a class="btn btn-secondary" href="{% url 'coordenacao_alunos' %}">Voltar para alunos</a>
+                </div>
+            {% elif is_orientador_do_aluno %}
+                {% comment %}
+                O orientador entra por "Meus Orientandos" e le sem editar. Sem este
+                link ele ficava sem volta: o "Voltar para alunos" so existe para a
+                coordenacao, e a listagem dele e outra.
+                {% endcomment %}
+                <div class="acoes-cabecalho">
+                    <a class="btn btn-secondary" href="{% url 'menu_meus_orientandos' %}">Voltar para orientandos</a>
+                </div>
             {% endif %}
         </section>
 
         <section id="trajetorias-academicas" class="card">
-            <div class="section-head">
-                <h2 class="section-title" style="margin:0;">Trajetórias acadêmicas</h2>
-                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <div class="secao-cabecalho">
+                <h2 class="section-title">Trajetórias acadêmicas</h2>
+                <div class="grupo-acoes">
                     {% if can_manage_aluno %}
                         <button type="button" class="btn" data-modal-open="modal-nova-trajetoria">Nova trajetória</button>
                     {% endif %}
@@ -114,18 +86,26 @@
                     {% for card in trajetoria_cards %}
                         {% with trajetoria=card.obj %}
                         <li>
-                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
-                                <div>
+                            <div class="secao-cabecalho">
+                                <div class="trajetoria-titulo">
                                     <strong>{{ trajetoria.get_nivel_curso_display }}</strong>
                                     <span class="badge badge-info">{{ trajetoria.get_status_display }}</span>
                                 </div>
                                 {% if can_manage_aluno %}
-                                    <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-status-{{ trajetoria.id }}">Editar status</button>
+                                    <div class="grupo-acoes">
+                                        <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-status-{{ trajetoria.id }}">Alterar status</button>
+                                        <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-nivel-{{ trajetoria.id }}">Alterar nível</button>
+                                    </div>
                                 {% endif %}
                             </div>
-                            <ul class="info-list">
-                                <li><span class="info-label">Nível</span><span>{{ trajetoria.get_nivel_curso_display }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-nivel-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                <li><span class="info-label">Ingresso</span><span>{{ trajetoria.ingresso|default:"-" }}</span><span></span></li>
+                            {% comment %}
+                            "Nivel" saiu da lista: o titulo do cartao ja e o nivel, e a
+                            linha repetia o mesmo valor logo abaixo dele. O botao que
+                            estava nessa linha subiu para o cabecalho, junto do status --
+                            os dois alteram o que identifica a trajetoria.
+                            {% endcomment %}
+                            <ul class="info-list info-list-editavel">
+                                <li><span class="info-label">Ingresso</span><span>{{ trajetoria.ingresso|default:"—" }}</span><span></span></li>
                                 <li>
                                     <span class="info-label">Estágios de docência</span>
                                     <span>
@@ -133,14 +113,20 @@
                                             {% if ultimo %}
                                                 <span class="badge badge-info">{{ ultimo.get_status_display }}</span>
                                             {% else %}
-                                                <span class="muted">Nenhum estágio cadastrado</span>
+                                                <span class="muted">Nenhum cadastrado</span>
                                             {% endif %}
                                         {% endwith %}
                                     </span>
-
-                                    <div style="display:flex; gap:0.5rem;"><button type="button" class="btn btn-secondary"data-toggle-estagios="{{ trajetoria.id }}">Ver todos ({{ trajetoria.estagios_docencia.count }})</button>
-
-                                    {% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-estagio-create-{{ trajetoria.id }}"> + Novo estágio</button>{% endif %}</div>
+                                    <div class="grupo-acoes">
+                                        {% comment %}
+                                        "Ver todos (0)" abria uma lista vazia. So aparece
+                                        quando ha o que ver.
+                                        {% endcomment %}
+                                        {% if trajetoria.estagios_docencia.count %}
+                                            <button type="button" class="btn btn-secondary" data-toggle-estagios="{{ trajetoria.id }}">Ver todos ({{ trajetoria.estagios_docencia.count }})</button>
+                                        {% endif %}
+                                        {% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-estagio-create-{{ trajetoria.id }}">Novo estágio</button>{% endif %}
+                                    </div>
                                 </li>
 
                                 <li id="lista-estagios-{{ trajetoria.id }}" style="display:none;">
@@ -162,9 +148,9 @@
                                                         </div>
 
                                                         <small class="muted" style="display:block; margin-top:0.35rem;">
-                                                            {{ estagio.inicio|default:"-" }}
+                                                            {{ estagio.inicio|default:"—" }}
                                                             -
-                                                            {{ estagio.termino|default:"-" }}
+                                                            {{ estagio.termino|default:"—" }}
                                                         </small>
                                                     </div>
                                                 {% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-estagio-editar-{{ estagio.id }}">Editar</button>{% endif %}
@@ -172,29 +158,29 @@
                                             </div>
 
                                         {% empty %}
-                                            <p class="muted">Nenhum estágio cadastrado.</p>
+                                            <p class="estado-vazio-inline">Nenhum estágio de docência cadastrado nesta trajetória.</p>
                                         {% endfor %}
 
                                     </div>
                                 </li>
 
                                 {% if trajetoria.usa_prazos_academicos %}
-                                    <li><span class="info-label">Prazo {{ trajetoria.qualificacao_label_lower }}</span><span>{{ trajetoria.prazo_qualificacao|default:"-" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                    <li><span class="info-label">Prazo defesa</span><span>{{ trajetoria.prazo_defesa|default:"-" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                    <li><span class="info-label">Prazo {{ trajetoria.qualificacao_label_lower }}</span><span>{{ trajetoria.prazo_qualificacao|default:"—" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                    <li><span class="info-label">Prazo defesa</span><span>{{ trajetoria.prazo_defesa|default:"—" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
                                     <li><span class="info-label">Reingressante</span><span>{% if trajetoria.reingressante %}Sim{% else %}Não{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-reingressante-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
                                     <li><span class="info-label">{{ trajetoria.qualificacao_label }}</span><span>{% if trajetoria.isQualificado %}Sim{% else %}Não{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-qualificacao-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                    <li><span class="info-label">Orientador</span><span>{% if trajetoria.orientador %}{{ trajetoria.orientador.nome }}{% else %}-{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-orientador-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                    <li><span class="info-label">Coorientador</span><span>{{ trajetoria.coorientador_display|default:"-" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-coorientador-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                    <li><span class="info-label">Orientador</span><span>{% if trajetoria.orientador %}{{ trajetoria.orientador.nome }}{% else %}—{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-orientador-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                    <li><span class="info-label">Coorientador</span><span>{{ trajetoria.coorientador_display|default:"—" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-coorientador-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
                                 {% endif %}
                                 {% if trajetoria.usa_conclusao %}
-                                    <li><span class="info-label">{{ trajetoria.conclusao_label }}</span><span>{% if trajetoria.numero_defesa or trajetoria.data_defesa %}{{ trajetoria.numero_defesa|default:"-" }}{% if trajetoria.data_defesa %} - {{ trajetoria.data_defesa|date:"d/m/Y" }}{% endif %}{% else %}-{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-defesa-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
+                                    <li><span class="info-label">{{ trajetoria.conclusao_label }}</span><span>{% if trajetoria.numero_defesa or trajetoria.data_defesa %}{{ trajetoria.numero_defesa|default:"—" }}{% if trajetoria.data_defesa %} - {{ trajetoria.data_defesa|date:"d/m/Y" }}{% endif %}{% else %}—{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-defesa-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
                                 {% endif %}
                                 {% if trajetoria.usa_deposito_final %}
                                     <li><span class="info-label">Depósito final</span><span>{% if trajetoria.deposito_versao_final %}Sim{% else %}Não{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-deposito-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
                                 {% endif %}
                             </ul>
-                            <div class="section-head" style="margin-top: 1rem;">
-                                <h3 class="section-title" style="margin:0;">Publicações</h3>
+                            <div class="secao-cabecalho secao-cabecalho-interna">
+                                <h3 class="section-title">Publicações</h3>
                                 {% if can_edit_publicacoes %}
                                     <button type="button" class="btn btn-secondary" data-modal-open="modal-publicacao-nova-{{ trajetoria.id }}">Adicionar publicação</button>
                                 {% endif %}
@@ -205,14 +191,14 @@
                                         <li>
                                             <div class="item-row">
                                                 <div>
-                                                    <strong>{{ publicacao.titulo }}</strong><br>
-                                                    <small class="muted">
-                                                        {{ publicacao.get_tipo_display }}
-                                                        {% if publicacao.ano %} | Ano: {{ publicacao.ano }}{% endif %}
-                                                        {% if publicacao.veiculo %} | {{ publicacao.veiculo }}{% endif %}
-                                                        {% if publicacao.doi_url %} | {{ publicacao.doi_url }}{% endif %}
-                                                    </small>
-                                                    {% if publicacao.autores %}<p style="margin: 0.35rem 0 0 0;">{{ publicacao.autores }}</p>{% endif %}
+                                                    <strong>{{ publicacao.titulo }}</strong>
+                                                    <p class="meta-linha">
+                                                        <span>{{ publicacao.get_tipo_display }}</span>
+                                                        {% if publicacao.ano %}<span>{{ publicacao.ano }}</span>{% endif %}
+                                                        {% if publicacao.veiculo %}<span>{{ publicacao.veiculo }}</span>{% endif %}
+                                                        {% if publicacao.doi_url %}<span>{{ publicacao.doi_url }}</span>{% endif %}
+                                                    </p>
+                                                    {% if publicacao.autores %}<p class="item-autores">{{ publicacao.autores }}</p>{% endif %}
                                                 </div>
                                                 {% if can_edit_publicacoes %}
                                                     <button type="button" class="btn btn-secondary" data-modal-open="modal-publicacao-{{ publicacao.id }}">Editar</button>
@@ -222,11 +208,11 @@
                                     {% endfor %}
                                 </ul>
                             {% else %}
-                                <p class="muted">Nenhuma publicação registrada.</p>
+                                <p class="estado-vazio-inline">Nenhuma publicação registrada nesta trajetória.</p>
                             {% endif %}
 
-                            <div class="section-head" style="margin-top: 1rem;">
-                                <h3 class="section-title" style="margin:0;">Disciplinas</h3>
+                            <div class="secao-cabecalho secao-cabecalho-interna">
+                                <h3 class="section-title">Disciplinas</h3>
                                 {% if can_edit_disciplinas %}
                                     <button type="button" class="btn btn-secondary" data-modal-open="modal-disciplina-nova-{{ trajetoria.id }}">Adicionar disciplina</button>
                                 {% endif %}
@@ -237,14 +223,14 @@
                                         <li>
                                             <div class="item-row">
                                                 <div>
-                                                    <strong>{% if disciplina.codigo %}{{ disciplina.codigo }} - {% endif %}{{ disciplina.nome }}</strong><br>
-                                                    <small class="muted">
-                                                        {{ disciplina.get_situacao_display }}
-                                                        {% if disciplina.semestre %} | Semestre: {{ disciplina.semestre }}{% endif %}
-                                                        {% if disciplina.conceito %} | Conceito: {{ disciplina.conceito }}{% endif %}
-                                                        {% if disciplina.creditos %} | Créditos: {{ disciplina.creditos }}{% endif %}
-                                                        {% if disciplina.carga_horaria %} | Carga horária: {{ disciplina.carga_horaria }}h{% endif %}
-                                                    </small>
+                                                    <strong>{% if disciplina.codigo %}{{ disciplina.codigo }} — {% endif %}{{ disciplina.nome }}</strong>
+                                                    <p class="meta-linha">
+                                                        <span>{{ disciplina.get_situacao_display }}</span>
+                                                        {% if disciplina.semestre %}<span>{{ disciplina.semestre }}</span>{% endif %}
+                                                        {% if disciplina.conceito %}<span>Conceito {{ disciplina.conceito }}</span>{% endif %}
+                                                        {% if disciplina.creditos %}<span>{{ disciplina.creditos }} créditos</span>{% endif %}
+                                                        {% if disciplina.carga_horaria %}<span>{{ disciplina.carga_horaria }}h</span>{% endif %}
+                                                    </p>
                                                 </div>
                                                 {% if can_edit_disciplinas %}
                                                     <button type="button" class="btn btn-secondary" data-modal-open="modal-disciplina-{{ disciplina.id }}">Editar</button>
@@ -254,12 +240,12 @@
                                     {% endfor %}
                                 </ul>
                             {% else %}
-                                <p class="muted">Nenhuma disciplina registrada.</p>
+                                <p class="estado-vazio-inline">Nenhuma disciplina registrada nesta trajetória.</p>
                             {% endif %}
 
                             {% with resumo=card.resumo_horas_complementares %}
-                            <div class="section-head" style="margin-top: 1rem;">
-                                <h3 class="section-title" style="margin:0;">Horas complementares</h3>
+                            <div class="secao-cabecalho secao-cabecalho-interna">
+                                <h3 class="section-title">Horas complementares</h3>
                                 <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
                                     {% if resumo.norma %}
                                         <span class="badge badge-info">{{ resumo.norma.identificacao }}</span>
@@ -269,29 +255,35 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="grid-two">
-                                <p class="aluno-kv"><strong>Horas exigidas:</strong> {{ resumo.horas_exigidas }}</p>
-                                <p class="aluno-kv"><strong>Horas computadas:</strong> {{ resumo.horas_computadas }}</p>
-                                <p class="aluno-kv"><strong>Horas pendentes:</strong> {{ resumo.horas_pendentes }}</p>
-                                <p class="aluno-kv"><strong>Situação:</strong> {{ resumo.situacao }}</p>
-                            </div>
+                            {% comment %}
+                            Eram quatro paragrafos "Rotulo: valor" em negrito numa grade
+                            de duas colunas -- o rotulo pesava mais que o numero, que e o
+                            que se le aqui. Mesma grade rotulada do resto da tela, com o
+                            numero em destaque.
+                            {% endcomment %}
+                            <dl class="dados-grid">
+                                <div><dt>Horas exigidas</dt><dd>{{ resumo.horas_exigidas }}</dd></div>
+                                <div><dt>Horas computadas</dt><dd>{{ resumo.horas_computadas }}</dd></div>
+                                <div><dt>Horas pendentes</dt><dd>{{ resumo.horas_pendentes }}</dd></div>
+                                <div><dt>Situação</dt><dd>{{ resumo.situacao }}</dd></div>
+                            </dl>
 
                             <h4 class="section-title" style="margin-top: 1rem;">Distribuição por grupo</h4>
                             {% if resumo.grupos %}
                                 <ul class="list">
                                     {% for item in resumo.grupos %}
                                         <li>
-                                            <strong>{{ item.grupo.nome }}</strong><br>
-                                            <small class="muted">
-                                                Computadas: {{ item.horas }}h |
-                                                Limite: {% if item.grupo.limite_maximo %}{{ item.grupo.limite_maximo }}h{% else %}Sem limite específico{% endif %} |
-                                                Saldo: {% if item.saldo is not None %}{{ item.saldo }}h{% else %}-{% endif %}
-                                            </small>
+                                            <strong>{{ item.grupo.nome }}</strong>
+                                            <p class="meta-linha">
+                                                <span>Computadas: {{ item.horas }}h</span>
+                                                <span>Limite: {% if item.grupo.limite_maximo %}{{ item.grupo.limite_maximo }}h{% else %}sem limite{% endif %}</span>
+                                                {% if item.saldo is not None %}<span>Saldo: {{ item.saldo }}h</span>{% endif %}
+                                            </p>
                                         </li>
                                     {% endfor %}
                                 </ul>
                             {% else %}
-                                <p class="muted">Nenhuma norma vigente configurada para esta trajetória.</p>
+                                <p class="estado-vazio-inline">Nenhuma norma de horas complementares vigente para esta trajetória.</p>
                             {% endif %}
 
                             <h4 class="section-title" style="margin-top: 1rem;">Histórico de lançamentos</h4>
@@ -300,27 +292,28 @@
                                     {% for lancamento in resumo.lancamentos %}
                                         <li>
                                             <strong>{{ lancamento.tipo_atividade.nome }}</strong>
-                                            <span class="badge badge-info">{{ lancamento.get_status_display }}</span><br>
-                                            <small class="muted">
-                                                {{ lancamento.criado_em|date:"d/m/Y H:i" }} |
-                                                {% if lancamento.processo_origem %}Quantidade: {{ lancamento.quantidade }} {{ lancamento.unidade_quantidade }} |{% endif %}
-                                                Aprovadas: {{ lancamento.horas_aprovadas }}h |
-                                                Processo:
-                                                {% if lancamento.processo_origem %}
-                                                    <a href="{% url 'processo_detalhe' lancamento.processo_origem.id %}">{{ lancamento.processo_origem.numero }}</a>
-                                                {% else %}
-                                                    Migração/administrativo
-                                                {% endif %}
-                                                | Responsável: {{ lancamento.criado_por.nome }}
-                                            </small>
+                                            <span class="badge badge-info">{{ lancamento.get_status_display }}</span>
+                                            <p class="meta-linha">
+                                                <span>{{ lancamento.criado_em|date:"d/m/Y H:i" }}</span>
+                                                {% if lancamento.processo_origem %}<span>{{ lancamento.quantidade }} {{ lancamento.unidade_quantidade }}</span>{% endif %}
+                                                <span>{{ lancamento.horas_aprovadas }}h aprovadas</span>
+                                                <span>
+                                                    {% if lancamento.processo_origem %}
+                                                        <a href="{% url 'processo_detalhe' lancamento.processo_origem.id %}">{{ lancamento.processo_origem.numero }}</a>
+                                                    {% else %}
+                                                        Migração/administrativo
+                                                    {% endif %}
+                                                </span>
+                                                <span>{{ lancamento.criado_por.nome }}</span>
+                                            </p>
                                             {% if lancamento.observacoes_secretaria %}
-                                                <p class="muted" style="margin:0.35rem 0 0 0;">{{ lancamento.observacoes_secretaria }}</p>
+                                                <p class="item-observacao">{{ lancamento.observacoes_secretaria }}</p>
                                             {% endif %}
                                         </li>
                                     {% endfor %}
                                 </ul>
                             {% else %}
-                                <p class="muted">Nenhum lançamento registrado para esta trajetória.</p>
+                                <p class="estado-vazio-inline">Nenhum lançamento de horas registrado nesta trajetória.</p>
                             {% endif %}
                             {% endwith %}
                         </li>
@@ -342,44 +335,37 @@
                             <strong>{{ item.trajetoria }}</strong>
                             <p style="margin: 0.45rem 0 0 0;"><strong>Alteração:</strong> {{ item.alteracao }}</p>
                             <p style="margin: 0.35rem 0 0 0;"><strong>Comentário:</strong> {{ item.obj.comentario }}</p>
-                            <small class="muted">Por: {{ item.obj.alterado_por.nome }} | Em: {{ item.obj.criado_em|date:"d/m/Y H:i" }}</small>
+                            <p class="meta-linha">
+                                <span>{{ item.obj.alterado_por.nome }}</span>
+                                <span>{{ item.obj.criado_em|date:"d/m/Y H:i" }}</span>
+                            </p>
                         </li>
                     {% endfor %}
                 </ul>
             {% else %}
-                <p class="muted">Sem alterações registradas.</p>
+                <p class="estado-vazio-inline">Nenhuma alteração registrada nesta ficha.</p>
             {% endif %}
         </section>
 
+        {% comment %}
+        A mesma lista de processos que as outras quatro telas mostram, e que aqui
+        estava numa marcacao propria: numero e assunto colados num <strong>,
+        quatro campos separados por pipe e um botao "Ver detalhes" por linha.
+        Passa a usar a tabela compartilhada -- inclusive porque o aluno reconhece
+        aqui o mesmo formato que ve em "Meus Processos".
+        {% endcomment %}
         <section id="processos-aluno" class="card">
-            <h2 class="section-title">Processos abertos pelo aluno</h2>
-            {% if processos_aluno %}
-                <ul class="list">
-                    {% for processo in processos_aluno %}
-                        <li>
-                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
-                                <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
-                                <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
-                            </div>
-                            <small class="muted">
-                                Tipo: {{ processo.get_tipo_display }} |
-                                Status: {{ processo.get_status_display }} |
-                                Setor: {{ processo.setor_atual.nome }} |
-                                Criado em: {{ processo.data_criacao|date:"d/m/Y H:i" }}
-                            </small>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p class="muted">Este aluno ainda não abriu processos.</p>
-            {% endif %}
+            <h2 class="section-title">{% if is_self_aluno %}Meus processos{% else %}Processos abertos pelo aluno{% endif %}</h2>
+            {% with texto_vazio=is_self_aluno|yesno:"Os processos que você abrir aparecem aqui.,Este aluno ainda não abriu processos." %}
+                {% include "includes/tabela_processos.html" with processos=processos_aluno mostrar_tipo=True mostrar_setor=True vazio_titulo="Nenhum processo aberto" vazio_texto=texto_vazio %}
+            {% endwith %}
         </section>
 </section>
 
 {% if can_manage_aluno %}
 <div id="modal-dados" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar dados do aluno</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar dados do aluno</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_dados">
@@ -400,9 +386,22 @@
 </div>
 {% endif %}
 
+{% comment %}
+Modais de edicao da coordenacao.
+
+Os botoes que os abrem sempre estiveram atras de {% if can_manage_aluno %},
+mas os modais em si nao: iam para o HTML de todo mundo que abre a ficha --
+o proprio aluno e o orientador, que sao leitores. O POST e barrado no servidor,
+entao nao da para alterar nada por ali; o que vazava era o conteudo dos
+formularios, incluindo o <select> de orientador com a lista de docentes.
+
+Publicacoes e disciplinas ja tinham a guarda ({% templatetag openblock %} if can_edit_publicacoes {% templatetag closeblock %} mais abaixo);
+faltava a da coordenacao.
+{% endcomment %}
+{% if can_manage_aluno %}
 <div id="modal-nova-trajetoria" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Nova trajetória acadêmica</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Nova trajetória acadêmica</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="nova_trajetoria">
@@ -450,12 +449,14 @@
         </form>
     </div>
 </div>
+{% endif %}
 
 {% for card in trajetoria_cards %}
 {% with trajetoria=card.obj form=card.form horas_form=card.horas_form %}
+{% if can_manage_aluno %}
 <div id="modal-horas-complementares-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Adicionar horas complementares</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Adicionar horas complementares</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="registrar_horas_complementares">
@@ -479,7 +480,7 @@
 
 <div id="modal-trajetoria-status-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar status da trajetória</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar status da trajetória</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
@@ -500,7 +501,7 @@
 
 <div id="modal-trajetoria-nivel-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar nível</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar nível</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
@@ -517,7 +518,7 @@
 
 <div id="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar prazo {{ trajetoria.qualificacao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar prazo {{ trajetoria.qualificacao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
@@ -534,7 +535,7 @@
 
 <div id="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar prazo defesa</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar prazo defesa</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
@@ -551,7 +552,7 @@
 
 <div id="modal-trajetoria-reingressante-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar reingressante</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar reingressante</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
@@ -567,7 +568,7 @@
 <div id="modal-estagio-create-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
         <div class="modal-head">
-            <h3 class="section-title" style="margin:0;">Novo estágio de docência</h3>
+            <h3 class="section-title">Novo estágio de docência</h3>
             <button type="button" class="modal-close" data-modal-close>Fechar</button>
         </div>
         <form method="post">
@@ -617,7 +618,7 @@
     <div class="modal-card">
 
         <div class="modal-head">
-            <h3 class="section-title" style="margin:0;">
+            <h3 class="section-title">
                 Editar estágio de docência
             </h3>
 
@@ -690,7 +691,7 @@
 
 <div id="modal-trajetoria-qualificacao-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar {{ trajetoria.qualificacao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar {{ trajetoria.qualificacao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
@@ -706,7 +707,7 @@
 
 <div id="modal-trajetoria-orientador-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar orientador</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar orientador</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
@@ -723,7 +724,7 @@
 
 <div id="modal-trajetoria-coorientador-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar coorientador</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar coorientador</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
@@ -752,7 +753,7 @@
 
 <div id="modal-trajetoria-defesa-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar {{ trajetoria.conclusao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar {{ trajetoria.conclusao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
@@ -771,7 +772,7 @@
 
 <div id="modal-trajetoria-deposito-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Alterar depósito final</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar depósito final</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
@@ -784,11 +785,12 @@
         </form>
     </div>
 </div>
+{% endif %}
 
 {% if can_edit_publicacoes %}
 <div id="modal-publicacao-nova-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Adicionar publicação</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Adicionar publicação</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="salvar_publicacao">
@@ -810,7 +812,7 @@
 {% for publicacao in trajetoria.publicacoes.all %}
 <div id="modal-publicacao-{{ publicacao.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Editar publicação</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Editar publicação</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="salvar_publicacao">
@@ -843,7 +845,7 @@
 {% if can_edit_disciplinas %}
 <div id="modal-disciplina-nova-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Adicionar disciplina</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Adicionar disciplina</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="salvar_disciplina">
@@ -865,7 +867,7 @@
 {% for disciplina in trajetoria.disciplinas.all %}
 <div id="modal-disciplina-{{ disciplina.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title" style="margin:0;">Editar disciplina</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Editar disciplina</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="salvar_disciplina">

@@ -1105,7 +1105,7 @@ class AlunosViewTests(TestCase):
         url = reverse("aluno_detalhe", args=[aluno_pendente.pk])
 
         response = self.client.get(url)
-        self.assertContains(response, "Aprovar Cadastro")
+        self.assertContains(response, "Aprovar cadastro")
         self.assertNotContains(response, '<p class="aluno-kv"><strong>CPF:</strong>', html=False)
         self.assertNotContains(response, '<p class="aluno-kv"><strong>Gênero:</strong>', html=False)
         self.assertContains(response, 'name="cpf"')
@@ -3865,6 +3865,51 @@ class OrientadorAcessaOrientandoTests(TestCase):
         resposta = self.client.post(self.url, {"acao": "salvar_publicacao"})
         self.assertEqual(resposta.status_code, 403)
 
+    # Formularios so da coordenacao, identificados pelo valor de "acao" que
+    # enviam. O modal-close nao serve: ele existe nos modais de publicacao, que
+    # o proprio aluno pode abrir legitimamente.
+    ACOES_DA_COORDENACAO = [
+        "nova_trajetoria",
+        "alterar_trajetoria_campo",
+        "registrar_horas_complementares",
+        "novo_estagio_docencia",
+    ]
+
+    def _formularios_de_coordenacao(self, corpo):
+        return [acao for acao in self.ACOES_DA_COORDENACAO if f'value="{acao}"' in corpo]
+
+    def test_leitor_nao_recebe_os_formularios_da_coordenacao(self):
+        """Os modais de edicao nao podem ir no HTML de quem so le.
+
+        Os botoes que abrem esses modais sempre estiveram atras de
+        can_manage_aluno, mas o modal em si nao estava: o markup ia para todo
+        mundo que abrisse a ficha. O POST e barrado no servidor -- o que vazava
+        era o conteudo dos formularios, entre eles o <select> de orientador com
+        a lista de docentes cadastrados.
+        """
+        for quem, usuario in (("orientador", self.orientador), ("proprio aluno", self.aluno)):
+            with self.subTest(leitor=quem):
+                self.client.force_login(usuario)
+                corpo = self.client.get(self.url).content.decode()
+                self.assertEqual(
+                    self._formularios_de_coordenacao(corpo), [],
+                    f"{quem} recebeu formularios que so a coordenacao usa",
+                )
+                self.assertNotContains(
+                    self.client.get(self.url), self.outro_docente.nome,
+                    msg_prefix="a lista de docentes vazou pelo select de orientador",
+                )
+
+    def test_coordenacao_continua_recebendo_os_formularios(self):
+        """A guarda nao pode ter escondido os modais de quem edita de fato."""
+        servidor = User.objects.create_user(
+            email="servidor.modais@example.com", password="senha-segura-123",
+            nome="Servidor Modais", tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.client.force_login(servidor)
+        corpo = self.client.get(self.url).content.decode()
+        self.assertEqual(sorted(self._formularios_de_coordenacao(corpo)), sorted(self.ACOES_DA_COORDENACAO))
+
     def test_lista_de_orientandos_leva_a_ficha(self):
         """Antes o nome era texto solto -- nao havia link para lugar nenhum."""
         self.client.force_login(self.orientador)
@@ -3979,4 +4024,86 @@ class TodasAsTelasRenderizamTests(TestCase):
                     self.assertEqual(
                         resposta.status_code, esperado,
                         f"{nome_rota} devolveu {resposta.status_code} para {perfil}",
+                    )
+
+
+class MenuMarcaItemAtivoTests(TestCase):
+    """Toda tela acende exatamente um item da barra lateral.
+
+    A barra marca o item cujo `url_names` contem o url_name da requisicao. Telas
+    de detalhe (abrir um processo, abrir a trajetoria de um aluno) nao tem
+    entrada propria no menu, e ninguem as declarava na listagem de origem: abrir
+    um processo apagava a barra inteira e o usuario perdia a referencia de onde
+    estava.
+
+    O outro lado do defeito e igualmente possivel: declarar o mesmo detalhe em
+    dois itens acende os dois. Por isso a asercao e "exatamente um", nao "ao
+    menos um" -- e por isso o coordenador entra no teste, que e o perfil que
+    acumula as telas pessoais e as da Coordenacao.
+    """
+
+    # Telas alcancadas pela barra superior, nao pelo menu lateral. Nenhum item
+    # as reivindica, e marcar uma delas seria mentir sobre a origem.
+    SEM_ITEM_NO_MENU = {"me"}
+
+    @classmethod
+    def setUpTestData(cls):
+        senha = "senha-segura-123"
+        cls.aluno = Aluno.objects.create_user(
+            email="aluno.menu@example.com", password=senha, nome="Aluno Menu",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026M0001",
+        )
+        cls.docente = Docente.objects.create_user(
+            email="docente.menu@example.com", password=senha, nome="Docente Menu",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        cls.coordenador = Docente.objects.create_user(
+            email="coord.menu@example.com", password=senha, nome="Coordenador Menu",
+            tipo_usuario=User.TipoUsuario.DOCENTE, coordenador=True,
+        )
+        cls.servidor = User.objects.create_user(
+            email="servidor.menu@example.com", password=senha, nome="Servidor Menu",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+
+    def _itens_ativos(self, usuario, url_name):
+        from processos.context_processors import _menu_lateral_sections
+
+        ativos = []
+        for secao in _menu_lateral_sections(usuario):
+            for item in secao["items"]:
+                if url_name in item["url_names"]:
+                    ativos.append(item["label"])
+        return ativos
+
+    def test_telas_de_detalhe_acendem_exatamente_um_item(self):
+        """As duas telas que motivaram a correcao, em todos os perfis."""
+        usuarios = {
+            "aluno": self.aluno,
+            "docente": self.docente,
+            "coordenador": self.coordenador,
+            "servidor": self.servidor,
+        }
+        for perfil, usuario in usuarios.items():
+            for url_name in ("processo_detalhe", "aluno_detalhe"):
+                with self.subTest(perfil=perfil, tela=url_name):
+                    ativos = self._itens_ativos(usuario, url_name)
+                    self.assertEqual(
+                        len(ativos), 1,
+                        f"{url_name} acendeu {ativos or 'nenhum item'} para {perfil}",
+                    )
+
+    def test_toda_tela_do_menu_acende_exatamente_um_item(self):
+        """Nenhuma tela alcancavel deixa a barra sem marcacao (nem com duas)."""
+        usuarios = {"aluno": self.aluno, "docente": self.docente, "servidor": self.servidor}
+
+        for nome_rota, perfis_com_acesso in TodasAsTelasRenderizamTests.TELAS:
+            if nome_rota in self.SEM_ITEM_NO_MENU:
+                continue
+            for perfil in perfis_com_acesso:
+                with self.subTest(tela=nome_rota, perfil=perfil):
+                    ativos = self._itens_ativos(usuarios[perfil], nome_rota)
+                    self.assertEqual(
+                        len(ativos), 1,
+                        f"{nome_rota} acendeu {ativos or 'nenhum item'} para {perfil}",
                     )

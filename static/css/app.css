@@ -916,11 +916,18 @@ input[type="checkbox"] {
     list-style: none;
 }
 
-.list li {
+/* Filho direto, nao descendente.
+
+   Como ".list li" a regra alcancava qualquer li aninhado. Na ficha do aluno,
+   cada trajetoria e um item de .list e dentro dela ha uma .info-list com onze
+   linhas: as onze recebiam moldura, fundo e padding de cartao, e a tela virava
+   uma pilha de caixas dentro de caixas. Quem e cartao e o item da lista, nao o
+   conteudo dele. */
+.list > li {
     padding: 0.9rem;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    background: #ffffff;
+    background: var(--color-surface);
 }
 
 .room-list > li {
@@ -2664,6 +2671,133 @@ dialog::backdrop {
     color: var(--color-danger);
 }
 
+/* Acoes de uma tela de detalhe, agrupadas no fim do cabecalho.
+
+   Estavam soltas ao lado do titulo, num flex inline, disputando a linha com
+   ele: em nome longo os botoes desciam e o cabecalho quebrava em duas alturas
+   diferentes. Embaixo, alinhadas a esquerda, elas leem como "o que da pra
+   fazer aqui" e o titulo fica livre. */
+.acoes-cabecalho {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espaco-3);
+    align-items: center;
+    margin-top: var(--espaco-5);
+    padding-top: var(--espaco-5);
+    border-top: 1px solid var(--color-border);
+}
+
+.acoes-cabecalho form {
+    margin: 0;
+}
+
+/* Cabecalho de secao dentro de um card: titulo a esquerda, acao a direita.
+   Vinha repetido como estilo inline em cada secao da ficha do aluno. */
+.secao-cabecalho {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--espaco-4);
+    flex-wrap: wrap;
+    margin-bottom: var(--espaco-4);
+}
+
+.secao-cabecalho > .section-title {
+    margin: 0;
+}
+
+/* Linha de metadados de um item de lista (ano, veiculo, conceito, creditos).
+
+   Substitui o formato "{{ a }} {% if b %} | {{ b }}{% endif %}", que tem dois
+   defeitos: o pipe fica coberto de espacos e vira ruido visual, e quando o
+   primeiro campo esta vazio sobra um separador solto no inicio da linha -- cada
+   template resolvia isso na mao, e nem todos resolviam.
+
+   Aqui o separador e gerado pelo CSS entre irmaos existentes. Campo ausente e
+   um <span> que o template nao renderiza, entao nao ha separador para sobrar. */
+.meta-linha {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--espaco-3);
+    margin: var(--espaco-2) 0 0;
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.meta-linha > * + *::before {
+    content: "·";
+    margin-right: var(--espaco-3);
+}
+
+.meta-linha a {
+    color: inherit;
+}
+
+/* Estado vazio de uma sub-secao (Publicacoes, Disciplinas, Estagios dentro de
+   uma trajetoria).
+
+   O .estado-vazio cheio, com icone e titulo, e para uma tela que nao tem o que
+   mostrar. Repetido cinco vezes dentro do mesmo card, viraria um card de
+   icones. Aqui basta distinguir "esta secao esta vazia" de um paragrafo solto,
+   e o recuo com a barra a esquerda faz isso sem ocupar espaco. */
+.estado-vazio-inline {
+    margin: 0;
+    padding: var(--espaco-3) var(--espaco-4);
+    border-left: 2px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.875rem;
+}
+
+/* Texto complementar de um item de lista: autores de uma publicacao, observacao
+   da secretaria. Nao e metadado (nao entra na meta-linha) nem titulo. */
+.item-autores,
+.item-observacao {
+    margin: var(--espaco-2) 0 0;
+    color: var(--color-muted);
+    font-size: 0.875rem;
+}
+
+/* Botoes que agem sobre a mesma coisa, mantidos juntos. */
+.grupo-acoes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espaco-3);
+    align-items: center;
+}
+
+/* Titulo de uma trajetoria: nivel do curso e o status, lado a lado. */
+.trajetoria-titulo {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    flex-wrap: wrap;
+}
+
+/* Sub-secao dentro de um card (Publicacoes, Disciplinas, Horas dentro de uma
+   trajetoria). Precisa de folga acima para nao colar no bloco anterior. */
+.secao-cabecalho-interna {
+    margin-top: var(--espaco-6);
+    padding-top: var(--espaco-5);
+    border-top: 1px solid var(--color-border);
+}
+
+/* Variante da info-list em que cada linha tem uma acao propria ("Alterar").
+   A info-list padrao e de duas colunas; aqui a terceira coluna guarda o botao,
+   senao ele quebra para a linha de baixo e a lista perde o alinhamento. */
+.info-list-editavel li {
+    grid-template-columns: 190px minmax(0, 1fr) auto;
+    align-items: center;
+}
+
+@media (max-width: 900px) {
+    .info-list-editavel li {
+        grid-template-columns: 1fr;
+        gap: var(--espaco-2);
+    }
+}
+
 /* Bloco de texto corrido dentro do registro (descricao, termo, observacoes).
    pre-wrap preserva as quebras que o requerente digitou. */
 .processo-texto + .processo-texto {
@@ -3032,4 +3166,69 @@ dialog::backdrop {
     .auth-cartao {
         animation: none !important;
     }
+}
+
+/* ==========================================================================
+   Modal
+
+   Vivia num bloco <style> dentro de aluno_detalhe.html, servindo as 19 caixas
+   de edicao daquela ficha. Enquanto o unico consumidor fosse aquele template
+   isso passava, mas e um componente -- e um <style> solto no meio do content
+   nao e revisavel nem reaproveitavel. A regra que importa e o display:none do
+   backdrop: sem ela, todos os formularios de edicao aparecem empilhados na
+   pagina de uma vez.
+   ========================================================================== */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 20, 38, 0.48);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: var(--espaco-4);
+}
+
+.modal-backdrop.open {
+    display: flex;
+}
+
+.modal-card {
+    width: min(720px, 96vw);
+    max-height: 92vh;
+    overflow: auto;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--espaco-5);
+    box-shadow: var(--shadow-card);
+}
+
+.modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--espaco-3);
+    margin-bottom: var(--espaco-5);
+    padding-bottom: var(--espaco-4);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.modal-head > .section-title {
+    margin: 0;
+}
+
+.modal-close {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    border-radius: var(--radius-sm);
+    padding: 0.35rem 0.6rem;
+    cursor: pointer;
+    color: var(--color-muted);
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.modal-close:hover {
+    color: var(--color-text);
+    border-color: var(--color-text-soft, var(--color-muted));
 }
