@@ -393,7 +393,7 @@ class PublicacaoTrajetoria(models.Model):
         OUTRO = "OUTRO", "Outro"
 
     trajetoria = models.ForeignKey(TrajetoriaAcademica, on_delete=models.CASCADE, related_name="publicacoes")
-    titulo = models.CharField(max_length=255)
+    titulo = models.CharField(max_length=255, verbose_name="Título")
     tipo = models.CharField(max_length=25, choices=TipoPublicacao.choices, default=TipoPublicacao.ARTIGO_PERIODICO)
     autores = models.TextField(blank=True)
     veiculo = models.CharField(max_length=255, blank=True)
@@ -429,13 +429,13 @@ class DisciplinaTrajetoria(models.Model):
         TRANCADA = "TRANCADA", "Trancada"
 
     trajetoria = models.ForeignKey(TrajetoriaAcademica, on_delete=models.CASCADE, related_name="disciplinas")
-    codigo = models.CharField(max_length=40, blank=True)
+    codigo = models.CharField(max_length=40, blank=True, verbose_name="Código")
     nome = models.CharField(max_length=255)
     semestre = models.CharField(max_length=6, blank=True, validators=[Aluno.semestre_validator])
     conceito = models.CharField(max_length=20, blank=True)
     creditos = models.PositiveSmallIntegerField(null=True, blank=True)
     carga_horaria = models.PositiveSmallIntegerField(null=True, blank=True)
-    situacao = models.CharField(max_length=15, choices=Situacao.choices, default=Situacao.CURSANDO)
+    situacao = models.CharField(max_length=15, choices=Situacao.choices, default=Situacao.CURSANDO, verbose_name="Situação")
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -454,7 +454,7 @@ class DisciplinaTrajetoria(models.Model):
 
 
 class Disciplina(models.Model):
-    codigo = models.CharField(max_length=40, unique=True)
+    codigo = models.CharField(max_length=40, unique=True, verbose_name="Código")
     nome = models.CharField(max_length=255)
     tipo = models.CharField(max_length=120, blank=True)
     creditos = models.PositiveSmallIntegerField(null=True, blank=True)
@@ -605,7 +605,7 @@ class OfertaDisciplina(models.Model):
         PRESENCIAL = "PRESENCIAL", "Presencial"
         HIBRIDA = "HIBRIDA", "Híbrida"
 
-    periodo = models.ForeignKey(PeriodoLetivo, on_delete=models.CASCADE, related_name="ofertas")
+    periodo = models.ForeignKey(PeriodoLetivo, on_delete=models.CASCADE, related_name="ofertas", verbose_name="Período")
     disciplina = models.ForeignKey(Disciplina, on_delete=models.PROTECT, related_name="ofertas")
     docente_responsavel = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -808,7 +808,7 @@ class SolicitacaoMatricula(models.Model):
         INDEFERIDA = "INDEFERIDA", "Indeferida"
         CANCELADA = "CANCELADA", "Cancelada"
 
-    periodo = models.ForeignKey(PeriodoLetivo, on_delete=models.PROTECT, related_name="solicitacoes_matricula")
+    periodo = models.ForeignKey(PeriodoLetivo, on_delete=models.PROTECT, related_name="solicitacoes_matricula", verbose_name="Período")
     aluno = models.ForeignKey(Aluno, on_delete=models.PROTECT, related_name="solicitacoes_matricula")
     tipo_matricula = models.CharField(max_length=12, choices=TipoMatricula.choices, default=TipoMatricula.DISCIPLINAS)
     tipo_aluno = models.CharField(max_length=10, choices=TipoAluno.choices, default=TipoAluno.REGULAR)
@@ -982,7 +982,7 @@ class NormaHorasComplementares(models.Model):
 
     nome = models.CharField(max_length=255)
     identificacao = models.CharField(max_length=80)
-    descricao = models.TextField(blank=True)
+    descricao = models.TextField(blank=True, verbose_name="Descrição")
     inicio_vigencia = models.DateField()
     fim_vigencia = models.DateField(null=True, blank=True)
     carga_horaria_exigida = models.PositiveIntegerField(default=45)
@@ -1006,7 +1006,7 @@ class GrupoLimiteHorasComplementares(models.Model):
         related_name="grupos_limite",
     )
     nome = models.CharField(max_length=120)
-    descricao = models.TextField(blank=True)
+    descricao = models.TextField(blank=True, verbose_name="Descrição")
     limite_maximo = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     ordem = models.PositiveIntegerField(default=0)
 
@@ -1032,7 +1032,7 @@ class TipoAtividadeHorasComplementares(models.Model):
         blank=True,
     )
     nome = models.CharField(max_length=180)
-    descricao = models.TextField(blank=True)
+    descricao = models.TextField(blank=True, verbose_name="Descrição")
     unidade_calculo = models.CharField(max_length=40)
     horas_por_unidade = models.DecimalField(max_digits=6, decimal_places=2)
     limite_individual = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
@@ -1082,7 +1082,7 @@ class LancamentoHorasComplementares(models.Model):
         null=True,
         blank=True,
     )
-    descricao = models.CharField(max_length=255)
+    descricao = models.CharField(max_length=255, verbose_name="Descrição")
     periodo_realizacao = models.CharField(max_length=120, blank=True)
     quantidade = models.DecimalField(max_digits=8, decimal_places=2)
     unidade_quantidade = models.CharField(max_length=40)
@@ -1334,7 +1334,7 @@ class SolicitacaoBanca(models.Model):
         related_name="solicitacoes_banca",
     )
     tipo_defesa = models.CharField(max_length=30, choices=TipoDefesa.choices)
-    titulo = models.CharField(max_length=255, blank=True)
+    titulo = models.CharField(max_length=255, blank=True, verbose_name="Título")
     resumo = models.TextField(blank=True)
     palavras_chave = models.CharField(max_length=255, blank=True)
     data_prevista = models.DateField(null=True, blank=True)
@@ -1484,7 +1484,7 @@ class MembroBanca(models.Model):
     solicitacao = models.ForeignKey(SolicitacaoBanca, on_delete=models.CASCADE, related_name="membros")
     papel = models.CharField(max_length=30, choices=Papel.choices)
     nome = models.CharField(max_length=255, blank=True)
-    instituicao = models.CharField(max_length=255, blank=True)
+    instituicao = models.CharField(max_length=255, blank=True, verbose_name="Instituição")
     cpf = models.CharField(max_length=14, blank=True)
 
     class Meta:
@@ -1539,7 +1539,7 @@ class Setor(models.Model):
         COMISSAO = "COMISSAO", "Comissao"
 
     nome = models.CharField(max_length=120, unique=True)
-    descricao = models.CharField(max_length=255, blank=True)
+    descricao = models.CharField(max_length=255, blank=True, verbose_name="Descrição")
     ativo = models.BooleanField(default=True)
     email = models.EmailField(max_length=255, blank=True, null=True, help_text="E-mail institucional do setor")
     tipo = models.CharField(max_length=20, choices=TipoSetor.choices, default=TipoSetor.SETOR)
@@ -1627,7 +1627,7 @@ class SolicitacaoAssinatura(models.Model):
     numero_bloco_sei = models.CharField(max_length=80, blank=True)
     documento_pdf = models.FileField(upload_to="assinaturas/originais/%Y/%m/", blank=True)
     documento_assinado_pdf = models.FileField(upload_to="assinaturas/assinados/%Y/%m/", blank=True)
-    observacao = models.TextField(blank=True)
+    observacao = models.TextField(blank=True, verbose_name="Observação")
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDENTE)
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
@@ -1771,7 +1771,7 @@ class Processo(models.Model):
     )
     tipo = models.CharField(max_length=40, choices=TipoProcesso.choices)
     assunto = models.CharField(max_length=255)
-    descricao = models.TextField()
+    descricao = models.TextField(verbose_name="Descrição")
     data_criacao = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
     status_inicial = models.CharField(
@@ -1790,7 +1790,7 @@ class Processo(models.Model):
         on_delete=models.PROTECT,
         related_name="processos_atuais",
     )
-    numero = models.CharField(max_length=20, unique=True, editable=False, blank=True)
+    numero = models.CharField(max_length=20, unique=True, editable=False, blank=True, verbose_name="Número")
     prazo_limite = models.DateField(null=True, blank=True)
     finalizado_em = models.DateTimeField(null=True, blank=True)
     termo_finalizacao = models.TextField(blank=True)
@@ -2039,7 +2039,7 @@ class Documento(models.Model):
         on_delete=models.CASCADE,
         related_name="documentos",
     )
-    titulo = models.CharField(max_length=255)
+    titulo = models.CharField(max_length=255, verbose_name="Título")
     texto = models.TextField(blank=True)
     arquivo = models.FileField(upload_to="documentos/processos/", blank=True, null=True)
     restrito = models.BooleanField(default=False)
@@ -2161,7 +2161,7 @@ class TramitacaoProcesso(models.Model):
         on_delete=models.PROTECT,
         related_name="tramitacoes_realizadas",
     )
-    observacao = models.TextField(blank=True)
+    observacao = models.TextField(blank=True, verbose_name="Observação")
     status_resultante = models.CharField(
         max_length=25,
         choices=Processo.StatusProcesso.choices,
@@ -2260,7 +2260,7 @@ class ComentarioProcesso(models.Model):
 
 class Polo(models.Model):
     nome = models.CharField(max_length=120, unique=True)
-    descricao = models.CharField(max_length=255, blank=True)
+    descricao = models.CharField(max_length=255, blank=True, verbose_name="Descrição")
     ativo = models.BooleanField(default=True)
 
     class Meta:
@@ -2339,7 +2339,7 @@ class ReservaAmbiente(models.Model):
         related_name="reservas_criadas",
     )
     tipo = models.CharField(max_length=20, choices=TipoReserva.choices)
-    titulo = models.CharField(max_length=255, blank=True)
+    titulo = models.CharField(max_length=255, blank=True, verbose_name="Título")
     inicio = models.DateTimeField()
     fim = models.DateTimeField()
     recorrente = models.BooleanField(default=False)

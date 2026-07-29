@@ -1882,6 +1882,28 @@ dialog::backdrop {
     padding-left: 1.1rem;
 }
 
+/* Largura de formulario de tarefa.
+
+   O sistema tinha duas regras convivendo: telas de formulario com max-width
+   inventado no proprio template (760px numa, 860px noutra, centralizado numa
+   e nao na outra), e outras ocupando a coluna inteira -- onde um select para
+   escolher "Mestrado" ou "Doutorado" esticava por 1070px.
+
+   A regra passa a ser: o cartao sempre ocupa a coluna, para a moldura da
+   pagina ser a mesma em todas; os campos e que ficam numa medida legivel.
+   Campo largo demais afasta o rotulo do conteudo e obriga o olho a varrer
+   vazio ate encontrar o dado. */
+.form-coluna {
+    max-width: 42rem;
+}
+
+/* Botoes do formulario acompanham a largura dos campos, senao ficam soltos
+   na outra ponta do cartao. */
+.form-coluna .form-actions,
+.form-coluna .actions-row {
+    max-width: 42rem;
+}
+
 .campo-linha {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -1,4 +1,4 @@
-<form method="post">
+<form class="form-coluna" method="post">
     {% csrf_token %}
     {% if setor_editado %}
         <input type="hidden" name="setor_id" value="{{ setor_editado.id }}">

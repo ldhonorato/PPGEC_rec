@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Novo processo | PPGEC{% endblock %}
 {% block content %}
-<section class="card" style="max-width: 760px; margin: 0 auto;">
+<section class="card">
     <h1 class="section-title">Abrir novo processo</h1>
     <p class="muted" style="margin-top: 0;">
-        Todo processo aberto e direcionado inicialmente para o setor <strong>Secretaria PPGEC</strong>.
+        Todo processo aberto é direcionado inicialmente para o setor <strong>Secretaria PPGEC</strong>.
     </p>
 
-   <form method="post" enctype="multipart/form-data">
+   <form class="form-coluna" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {% for field in form %}
             <div class="field">
