@@ -124,7 +124,7 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
                 <ul class="activity-list" style="margin-top:0.7rem;">
                     {% for item in aluno_matricula_atual.itens.all|slice:":4" %}
                         <li>
-                            <span class="soft-icon">{% if item.status == "SOLICITADO" or item.status == "HOMOLOGADO" %}OK{% else %}!{% endif %}</span>
+                            <svg class="soft-icon {% if item.status == "SOLICITADO" or item.status == "HOMOLOGADO" %}is-ok{% else %}is-aviso{% endif %}" aria-hidden="true"><use href="#i-{% if item.status == "SOLICITADO" or item.status == "HOMOLOGADO" %}checado{% else %}pendente{% endif %}"></use></svg>
                             <span>{{ item.oferta.disciplina.codigo }} - {{ item.oferta.disciplina.nome }}</span>
                             <time>{{ item.get_status_display }}</time>
                         </li>
@@ -132,7 +132,12 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
                 </ul>
             {% endif %}
         {% else %}
-            <p class="muted">Nenhuma solicitação de matrícula registrada.</p>
+            <div class="estado-vazio">
+                <svg aria-hidden="true"><use href="#i-matricula"></use></svg>
+                <p class="estado-vazio-titulo">Nenhuma solicitação neste período</p>
+                <p>Quando a janela de matrícula abrir, sua solicitação aparece aqui.</p>
+                <a class="btn btn-secondary" href="{% url 'matricula_solicitar' %}">Solicitar matrícula</a>
+            </div>
         {% endif %}
     </article>
 
@@ -151,39 +156,52 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
 
 {% if aluno_checklist_integralizacao %}
 <section class="card panel">
-    <div class="actions-row">
+    {% comment %}
+    O resumo era uma linha de pipes com quatro dados de naturezas diferentes.
+    Vira uma fileira de valores rotulados: o numero fica em destaque e o
+    rotulo abaixo, no mesmo padrao dos cartoes da visao geral.
+    {% endcomment %}
+    <h2 class="section-title">{{ aluno_checklist_integralizacao.titulo }}</h2>
+    <dl class="resumo-linha">
         <div>
-            <h2 class="section-title">{{ aluno_checklist_integralizacao.titulo }}</h2>
-            <p class="muted">
-                Trajetória {{ aluno_checklist_integralizacao.trajetoria.get_nivel_curso_display }} |
-                Ingresso {{ aluno_checklist_integralizacao.trajetoria.ingresso|default:"-" }} |
-                Créditos aprovados: {{ aluno_checklist_integralizacao.creditos_aprovados }} |
-                Seminários: {{ aluno_checklist_integralizacao.horas_complementares }}h
-            </p>
+            <dt>Nível</dt>
+            <dd>{{ aluno_checklist_integralizacao.trajetoria.get_nivel_curso_display }}</dd>
         </div>
-    </div>
+        <div>
+            <dt>Ingresso</dt>
+            <dd>{{ aluno_checklist_integralizacao.trajetoria.ingresso|default:"—" }}</dd>
+        </div>
+        <div>
+            <dt>Créditos aprovados</dt>
+            <dd>{{ aluno_checklist_integralizacao.creditos_aprovados }}</dd>
+        </div>
+        <div>
+            <dt>Seminários</dt>
+            <dd>{{ aluno_checklist_integralizacao.horas_complementares }}h</dd>
+        </div>
+    </dl>
     <div class="dashboard-grid">
         {% for grupo in aluno_checklist_integralizacao.grupos %}
             <article>
                 <h3 class="section-title">{{ grupo.titulo }}</h3>
                 {% if grupo.tipo == "progresso" %}
-                    <p class="aluno-kv" style="margin-bottom:0.55rem;">
-                        <strong>{{ grupo.progresso.texto }}:</strong>
-                        {{ grupo.progresso.atual }}h de {{ grupo.progresso.total }}h
+                    <p class="progresso-rotulo">
+                        <strong>{{ grupo.progresso.atual }}h</strong> de {{ grupo.progresso.total }}h · {{ grupo.progresso.texto }}
                     </p>
-                    <div style="height:0.75rem; border-radius:999px; background:var(--color-border); overflow:hidden;">
-                        <div style="height:100%; width:{{ grupo.progresso.percentual }}%; background:var(--color-primary);"></div>
+                    <div class="barra-progresso" role="img"
+                         aria-label="{{ grupo.progresso.percentual }} por cento concluído">
+                        <span style="width: {{ grupo.progresso.percentual }}%"></span>
                     </div>
-                    <small class="muted" style="display:block; margin-top:0.45rem;">
-                        {{ grupo.progresso.percentual }}% concluído
-                    </small>
+                    <p class="progresso-percentual">{{ grupo.progresso.percentual }}% concluído</p>
                 {% else %}
                     <ul class="activity-list">
                         {% for item in grupo.itens %}
-                            <li>
-                                <span class="soft-icon">{% if item.cumprido %}OK{% else %}☐{% endif %}</span>
+                            <li class="{% if item.cumprido %}is-cumprido{% else %}is-pendente{% endif %}">
+                                <svg class="soft-icon" aria-hidden="true">
+                                    <use href="#i-{% if item.cumprido %}checado{% else %}pendente{% endif %}"></use>
+                                </svg>
                                 <span>{{ item.texto }}</span>
-                                <time>{% if item.cumprido %}Cumprido{% else %}Pendente{% endif %}</time>
+                                <span class="estado-item">{% if item.cumprido %}Cumprido{% else %}Pendente{% endif %}</span>
                             </li>
                         {% endfor %}
                     </ul>
@@ -205,7 +223,7 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
             {% if meus_processos_requerente %}
                 {% for processo in meus_processos_requerente|slice:":4" %}
                     <li>
-                        <span class="soft-icon">!</span>
+                        <svg class="soft-icon is-aviso" aria-hidden="true"><use href="#i-alerta"></use></svg>
                         <span>
                             <strong>{{ processo.numero }}</strong> aguarda ação do requerente
                         </span>
@@ -215,7 +233,7 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
             {% elif cientes_pendentes_orientador %}
                 {% for manifestacao in cientes_pendentes_orientador|slice:":4" %}
                     <li>
-                        <span class="soft-icon">C</span>
+                        <svg class="soft-icon" aria-hidden="true"><use href="#i-ciencias"></use></svg>
                         <span>
                             Ciência pendente no processo <strong>{{ manifestacao.processo.numero }}</strong>
                         </span>
@@ -225,7 +243,7 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
             {% elif assinaturas_pendentes %}
                 {% for solicitacao in assinaturas_pendentes|slice:":4" %}
                     <li>
-                        <span class="soft-icon">A</span>
+                        <svg class="soft-icon" aria-hidden="true"><use href="#i-assinaturas"></use></svg>
                         <span>
                             Assinatura pendente: <strong>{{ solicitacao.referencia_documento }}</strong>
                         </span>
@@ -234,7 +252,7 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
                 {% endfor %}
             {% else %}
                 <li>
-                    <span class="soft-icon">OK</span>
+                    <svg class="soft-icon is-ok" aria-hidden="true"><use href="#i-checado"></use></svg>
                     <span>Nenhuma atividade pendente para o seu perfil.</span>
                     <time>Hoje</time>
                 </li>
@@ -247,20 +265,20 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
         <div class="quick-list">
             {% if can_add_processo %}
                 <a href="{% url 'novo_processo' %}">
-                    <span class="soft-icon">N</span>
+                    <svg class="soft-icon" aria-hidden="true"><use href="#i-novo-processo"></use></svg>
                     <strong>Novo requerimento</strong>
-                    <span>-></span>
+                    <svg class="quick-seta" aria-hidden="true"><use href="#i-avancar"></use></svg>
                 </a>
             {% endif %}
             <a href="{% url 'menu_meus_processos' %}">
-                <span class="soft-icon">B</span>
+                <svg class="soft-icon" aria-hidden="true"><use href="#i-meus-processos"></use></svg>
                 <strong>Consultar processos</strong>
-                <span>-></span>
+                <svg class="quick-seta" aria-hidden="true"><use href="#i-avancar"></use></svg>
             </a>
             <a href="{% url 'me' %}">
-                <span class="soft-icon">U</span>
+                <svg class="soft-icon" aria-hidden="true"><use href="#i-perfil"></use></svg>
                 <strong>Meu perfil</strong>
-                <span>-></span>
+                <svg class="quick-seta" aria-hidden="true"><use href="#i-avancar"></use></svg>
             </a>
         </div>
     </article>

@@ -832,9 +832,16 @@ input[type="checkbox"] {
 
    O seletor pega o irmao seguinte, entao o primeiro bloco nao ganha margem
    superior indevida. */
-.content-area > * + *,
-.dashboard-grid > .card + .card {
+.content-area > * + * {
     margin-top: var(--espaco-bloco);
+}
+
+/* Filho de grid nao entra no ritmo: o espacamento ali e do gap. Uma margem
+   aqui empurra so o segundo item e desalinha o topo da fileira -- foi o que
+   aconteceu com "Trajetoria academica", que nascia 20px abaixo do vizinho. */
+.metric-grid > *,
+.dashboard-grid > * {
+    margin-top: 0;
 }
 
 /* Titulo de secao abrindo um bloco novo pede mais ar que dois blocos
@@ -1354,8 +1361,7 @@ dialog::backdrop {
 .metric-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 18px;
-    margin-bottom: 20px;
+    gap: var(--espaco-4);
 }
 
 /* O cartao inteiro virou link: antes so o "Ver todos ->" no rodape levava a
@@ -1407,7 +1413,13 @@ dialog::backdrop {
     background: var(--metric-bg, var(--color-primary-soft));
 }
 
+/* Altura fixa para o valor: numero (1.9rem) e palavra (1.15rem) tem caixas
+   de texto diferentes, e sem isso o rotulo de cada cartao parava numa altura
+   propria -- a fileira ficava com a base serrilhada em 3px. */
 .metric-value {
+    display: flex;
+    align-items: center;
+    min-height: 2.1rem;
     margin: 0;
     color: var(--metric-color, var(--color-primary));
     font-size: 1.9rem;
@@ -1450,7 +1462,8 @@ dialog::backdrop {
 .dashboard-grid {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
-    gap: 20px;
+    gap: var(--espaco-4);
+    align-items: start;
 }
 
 .activity-list,
@@ -1465,10 +1478,10 @@ dialog::backdrop {
 .activity-list li,
 .quick-list a {
     display: grid;
-    grid-template-columns: 42px minmax(0, 1fr) auto;
-    gap: 14px;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    gap: 12px;
     align-items: center;
-    min-height: 58px;
+    min-height: 46px;
     color: var(--color-text);
     text-decoration: none;
     border-bottom: 1px solid var(--color-border);
@@ -1479,15 +1492,14 @@ dialog::backdrop {
     border-bottom: 0;
 }
 
+/* Marcador de item em lista. Era um circulo de 34px com uma letra dentro
+   ("OK", "!", "N", "C"); agora recebe icone e encolhe -- em lista, o
+   marcador nao deve competir com o texto que ele acompanha. */
 .soft-icon {
-    width: 34px;
-    height: 34px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--color-primary-soft);
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
     color: var(--color-primary);
-    font-weight: 650;
 }
 
 .text-link {
@@ -2262,10 +2274,11 @@ dialog::backdrop {
 
     .activity-list li,
     .quick-list a {
-        grid-template-columns: 36px minmax(0, 1fr);
+        grid-template-columns: 22px minmax(0, 1fr);
     }
 
     .activity-list time,
+    .activity-list .estado-item,
     .quick-list span:last-child {
         grid-column: 2;
     }
@@ -2495,6 +2508,93 @@ dialog::backdrop {
 
 .paginacao-total {
     color: #90a0b5;
+}
+
+/* Fileira de valores rotulados. Substitui resumos escritos em linha unica
+   separada por pipes: o numero ganha destaque e o rotulo fica abaixo, no
+   mesmo padrao dos cartoes da visao geral. */
+.resumo-linha {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espaco-6);
+    margin: 0 0 var(--espaco-5);
+    padding-bottom: var(--espaco-4);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.resumo-linha dt {
+    color: var(--color-muted);
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.resumo-linha dd {
+    margin: 0.15rem 0 0;
+    color: var(--color-text);
+    font-size: 1.05rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Barra de progresso. Estava escrita em style inline dentro do template. */
+.barra-progresso {
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--color-border);
+    overflow: hidden;
+}
+
+.barra-progresso span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--color-primary);
+}
+
+.progresso-rotulo {
+    margin: 0 0 var(--espaco-2);
+    font-size: 0.88rem;
+}
+
+.progresso-rotulo strong {
+    font-size: 1.05rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.progresso-percentual {
+    margin: var(--espaco-2) 0 0;
+    color: var(--color-muted);
+    font-size: 0.79rem;
+}
+
+/* Estado do item de checklist. O texto sozinho, repetido em cada linha, nao
+   se distingue do proprio item; a cor separa cumprido de pendente sem exigir
+   leitura -- e o rotulo continua escrito. */
+.estado-item {
+    color: var(--color-muted);
+    font-size: 0.79rem;
+    white-space: nowrap;
+}
+
+.activity-list .is-cumprido .estado-item {
+    color: var(--color-accent-strong);
+}
+
+.activity-list .is-cumprido .soft-icon,
+.soft-icon.is-ok {
+    color: var(--color-accent-strong);
+}
+
+.soft-icon.is-aviso {
+    color: var(--color-warning);
+}
+
+.quick-seta {
+    width: 16px;
+    height: 16px;
+    color: var(--color-muted);
 }
 
 /* Estado vazio: antes era um <p> solto com o texto em cinza. */
