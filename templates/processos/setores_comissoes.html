@@ -1,9 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Setores e Comissões | Coordenação{% endblock %}
 {% block content %}
+{% comment %}
+O h1 da pagina fica aqui fora porque o painel de edicao so aparece as vezes;
+sem ele, a listagem comecava direto num h2 e a tela ficava sem titulo.
+{% endcomment %}
+<h1 class="section-title">Setores e comissões</h1>
+
 {% if can_edit_setores and setor_editado %}
     <section class="card" style="margin-bottom: 1rem;">
-        <h1 class="section-title">Editar setor/comissão</h1>
+        <h2 class="section-title">Editar setor/comissão</h2>
         {% url 'setores_comissoes' as setores_url %}
         {% include "processos/includes/setor_comissao_form.html" with submit_label="Salvar alterações" cancel_url=setores_url %}
     </section>

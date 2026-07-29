@@ -70,10 +70,64 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* Escala de titulos.
+
+   A classe .section-title esta em 148 lugares, aplicada indistintamente a h1,
+   h2, h3 e h4 -- todos saiam com o mesmo 1.35rem, entao a pagina nao tinha
+   hierarquia: "Meus orientandos" e "Orientacoes ativas" pesavam igual.
+
+   Em vez de editar os 148 usos, a escala vem do proprio elemento. O tamanho
+   cai a cada nivel e o entrelinhamento acompanha; o espacamento inferior
+   tambem diminui, para o titulo grudar na secao que ele nomeia.
+
+   O letter-spacing negativo so vale nos tamanhos grandes: em texto pequeno
+   ele atrapalha a leitura em vez de ajudar. */
 h1, h2, h3, h4 {
+    margin: 0 0 0.6rem;
+    color: var(--color-text);
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+h1, h1.section-title {
+    font-size: 1.5rem;
     font-weight: 650;
-    line-height: 1.25;
-    letter-spacing: -0.014em;
+    line-height: 1.2;
+    letter-spacing: -0.018em;
+    margin-bottom: 0.85rem;
+}
+
+h2, h2.section-title {
+    font-size: 1.125rem;
+    letter-spacing: -0.008em;
+    margin-bottom: 0.7rem;
+}
+
+h3, h3.section-title {
+    font-size: 0.975rem;
+    margin-bottom: 0.45rem;
+}
+
+h4, h4.section-title {
+    font-size: 0.9rem;
+    color: var(--color-muted);
+    margin-bottom: 0.4rem;
+}
+
+/* Um h2 logo apos o h1 e subtitulo da mesma area, nao uma secao nova:
+   encosta nele em vez de abrir espaco. */
+h1 + h2 {
+    margin-top: -0.2rem;
+}
+
+/* Titulo de secao a seguir de conteudo precisa de ar acima, senao cola no
+   bloco anterior -- e o caso de "Coorientacoes" logo abaixo da lista. */
+* + h2 {
+    margin-top: 1.75rem;
+}
+
+* + h3 {
+    margin-top: 1.15rem;
 }
 
 [hidden] {
@@ -755,11 +809,11 @@ input[type="checkbox"] {
     padding: 1.35rem;
 }
 
+/* Tamanho e margem vem da escala por elemento, logo acima. A classe segue
+   existindo por estar espalhada pelos templates e por marcar "titulo de
+   secao" -- mas nao dita mais o tamanho. */
 .section-title {
-    margin: 0 0 0.85rem;
     color: var(--color-text);
-    font-size: 1.35rem;
-    line-height: 1.2;
 }
 
 .muted {
