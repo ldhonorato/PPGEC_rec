@@ -1,15 +1,20 @@
+import ast
+import re
 import tempfile
 from datetime import date, datetime, time, timedelta
 from io import BytesIO
+from pathlib import Path
 from unittest.mock import patch
 from zipfile import ZipFile
 
+from django.conf import settings
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+
 
 from .models import (
     AlteracaoAluno,
@@ -3581,3 +3586,74 @@ class ReservaAmbienteTests(TestCase):
         )
 
         self.assertEqual(ReservaAmbiente.objects.count(), 2)
+
+
+class MenuLateralIconesTests(SimpleTestCase):
+    """Garante que todo icone referenciado no menu existe no sprite SVG.
+
+    Um icone inexistente nao quebra nada: o <use> simplesmente nao renderiza e
+    o item aparece sem icone -- falha silenciosa, facil de passar em revisao.
+
+    A verificacao le a arvore sintatica do context_processors em vez de montar
+    menus para usuarios de teste. Motivo: o menu tem varios ramos condicionais
+    (vinculo com setor, coordenador, membro do Pleno) e uma bateria de perfis
+    sinteticos nunca cobre todos -- a primeira versao deste teste passava com
+    um icone comprovadamente quebrado.
+    """
+
+    @staticmethod
+    def _icones_do_sprite():
+        caminho = Path(settings.BASE_DIR) / "templates" / "includes" / "icons.html"
+        return set(re.findall(r'<symbol id="i-([\w-]+)"', caminho.read_text(encoding="utf-8")))
+
+    @staticmethod
+    def _icones_declarados():
+        """Todo 4o argumento posicional de _menu_item(...), em qualquer ramo."""
+        origem = Path(settings.BASE_DIR) / "processos" / "context_processors.py"
+        arvore = ast.parse(origem.read_text(encoding="utf-8"))
+        icones = {}
+        for no in ast.walk(arvore):
+            if not isinstance(no, ast.Call):
+                continue
+            if not (isinstance(no.func, ast.Name) and no.func.id == "_menu_item"):
+                continue
+            if len(no.args) < 4:
+                continue
+            rotulo, icone = no.args[0], no.args[3]
+            if isinstance(icone, ast.Constant) and isinstance(icone.value, str):
+                nome = rotulo.value if isinstance(rotulo, ast.Constant) else f"linha {no.lineno}"
+                icones[(nome, no.lineno)] = icone.value
+        return icones
+
+    def test_todos_os_icones_do_menu_existem_no_sprite(self):
+        disponiveis = self._icones_do_sprite()
+        declarados = self._icones_declarados()
+
+        self.assertTrue(disponiveis, "sprite de icones vazio ou nao encontrado")
+        self.assertGreaterEqual(
+            len(declarados), 25,
+            "poucos itens de menu encontrados -- a leitura do context_processors falhou?",
+        )
+
+        ausentes = {
+            f"{rotulo} (linha {linha}) -> {icone}"
+            for (rotulo, linha), icone in declarados.items()
+            if icone not in disponiveis
+        }
+        self.assertEqual(
+            ausentes, set(),
+            "icones sem <symbol> correspondente em templates/includes/icons.html:\n  "
+            + "\n  ".join(sorted(ausentes)),
+        )
+
+    def test_nomes_de_icone_seguem_o_padrao(self):
+        fora_do_padrao = {
+            f"{rotulo} -> {icone!r}"
+            for (rotulo, _), icone in self._icones_declarados().items()
+            if not re.fullmatch(r"[a-z][a-z-]*", icone)
+        }
+        self.assertEqual(
+            fora_do_padrao, set(),
+            "nome de icone deve ser minusculo com hifens (ex.: novo-processo):\n  "
+            + "\n  ".join(sorted(fora_do_padrao)),
+        )

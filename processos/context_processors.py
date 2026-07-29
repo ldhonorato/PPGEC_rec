@@ -110,23 +110,23 @@ def _menu_lateral_sections(user):
 
     principal_items = []
     if user.tipo_usuario != User.TipoUsuario.SERVIDOR:
-        principal_items.append(_menu_item("Meus Processos", "/menu/meus-processos/", ["menu_meus_processos"], "M"))
+        principal_items.append(_menu_item("Meus Processos", "/menu/meus-processos/", ["menu_meus_processos"], "meus-processos"))
         if _can_add_processo(user):
-            principal_items.append(_menu_item("Novo Processo", "/processos/novo/", ["novo_processo"], "N"))
+            principal_items.append(_menu_item("Novo Processo", "/processos/novo/", ["novo_processo"], "novo-processo"))
     if user.tipo_usuario == User.TipoUsuario.ALUNO:
         principal_items.append(
             _menu_item(
                 "Matrícula",
                 "/matriculas/",
                 ["matriculas_minhas", "matricula_solicitar", "matricula_solicitar_periodo", "matricula_minha_solicitacao"],
-                "M",
+                "matricula",
             )
         )
         principal_items.append(
-            _menu_item("Documento de Vínculo", "/aluno/documento-vinculo/", ["aluno_documento_vinculo"], "D")
+            _menu_item("Documento de Vínculo", "/aluno/documento-vinculo/", ["aluno_documento_vinculo"], "documento-vinculo")
         )
         principal_items.append(
-            _menu_item("Minha Trajetória", f"/coordenacao/alunos/{user.id}/", ["aluno_detalhe"], "T")
+            _menu_item("Minha Trajetória", f"/coordenacao/alunos/{user.id}/", ["aluno_detalhe"], "trajetoria")
         )
     if user.tipo_usuario in {User.TipoUsuario.DOCENTE, User.TipoUsuario.SERVIDOR} or _is_secretaria_member(user):
         principal_items.append(
@@ -134,20 +134,20 @@ def _menu_lateral_sections(user):
                 "Reserva de Ambiente",
                 "/ambientes/reservas/",
                 ["reservas_ambientes", "disponibilidade_ambientes", "reservas_ambientes_feitas"],
-                "R",
+                "ambiente",
                 children=[
-                    _menu_item("Nova reserva de ambiente", "/ambientes/reservas/", ["reservas_ambientes"], "N"),
+                    _menu_item("Nova reserva de ambiente", "/ambientes/reservas/", ["reservas_ambientes"], "nova-reserva"),
                     _menu_item(
                         "Disponibilidade semanal",
                         "/ambientes/disponibilidade/",
                         ["disponibilidade_ambientes"],
-                        "D",
+                        "disponibilidade",
                     ),
                     _menu_item(
                         "Reservas feitas",
                         "/ambientes/reservas/feitas/",
                         ["reservas_ambientes_feitas"],
-                        "F",
+                        "reservas-feitas",
                     ),
                 ],
             )
@@ -159,7 +159,7 @@ def _menu_lateral_sections(user):
                 "Caixa de Processos",
                 "/coordenacao/caixa-processos/",
                 ["coordenacao_caixa_processos"],
-                "C",
+                "caixa",
             )
         )
     if _has_assinaturas_access(user) and not _has_gestao_access(user):
@@ -168,7 +168,7 @@ def _menu_lateral_sections(user):
                 "Assinaturas",
                 "/assinaturas/pendentes/",
                 ["pendencias_assinatura", "solicitacao_assinatura_detalhe"],
-                "A",
+                "assinaturas",
             )
         )
     if principal_items:
@@ -176,26 +176,26 @@ def _menu_lateral_sections(user):
 
     if user.tipo_usuario == User.TipoUsuario.DOCENTE:
         docente_items = [
-            _menu_item("Ofertas de Disciplinas", "/gestao/matriculas/ofertas/", ["matriculas_ofertas"], "O"),
-            _menu_item("Ciências", "/menu/ciencias-manifestadas/", ["menu_ciencias_manifestadas"], "C"),
-            _menu_item("Meus Orientandos", "/menu/meus-orientandos/", ["menu_meus_orientandos"], "O"),
+            _menu_item("Ofertas de Disciplinas", "/gestao/matriculas/ofertas/", ["matriculas_ofertas"], "ofertas"),
+            _menu_item("Ciências", "/menu/ciencias-manifestadas/", ["menu_ciencias_manifestadas"], "ciencias"),
+            _menu_item("Meus Orientandos", "/menu/meus-orientandos/", ["menu_meus_orientandos"], "orientandos"),
             _menu_item(
                 "Solicitação de Banca",
                 "/bancas/",
                 ["solicitacoes_banca", "solicitacao_banca_nova", "solicitacao_banca_detalhe"],
-                "B",
+                "banca",
             ),
             _menu_item(
                 "Processos dos Orientandos",
                 "/menu/processos-orientandos/",
                 ["menu_processos_orientandos"],
-                "P",
+                "processos-orientandos",
             ),
         ]
         if _is_membro_setor_nome(user, "Colegiando PPGEC (Pleno)"):
             docente_items.insert(
                 0,
-                _menu_item("Processos no Pleno", "/menu/processos-pleno/", ["menu_processos_pleno"], "P"),
+                _menu_item("Processos no Pleno", "/menu/processos-pleno/", ["menu_processos_pleno"], "pleno"),
             )
         sections.append({"label": "Docente", "items": docente_items})
 
@@ -207,11 +207,11 @@ def _menu_lateral_sections(user):
                     "Caixa de Processos",
                     "/coordenacao/caixa-processos/",
                     ["coordenacao_caixa_processos"],
-                    "C",
+                    "caixa",
                 )
             )
         coordenacao_items.extend([
-            _menu_item("Dashboard", "/coordenacao/dashboard/", ["coordenacao_dashboard"], "D"),
+            _menu_item("Dashboard", "/coordenacao/dashboard/", ["coordenacao_dashboard"], "dashboard"),
             _menu_item(
                 "Matrículas",
                 "/gestao/matriculas/periodos/",
@@ -223,38 +223,38 @@ def _menu_lateral_sections(user):
                     "matricula_oferta_alunos",
                     "matricula_oferta_exportar",
                 ],
-                "M",
+                "matriculas",
                 children=[
-                    _menu_item("Períodos letivos", "/gestao/matriculas/periodos/", ["matriculas_periodos"], "P"),
+                    _menu_item("Períodos letivos", "/gestao/matriculas/periodos/", ["matriculas_periodos"], "periodos"),
                     _menu_item(
                         "Solicitações",
                         "/gestao/matriculas/solicitacoes/",
                         ["matriculas_solicitacoes"],
-                        "S",
+                        "solicitacoes",
                     ),
-                    _menu_item("Disciplinas", "/gestao/matriculas/disciplinas/", ["matriculas_disciplinas"], "D"),
+                    _menu_item("Disciplinas", "/gestao/matriculas/disciplinas/", ["matriculas_disciplinas"], "disciplinas"),
                     _menu_item(
                         "Ofertas de disciplinas",
                         "/gestao/matriculas/ofertas/",
                         ["matriculas_ofertas", "matricula_oferta_alunos", "matricula_oferta_exportar"],
-                        "O",
+                        "ofertas",
                     ),
                 ],
             ),
-            _menu_item("Alunos", "/coordenacao/alunos/", ["coordenacao_alunos", "aluno_detalhe"], "A"),
+            _menu_item("Alunos", "/coordenacao/alunos/", ["coordenacao_alunos", "aluno_detalhe"], "alunos"),
             *(
                 [
                     _menu_item(
                         "Validar Cadastros",
                         "/coordenacao/alunos/cadastros/",
                         ["validar_cadastros_alunos"],
-                        "V",
+                        "validar",
                     )
                 ]
                 if _is_servidor(user) or _is_secretaria_member(user)
                 else []
             ),
-            _menu_item("Setores e Comissões", "/coordenacao/setores/", ["setores_comissoes"], "S"),
+            _menu_item("Setores e Comissões", "/coordenacao/setores/", ["setores_comissoes"], "setores"),
         ])
         coordenacao_items.append(
             _menu_item(
@@ -266,39 +266,39 @@ def _menu_lateral_sections(user):
                     "solicitacoes_assinatura",
                     "solicitacao_assinatura_detalhe",
                 ],
-                "A",
+                "assinaturas",
                 children=[
                     _menu_item(
                         "Nova solicitação",
                         "/assinaturas/nova/",
                         ["nova_solicitacao_assinatura"],
-                        "N",
+                        "nova-solicitacao",
                     ),
                     _menu_item(
                         "Pendências de assinatura",
                         "/assinaturas/pendentes/",
                         ["pendencias_assinatura"],
-                        "P",
+                        "pendencias",
                     ),
                     _menu_item(
                         "Solicitações feitas",
                         "/assinaturas/",
                         ["solicitacoes_assinatura"],
-                        "S",
+                        "solicitacoes-feitas",
                     ),
                 ],
             )
         )
         if _is_coordenador(user):
             coordenacao_items.append(
-                _menu_item("Criar Comissão", "/coordenacao/setores/criar/", ["criar_comissao"], "C")
+                _menu_item("Criar Comissão", "/coordenacao/setores/criar/", ["criar_comissao"], "criar-comissao")
             )
         if _has_gestao_access(user):
-            coordenacao_items.extend(
-                [
-                    _menu_item("Cadastro de Salas", "/ambientes/salas/", ["salas_ambientes"], "S"),
-                    _menu_item("Reservas de Salas", "/ambientes/reservas/feitas/", ["reservas_ambientes_feitas"], "R"),
-                ]
+            # "Reservas de Salas" existia aqui apontando para /ambientes/reservas/feitas/,
+            # o mesmo destino de "Reservas feitas" (submenu Reserva de Ambiente). O item era
+            # montado aqui e escondido por um {% if %} fixo no base.html; removido na origem.
+            coordenacao_items.append(
+                _menu_item("Cadastro de Salas", "/ambientes/salas/", ["salas_ambientes"], "salas")
             )
         sections.append({"label": "Coordenação", "items": coordenacao_items})
 

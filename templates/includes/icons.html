@@ -1,0 +1,199 @@
+{% comment %}
+Conjunto de icones do AcadFlow.
+
+Sprite SVG inline: cada icone e um <symbol> referenciado no restante das
+paginas por <svg class="side-icon"><use href="#i-nome"></use></svg>.
+
+Por que inline e nao arquivos separados: evita 30+ requisicoes HTTP, herda a
+cor do texto via currentColor (o icone acompanha os estados hover/ativo sem
+CSS extra) e nao adiciona dependencia de biblioteca ao projeto.
+
+Padrao de desenho: grade 24x24, apenas traco (sem preenchimento), espessura
+1.75, pontas e juncoes arredondadas. Ao criar um icone novo, siga esse padrao
+para o conjunto continuar visualmente coerente.
+
+O nome usado aqui e o mesmo passado em _menu_item(..., icon="nome") no
+processos/context_processors.py.
+{% endcomment %}
+<svg xmlns="http://www.w3.org/2000/svg" class="icon-sprite" aria-hidden="true" focusable="false">
+    <defs>
+        <g id="i-base" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></g>
+    </defs>
+
+    {# --- Processos --- #}
+    <symbol id="i-meus-processos" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
+        <path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/>
+    </symbol>
+    <symbol id="i-novo-processo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
+        <path d="M14 3v5h5"/><path d="M12 12v6"/><path d="M9 15h6"/>
+    </symbol>
+    <symbol id="i-caixa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5.5 4h13l2.5 8.5V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5.5z"/>
+        <path d="M3 12.5h4.5l1.5 3h6l1.5-3H21"/>
+    </symbol>
+    <symbol id="i-processos-orientandos" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 7a2 2 0 0 1 2-2h3.8l2 2.5H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <path d="M8 13h8"/><path d="M8 16.5h5"/>
+    </symbol>
+    <symbol id="i-pleno" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9" cy="8" r="3.2"/>
+        <path d="M3 19.5a6 6 0 0 1 12 0"/>
+        <path d="M16 5.4a3.2 3.2 0 0 1 0 6.2"/>
+        <path d="M17.2 14.4A5.5 5.5 0 0 1 21 19.5"/>
+    </symbol>
+
+    {# --- Aluno --- #}
+    <symbol id="i-matricula" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="14" rx="2"/>
+        <circle cx="8.5" cy="11" r="2"/>
+        <path d="M5.5 16c.6-1.2 1.7-1.9 3-1.9s2.4.7 3 1.9"/>
+        <path d="M14.5 10h4"/><path d="M14.5 13.5h2.5"/>
+    </symbol>
+    <symbol id="i-documento-vinculo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h2.5"/>
+        <path d="M14 3v5h5v3"/>
+        <circle cx="16" cy="16.5" r="4"/>
+        <path d="M14.4 16.5l1.2 1.2 2.2-2.3"/>
+    </symbol>
+    <symbol id="i-trajetoria" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="5.5" r="2.5"/>
+        <path d="M8 18.5h5a3.5 3.5 0 0 0 0-7h-2a3.5 3.5 0 0 1 0-7h5"/>
+    </symbol>
+
+    {# --- Ambientes --- #}
+    <symbol id="i-ambiente" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 21h16"/>
+        <path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/>
+        <path d="M10 7.5h1"/><path d="M13 7.5h1"/><path d="M10 11.5h1"/><path d="M13 11.5h1"/>
+        <path d="M10 21v-3.5h4V21"/>
+    </symbol>
+    <symbol id="i-nova-reserva" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="16" rx="2"/>
+        <path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/>
+        <path d="M12 13v5"/><path d="M9.5 15.5h5"/>
+    </symbol>
+    <symbol id="i-disponibilidade" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="16" rx="2"/>
+        <path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/>
+        <path d="M7.5 13.8h.01"/><path d="M12 13.8h.01"/><path d="M16.5 13.8h.01"/>
+        <path d="M7.5 17.5h.01"/><path d="M12 17.5h.01"/>
+    </symbol>
+    <symbol id="i-reservas-feitas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="16" rx="2"/>
+        <path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/>
+        <path d="M8.8 15.4l2.2 2.2 4.2-4.2"/>
+    </symbol>
+    <symbol id="i-salas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 21h16"/>
+        <path d="M6.5 21V4.5A1.5 1.5 0 0 1 8 3h8a1.5 1.5 0 0 1 1.5 1.5V21"/>
+        <circle cx="14.5" cy="12.5" r="1"/>
+    </symbol>
+
+    {# --- Gestao academica --- #}
+    <symbol id="i-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7.5" height="8" rx="1.5"/>
+        <rect x="13.5" y="3" width="7.5" height="5" rx="1.5"/>
+        <rect x="3" y="14" width="7.5" height="7" rx="1.5"/>
+        <rect x="13.5" y="11" width="7.5" height="10" rx="1.5"/>
+    </symbol>
+    <symbol id="i-matriculas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 4.5H7a2 2 0 0 0-2 2V19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6.5a2 2 0 0 0-2-2h-2"/>
+        <rect x="9" y="2.5" width="6" height="4" rx="1.2"/>
+        <path d="M8.5 11.5h7"/><path d="M8.5 15.5h7"/>
+    </symbol>
+    <symbol id="i-periodos" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="16" rx="2"/>
+        <path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/>
+        <path d="M7.5 15.5h9"/><circle cx="7.5" cy="15.5" r="1.1"/><circle cx="16.5" cy="15.5" r="1.1"/>
+    </symbol>
+    <symbol id="i-solicitacoes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6.5l1.5 1.5L7.5 5"/><path d="M10.5 6.5H21"/>
+        <path d="M3 12.5l1.5 1.5L7.5 11"/><path d="M10.5 12.5H21"/>
+        <path d="M3 18.5l1.5 1.5L7.5 17"/><path d="M10.5 18.5H21"/>
+    </symbol>
+    <symbol id="i-disciplinas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+        <path d="M6.5 2.5H20v19H6.5A2.5 2.5 0 0 1 4 19V5a2.5 2.5 0 0 1 2.5-2.5z"/>
+    </symbol>
+    <symbol id="i-ofertas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 7.5v12.5"/>
+        <path d="M12 7.5C10.5 6 8.5 5.5 6 5.5H3v12h3c2.5 0 4.5.5 6 2"/>
+        <path d="M12 7.5c1.5-1.5 3.5-2 6-2h3v12h-3c-2.5 0-4.5.5-6 2"/>
+    </symbol>
+    <symbol id="i-alunos" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3.5L2.5 8 12 12.5 21.5 8z"/>
+        <path d="M6.5 10.2V16c0 1.7 2.5 3 5.5 3s5.5-1.3 5.5-3v-5.8"/>
+        <path d="M21.5 8v6"/>
+    </symbol>
+    <symbol id="i-validar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9" cy="8" r="3.5"/>
+        <path d="M2.5 20a6.5 6.5 0 0 1 11-4.7"/>
+        <path d="M15 17.5l2 2 4-4"/>
+    </symbol>
+    <symbol id="i-orientandos" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 20v-1.5a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20"/>
+        <circle cx="8.5" cy="7.5" r="3.5"/>
+        <path d="M21.5 20v-1.5a4 4 0 0 0-3-3.87"/>
+        <path d="M16 4.13a4 4 0 0 1 0 7.75"/>
+    </symbol>
+    <symbol id="i-ciencias" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2.8l2.1 1.5 2.6-.2.8 2.5 2.1 1.5-.9 2.4.9 2.4-2.1 1.5-.8 2.5-2.6-.2L12 18.2l-2.1-1.5-2.6.2-.8-2.5-2.1-1.5.9-2.4-.9-2.4 2.1-1.5.8-2.5 2.6.2z"/>
+        <path d="M9.6 10.5l1.7 1.7 3.1-3.3"/>
+    </symbol>
+    <symbol id="i-banca" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="8.5" r="5.5"/>
+        <path d="M8.6 13.2L7.5 21.5l4.5-2.6 4.5 2.6-1.1-8.3"/>
+    </symbol>
+    <symbol id="i-setores" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="2.5" width="6" height="5" rx="1.2"/>
+        <rect x="2.5" y="16.5" width="6" height="5" rx="1.2"/>
+        <rect x="15.5" y="16.5" width="6" height="5" rx="1.2"/>
+        <path d="M12 7.5v3.5"/><path d="M5.5 16.5V11h13v5.5"/>
+    </symbol>
+    <symbol id="i-criar-comissao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13.5 20v-1.5a4 4 0 0 0-4-4h-4a4 4 0 0 0-4 4V20"/>
+        <circle cx="7.5" cy="7.5" r="3.5"/>
+        <path d="M18.5 7v6"/><path d="M15.5 10h6"/>
+    </symbol>
+
+    {# --- Assinaturas --- #}
+    <symbol id="i-assinaturas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 16.5c2-4.5 3.5 1.5 5.5-1.5s1.5-7 3.5-7 1.5 4.5 3.5 4.5 3-1 4.5-2.5"/>
+        <path d="M4 20.5h16"/>
+    </symbol>
+    <symbol id="i-nova-solicitacao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/><path d="M12 8v8"/><path d="M8 12h8"/>
+    </symbol>
+    <symbol id="i-pendencias" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/><path d="M12 6.5V12l3.5 2"/>
+    </symbol>
+    <symbol id="i-solicitacoes-feitas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 3L10.5 13.5"/>
+        <path d="M21 3l-6.5 18-4-7.5L3 9.5z"/>
+    </symbol>
+
+    {# --- Conta e interface --- #}
+    <symbol id="i-perfil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3.2"/>
+        <path d="M6.2 18.7a6.6 6.6 0 0 1 11.6 0"/>
+    </symbol>
+    <symbol id="i-sair" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9.5 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.5"/>
+        <path d="M16 16.5l4.5-4.5L16 7.5"/><path d="M20.5 12H9.5"/>
+    </symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6.5 9.5l5.5 5.5 5.5-5.5"/>
+    </symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>
+    </symbol>
+    <symbol id="i-fechar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6.5 6.5l11 11"/><path d="M17.5 6.5l-11 11"/>
+    </symbol>
+    <symbol id="i-alerta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.3 3.9a2 2 0 0 1 3.4 0l7.4 12.8a2 2 0 0 1-1.7 3H4.6a2 2 0 0 1-1.7-3z"/>
+        <path d="M12 9.5v4"/><path d="M12 17h.01"/>
+    </symbol>
+</svg>
