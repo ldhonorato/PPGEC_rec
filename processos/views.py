@@ -163,6 +163,24 @@ def _is_docente(user):
     return user.is_authenticated and user.tipo_usuario == User.TipoUsuario.DOCENTE
 
 
+def _e_orientador_do_aluno(user, aluno_id):
+    """Diz se o docente orienta ou coorienta o aluno informado.
+
+    O vinculo mora em TrajetoriaAcademica, nao no Aluno -- consultar
+    Aluno.orientador nao funciona, o campo nao existe mais.
+
+    Considera qualquer trajetoria, nao so a ativa: o orientador continua
+    respondendo pelo historico de quem ja concluiu, e a tela "Meus
+    Orientandos" tambem lista as orientacoes encerradas.
+    """
+    if not _is_docente(user):
+        return False
+    return TrajetoriaAcademica.objects.filter(
+        Q(orientador=user) | Q(coorientador=user),
+        aluno_id=aluno_id,
+    ).exists()
+
+
 def _is_servidor(user):
     return user.is_authenticated and user.tipo_usuario == User.TipoUsuario.SERVIDOR
 
@@ -2219,8 +2237,14 @@ def alunos_view(request):
 def aluno_detalhe_view(request, aluno_id):
     can_manage_aluno = _has_gestao_access(request.user)
     is_self_aluno = request.user.tipo_usuario == User.TipoUsuario.ALUNO and request.user.id == aluno_id
-    if not (can_manage_aluno or is_self_aluno):
-        raise PermissionDenied("Acesso restrito ao aluno, coordenadores e servidores.")
+    # O orientador entra como leitor. Antes ficava de fora: a tela "Meus
+    # Orientandos" listava os alunos dele, mas abrir qualquer um dava 403 --
+    # nao havia caminho nenhum para a trajetoria do proprio orientando.
+    is_orientador_do_aluno = _e_orientador_do_aluno(request.user, aluno_id)
+    if not (can_manage_aluno or is_self_aluno or is_orientador_do_aluno):
+        raise PermissionDenied(
+            "Esta ficha é acessível ao próprio aluno, ao orientador dele e à coordenação."
+        )
 
     aluno = get_object_or_404(
         Aluno.objects.prefetch_related(
@@ -2236,8 +2260,13 @@ def aluno_detalhe_view(request, aluno_id):
 
     if request.method == "POST":
         acao = request.POST.get("acao", "").strip()
-        if not can_manage_aluno and acao not in {"salvar_publicacao"}:
-            raise PermissionDenied("Apenas publicações podem ser alteradas pelo aluno.")
+        # A guarda cita quem pode fazer o que, em vez de so negar o que nao e
+        # gestao: o orientador tambem chega ate aqui agora, e entra como leitor.
+        # Sem o "is_self_aluno" explicito ele herdaria a edicao de publicacoes.
+        if not can_manage_aluno and not (is_self_aluno and acao == "salvar_publicacao"):
+            raise PermissionDenied(
+                "Somente a coordenação altera esta ficha. O aluno pode editar as próprias publicações."
+            )
 
         if acao == "alterar_dados":
             form = AlunoDadosForm(request.POST, aluno=aluno)

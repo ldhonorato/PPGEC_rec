@@ -3789,3 +3789,103 @@ class PaginacaoListagensTests(TestCase):
         uma_so = self.client.get(reverse("coordenacao_processos"), {"q": "Alvo do filtro"})
         self.assertEqual(self._pagina(uma_so).paginator.num_pages, 1)
         self.assertNotContains(uma_so, "paginacao-passo")
+
+
+class OrientadorAcessaOrientandoTests(TestCase):
+    """O orientador precisa alcancar a ficha do proprio orientando.
+
+    A tela "Meus Orientandos" lista os alunos dele, mas abrir qualquer um dava
+    403: a verificacao so considerava gestao e o proprio aluno. Nao havia
+    caminho nenhum para a trajetoria do orientando.
+
+    O acesso e de leitura -- alterar a ficha continua sendo da coordenacao.
+    """
+
+    def setUp(self):
+        senha = "senha-segura-123"
+        self.orientador = Docente.objects.create_user(
+            email="orientador.acesso@example.com", password=senha, nome="Orientador Acesso",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        self.coorientador = Docente.objects.create_user(
+            email="coorientador.acesso@example.com", password=senha, nome="Coorientador Acesso",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        self.outro_docente = Docente.objects.create_user(
+            email="alheio.acesso@example.com", password=senha, nome="Docente Alheio",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        self.aluno = Aluno.objects.create_user(
+            email="orientando.acesso@example.com", password=senha, nome="Orientando Acesso",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026B0001",
+        )
+        self.trajetoria = TrajetoriaAcademica.objects.create(
+            aluno=self.aluno, orientador=self.orientador, coorientador=self.coorientador,
+            nivel_curso="MESTRADO", ingresso="2026.1",
+            status=TrajetoriaAcademica.Status.ATIVA,
+        )
+        self.url = reverse("aluno_detalhe", args=[self.aluno.id])
+
+    def test_orientador_abre_a_ficha(self):
+        self.client.force_login(self.orientador)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_coorientador_abre_a_ficha(self):
+        self.client.force_login(self.coorientador)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_docente_sem_vinculo_continua_barrado(self):
+        self.client.force_login(self.outro_docente)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+
+    def test_orientacao_encerrada_mantem_o_acesso(self):
+        """O orientador continua respondendo pelo historico de quem concluiu."""
+        self.trajetoria.status = TrajetoriaAcademica.Status.CONCLUIDA
+        self.trajetoria.numero_defesa = "ATA-2026-07"
+        self.trajetoria.data_defesa = timezone.localdate()
+        self.trajetoria.save()
+
+        self.client.force_login(self.orientador)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_orientador_nao_altera_a_ficha(self):
+        """Leitura nao pode virar escrita: o aluno pode editar as proprias
+        publicacoes, e sem a guarda explicita o orientador herdaria isso."""
+        self.client.force_login(self.orientador)
+        resposta = self.client.post(self.url, {"acao": "salvar_publicacao"})
+        self.assertEqual(resposta.status_code, 403)
+
+    def test_lista_de_orientandos_leva_a_ficha(self):
+        """Antes o nome era texto solto -- nao havia link para lugar nenhum."""
+        self.client.force_login(self.orientador)
+        resposta = self.client.get(reverse("menu_meus_orientandos"))
+        self.assertContains(resposta, f'href="{self.url}"')
+
+
+class MensagemDeAcessoNegadoTests(TestCase):
+    """A tela de 403 deve dizer o motivo, nao so negar.
+
+    As views levantam PermissionDenied com uma mensagem que identifica quem
+    tem acesso; ela era descartada e o usuario via um texto generico.
+    """
+
+    def setUp(self):
+        self.aluno = Aluno.objects.create_user(
+            email="aluno.negado@example.com", password="senha-segura-123",
+            nome="Aluno Negado", tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026B0002",
+        )
+
+    def test_403_mostra_o_motivo_da_recusa(self):
+        self.client.force_login(self.aluno)
+        with self.settings(DEBUG=False):
+            resposta = self.client.get(reverse("coordenacao_dashboard"))
+
+        self.assertEqual(resposta.status_code, 403)
+        self.assertContains(resposta, "Acesso restrito", status_code=403)
+
+    def test_403_do_pleno_identifica_o_colegiado(self):
+        self.client.force_login(self.aluno)
+        with self.settings(DEBUG=False):
+            resposta = self.client.get(reverse("menu_processos_pleno"))
+
+        self.assertContains(resposta, "Colegiado", status_code=403)

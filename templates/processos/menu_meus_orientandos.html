@@ -9,7 +9,7 @@
         <ul class="list">
             {% for trajetoria in orientacoes_ativas %}
                 <li>
-                    <strong>{{ trajetoria.aluno.nome }}</strong><br>
+                    <strong><a class="text-link" href="{% url 'aluno_detalhe' trajetoria.aluno.id %}">{{ trajetoria.aluno.nome }}</a></strong><br>
                     <small class="muted">
                         {{ trajetoria.aluno.email }}
                         {% if trajetoria.aluno.matricula %} | Matrícula: {{ trajetoria.aluno.matricula }}{% endif %}
@@ -28,7 +28,7 @@
         <ul class="list">
             {% for trajetoria in coorientacoes_ativas %}
                 <li>
-                    <strong>{{ trajetoria.aluno.nome }}</strong><br>
+                    <strong><a class="text-link" href="{% url 'aluno_detalhe' trajetoria.aluno.id %}">{{ trajetoria.aluno.nome }}</a></strong><br>
                     <small class="muted">
                         {{ trajetoria.aluno.email }}
                         {% if trajetoria.aluno.matricula %} | Matrícula: {{ trajetoria.aluno.matricula }}{% endif %}
@@ -49,7 +49,7 @@
         <ul class="list">
             {% for trajetoria in vinculos_concluidos %}
                 <li>
-                    <strong>{{ trajetoria.aluno.nome }}</strong><br>
+                    <strong><a class="text-link" href="{% url 'aluno_detalhe' trajetoria.aluno.id %}">{{ trajetoria.aluno.nome }}</a></strong><br>
                     <small class="muted">
                         {{ trajetoria.aluno.email }}
                         {% if trajetoria.aluno.matricula %} | Matrícula: {{ trajetoria.aluno.matricula }}{% endif %}

@@ -343,10 +343,17 @@ class TrajetoriaAcademica(models.Model):
             self.coorientador_externo_instituicao = ""
 
         if self.status == self.Status.CONCLUIDA and self.usa_conclusao:
+            # Usa os rotulos proprios de cada campo. Com conclusao_label_lower
+            # a mensagem saia como "Informe o defesa" -- genero errado e
+            # apontando para a defesa, quando o que falta e o numero dela.
             if not (self.numero_defesa or "").strip():
-                errors["numero_defesa"] = f"Informe o {self.conclusao_label_lower} para trajetória concluída."
+                errors["numero_defesa"] = (
+                    f"Informe o {self.numero_conclusao_label.lower()} para concluir a trajetória."
+                )
             if not self.data_defesa:
-                errors["data_defesa"] = f"Informe a data do {self.conclusao_label_lower} para trajetória concluída."
+                errors["data_defesa"] = (
+                    f"Informe a {self.data_conclusao_label.lower()} para concluir a trajetória."
+                )
         elif self.deposito_versao_final:
             errors["deposito_versao_final"] = "Depósito da versão final só pode ser marcado após conclusão."
 
