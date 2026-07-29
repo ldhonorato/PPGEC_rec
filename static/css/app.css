@@ -1439,11 +1439,15 @@ dialog::backdrop {
     padding: 0;
 }
 
+/* Altura travada na janela: o painel institucional fica parado e so a coluna
+   do formulario rola. Antes o .auth-shell usava min-height, entao o cadastro
+   (o formulario mais longo) rolava a pagina inteira e levava a marca junto. */
 .auth-shell {
     display: grid;
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-    min-height: 100vh;
-    min-height: 100dvh;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
 }
 
 .auth-institucional {
@@ -1456,6 +1460,7 @@ dialog::backdrop {
         radial-gradient(circle at 22% 12%, rgba(88, 201, 141, 0.2), transparent 45%),
         linear-gradient(160deg, #063a78 0%, #002b63 100%);
     color: #ffffff;
+    overflow-y: auto;
 }
 
 .auth-logo {
@@ -1517,6 +1522,7 @@ dialog::backdrop {
 }
 
 .auth-formulario {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1525,6 +1531,98 @@ dialog::backdrop {
     padding: 3rem 2rem;
     background: var(--color-surface);
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #c8d2e0 transparent;
+}
+
+/* Conteudo mais alto que a coluna sobe ate o topo em vez de ficar centralizado
+   e cortado nas duas pontas. */
+.auth-formulario.rola-acima,
+.auth-formulario.rola-abaixo {
+    justify-content: flex-start;
+}
+
+/* Sombra interna nas bordas: nao acompanha a rolagem, entao marca exatamente
+   onde o conteudo esta sendo cortado. */
+.auth-formulario.rola-acima {
+    box-shadow: inset 0 14px 12px -12px rgba(18, 35, 61, 0.22);
+}
+
+.auth-formulario.rola-abaixo {
+    box-shadow: inset 0 -14px 12px -12px rgba(18, 35, 61, 0.22);
+}
+
+.auth-formulario.rola-acima.rola-abaixo {
+    box-shadow:
+        inset 0 14px 12px -12px rgba(18, 35, 61, 0.22),
+        inset 0 -14px 12px -12px rgba(18, 35, 61, 0.22);
+}
+
+.auth-formulario::-webkit-scrollbar {
+    width: 8px;
+}
+
+.auth-formulario::-webkit-scrollbar-thumb {
+    background: #c8d2e0;
+    border-radius: 4px;
+}
+
+.auth-formulario::-webkit-scrollbar-thumb:hover {
+    background: #a8b6ca;
+}
+
+/* Botao de descer. Sticky no rodape da coluna, alinhado a direita para nao
+   cobrir campo nenhum. So aparece quando ha conteudo abaixo. */
+.auth-indicador {
+    position: sticky;
+    bottom: 1rem;
+    align-self: flex-end;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    margin: -38px 0 0;
+    padding: 0;
+    color: var(--color-primary);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    box-shadow: 0 6px 18px rgba(18, 35, 61, 0.16);
+    cursor: pointer;
+    /* Tres pulsos e para. Em repeticao infinita vira ruido permanente no canto
+       da tela -- e um alvo que nunca fica parado para receber o clique. */
+    animation: auth-indicador-pulso 2s ease-in-out 3;
+}
+
+.auth-formulario.rola-abaixo .auth-indicador {
+    display: inline-flex;
+}
+
+.auth-indicador svg {
+    width: 19px;
+    height: 19px;
+}
+
+.auth-indicador:hover {
+    background: var(--color-primary-soft);
+}
+
+.auth-indicador:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+@keyframes auth-indicador-pulso {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-indicador {
+        animation: none;
+    }
 }
 
 .auth-cartao {
@@ -1840,9 +1938,21 @@ dialog::backdrop {
 }
 
 @media (max-width: 900px) {
+    /* Em coluna unica quem rola e a pagina, nao a coluna: travar a altura aqui
+       criaria duas areas de rolagem aninhadas. */
     .auth-shell {
         grid-template-columns: 1fr;
-        min-height: 0;
+        height: auto;
+        overflow: visible;
+    }
+
+    .auth-formulario {
+        overflow: visible;
+        box-shadow: none;
+    }
+
+    .auth-indicador {
+        display: none !important;
     }
 
     /* No mobile o painel institucional vira uma faixa de identificacao: mantem
