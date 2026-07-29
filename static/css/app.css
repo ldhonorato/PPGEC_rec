@@ -12,8 +12,31 @@
     --color-warning: #e87510;
     --color-danger: #b42336;
     --color-border: #e3e9f2;
-    --shadow-card: 0 16px 36px rgba(18, 35, 61, 0.08);
-    --shadow-control: 0 10px 22px rgba(0, 72, 154, 0.16);
+    /* Sombras.
+
+       A anterior era 0 16px 36px: deslocada 16px para baixo e espalhada por
+       36px, ela formava uma poça escura sob cada cartao que avancava sobre o
+       bloco seguinte. Com cartoes empilhados, a tela ficava suja.
+
+       Estas sao em duas camadas -- um contorno de 1px que assenta a borda e
+       um halo curto que levanta o cartao. Quem separa os blocos e a borda
+       mais o espaco; a sombra so da profundidade. */
+    --shadow-card: 0 1px 2px rgba(18, 35, 61, 0.05), 0 4px 12px rgba(18, 35, 61, 0.05);
+    --shadow-card-alta: 0 2px 4px rgba(18, 35, 61, 0.06), 0 12px 28px rgba(18, 35, 61, 0.09);
+    --shadow-control: 0 1px 2px rgba(0, 72, 154, 0.16), 0 4px 10px rgba(0, 72, 154, 0.14);
+
+    /* Escala de espacamento. Antes nao havia nenhuma: cada template resolvia
+       o proprio respiro com style="margin-bottom: 1rem" inline, e onde
+       ninguem lembrou os blocos ficaram colados. */
+    --espaco-1: 0.25rem;
+    --espaco-2: 0.5rem;
+    --espaco-3: 0.75rem;
+    --espaco-4: 1rem;
+    --espaco-5: 1.5rem;
+    --espaco-6: 2rem;
+    --espaco-7: 3rem;
+    /* Distancia entre dois blocos de conteudo da pagina. */
+    --espaco-bloco: 1.25rem;
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 18px;
@@ -801,6 +824,26 @@ input[type="checkbox"] {
     display: none;
 }
 
+/* Ritmo vertical da coluna de conteudo.
+
+   Cada bloco irmao se afasta do anterior sozinho. Antes o respiro dependia de
+   cada template lembrar de um style="margin-bottom" inline -- onde ninguem
+   lembrou, os blocos ficaram colados; onde dois lembraram, dobrou.
+
+   O seletor pega o irmao seguinte, entao o primeiro bloco nao ganha margem
+   superior indevida. */
+.content-area > * + *,
+.dashboard-grid > .card + .card {
+    margin-top: var(--espaco-bloco);
+}
+
+/* Titulo de secao abrindo um bloco novo pede mais ar que dois blocos
+   irmaos -- senao ele cola no cartao anterior e parece legenda dele. */
+.content-area > * + h2,
+.content-area > * + .overview-title {
+    margin-top: var(--espaco-6);
+}
+
 .card {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
@@ -1266,97 +1309,41 @@ dialog::backdrop {
     flex-wrap: wrap;
 }
 
+/* Faixa de abertura. Substitui um bloco de 245px que repetia a marca da
+   barra lateral, com um documento desenhado em CSS e um padrao de circulos
+   ancorado fora da area visivel -- que aparecia cortado. */
 .hero-card {
-    position: relative;
-    display: grid;
-    grid-template-columns: 190px minmax(0, 1fr);
-    gap: 32px;
+    display: flex;
     align-items: center;
-    min-height: 245px;
-    margin-bottom: 26px;
-    overflow: hidden;
-    border-radius: var(--radius-lg);
-    background: #ffffff;
-}
-
-.hero-card::after {
-    content: "";
-    position: absolute;
-    inset: 0 0 0 auto;
-    width: 34%;
-    opacity: 0.5;
-    background:
-        repeating-radial-gradient(ellipse at 100% 50%, transparent 0 13px, rgba(0, 72, 154, 0.24) 14px 15px, transparent 16px 28px);
-}
-
-.hero-mark {
-    position: relative;
-    width: 150px;
-    height: 150px;
-    margin-left: 18px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--color-primary-soft);
-    color: var(--color-primary);
-}
-
-.hero-mark::before {
-    content: "";
-    width: 70px;
-    height: 86px;
-    border: 4px solid currentColor;
-    border-radius: 12px;
-    background:
-        linear-gradient(currentColor, currentColor) 18px 24px / 34px 4px no-repeat,
-        linear-gradient(currentColor, currentColor) 18px 42px / 34px 4px no-repeat,
-        linear-gradient(currentColor, currentColor) 18px 60px / 34px 4px no-repeat;
-}
-
-.hero-mark::after {
-    content: "";
-    position: absolute;
-    right: 22px;
-    bottom: 28px;
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-    background: var(--color-accent);
-    box-shadow: 0 0 0 7px #ffffff;
-}
-
-.hero-content {
-    position: relative;
-    z-index: 1;
-}
-
-.hero-kicker {
-    margin: 0 0 6px;
-    font-size: 1.55rem;
-    font-weight: 600;
+    justify-content: space-between;
+    gap: var(--espaco-4);
+    flex-wrap: wrap;
+    padding: 1.1rem 1.35rem;
 }
 
 .hero-title {
     margin: 0;
-    color: var(--color-primary);
-    font-size: clamp(2.5rem, 6vw, 4.35rem);
-    line-height: 0.95;
-}
-
-.hero-title span {
-    color: var(--color-accent);
-}
-
-.hero-subtitle {
-    margin: 18px 0 6px;
-    font-weight: 600;
+    font-size: 1.45rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
 }
 
 .hero-copy {
-    max-width: 520px;
+    margin: 0.2rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.87rem;
+}
+
+.hero-data {
     margin: 0;
     color: var(--color-muted);
-    line-height: 1.55;
+    font-size: 0.83rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* capitalize deixaria "29 De Julho De 2026"; so a primeira letra sobe. */
+.hero-data::first-letter {
+    text-transform: uppercase;
 }
 
 .overview-title {
@@ -2178,9 +2165,6 @@ dialog::backdrop {
 
 @media (max-width: 920px) {
     .dashboard-grid,
-    .hero-card {
-        grid-template-columns: 1fr;
-    }
 
     /* Abaixo de 920px a barra vira gaveta. Antes ela ficava estatica no topo,
        empilhada acima do conteudo: em toda pagina o usuario rolava ~470px de
@@ -2241,13 +2225,7 @@ dialog::backdrop {
         grid-template-columns: 1fr;
     }
 
-    .hero-mark {
-        margin: 0;
-    }
 
-    .hero-card::after {
-        width: 60%;
-    }
 }
 
 @media (max-width: 640px) {
@@ -2280,13 +2258,7 @@ dialog::backdrop {
         width: 100%;
     }
 
-    .hero-card {
-        padding: 1.1rem;
-    }
 
-    .hero-title {
-        font-size: 2.55rem;
-    }
 
     .activity-list li,
     .quick-list a {

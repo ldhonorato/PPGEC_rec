@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Processo {{ processo.numero }}{% endblock %}
 {% block content %}
-<section class="card" style="margin-bottom: 1rem;">
+<section class="card">
     <h1 class="section-title">Processo {{ processo.numero }}</h1>
     <p style="margin: 0.35rem 0;"><strong>Assunto:</strong> {{ processo.assunto }}</p>
     <p style="margin: 0.35rem 0;"><strong>Tipo:</strong> {{ processo.get_tipo_display }}</p>
@@ -30,7 +30,7 @@
 </section>
 
 {% if solicitacoes_banca_display %}
-<section class="card" style="margin-bottom: 1rem;">
+<section class="card">
     <h2 class="section-title">Formulários anexados</h2>
     <ul class="list">
         {% for item in solicitacoes_banca_display %}
@@ -160,7 +160,7 @@
 {% endif %}
 
 {% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo or can_registrar_horas_complementares %}
-<section class="card" style="margin-bottom: 1rem;">
+<section class="card">
     <h2 class="section-title">Acoes</h2>
     <div style="display: flex; gap: 0.7rem; flex-wrap: wrap;">
         {% if can_registrar_horas_complementares %}
@@ -188,7 +188,7 @@
     </div>
 </section>
 {% elif not can_comment_pleno %}
-<section class="card" style="margin-bottom: 1rem;">
+<section class="card">
     <p class="muted" style="margin: 0;">
         Você não tem permissão para adicionar documento ou encaminhar neste processo.
     </p>
@@ -196,7 +196,7 @@
 {% endif %}
 
 {% if resumo_horas_complementares %}
-<section class="card" style="margin-bottom: 1rem;">
+<section class="card">
     <h2 class="section-title">Horas complementares</h2>
     <div class="grid-two">
         <p><strong>Aluno:</strong> {{ aluno_horas_complementares.nome }}</p>
@@ -243,7 +243,7 @@
 </section>
 {% endif %}
 
-<section class="card" style="margin-bottom: 1rem;">
+<section class="card">
     <h2 class="section-title">Ciente do orientador</h2>
     {% if orientador_responsavel %}
         <p class="muted" style="margin: 0 0 0.7rem 0;">Orientador responsável: {{ orientador_responsavel.nome }} ({{ orientador_responsavel.email }})</p>
@@ -426,7 +426,7 @@
 </dialog>
 {% endif %}
 
-<section class="card" style="margin-bottom: 1rem;">
+<section class="card">
     <h2 class="section-title">Documentos</h2>
     {% if documentos_exibicao %}
         <ul class="list">
@@ -483,7 +483,7 @@
 </section>
 
 {% if can_comment_pleno %}
-<section class="card" style="margin-bottom: 1rem;">
+<section class="card">
     <h2 class="section-title">Comentários do Pleno</h2>
     <form method="post" style="margin-bottom: 1rem;">
         {% csrf_token %}

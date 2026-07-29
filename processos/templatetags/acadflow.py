@@ -28,3 +28,15 @@ def status_processo_tom(status):
     antigos cujo valor saiu das choices atuais.
     """
     return TONS_STATUS_PROCESSO.get(status, "info")
+
+
+@register.filter
+def primeiro_nome(nome_completo):
+    """Primeiro nome de uma pessoa, para saudacao.
+
+    truncatewords:1 nao serve aqui: ele acrescenta reticencias, e a saudacao
+    saia como "Ola, Aluno ...".
+    """
+    if not nome_completo:
+        return ""
+    return str(nome_completo).strip().split()[0]

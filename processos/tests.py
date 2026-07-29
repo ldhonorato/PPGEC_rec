@@ -2319,8 +2319,11 @@ class FrontendIdentityTests(TestCase):
         response = self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Bem-vindo ao")
-        self.assertContains(response, "Acad<span>Flow</span>", html=True)
+        # A faixa de abertura deixou de repetir a marca -- que ja esta na barra
+        # lateral, em toda tela -- e passou a cumprimentar pelo nome.
+        self.assertContains(response, "Olá,")
+        self.assertContains(response, self.docente.nome.split()[0])
+        self.assertContains(response, "img/acadflow-wordmark")
         self.assertContains(response, 'class="sidebar"')
         self.assertContains(response, 'class="metric-grid"')
         self.assertContains(response, "overdue-link")

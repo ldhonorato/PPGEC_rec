@@ -8,7 +8,7 @@ sem ele, a listagem comecava direto num h2 e a tela ficava sem titulo.
 <h1 class="section-title">Setores e comissões</h1>
 
 {% if can_edit_setores and setor_editado %}
-    <section class="card" style="margin-bottom: 1rem;">
+    <section class="card">
         <h2 class="section-title">Editar setor/comissão</h2>
         {% url 'setores_comissoes' as setores_url %}
         {% include "processos/includes/setor_comissao_form.html" with submit_label="Salvar alterações" cancel_url=setores_url %}

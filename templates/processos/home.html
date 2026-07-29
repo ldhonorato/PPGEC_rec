@@ -1,16 +1,23 @@
 {% extends "base.html" %}
+{% load acadflow %}
 {% block title %}Início | AcadFlow{% endblock %}
 {% block content %}
+{% comment %}
+Faixa de abertura.
+
+Antes ocupava 245px repetindo a marca da barra lateral, com um desenho de
+documento feito a mao em CSS e um padrao de circulos concentricos ancorado
+fora da area visivel -- o que dava a impressao de recorte acidental.
+
+Agora cumprimenta pelo nome, que e a informacao que muda a cada visita, e
+cede a altura para os dados logo abaixo.
+{% endcomment %}
 <section class="card hero-card">
-    <div class="hero-mark" aria-hidden="true"></div>
-    <div class="hero-content">
-        <p class="hero-kicker">Bem-vindo ao</p>
-        <h1 class="hero-title">Acad<span>Flow</span></h1>
-        <p class="hero-subtitle">Sistema de Gestão Acadêmica do PPGEC</p>
-        <p class="hero-copy">
-            Utilize o menu lateral para acessar as funcionalidades disponíveis para o seu perfil.
-        </p>
+    <div>
+        <h1 class="hero-title">Olá, {{ user.nome|default:user.email|primeiro_nome }}</h1>
+        <p class="hero-copy">{{ user.get_tipo_usuario_display }} · Sistema de Gestão Acadêmica do PPGEC</p>
     </div>
+    <p class="hero-data">{% now "l, j \d\e F \d\e Y" %}</p>
 </section>
 
 <h2 class="overview-title">Visão geral</h2>
