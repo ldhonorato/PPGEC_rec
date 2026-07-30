@@ -2640,6 +2640,16 @@ dialog::backdrop {
     border-bottom: 1px solid var(--color-border);
 }
 
+/* A borda e a margem inferiores separam a grade do bloco seguinte. Quando a
+   grade e a ultima coisa do cartao -- na ficha vista pelo aluno, que nao tem a
+   faixa de acoes da coordenacao -- elas viravam uma linha solta seguida de um
+   vao vazio, e o cartao parecia cortado no meio. */
+.dados-grid:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
 .dados-grid dt {
     color: var(--color-muted);
     font-size: 0.73rem;
@@ -3541,4 +3551,94 @@ dialog::backdrop {
 /* Lista de atividades logo abaixo de uma grade de dados, no mesmo cartao. */
 .activity-list-apos-dados {
     margin-top: var(--espaco-5);
+}
+
+/* ==========================================================================
+   Trajetoria academica como bloco que abre e fecha
+
+   As trajetorias vinham todas abertas, uma embaixo da outra, cada uma com onze
+   linhas de dados mais publicacoes, disciplinas e horas complementares. Com uma
+   trajetoria a tela passava de 3000px; um aluno que concluiu o mestrado e esta
+   no doutorado tem duas, e a que esta em curso -- que e o motivo da visita --
+   ficava soterrada pelo historico.
+
+   A ativa abre sozinha; as demais ficam fechadas com o resumo no cabecalho.
+   Reaproveita o marcador do .revelar, mas aqui o cabecalho e um item de lista
+   clicavel, nao um link discreto.
+   ========================================================================== */
+.pilha-trajetorias {
+    display: grid;
+    gap: var(--espaco-4);
+}
+
+.trajetoria {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+}
+
+.trajetoria[open] {
+    border-color: var(--color-primary-soft);
+    box-shadow: var(--shadow-card);
+}
+
+.trajetoria-resumo {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-4);
+    flex-wrap: wrap;
+    padding: var(--espaco-4);
+    list-style: none;
+    cursor: pointer;
+    border-radius: var(--radius-md);
+}
+
+.trajetoria-resumo::-webkit-details-marker {
+    display: none;
+}
+
+.trajetoria-resumo:hover {
+    background: var(--color-surface-soft);
+}
+
+/* Marcador antes do titulo: aponta para baixo quando aberto. */
+.trajetoria-resumo::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-right: 1.5px solid var(--color-muted);
+    border-bottom: 1.5px solid var(--color-muted);
+    transform: rotate(-45deg);
+    transition: transform 0.15s ease;
+}
+
+.trajetoria[open] > .trajetoria-resumo::before {
+    transform: rotate(45deg);
+}
+
+/* O resumo empurra os metadados para a direita, longe do titulo: o que
+   identifica a trajetoria fica junto, e o apoio fica no fim da linha. */
+.trajetoria-resumo > .meta-linha {
+    margin: 0 0 0 auto;
+}
+
+.trajetoria-corpo {
+    padding: 0 var(--espaco-4) var(--espaco-4);
+    border-top: 1px solid var(--color-border);
+    margin-top: 0;
+    padding-top: var(--espaco-5);
+}
+
+.trajetoria-corpo > .grupo-acoes {
+    margin-bottom: var(--espaco-5);
+}
+
+/* Coluna de numeros numa tabela: alinhada a direita, com digitos de largura
+   fixa, para que as casas fiquem uma sobre a outra e os valores possam ser
+   comparados de relance. */
+.tabela .celula-numerica {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }

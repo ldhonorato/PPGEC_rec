@@ -2290,6 +2290,67 @@ def alunos_view(request):
     )
 
 
+def _linhas_trajetoria(trajetoria):
+    """Os campos de uma trajetoria, na ordem em que sao lidos.
+
+    O template listava os onze campos na mao, cada um numa linha com o rotulo, o
+    valor e o botao que abre o modal correspondente. Isso amarrava tres coisas:
+    quais campos existem, como sao formatados e que a tela e uma lista editavel.
+
+    Como dado, a mesma lista serve as duas leituras da tela -- a coordenacao, que
+    edita campo por campo, e o aluno e o orientador, que so leem e nao precisam
+    de uma coluna de acoes vazia ao lado de cada linha.
+
+    "campo" e o sufixo do id do modal (modal-trajetoria-<campo>-<id>); vazio
+    significa que o campo nao e editavel isoladamente.
+    """
+    sim_nao = lambda valor: "Sim" if valor else "Não"
+    linhas = [{"rotulo": "Ingresso", "valor": trajetoria.ingresso or "—", "campo": ""}]
+
+    if trajetoria.usa_prazos_academicos:
+        linhas += [
+            {
+                "rotulo": f"Prazo {trajetoria.qualificacao_label_lower}",
+                "valor": trajetoria.prazo_qualificacao or "—",
+                "campo": "prazo-qualificacao",
+            },
+            {"rotulo": "Prazo defesa", "valor": trajetoria.prazo_defesa or "—", "campo": "prazo-defesa"},
+            {"rotulo": "Reingressante", "valor": sim_nao(trajetoria.reingressante), "campo": "reingressante"},
+            {
+                "rotulo": trajetoria.qualificacao_label,
+                "valor": sim_nao(trajetoria.isQualificado),
+                "campo": "qualificacao",
+            },
+            {
+                "rotulo": "Orientador",
+                "valor": trajetoria.orientador.nome if trajetoria.orientador else "—",
+                "campo": "orientador",
+            },
+            {"rotulo": "Coorientador", "valor": trajetoria.coorientador_display or "—", "campo": "coorientador"},
+        ]
+
+    if trajetoria.usa_conclusao:
+        if trajetoria.numero_defesa or trajetoria.data_defesa:
+            partes = [trajetoria.numero_defesa or "—"]
+            if trajetoria.data_defesa:
+                partes.append(trajetoria.data_defesa.strftime("%d/%m/%Y"))
+            valor = " · ".join(partes)
+        else:
+            valor = "—"
+        linhas.append({"rotulo": trajetoria.conclusao_label, "valor": valor, "campo": "defesa"})
+
+    if trajetoria.usa_deposito_final:
+        linhas.append(
+            {
+                "rotulo": "Depósito final",
+                "valor": sim_nao(trajetoria.deposito_versao_final),
+                "campo": "deposito",
+            }
+        )
+
+    return linhas
+
+
 @login_required
 def aluno_detalhe_view(request, aluno_id):
     can_manage_aluno = _has_gestao_access(request.user)
@@ -3111,7 +3172,13 @@ def aluno_detalhe_view(request, aluno_id):
         .filter(usuario_criado_por=aluno)
         .order_by("-data_criacao")
     )
-    trajetorias = aluno.trajetorias.select_related("orientador", "coorientador").order_by("-criado_em")
+    # Ativa primeiro, depois as demais da mais recente para a mais antiga: a
+    # trajetoria em curso e a que se abre ao entrar na tela, e um aluno pode ter
+    # varias (mestrado concluido, doutorado em andamento, um trancamento).
+    trajetorias = sorted(
+        aluno.trajetorias.select_related("orientador", "coorientador").all(),
+        key=lambda t: (t.status != TrajetoriaAcademica.Status.ATIVA, -t.criado_em.timestamp()),
+    )
     trajetoria_cards = []
     for trajetoria in trajetorias:
         estagio_cards = [
@@ -3132,6 +3199,8 @@ def aluno_detalhe_view(request, aluno_id):
         trajetoria_cards.append(
             {
                 "obj": trajetoria,
+                "linhas": _linhas_trajetoria(trajetoria),
+                "esta_ativa": trajetoria.status == TrajetoriaAcademica.Status.ATIVA,
                 "form": TrajetoriaAcademicaForm(initial=_trajetoria_form_initial(trajetoria)),
                 "resumo_horas_complementares": LancamentoHorasComplementares.resumo_trajetoria(trajetoria),
                 "horas_form": HorasComplementaresAdministrativoForm(

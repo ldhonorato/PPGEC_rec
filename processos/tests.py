@@ -17,6 +17,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 
+from .views import _linhas_trajetoria
 from .models import (
     AlteracaoAluno,
     Aluno,
@@ -4028,6 +4029,113 @@ class TodasAsTelasRenderizamTests(TestCase):
                         resposta.status_code, esperado,
                         f"{nome_rota} devolveu {resposta.status_code} para {perfil}",
                     )
+
+
+class TrajetoriasNaFichaDoAlunoTests(TestCase):
+    """Como as trajetorias sao apresentadas na ficha.
+
+    Um aluno pode ter varias: mestrado concluido e doutorado em curso, um
+    trancamento, um reingresso. Todas vinham abertas, uma embaixo da outra, cada
+    uma com onze linhas de dados mais publicacoes, disciplinas e horas
+    complementares -- a trajetoria em curso, que e o motivo da visita, ficava
+    soterrada pelo historico.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        senha = "senha-segura-123"
+        cls.docente = Docente.objects.create_user(
+            email="orientador.traj@example.com", password=senha, nome="Orientador Traj",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        cls.aluno = Aluno.objects.create_user(
+            email="aluno.traj@example.com", password=senha, nome="Aluno Traj",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026T0001",
+        )
+        cls.servidor = User.objects.create_user(
+            email="servidor.traj@example.com", password=senha, nome="Servidor Traj",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        cls.concluida = TrajetoriaAcademica.objects.create(
+            aluno=cls.aluno, orientador=cls.docente, nivel_curso="MESTRADO",
+            ingresso="2021.1", status=TrajetoriaAcademica.Status.CONCLUIDA,
+            numero_defesa="ATA-2023-14", data_defesa=date(2023, 8, 18),
+        )
+        cls.ativa = TrajetoriaAcademica.objects.create(
+            aluno=cls.aluno, orientador=cls.docente, nivel_curso="DOUTORADO",
+            ingresso="2024.1", status=TrajetoriaAcademica.Status.ATIVA,
+        )
+        cls.url = reverse("aluno_detalhe", args=[cls.aluno.id])
+
+    def test_a_trajetoria_ativa_e_a_que_abre(self):
+        """A concluida existe na tela, mas fechada."""
+        self.client.force_login(self.aluno)
+        corpo = self.client.get(self.url).content.decode()
+
+        blocos = re.findall(r"<details class=\"trajetoria\"[^>]*>", corpo)
+        self.assertEqual(len(blocos), 2, "as duas trajetorias devem estar na tela")
+        self.assertEqual(
+            [1 for bloco in blocos if "open" in bloco], [1],
+            f"exatamente uma trajetoria abre sozinha; abertas: {blocos}",
+        )
+        # A ativa vem primeiro, e e a que tem o open.
+        self.assertIn("open", blocos[0])
+
+    def test_leitor_recebe_grade_em_vez_de_linhas_com_botao(self):
+        """Quem nao edita nao precisa de uma coluna de acoes vazia por linha.
+
+        Os onze campos cabem em quatro linhas de tres colunas. Como lista
+        editavel, sao onze linhas com o lado direito em branco.
+        """
+        for quem, usuario in (("aluno", self.aluno), ("orientador", self.docente)):
+            with self.subTest(leitor=quem):
+                self.client.force_login(usuario)
+                corpo = self.client.get(self.url).content.decode()
+                self.assertNotIn("info-list-editavel", corpo)
+                self.assertIn("dados-grid", corpo)
+
+    def test_coordenacao_continua_editando_campo_por_campo(self):
+        self.client.force_login(self.servidor)
+        corpo = self.client.get(self.url).content.decode()
+        self.assertIn("info-list-editavel", corpo)
+        self.assertIn(f"modal-trajetoria-orientador-{self.ativa.id}", corpo)
+
+    def test_as_duas_leituras_mostram_os_mesmos_campos(self):
+        """A lista de campos vem da view, nao escrita duas vezes no template.
+
+        Enquanto o template listava os campos na mao em cada ramo, era possivel
+        acrescentar um campo para a coordenacao e esquecer o do aluno.
+        """
+        rotulos = [linha["rotulo"] for linha in _linhas_trajetoria(self.ativa)]
+
+        corpos = {}
+        for quem, usuario in (("aluno", self.aluno), ("servidor", self.servidor)):
+            self.client.force_login(usuario)
+            corpos[quem] = self.client.get(self.url).content.decode()
+
+        for rotulo in rotulos:
+            for quem, corpo in corpos.items():
+                with self.subTest(campo=rotulo, leitor=quem):
+                    self.assertIn(rotulo, corpo)
+
+    def test_campos_seguem_o_nivel_do_curso(self):
+        """Nivel sem prazos academicos nao ganha linhas de prazo em branco."""
+        rotulos_doutorado = {linha["rotulo"] for linha in _linhas_trajetoria(self.ativa)}
+        self.assertIn("Orientador", rotulos_doutorado)
+        self.assertIn("Prazo defesa", rotulos_doutorado)
+        # "Nivel" saiu: o titulo do bloco ja e o nivel do curso.
+        self.assertNotIn("Nível", rotulos_doutorado)
+
+    def test_conclusao_junta_numero_e_data_da_ata(self):
+        linhas = {linha["rotulo"]: linha["valor"] for linha in _linhas_trajetoria(self.concluida)}
+        valor = linhas[self.concluida.conclusao_label]
+        self.assertIn("ATA-2023-14", valor)
+        self.assertIn("18/08/2023", valor)
+
+    def test_campo_sem_valor_mostra_travessao(self):
+        """Nao string vazia nem "None": a ficha e lida como documento."""
+        linhas = {linha["rotulo"]: linha["valor"] for linha in _linhas_trajetoria(self.ativa)}
+        self.assertEqual(linhas["Coorientador"], "—")
 
 
 class PadraoVisualDosTemplatesTests(SimpleTestCase):

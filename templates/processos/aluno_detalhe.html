@@ -82,30 +82,64 @@ a mesma grade rotulada das demais telas de detalhe.
                 </div>
             </div>
             {% if trajetoria_cards %}
-                <ul class="list">
+                {% comment %}
+                Cada trajetoria e um bloco que abre e fecha.
+
+                Antes as trajetorias vinham todas abertas, uma embaixo da outra,
+                com onze linhas de dados, publicacoes, disciplinas e horas
+                complementares cada. Com uma trajetoria a tela ja tinha 3000px;
+                um aluno que fez mestrado e esta no doutorado dobra isso, e a
+                trajetoria em curso -- que e o que se vem ver -- fica soterrada.
+
+                Agora a ativa vem aberta e as demais fechadas, com o resumo no
+                proprio cabecalho: quem quer o historico abre, quem quer a
+                situacao atual ja esta olhando para ela.
+                {% endcomment %}
+                <div class="pilha-trajetorias">
                     {% for card in trajetoria_cards %}
                         {% with trajetoria=card.obj %}
-                        <li>
-                            <div class="secao-cabecalho">
-                                <div class="trajetoria-titulo">
+                        <details class="trajetoria" {% if card.esta_ativa %}open{% endif %}>
+                            <summary class="trajetoria-resumo">
+                                <span class="trajetoria-titulo">
                                     <strong>{{ trajetoria.get_nivel_curso_display }}</strong>
                                     <span class="badge badge-info">{{ trajetoria.get_status_display }}</span>
+                                </span>
+                                <span class="meta-linha">
+                                    {% if trajetoria.ingresso %}<span>Ingresso {{ trajetoria.ingresso }}</span>{% endif %}
+                                    {% if trajetoria.orientador %}<span>{{ trajetoria.orientador.nome }}</span>{% endif %}
+                                </span>
+                            </summary>
+
+                            <div class="trajetoria-corpo">
+                            {% if can_manage_aluno %}
+                                <div class="grupo-acoes">
+                                    <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-status-{{ trajetoria.id }}">Alterar status</button>
+                                    <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-nivel-{{ trajetoria.id }}">Alterar nível</button>
                                 </div>
-                                {% if can_manage_aluno %}
-                                    <div class="grupo-acoes">
-                                        <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-status-{{ trajetoria.id }}">Alterar status</button>
-                                        <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-nivel-{{ trajetoria.id }}">Alterar nível</button>
-                                    </div>
-                                {% endif %}
-                            </div>
+                            {% endif %}
                             {% comment %}
-                            "Nivel" saiu da lista: o titulo do cartao ja e o nivel, e a
-                            linha repetia o mesmo valor logo abaixo dele. O botao que
-                            estava nessa linha subiu para o cabecalho, junto do status --
-                            os dois alteram o que identifica a trajetoria.
+                            Os campos vem da view (card.linhas), nao escritos um por um
+                            aqui: sao os mesmos onze campos nas duas leituras da tela, e
+                            duplicar a lista era garantir que uma das duas ficasse atras.
+
+                            A coordenacao edita campo a campo, e ai cada linha precisa do
+                            proprio botao. Quem so le -- o aluno e o orientador -- recebe
+                            a grade compacta: os mesmos onze campos em quatro linhas de
+                            tres colunas, sem uma coluna de acoes vazia do lado direito.
                             {% endcomment %}
+                            {% if can_manage_aluno %}
                             <ul class="info-list info-list-editavel">
-                                <li><span class="info-label">Ingresso</span><span>{{ trajetoria.ingresso|default:"—" }}</span><span></span></li>
+                                {% for linha in card.linhas %}
+                                    <li>
+                                        <span class="info-label">{{ linha.rotulo }}</span>
+                                        <span>{{ linha.valor }}</span>
+                                        {% if linha.campo %}
+                                            <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-{{ linha.campo }}-{{ trajetoria.id }}">Alterar</button>
+                                        {% else %}
+                                            <span></span>
+                                        {% endif %}
+                                    </li>
+                                {% endfor %}
                                 <li>
                                     <span class="info-label">Estágios de docência</span>
                                     <span>
@@ -125,7 +159,7 @@ a mesma grade rotulada das demais telas de detalhe.
                                         {% if trajetoria.estagios_docencia.count %}
                                             <button type="button" class="btn btn-secondary" data-toggle-estagios="{{ trajetoria.id }}">Ver todos ({{ trajetoria.estagios_docencia.count }})</button>
                                         {% endif %}
-                                        {% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-estagio-create-{{ trajetoria.id }}">Novo estágio</button>{% endif %}
+                                        <button type="button" class="btn btn-secondary" data-modal-open="modal-estagio-create-{{ trajetoria.id }}">Novo estágio</button>
                                     </div>
                                 </li>
 
@@ -164,21 +198,25 @@ a mesma grade rotulada das demais telas de detalhe.
                                     </div>
                                 </li>
 
-                                {% if trajetoria.usa_prazos_academicos %}
-                                    <li><span class="info-label">Prazo {{ trajetoria.qualificacao_label_lower }}</span><span>{{ trajetoria.prazo_qualificacao|default:"—" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                    <li><span class="info-label">Prazo defesa</span><span>{{ trajetoria.prazo_defesa|default:"—" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                    <li><span class="info-label">Reingressante</span><span>{% if trajetoria.reingressante %}Sim{% else %}Não{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-reingressante-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                    <li><span class="info-label">{{ trajetoria.qualificacao_label }}</span><span>{% if trajetoria.isQualificado %}Sim{% else %}Não{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-qualificacao-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                    <li><span class="info-label">Orientador</span><span>{% if trajetoria.orientador %}{{ trajetoria.orientador.nome }}{% else %}—{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-orientador-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                    <li><span class="info-label">Coorientador</span><span>{{ trajetoria.coorientador_display|default:"—" }}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-coorientador-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                {% endif %}
-                                {% if trajetoria.usa_conclusao %}
-                                    <li><span class="info-label">{{ trajetoria.conclusao_label }}</span><span>{% if trajetoria.numero_defesa or trajetoria.data_defesa %}{{ trajetoria.numero_defesa|default:"—" }}{% if trajetoria.data_defesa %} - {{ trajetoria.data_defesa|date:"d/m/Y" }}{% endif %}{% else %}—{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-defesa-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                {% endif %}
-                                {% if trajetoria.usa_deposito_final %}
-                                    <li><span class="info-label">Depósito final</span><span>{% if trajetoria.deposito_versao_final %}Sim{% else %}Não{% endif %}</span>{% if can_manage_aluno %}<button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-deposito-{{ trajetoria.id }}">Alterar</button>{% endif %}</li>
-                                {% endif %}
                             </ul>
+                            {% else %}
+                            <dl class="dados-grid">
+                                {% for linha in card.linhas %}
+                                    <div><dt>{{ linha.rotulo }}</dt><dd>{{ linha.valor }}</dd></div>
+                                {% endfor %}
+                                <div>
+                                    <dt>Estágios de docência</dt>
+                                    <dd>
+                                        {% with ultimo=trajetoria.estagios_docencia.last %}
+                                            {% if ultimo %}{{ ultimo.get_status_display }}{% else %}—{% endif %}
+                                        {% endwith %}
+                                    </dd>
+                                    {% if trajetoria.estagios_docencia.count %}
+                                        <span class="dado-nota">{{ trajetoria.estagios_docencia.count }} registrado{{ trajetoria.estagios_docencia.count|pluralize }}</span>
+                                    {% endif %}
+                                </div>
+                            </dl>
+                            {% endif %}
                             <div class="secao-cabecalho secao-cabecalho-interna">
                                 <h3 class="section-title">Publicações</h3>
                                 {% if can_edit_publicacoes %}
@@ -269,19 +307,36 @@ a mesma grade rotulada das demais telas de detalhe.
                             </dl>
 
                             <h4 class="section-title titulo-interno">Distribuição por grupo</h4>
+                            {% comment %}
+                            Sete cartoes, cada um com um titulo e uma linha de tres
+                            numeros -- 500px de altura para comparar valores que estao
+                            em caixas diferentes. Sao quatro colunas de dados por grupo:
+                            e tabela, e como tabela os numeros ficam alinhados na
+                            vertical, que e como se comparam.
+                            {% endcomment %}
                             {% if resumo.grupos %}
-                                <ul class="list">
-                                    {% for item in resumo.grupos %}
-                                        <li>
-                                            <strong>{{ item.grupo.nome }}</strong>
-                                            <p class="meta-linha">
-                                                <span>Computadas: {{ item.horas }}h</span>
-                                                <span>Limite: {% if item.grupo.limite_maximo %}{{ item.grupo.limite_maximo }}h{% else %}sem limite{% endif %}</span>
-                                                {% if item.saldo is not None %}<span>Saldo: {{ item.saldo }}h</span>{% endif %}
-                                            </p>
-                                        </li>
-                                    {% endfor %}
-                                </ul>
+                                <div class="tabela-envolvido">
+                                    <table class="tabela">
+                                        <thead>
+                                            <tr>
+                                                <th scope="col">Grupo</th>
+                                                <th scope="col" class="celula-numerica">Computadas</th>
+                                                <th scope="col" class="celula-numerica">Limite</th>
+                                                <th scope="col" class="celula-numerica">Saldo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in resumo.grupos %}
+                                                <tr>
+                                                    <td class="celula-principal">{{ item.grupo.nome }}</td>
+                                                    <td class="celula-numerica">{{ item.horas }}h</td>
+                                                    <td class="celula-numerica">{% if item.grupo.limite_maximo %}{{ item.grupo.limite_maximo }}h{% else %}<span class="muted">sem limite</span>{% endif %}</td>
+                                                    <td class="celula-numerica">{% if item.saldo is not None %}{{ item.saldo }}h{% else %}—{% endif %}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
                             {% else %}
                                 <p class="estado-vazio-inline">Nenhuma norma de horas complementares vigente para esta trajetória.</p>
                             {% endif %}
@@ -316,13 +371,23 @@ a mesma grade rotulada das demais telas de detalhe.
                                 <p class="estado-vazio-inline">Nenhum lançamento de horas registrado nesta trajetória.</p>
                             {% endif %}
                             {% endwith %}
-                        </li>
-
+                            </div>
+                        </details>
                         {% endwith %}
                     {% endfor %}
-                </ul>
+                </div>
             {% else %}
-                <p class="muted">Sem trajetórias registradas.</p>
+                <div class="estado-vazio">
+                    <svg aria-hidden="true"><use href="#i-trajetoria"></use></svg>
+                    <p class="estado-vazio-titulo">Nenhuma trajetória registrada</p>
+                    <p>
+                        {% if is_self_aluno %}
+                            A coordenação cadastra sua trajetória após a validação do vínculo.
+                        {% else %}
+                            A trajetória define nível, prazos e orientação do aluno.
+                        {% endif %}
+                    </p>
+                </div>
             {% endif %}
         </section>
 
