@@ -4067,19 +4067,46 @@ class TrajetoriasNaFichaDoAlunoTests(TestCase):
         )
         cls.url = reverse("aluno_detalhe", args=[cls.aluno.id])
 
-    def test_a_trajetoria_ativa_e_a_que_abre(self):
-        """A concluida existe na tela, mas fechada."""
+    def test_as_trajetorias_comecam_fechadas(self):
+        """A tela abre mostrando quantas existem, nao o conteudo de todas."""
         self.client.force_login(self.aluno)
         corpo = self.client.get(self.url).content.decode()
 
         blocos = re.findall(r"<details class=\"trajetoria\"[^>]*>", corpo)
         self.assertEqual(len(blocos), 2, "as duas trajetorias devem estar na tela")
         self.assertEqual(
-            [1 for bloco in blocos if "open" in bloco], [1],
-            f"exatamente uma trajetoria abre sozinha; abertas: {blocos}",
+            [bloco for bloco in blocos if "open" in bloco], [],
+            f"nenhuma trajetoria abre sozinha; abertas: {blocos}",
         )
-        # A ativa vem primeiro, e e a que tem o open.
-        self.assertIn("open", blocos[0])
+
+    def test_a_trajetoria_ativa_vem_primeiro(self):
+        """Fechadas, a ordem e o que coloca a trajetoria em curso a um clique.
+
+        A ordenacao era so por data de criacao; a que esta em curso podia cair
+        no fim, atras de mestrados concluidos anos antes.
+        """
+        self.client.force_login(self.aluno)
+        resposta = self.client.get(self.url)
+        ordem = [card["obj"].id for card in resposta.context["trajetoria_cards"]]
+        self.assertEqual(ordem[0], self.ativa.id, "a trajetoria ativa deve ser a primeira")
+
+    def test_o_resumo_fechado_identifica_a_trajetoria(self):
+        """Fechada, a trajetoria ainda precisa dizer qual e.
+
+        Sem isso o retraimento troca uma tela longa por uma lista de blocos
+        indistinguiveis.
+        """
+        self.client.force_login(self.aluno)
+        corpo = self.client.get(self.url).content.decode()
+
+        resumos = re.findall(r"<summary class=\"trajetoria-resumo\">(.*?)</summary>", corpo, re.S)
+        self.assertEqual(len(resumos), 2)
+        for resumo, trajetoria in zip(resumos, (self.ativa, self.concluida)):
+            with self.subTest(trajetoria=trajetoria.id):
+                self.assertIn(trajetoria.get_nivel_curso_display(), resumo)
+                self.assertIn(trajetoria.get_status_display(), resumo)
+                self.assertIn(trajetoria.ingresso, resumo)
+                self.assertIn(trajetoria.orientador.nome, resumo)
 
     def test_leitor_recebe_grade_em_vez_de_linhas_com_botao(self):
         """Quem nao edita nao precisa de uma coluna de acoes vazia por linha.
