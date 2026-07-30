@@ -1,0 +1,13 @@
+{% extends "errors/base_error.html" %}
+
+{% block title %}Erro interno · AcadFlow{% endblock %}
+
+{% block error_code %}500{% endblock %}
+
+{% block error_heading %}Algo deu errado{% endblock %}
+
+{% block error_message %}
+Ocorreu um erro inesperado ao processar sua solicitação. A equipe técnica foi
+notificada. Tente novamente em alguns instantes e, se o problema persistir,
+informe a Secretaria do PPGEC.
+{% endblock %}

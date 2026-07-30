@@ -59,21 +59,32 @@
             {% endfor %}
         </div>
 
-        <div class="trajectory-panel" style="margin-top:1rem;">
+        <div class="trajectory-panel">
             {% for checklist in checklists_integralizacao %}
                 <article data-integralizacao-checklist data-trajetoria-id="{{ checklist.trajetoria.id }}" hidden>
                     <h3 class="section-title">{{ checklist.titulo }}</h3>
-                    <p class="muted" style="margin-top:0;">
-                        {{ checklist.trajetoria.aluno.nome }} |
-                        {{ checklist.trajetoria.get_nivel_curso_display }} |
-                        Ingresso {{ checklist.trajetoria.ingresso|default:"-" }}
+                    <p class="meta-linha">
+                        <span>{{ checklist.trajetoria.aluno.nome }}</span>
+                        <span>{{ checklist.trajetoria.get_nivel_curso_display }}</span>
+                        {% if checklist.trajetoria.ingresso %}<span>Ingresso {{ checklist.trajetoria.ingresso }}</span>{% endif %}
                     </p>
                     <ul class="activity-list">
                         {% for item in checklist.itens %}
+                            {% comment %}
+                            O marcador era a palavra "OK" ou o caractere "☐" dentro do
+                            .soft-icon, que e um contorno feito para receber icone. Com
+                            texto dentro ele ficava desalinhado, e "OK" aparecia duas
+                            vezes na mesma linha -- no marcador e no rotulo a direita.
+
+                            Passa a usar o mesmo par de icones da tela inicial, que ja
+                            marca cumprido e pendente assim.
+                            {% endcomment %}
                             <li>
-                                <span class="soft-icon">{% if item.cumprido %}OK{% else %}☐{% endif %}</span>
+                                <svg class="soft-icon {% if item.cumprido %}is-ok{% else %}is-aviso{% endif %}" aria-hidden="true">
+                                    <use href="#i-{% if item.cumprido %}checado{% else %}pendente{% endif %}"></use>
+                                </svg>
                                 <span><strong>{{ item.grupo }}:</strong> {{ item.texto }}</span>
-                                <time>{% if item.cumprido %}OK{% else %}Pendente{% endif %}</time>
+                                <time>{% if item.cumprido %}Cumprido{% else %}Pendente{% endif %}</time>
                             </li>
                         {% endfor %}
                     </ul>

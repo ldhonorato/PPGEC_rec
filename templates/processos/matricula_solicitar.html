@@ -1,36 +1,39 @@
 {% extends "base.html" %}
 {% block title %}Solicitar Matrícula | AcadFlow{% endblock %}
 {% block content %}
+{% comment %}
+O seletor de periodo ocupava um cartao inteiro, com titulo "Periodo" e um unico
+botao dentro -- e o cabecalho logo acima ja dizia em que periodo o aluno estava.
+Os dois viram um cartao so: o periodo corrente identifica a tela, e as opcoes
+ficam junto dele. Com um periodo aberto so, que e o caso comum, nao ha seletor
+nenhum para mostrar.
+{% endcomment %}
 <section class="card panel">
     <div class="actions-row">
         <div>
-            <h1 class="section-title">Solicitar Matrícula</h1>
+            <h1 class="section-title">Solicitar matrícula</h1>
             {% if periodo %}
-                <p class="muted">Período {{ periodo.nome }} - {{ periodo.status_atual_display }}.</p>
+                <p class="muted">Período {{ periodo.nome }} · {{ periodo.status_atual_display }}</p>
             {% else %}
-                <p class="muted">Não há período aberto para matrícula ou modificação.</p>
+                <p class="muted">Nenhum período com matrícula aberta no momento.</p>
                 {% if proximo_periodo %}
                     <p class="muted">
-                        Próximo período previsto: {{ proximo_periodo.nome }},
-                        matrícula de {{ proximo_periodo.matricula_inicio|date:"d/m/Y" }} a {{ proximo_periodo.matricula_fim|date:"d/m/Y" }}.
+                        Próximo período previsto: {{ proximo_periodo.nome }}, com matrícula
+                        de {{ proximo_periodo.matricula_inicio|date:"d/m/Y" }} a {{ proximo_periodo.matricula_fim|date:"d/m/Y" }}.
                     </p>
                 {% endif %}
             {% endif %}
         </div>
         <a class="btn btn-secondary" href="{% url 'matriculas_minhas' %}">Minhas matrículas</a>
     </div>
+    {% if periodos_abertos|length > 1 %}
+        <div class="acoes-cabecalho">
+            {% for periodo_opcao in periodos_abertos %}
+                <a class="btn {% if periodo.pk != periodo_opcao.pk %}btn-secondary{% endif %}" href="{% url 'matricula_solicitar_periodo' periodo_opcao.pk %}">{{ periodo_opcao.nome }}</a>
+            {% endfor %}
+        </div>
+    {% endif %}
 </section>
-
-{% if periodos_abertos %}
-<section class="card panel">
-    <h2 class="section-title">Período</h2>
-    <div class="calendar-nav">
-        {% for periodo_opcao in periodos_abertos %}
-            <a class="btn {% if periodo.pk != periodo_opcao.pk %}btn-secondary{% endif %}" href="{% url 'matricula_solicitar_periodo' periodo_opcao.pk %}">{{ periodo_opcao.nome }}</a>
-        {% endfor %}
-    </div>
-</section>
-{% endif %}
 
 {% if periodo and not trajetoria_ativa %}
 <section class="card panel">
@@ -54,11 +57,14 @@
         <input type="hidden" name="periodo_id" value="{{ periodo.pk }}">
         <input type="hidden" name="aceitar_lista_espera" id="id_aceitar_lista_espera" value="">
         {{ form.non_field_errors }}
-        <div class="field">
-            <span class="info-label">Tipo de vínculo</span>
-            <strong>{{ nivel_trajetoria_display }}</strong>
-            <small class="muted" style="display:block; margin-top:0.25rem;">Matrícula como aluno {{ tipo_aluno_display|lower }}.</small>
-        </div>
+        <dl class="dados-grid">
+            <div>
+                <dt>Tipo de vínculo</dt>
+                <dd>{{ nivel_trajetoria_display }}</dd>
+                <p class="dado-nota">Matrícula como aluno {{ tipo_aluno_display|lower }}.</p>
+            </div>
+        </dl>
+
         <div class="field checkbox-field">
             {{ form.matricula_vinculo }}
             <label for="{{ form.matricula_vinculo.id_for_label }}">{{ form.matricula_vinculo.label }}</label>
@@ -72,48 +78,59 @@
                 <ul class="list">
                     {% for oferta in form.fields.ofertas.queryset %}
                         <li>
-                            <label class="checkbox-field" style="align-items:flex-start;">
+                            <label class="opcao-disciplina">
                                 <input type="checkbox" name="ofertas" value="{{ oferta.pk }}" data-oferta-label="{{ oferta.disciplina.codigo }} - {{ oferta.disciplina.nome }}">
                                 <span>
-                                    <strong>{{ oferta.disciplina.codigo }} - {{ oferta.disciplina.nome }}</strong>
-                                    <small class="muted" style="display:block; margin-top:0.25rem;">
-                                        {{ oferta.docentes_display }} | {{ oferta.get_modalidade_display }} |
-                                        Tipo: {{ oferta.disciplina.tipo|default:"-" }} |
-                                        Carga horária: {{ oferta.disciplina.carga_horaria|default:"-" }}h |
-                                        Créditos: {{ oferta.disciplina.creditos|default:"-" }} |
-                                        Vagas regulares: {{ oferta.vagas_regulares }} | Vagas especiais: {{ oferta.vagas_especiais }}
-                                    </small>
+                                    <strong>{{ oferta.disciplina.codigo }} — {{ oferta.disciplina.nome }}</strong>
+                                    {% comment %}
+                                    Sete campos separados por pipe numa linha so. Viram
+                                    metadados com separador do CSS, e "Tipo:" /
+                                    "Carga horaria:" saem: o valor ja se explica.
+                                    {% endcomment %}
+                                    <span class="meta-linha">
+                                        <span>{{ oferta.docentes_display }}</span>
+                                        <span>{{ oferta.get_modalidade_display }}</span>
+                                        {% if oferta.disciplina.tipo %}<span>{{ oferta.disciplina.get_tipo_display }}</span>{% endif %}
+                                        {% if oferta.disciplina.carga_horaria %}<span>{{ oferta.disciplina.carga_horaria }}h</span>{% endif %}
+                                        {% if oferta.disciplina.creditos %}<span>{{ oferta.disciplina.creditos }} créditos</span>{% endif %}
+                                        <span>{{ oferta.vagas_regulares }} vagas regulares</span>
+                                        <span>{{ oferta.vagas_especiais }} especiais</span>
+                                    </span>
                                     {% if oferta.encontros.all %}
-                                        <span class="availability-list" style="margin-top:0.45rem;">
+                                        <span class="lista-encontros">
                                             {% for encontro in oferta.encontros.all %}
-                                                <span class="badge badge-info">{{ encontro.get_dia_semana_display }} {{ encontro.hora_inicio|time:"H:i" }}-{{ encontro.hora_fim|time:"H:i" }}</span>
+                                                <span class="badge badge-info">{{ encontro.get_dia_semana_display }} {{ encontro.hora_inicio|time:"H:i" }}–{{ encontro.hora_fim|time:"H:i" }}</span>
                                             {% endfor %}
                                         </span>
                                     {% endif %}
                                 </span>
                             </label>
-                            <details style="margin:0.65rem 0 0 1.75rem;">
-                                <summary class="muted">Ver ementa, pré-requisitos e bibliografia</summary>
-                                <div style="display:grid; gap:0.65rem; margin-top:0.65rem;">
+                            {% comment %}
+                            <details> cru, com o triangulo do navegador e o texto em
+                            cinza de paragrafo. Ganha o marcador do proprio sistema.
+                            {% endcomment %}
+                            <details class="revelar">
+                                <summary>Ementa, pré-requisitos e bibliografia</summary>
+                                <dl class="dados-grid dados-grid-texto">
                                     <div>
-                                        <span class="info-label">Pré-requisitos</span>
-                                        <p class="muted" style="margin:0.25rem 0 0;">{{ oferta.disciplina.pre_requisitos|default:"Não informado." }}</p>
+                                        <dt>Pré-requisitos</dt>
+                                        <dd>{{ oferta.disciplina.pre_requisitos|default:"Não informado." }}</dd>
                                     </div>
                                     <div>
-                                        <span class="info-label">Ementa</span>
-                                        <p class="muted" style="margin:0.25rem 0 0;">{{ oferta.disciplina.ementa|default:"Não informada." }}</p>
+                                        <dt>Ementa</dt>
+                                        <dd>{{ oferta.disciplina.ementa|default:"Não informada." }}</dd>
                                     </div>
                                     <div>
-                                        <span class="info-label">Bibliografia</span>
-                                        <p class="muted" style="margin:0.25rem 0 0;">{{ oferta.disciplina.bibliografia|default:"Não informada." }}</p>
+                                        <dt>Bibliografia</dt>
+                                        <dd>{{ oferta.disciplina.bibliografia|default:"Não informada." }}</dd>
                                     </div>
-                                </div>
+                                </dl>
                             </details>
                         </li>
                     {% endfor %}
                 </ul>
             {% else %}
-                <p class="muted">Nenhuma disciplina ofertada para este período.</p>
+                <p class="estado-vazio-inline">Nenhuma disciplina ofertada para este período.</p>
             {% endif %}
         </div>
 
@@ -132,27 +149,37 @@
     </form>
 </section>
 
+{% comment %}
+A grade da semana, a mesma que a coordenacao e o docente veem em Ofertas de
+Disciplinas. Quem monta a propria grade e o aluno, e ate aqui ele so tinha o dia
+e a hora escritos em cada disciplina -- para saber se duas se chocam, precisava
+comparar de cabeca.
+{% endcomment %}
+{% if horario_semanal %}
+<section class="card">
+    <h2 class="section-title">Horário do período</h2>
+    <p class="muted">Onde cada disciplina ofertada cai na semana. Use para conferir choques antes de escolher.</p>
+    {% include "includes/grade_horario.html" with horario=horario_semanal vazio="As disciplinas deste período ainda não têm encontros cadastrados." %}
+</section>
+{% endif %}
+
 <dialog id="confirmar-matricula" class="modal-dialog">
     <div class="modal-body">
         <div class="actions-row">
             <h2 class="section-title">Confirmar matrícula</h2>
             <button class="btn btn-secondary" type="button" data-close-confirmacao>Fechar</button>
         </div>
-        <div class="field">
-            <span class="info-label">Período</span>
-            <strong>{{ periodo.nome }}</strong>
-        </div>
-        <div class="field">
-            <span class="info-label">Tipo de vínculo</span>
-            <strong>{{ nivel_trajetoria_display }}</strong>
-            <small class="muted" style="display:block; margin-top:0.25rem;">Matrícula como aluno {{ tipo_aluno_display|lower }}.</small>
-        </div>
-        <div class="field">
-            <span class="info-label">Solicitação</span>
-            <strong data-resumo-tipo>Matrícula vínculo</strong>
-        </div>
+        <dl class="dados-grid">
+            <div><dt>Período</dt><dd>{{ periodo.nome }}</dd></div>
+            <div>
+                <dt>Tipo de vínculo</dt>
+                <dd>{{ nivel_trajetoria_display }}</dd>
+                <p class="dado-nota">Aluno {{ tipo_aluno_display|lower }}</p>
+            </div>
+            <div><dt>Solicitação</dt><dd data-resumo-tipo>Matrícula vínculo</dd></div>
+        </dl>
         <div class="field" data-resumo-disciplinas-wrap hidden>
-            <span class="info-label">Disciplinas selecionadas</span>
+            <label>Disciplinas selecionadas</label>
             <ul class="list" data-resumo-disciplinas></ul>
         </div>
         <p class="muted">

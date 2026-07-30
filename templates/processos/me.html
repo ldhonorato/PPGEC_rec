@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}/me | PPGEC{% endblock %}
+{% block title %}Meu perfil{% endblock %}
 {% block content %}
 <section class="grid-two">
     <article class="card">
         <h1 class="section-title">Meu perfil</h1>
-        <form method="post">
+        <form method="post" class="form-coluna">
             {% csrf_token %}
             <input type="hidden" name="save_profile" value="1">
             {% for field in profile_form %}
@@ -20,14 +20,26 @@
 
     <article class="card">
         <h2 class="section-title">Alterar senha</h2>
-        <form method="post">
+        <form method="post" class="form-coluna">
             {% csrf_token %}
             <input type="hidden" name="change_password" value="1">
+            {% comment %}
+            Os campos de senha ganham o mesmo botao de revelar das telas de
+            acesso -- era a unica parte do sistema onde digitar senha as cegas
+            continuava sendo a unica opcao.
+            {% endcomment %}
             {% for field in password_form %}
-                <div class="field">
+                <div class="campo{% if field.errors %} tem-erro{% endif %}">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {{ field.errors }}
+                    <div class="campo-senha">
+                        {{ field }}
+                        <button type="button" class="campo-senha-alternar" data-alternar-senha
+                                aria-label="Mostrar senha" aria-pressed="false">
+                            <svg aria-hidden="true"><use href="#i-olho"></use></svg>
+                        </button>
+                    </div>
+                    {% if field.help_text %}<div class="campo-ajuda">{{ field.help_text|safe }}</div>{% endif %}
+                    {% for erro in field.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
                 </div>
             {% endfor %}
             <button type="submit" class="btn">Atualizar senha</button>
@@ -35,7 +47,7 @@
     </article>
 </section>
 
-<section class="grid-two" style="margin-top: 1rem;">
+<section class="grid-two">
     <article class="card">
         <h2 class="section-title">Setores e comissões atuais</h2>
         {% if participacoes_ativas %}
@@ -44,15 +56,19 @@
                     <li>
                         <strong>{{ participacao.setor.nome }}</strong>
                         <br>
-                        <small class="muted">
-                            Desde {{ participacao.data_entrada|date:"d/m/Y" }}
-                            {% if participacao.designado_por %} | Designado por {{ participacao.designado_por.nome }}{% endif %}
-                        </small>
+                        <span class="meta-linha">
+                            <span>Desde {{ participacao.data_entrada|date:"d/m/Y" }}</span>
+                            {% if participacao.designado_por %}<span>Designado por {{ participacao.designado_por.nome }}</span>{% endif %}
+                        </span>
                     </li>
                 {% endfor %}
             </ul>
         {% else %}
-            <p class="muted">Você não participa de nenhum setor/comissão no momento.</p>
+            <div class="estado-vazio">
+                <svg aria-hidden="true"><use href="#i-setores"></use></svg>
+                <p class="estado-vazio-titulo">Sem participação em setores</p>
+                <p>A secretaria vincula servidores e docentes aos setores que tramitam processos.</p>
+            </div>
         {% endif %}
     </article>
 
@@ -64,15 +80,19 @@
                     <li>
                         <strong>{{ participacao.setor.nome }}</strong>
                         <br>
-                        <small class="muted">
-                            {{ participacao.data_entrada|date:"d/m/Y" }} a {{ participacao.data_saida|date:"d/m/Y" }}
-                            {% if participacao.designado_por %} | Designado por {{ participacao.designado_por.nome }}{% endif %}
-                        </small>
+                        <span class="meta-linha">
+                            <span>{{ participacao.data_entrada|date:"d/m/Y" }} a {{ participacao.data_saida|date:"d/m/Y" }}</span>
+                            {% if participacao.designado_por %}<span>Designado por {{ participacao.designado_por.nome }}</span>{% endif %}
+                        </span>
                     </li>
                 {% endfor %}
             </ul>
         {% else %}
-            <p class="muted">Nenhum histórico de participação encerrada.</p>
+            <div class="estado-vazio">
+                <svg aria-hidden="true"><use href="#i-pendencias"></use></svg>
+                <p class="estado-vazio-titulo">Nenhuma participação encerrada</p>
+                <p>Vínculos com setores que forem encerrados ficam registrados aqui.</p>
+            </div>
         {% endif %}
     </article>
 </section>

@@ -1,127 +1,114 @@
 {% extends "base.html" %}
-{% block title %}Inicio | AcadFlow{% endblock %}
+{% load acadflow %}
+{% block title %}Início | AcadFlow{% endblock %}
 {% block content %}
+{% comment %}
+Faixa de abertura.
+
+Antes ocupava 245px repetindo a marca da barra lateral, com um desenho de
+documento feito a mao em CSS e um padrao de circulos concentricos ancorado
+fora da area visivel -- o que dava a impressao de recorte acidental.
+
+Agora cumprimenta pelo nome, que e a informacao que muda a cada visita, e
+cede a altura para os dados logo abaixo.
+{% endcomment %}
 <section class="card hero-card">
-    <div class="hero-mark" aria-hidden="true"></div>
-    <div class="hero-content">
-        <p class="hero-kicker">Bem-vindo ao</p>
-        <h1 class="hero-title">Acad<span>Flow</span></h1>
-        <p class="hero-subtitle">Sistema de Gestao Academica do PPGEC</p>
-        <p class="hero-copy">
-            Utilize o menu lateral para acessar as funcionalidades disponiveis para o seu perfil.
-        </p>
+    <div>
+        <h1 class="hero-title">Olá, {{ user.nome|default:user.email|primeiro_nome }}</h1>
+        <p class="hero-copy">{{ user.get_tipo_usuario_display }} · Sistema de Gestão Acadêmica do PPGEC</p>
     </div>
+    <p class="hero-data">{% now "l, j \d\e F \d\e Y" %}</p>
 </section>
 
-<h2 class="overview-title">Visao geral</h2>
-<section class="metric-grid" aria-label="Visao geral">
+<h2 class="overview-title">Visão geral</h2>
+{% comment %}
+Visao geral. Cada cartao mostra uma contagem real e leva ao lugar onde ela
+pode ser trabalhada.
+
+Antes os cartoes da gestao traziam "1" fixo em todos os quatro, e o do aluno
+usava "+" e "-" como se fossem valores -- eram atalhos disfarcados de metrica.
+Numero que nao significa nada ensina a ignorar os numeros da tela, inclusive
+os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
+{% endcomment %}
+<section class="metric-grid" aria-label="Visão geral">
     {% if user.tipo_usuario == "DOCENTE" %}
-        <article class="card metric-card">
-            <span class="metric-icon">P</span>
-            <div>
-                <p class="metric-value">{{ meus_processos_requerente|length }}</p>
-                <p class="metric-label">Pendencias</p>
-            </div>
-            <a class="metric-link" href="{% url 'menu_meus_processos' %}">Ver todos -></a>
-        </article>
-        <article class="card metric-card is-green">
-            <span class="metric-icon">O</span>
-            <div>
-                <p class="metric-value">{% if orientandos %}{{ orientandos|length }}{% else %}0{% endif %}</p>
-                <p class="metric-label">Orientandos</p>
-            </div>
-            <a class="metric-link" href="{% url 'menu_meus_orientandos' %}">Ver todos -></a>
-        </article>
-        <article class="card metric-card is-purple">
-            <span class="metric-icon">C</span>
-            <div>
-                <p class="metric-value">{% if processos_orientandos %}{{ processos_orientandos|length }}{% else %}0{% endif %}</p>
-                <p class="metric-label">Processos dos orientandos</p>
-            </div>
-            <a class="metric-link" href="{% url 'menu_processos_orientandos' %}">Ver todos -></a>
-        </article>
-        <article class="card metric-card is-orange">
-            <span class="metric-icon">M</span>
-            <div>
-                <p class="metric-value">{% if cientes_pendentes_orientador %}{{ cientes_pendentes_orientador|length }}{% else %}0{% endif %}</p>
-                <p class="metric-label">Ciencias pendentes</p>
-            </div>
-            <a class="metric-link" href="{% url 'menu_ciencias_manifestadas' %}">Ver todos -></a>
-        </article>
-        <article class="card metric-card">
-            <span class="metric-icon">A</span>
-            <div>
-                <p class="metric-value">{% if assinaturas_pendentes %}{{ assinaturas_pendentes|length }}{% else %}0{% endif %}</p>
-                <p class="metric-label">Assinaturas pendentes</p>
-            </div>
-            <a class="metric-link" href="{% url 'solicitacoes_assinatura' %}">Ver todos -></a>
-        </article>
+        <a class="card metric-card" href="{% url 'menu_meus_processos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-meus-processos"></use></svg>
+            <p class="metric-value">{{ meus_processos_requerente|length }}</p>
+            <p class="metric-label">Processos que você abriu</p>
+        </a>
+        <a class="card metric-card is-green" href="{% url 'menu_meus_orientandos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-orientandos"></use></svg>
+            <p class="metric-value">{{ orientandos|length|default:"0" }}</p>
+            <p class="metric-label">Orientandos ativos</p>
+        </a>
+        <a class="card metric-card is-purple" href="{% url 'menu_processos_orientandos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-processos-orientandos"></use></svg>
+            <p class="metric-value">{{ processos_orientandos|length|default:"0" }}</p>
+            <p class="metric-label">Processos dos orientandos</p>
+        </a>
+        <a class="card metric-card {% if cientes_pendentes_orientador %}is-alerta{% else %}is-orange{% endif %}"
+           href="{% url 'menu_ciencias_manifestadas' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-ciencias"></use></svg>
+            <p class="metric-value">{{ cientes_pendentes_orientador|length|default:"0" }}</p>
+            <p class="metric-label">Ciências aguardando você</p>
+        </a>
+        <a class="card metric-card" href="{% url 'solicitacoes_assinatura' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-assinaturas"></use></svg>
+            <p class="metric-value">{{ assinaturas_pendentes|length|default:"0" }}</p>
+            <p class="metric-label">Assinaturas pendentes</p>
+        </a>
+
     {% elif user.tipo_usuario == "ALUNO" %}
-        <article class="card metric-card">
-            <span class="metric-icon">P</span>
-            <div>
-                <p class="metric-value">{{ meus_processos_requerente|length }}</p>
-                <p class="metric-label">Pendencias</p>
-            </div>
-            <a class="metric-link" href="{% url 'menu_meus_processos' %}">Ver todos -></a>
-        </article>
-        <article class="card metric-card is-green">
-            <span class="metric-icon">N</span>
-            <div>
-                <p class="metric-value">+</p>
-                <p class="metric-label">Novo processo</p>
-            </div>
-            <a class="metric-link" href="{% url 'novo_processo' %}">Abrir -></a>
-        </article>
-        <article class="card metric-card is-purple">
-            <span class="metric-icon">V</span>
-            <div>
-                <p class="metric-value">1</p>
-                <p class="metric-label">Documento de vinculo</p>
-            </div>
-            <a class="metric-link" href="{% url 'aluno_documento_vinculo' %}">Acessar -></a>
-        </article>
-        <article class="card metric-card is-orange">
-            <span class="metric-icon">M</span>
-            <div>
-                <p class="metric-value">{% if aluno_matricula_atual %}{{ aluno_matricula_atual.get_status_display }}{% else %}-{% endif %}</p>
-                <p class="metric-label">Matrícula atual</p>
-            </div>
-            <a class="metric-link" href="{% url 'matriculas_minhas' %}">Ver -></a>
-        </article>
+        <a class="card metric-card" href="{% url 'menu_meus_processos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-meus-processos"></use></svg>
+            <p class="metric-value">{{ meus_processos_requerente|length }}</p>
+            <p class="metric-label">Processos em andamento</p>
+        </a>
+        {% comment %}
+        Matricula nao e contagem: o dado util e a situacao. O cartao mostra o
+        proprio status em vez de um numero inventado.
+        {% endcomment %}
+        <a class="card metric-card is-green metric-card-texto" href="{% url 'matriculas_minhas' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-matricula"></use></svg>
+            <p class="metric-value">{% if aluno_matricula_atual %}{{ aluno_matricula_atual.get_status_display }}{% else %}Sem solicitação{% endif %}</p>
+            <p class="metric-label">Matrícula do período</p>
+        </a>
+        <a class="card metric-card is-purple metric-card-texto" href="{% url 'aluno_documento_vinculo' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-documento-vinculo"></use></svg>
+            <p class="metric-value">Emitir</p>
+            <p class="metric-label">Documento de vínculo</p>
+        </a>
+        {% if can_add_processo %}
+            <a class="card metric-card is-orange metric-card-texto" href="{% url 'novo_processo' %}">
+                <svg class="metric-icon" aria-hidden="true"><use href="#i-novo-processo"></use></svg>
+                <p class="metric-value">Abrir</p>
+                <p class="metric-label">Novo requerimento</p>
+            </a>
+        {% endif %}
+
     {% else %}
-        <article class="card metric-card">
-            <span class="metric-icon">D</span>
-            <div>
-                <p class="metric-value">1</p>
-                <p class="metric-label">Dashboard</p>
-            </div>
-            <a class="metric-link" href="{% url 'coordenacao_dashboard' %}">Acessar -></a>
-        </article>
-        <article class="card metric-card is-green">
-            <span class="metric-icon">A</span>
-            <div>
-                <p class="metric-value">1</p>
-                <p class="metric-label">Alunos</p>
-            </div>
-            <a class="metric-link" href="{% url 'coordenacao_alunos' %}">Acessar -></a>
-        </article>
-        <article class="card metric-card is-purple">
-            <span class="metric-icon">P</span>
-            <div>
-                <p class="metric-value">1</p>
-                <p class="metric-label">Processos</p>
-            </div>
-            <a class="metric-link" href="{% url 'coordenacao_processos' %}">Acessar -></a>
-        </article>
-        <article class="card metric-card is-orange">
-            <span class="metric-icon">C</span>
-            <div>
-                <p class="metric-value">1</p>
-                <p class="metric-label">Caixa de processos</p>
-            </div>
-            <a class="metric-link" href="{% url 'coordenacao_caixa_processos' %}">Acessar -></a>
-        </article>
+        <a class="card metric-card" href="{% url 'coordenacao_alunos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-alunos"></use></svg>
+            <p class="metric-value">{{ gestao_metricas.alunos_ativos }}</p>
+            <p class="metric-label">Alunos com trajetória ativa</p>
+        </a>
+        <a class="card metric-card is-green" href="{% url 'coordenacao_processos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-todos-processos"></use></svg>
+            <p class="metric-value">{{ gestao_metricas.processos_abertos }}</p>
+            <p class="metric-label">Processos em aberto</p>
+        </a>
+        <a class="card metric-card is-purple" href="{% url 'coordenacao_caixa_processos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-caixa"></use></svg>
+            <p class="metric-value">{{ gestao_metricas.na_caixa }}</p>
+            <p class="metric-label">Na caixa do seu setor</p>
+        </a>
+        <a class="card metric-card {% if gestao_metricas.cadastros_a_validar %}is-alerta{% else %}is-orange{% endif %}"
+           href="{% url 'validar_cadastros_alunos' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-validar"></use></svg>
+            <p class="metric-value">{{ gestao_metricas.cadastros_a_validar }}</p>
+            <p class="metric-label">Cadastros a validar</p>
+        </a>
     {% endif %}
 </section>
 
@@ -130,14 +117,22 @@
     <article class="card">
         <h2 class="section-title">Situação de matrícula</h2>
         {% if aluno_matricula_atual %}
-            <p class="aluno-kv"><strong>Período:</strong> {{ aluno_matricula_atual.periodo.nome }}</p>
-            <p class="aluno-kv"><strong>Tipo:</strong> {{ aluno_matricula_atual.get_tipo_matricula_display }} | {{ aluno_matricula_atual.get_tipo_aluno_display }}</p>
-            <p class="aluno-kv"><strong>Status:</strong> <span class="badge badge-info">{{ aluno_matricula_atual.get_status_display }}</span></p>
+            {% comment %}
+            .aluno-kv era uma classe do bloco <style> da ficha do aluno, que nunca
+            valeu aqui -- estas linhas sempre foram paragrafos sem estilo nenhum.
+            Passam a usar a mesma grade rotulada das telas de detalhe.
+            {% endcomment %}
+            <dl class="dados-grid">
+                <div><dt>Período</dt><dd>{{ aluno_matricula_atual.periodo.nome }}</dd></div>
+                <div><dt>Tipo</dt><dd>{{ aluno_matricula_atual.get_tipo_matricula_display }}</dd></div>
+                <div><dt>Vínculo</dt><dd>{{ aluno_matricula_atual.get_tipo_aluno_display }}</dd></div>
+                <div><dt>Status</dt><dd><span class="badge badge-info">{{ aluno_matricula_atual.get_status_display }}</span></dd></div>
+            </dl>
             {% if aluno_matricula_atual.itens.all %}
-                <ul class="activity-list" style="margin-top:0.7rem;">
+                <ul class="activity-list activity-list-apos-dados">
                     {% for item in aluno_matricula_atual.itens.all|slice:":4" %}
                         <li>
-                            <span class="soft-icon">{% if item.status == "SOLICITADO" or item.status == "HOMOLOGADO" %}OK{% else %}!{% endif %}</span>
+                            <svg class="soft-icon {% if item.status == "SOLICITADO" or item.status == "HOMOLOGADO" %}is-ok{% else %}is-aviso{% endif %}" aria-hidden="true"><use href="#i-{% if item.status == "SOLICITADO" or item.status == "HOMOLOGADO" %}checado{% else %}pendente{% endif %}"></use></svg>
                             <span>{{ item.oferta.disciplina.codigo }} - {{ item.oferta.disciplina.nome }}</span>
                             <time>{{ item.get_status_display }}</time>
                         </li>
@@ -145,58 +140,91 @@
                 </ul>
             {% endif %}
         {% else %}
-            <p class="muted">Nenhuma solicitação de matrícula registrada.</p>
+            <div class="estado-vazio">
+                <svg aria-hidden="true"><use href="#i-matricula"></use></svg>
+                <p class="estado-vazio-titulo">Nenhuma solicitação neste período</p>
+                <p>Quando a janela de matrícula abrir, sua solicitação aparece aqui.</p>
+                <a class="btn btn-secondary" href="{% url 'matricula_solicitar' %}">Solicitar matrícula</a>
+            </div>
         {% endif %}
     </article>
 
     <article class="card">
         <h2 class="section-title">Trajetória acadêmica mais recente</h2>
         {% if aluno_trajetoria_recente %}
-            <p class="aluno-kv"><strong>Nível:</strong> {{ aluno_trajetoria_recente.get_nivel_curso_display }}</p>
-            <p class="aluno-kv"><strong>Ingresso:</strong> {{ aluno_trajetoria_recente.ingresso|default:"-" }}</p>
-            <p class="aluno-kv"><strong>Status:</strong> <span class="badge badge-info">{{ aluno_trajetoria_recente.get_status_display }}</span></p>
-            <p class="aluno-kv"><strong>Orientador:</strong> {{ aluno_trajetoria_recente.orientador.nome|default:"-" }}</p>
+            <dl class="dados-grid">
+                <div><dt>Nível</dt><dd>{{ aluno_trajetoria_recente.get_nivel_curso_display }}</dd></div>
+                <div><dt>Ingresso</dt><dd>{{ aluno_trajetoria_recente.ingresso|default:"—" }}</dd></div>
+                <div><dt>Status</dt><dd><span class="badge badge-info">{{ aluno_trajetoria_recente.get_status_display }}</span></dd></div>
+                <div><dt>Orientador</dt><dd>{{ aluno_trajetoria_recente.orientador.nome|default:"—" }}</dd></div>
+            </dl>
         {% else %}
-            <p class="muted">Nenhuma trajetória acadêmica registrada.</p>
+            <div class="estado-vazio">
+                <svg aria-hidden="true"><use href="#i-trajetoria"></use></svg>
+                <p class="estado-vazio-titulo">Nenhuma trajetória registrada</p>
+                <p>A coordenação cadastra sua trajetória após a validação do vínculo.</p>
+            </div>
         {% endif %}
     </article>
 </section>
 
 {% if aluno_checklist_integralizacao %}
 <section class="card panel">
-    <div class="actions-row">
+    {% comment %}
+    O resumo era uma linha de pipes com quatro dados de naturezas diferentes.
+    Vira uma fileira de valores rotulados: o numero fica em destaque e o
+    rotulo abaixo, no mesmo padrao dos cartoes da visao geral.
+    {% endcomment %}
+    <h2 class="section-title">{{ aluno_checklist_integralizacao.titulo }}</h2>
+    <dl class="resumo-linha">
         <div>
-            <h2 class="section-title">{{ aluno_checklist_integralizacao.titulo }}</h2>
-            <p class="muted">
-                Trajetória {{ aluno_checklist_integralizacao.trajetoria.get_nivel_curso_display }} |
-                Ingresso {{ aluno_checklist_integralizacao.trajetoria.ingresso|default:"-" }} |
-                Créditos aprovados: {{ aluno_checklist_integralizacao.creditos_aprovados }} |
-                Seminários: {{ aluno_checklist_integralizacao.horas_complementares }}h
-            </p>
+            <dt>Nível</dt>
+            <dd>{{ aluno_checklist_integralizacao.trajetoria.get_nivel_curso_display }}</dd>
         </div>
+        <div>
+            <dt>Ingresso</dt>
+            <dd>{{ aluno_checklist_integralizacao.trajetoria.ingresso|default:"—" }}</dd>
+        </div>
+        <div>
+            <dt>Créditos aprovados</dt>
+            <dd>{{ aluno_checklist_integralizacao.creditos_aprovados }}</dd>
+        </div>
+        <div>
+            <dt>Seminários</dt>
+            <dd>{{ aluno_checklist_integralizacao.horas_complementares }}h</dd>
+        </div>
+        <div class="resumo-destaque">
+            <dt>Integralização</dt>
+            <dd>{{ aluno_checklist_integralizacao.itens_cumpridos }} de {{ aluno_checklist_integralizacao.itens_total }} etapas</dd>
+        </div>
+    </dl>
+
+    <div class="barra-progresso barra-progresso-larga"
+         role="img" aria-label="{{ aluno_checklist_integralizacao.percentual_concluido }} por cento das etapas concluídas">
+        <span style="width: {{ aluno_checklist_integralizacao.percentual_concluido }}%"></span>
     </div>
-    <div class="dashboard-grid">
+    <div class="checklist-grid">
         {% for grupo in aluno_checklist_integralizacao.grupos %}
             <article>
                 <h3 class="section-title">{{ grupo.titulo }}</h3>
                 {% if grupo.tipo == "progresso" %}
-                    <p class="aluno-kv" style="margin-bottom:0.55rem;">
-                        <strong>{{ grupo.progresso.texto }}:</strong>
-                        {{ grupo.progresso.atual }}h de {{ grupo.progresso.total }}h
+                    <p class="progresso-rotulo">
+                        <strong>{{ grupo.progresso.atual }}h</strong> de {{ grupo.progresso.total }}h · {{ grupo.progresso.texto }}
                     </p>
-                    <div style="height:0.75rem; border-radius:999px; background:var(--color-border); overflow:hidden;">
-                        <div style="height:100%; width:{{ grupo.progresso.percentual }}%; background:var(--color-primary);"></div>
+                    <div class="barra-progresso" role="img"
+                         aria-label="{{ grupo.progresso.percentual }} por cento concluído">
+                        <span style="width: {{ grupo.progresso.percentual }}%"></span>
                     </div>
-                    <small class="muted" style="display:block; margin-top:0.45rem;">
-                        {{ grupo.progresso.percentual }}% concluído
-                    </small>
+                    <p class="progresso-percentual">{{ grupo.progresso.percentual }}% concluído</p>
                 {% else %}
                     <ul class="activity-list">
                         {% for item in grupo.itens %}
-                            <li>
-                                <span class="soft-icon">{% if item.cumprido %}OK{% else %}☐{% endif %}</span>
+                            <li class="{% if item.cumprido %}is-cumprido{% else %}is-pendente{% endif %}">
+                                <svg class="soft-icon" aria-hidden="true">
+                                    <use href="#i-{% if item.cumprido %}checado{% else %}pendente{% endif %}"></use>
+                                </svg>
                                 <span>{{ item.texto }}</span>
-                                <time>{% if item.cumprido %}Cumprido{% else %}Pendente{% endif %}</time>
+                                <span class="estado-item">{% if item.cumprido %}Cumprido{% else %}Pendente{% endif %}</span>
                             </li>
                         {% endfor %}
                     </ul>
@@ -208,8 +236,13 @@
 {% endif %}
 {% endif %}
 
-<section class="dashboard-grid">
-    <article class="card">
+{% comment %}
+So aparece quando ha atividade. Antes ocupava um cartao inteiro para dizer
+"nenhuma atividade pendente" -- que e justamente a situacao em que nao ha
+nada para o usuario fazer ali.
+{% endcomment %}
+{% if meus_processos_requerente or cientes_pendentes_orientador or assinaturas_pendentes %}
+<section class="card">
         <div class="actions-row">
             <h2 class="section-title">Atividades recentes</h2>
             <a class="text-link" href="{% url 'menu_meus_processos' %}">Ver todas</a>
@@ -218,9 +251,9 @@
             {% if meus_processos_requerente %}
                 {% for processo in meus_processos_requerente|slice:":4" %}
                     <li>
-                        <span class="soft-icon">!</span>
+                        <svg class="soft-icon is-aviso" aria-hidden="true"><use href="#i-alerta"></use></svg>
                         <span>
-                            <strong>{{ processo.numero }}</strong> aguarda acao do requerente
+                            <strong>{{ processo.numero }}</strong> aguarda ação do requerente
                         </span>
                         <time>{{ processo.atualizado_em|date:"d/m/Y" }}</time>
                     </li>
@@ -228,9 +261,9 @@
             {% elif cientes_pendentes_orientador %}
                 {% for manifestacao in cientes_pendentes_orientador|slice:":4" %}
                     <li>
-                        <span class="soft-icon">C</span>
+                        <svg class="soft-icon" aria-hidden="true"><use href="#i-ciencias"></use></svg>
                         <span>
-                            Ciencia pendente no processo <strong>{{ manifestacao.processo.numero }}</strong>
+                            Ciência pendente no processo <strong>{{ manifestacao.processo.numero }}</strong>
                         </span>
                         <time>{{ manifestacao.data_solicitacao|date:"d/m/Y" }}</time>
                     </li>
@@ -238,46 +271,17 @@
             {% elif assinaturas_pendentes %}
                 {% for solicitacao in assinaturas_pendentes|slice:":4" %}
                     <li>
-                        <span class="soft-icon">A</span>
+                        <svg class="soft-icon" aria-hidden="true"><use href="#i-assinaturas"></use></svg>
                         <span>
                             Assinatura pendente: <strong>{{ solicitacao.referencia_documento }}</strong>
                         </span>
                         <time>{{ solicitacao.criado_em|date:"d/m/Y" }}</time>
                     </li>
                 {% endfor %}
-            {% else %}
-                <li>
-                    <span class="soft-icon">OK</span>
-                    <span>Nenhuma atividade pendente para o seu perfil.</span>
-                    <time>Hoje</time>
-                </li>
             {% endif %}
         </ul>
-    </article>
-
-    <article class="card">
-        <h2 class="section-title">Acesso rapido</h2>
-        <div class="quick-list">
-            {% if can_add_processo %}
-                <a href="{% url 'novo_processo' %}">
-                    <span class="soft-icon">N</span>
-                    <strong>Novo requerimento</strong>
-                    <span>-></span>
-                </a>
-            {% endif %}
-            <a href="{% url 'menu_meus_processos' %}">
-                <span class="soft-icon">B</span>
-                <strong>Consultar processos</strong>
-                <span>-></span>
-            </a>
-            <a href="{% url 'me' %}">
-                <span class="soft-icon">U</span>
-                <strong>Meu perfil</strong>
-                <span>-></span>
-            </a>
-        </div>
-    </article>
 </section>
+{% endif %}
 
 {% if can_add_processo and meus_processos_requerente %}
 <section class="card panel alert-danger">
@@ -287,9 +291,9 @@
             <li>
                 <div class="item-row">
                     <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
-                    <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Resolver pendencia</a>
+                    <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Resolver pendência</a>
                 </div>
-                <small class="muted">Este processo esta no setor Requerente e pode exigir envio de documentacao.</small>
+                <small class="muted">Este processo está no setor Requerente e pode exigir envio de documentação.</small>
             </li>
         {% endfor %}
     </ul>
@@ -306,10 +310,10 @@
                     <strong>{{ solicitacao.get_tipo_documento_display }} - {{ solicitacao.referencia_documento }}</strong>
                     <a class="btn" href="{% url 'solicitacao_assinatura_detalhe' solicitacao.id %}">Atender assinatura</a>
                 </div>
-                <small class="muted">
-                    Solicitado por: {{ solicitacao.criado_por.nome }} |
-                    Em: {{ solicitacao.criado_em|date:"d/m/Y H:i" }}
-                </small>
+                <span class="meta-linha">
+                    <span>{{ solicitacao.criado_por.nome }}</span>
+                    <span>{{ solicitacao.criado_em|date:"d/m/Y H:i" }}</span>
+                </span>
             </li>
         {% endfor %}
     </ul>
@@ -318,18 +322,18 @@
 
 {% if user.tipo_usuario == "DOCENTE" and cientes_pendentes_orientador %}
 <section class="card panel alert-info">
-    <h2 class="section-title">Pedidos de ciencia pendentes</h2>
+    <h2 class="section-title">Pedidos de ciência pendentes</h2>
     <ul class="list">
         {% for manifestacao in cientes_pendentes_orientador %}
             <li>
                 <div class="item-row">
                     <strong>{{ manifestacao.processo.numero }} - {{ manifestacao.processo.assunto }}</strong>
-                    <a class="btn" href="{% url 'processo_detalhe' manifestacao.processo.id %}">Analisar ciencia</a>
+                    <a class="btn" href="{% url 'processo_detalhe' manifestacao.processo.id %}">Analisar ciência</a>
                 </div>
-                <small class="muted">
-                    Solicitado por: {{ manifestacao.solicitado_por.nome }} |
-                    Em: {{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}
-                </small>
+                <span class="meta-linha">
+                    <span>{{ manifestacao.solicitado_por.nome }}</span>
+                    <span>{{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}</span>
+                </span>
             </li>
         {% endfor %}
     </ul>

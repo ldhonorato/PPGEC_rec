@@ -74,9 +74,28 @@ X_FRAME_OPTIONS = os.getenv("X_FRAME_OPTIONS", "DENY")
 if env_bool("USE_X_FORWARDED_PROTO", not DEBUG):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-APP_VERSION = os.getenv("APP_VERSION", "local")
+def _versao_do_arquivo():
+    """Le o arquivo VERSION da raiz do projeto.
+
+    E a fonte da verdade da versao em desenvolvimento e a referencia para
+    quem le o repositorio. Em producao a esteira sobrescreve via APP_VERSION
+    (veja .github/workflows/build-web-image.yml), entao a variavel de
+    ambiente tem precedencia.
+    """
+    arquivo = BASE_DIR / "VERSION"
+    try:
+        return arquivo.read_text(encoding="utf-8").strip() or "0.0.0"
+    except OSError:
+        return "0.0.0"
+
+
+APP_VERSION = os.getenv("APP_VERSION") or _versao_do_arquivo()
 APP_REVISION = os.getenv("APP_REVISION", "unknown")
 APP_BUILD_RUN_ID = os.getenv("APP_BUILD_RUN_ID", "local")
+
+# Exibido no rodape de todas as telas.
+APP_ORGANIZACAO = "PPGEC · UPE"
+APP_COPYRIGHT = "Todos os direitos reservados ao PPGEC · UPE"
 
 
 # Application definition
@@ -114,6 +133,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'ppgec.context_processors.rodape_institucional',
                 'processos.context_processors.processos_atrasados',
                 'processos.context_processors.navegacao_lateral',
             ],
@@ -169,9 +189,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'pt-br'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Recife'
 
 USE_I18N = True
 
@@ -184,6 +204,27 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Nome dos arquivos estaticos com hash do conteudo (app.a1b2c3d4.css).
+#
+# Sem isso o CSS era servido sempre como /static/css/app.css: o navegador
+# guardava a versao antiga e continuava usando depois do deploy, misturando
+# marcacao nova com estilo velho. Com o hash, qualquer alteracao gera uma URL
+# nova e o cache nunca fica desatualizado.
+#
+# O WhiteNoise complementa: serve os arquivos com hash como imutaveis por um
+# ano e mantem prazo curto nos demais. Tambem gera versoes comprimidas.
+#
+# Em DEBUG=True o Django ignora o hash e serve o caminho direto, entao o
+# desenvolvimento nao depende de rodar collectstatic a cada alteracao.
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "ppgec.storage.EstaticosComHash",
+    },
+}
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 

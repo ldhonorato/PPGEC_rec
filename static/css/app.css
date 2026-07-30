@@ -12,14 +12,60 @@
     --color-warning: #e87510;
     --color-danger: #b42336;
     --color-border: #e3e9f2;
-    --shadow-card: 0 16px 36px rgba(18, 35, 61, 0.08);
-    --shadow-control: 0 10px 22px rgba(0, 72, 154, 0.16);
+    /* Sombras.
+
+       A anterior era 0 16px 36px: deslocada 16px para baixo e espalhada por
+       36px, ela formava uma poça escura sob cada cartao que avancava sobre o
+       bloco seguinte. Com cartoes empilhados, a tela ficava suja.
+
+       Estas sao em duas camadas -- um contorno de 1px que assenta a borda e
+       um halo curto que levanta o cartao. Quem separa os blocos e a borda
+       mais o espaco; a sombra so da profundidade. */
+    --shadow-card: 0 1px 2px rgba(18, 35, 61, 0.05), 0 4px 12px rgba(18, 35, 61, 0.05);
+    --shadow-card-alta: 0 2px 4px rgba(18, 35, 61, 0.06), 0 12px 28px rgba(18, 35, 61, 0.09);
+    --shadow-control: 0 1px 2px rgba(0, 72, 154, 0.16), 0 4px 10px rgba(0, 72, 154, 0.14);
+
+    /* Escala de espacamento. Antes nao havia nenhuma: cada template resolvia
+       o proprio respiro com style="margin-bottom: 1rem" inline, e onde
+       ninguem lembrou os blocos ficaram colados. */
+    --espaco-1: 0.25rem;
+    --espaco-2: 0.5rem;
+    --espaco-3: 0.75rem;
+    --espaco-4: 1rem;
+    --espaco-5: 1.5rem;
+    --espaco-6: 2rem;
+    --espaco-7: 3rem;
+    /* Distancia entre dois blocos de conteudo da pagina. */
+    --espaco-bloco: 1.25rem;
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 18px;
     --radius-xl: 24px;
-    --sidebar-width: 290px;
-    --topbar-height: 96px;
+    --sidebar-width: 276px;
+    --topbar-height: 64px;
+    /* Recuo horizontal comum a logo, rotulos de secao e itens do menu, para
+       que os tres fiquem no mesmo eixo vertical. */
+    --recuo-lateral: 10px;
+
+    --font-sans: "Inter var", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    /* Escala de peso. A interface usava 800/900 em quase tudo, o que deixava
+       tudo com o mesmo destaque -- e nada com destaque de fato. */
+    --peso-normal: 400;
+    --peso-medio: 500;
+    --peso-forte: 600;
+    --peso-titulo: 650;
+}
+
+/* Inter variavel, subconjunto latino (71KB), servida pelo WhiteNoise.
+   Antes a fonte era declarada mas nao existia no projeto: a plataforma caia
+   em Arial. Licenca SIL OFL em static/fonts/Inter-LICENSE.txt.
+   Um unico arquivo cobre os pesos 100-900 -- nao ha requisicao por peso. */
+@font-face {
+    font-family: "Inter var";
+    src: url("../fonts/inter-latin-variable.woff2") format("woff2-variations");
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
 }
 
 * {
@@ -28,16 +74,87 @@
 
 html {
     min-height: 100%;
+    -webkit-text-size-adjust: 100%;
 }
 
 body {
     min-height: 100%;
     margin: 0;
-    font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.55;
     color: var(--color-text);
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(245, 247, 251, 0.95)),
-        var(--color-bg);
+    background: var(--color-bg);
+    /* opsz ajusta o desenho da letra ao tamanho; cv11 usa o "1" com base,
+       tnum alinha numeros em colunas (util nas listagens e tabelas). */
+    font-optical-sizing: auto;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Escala de titulos.
+
+   A classe .section-title esta em 148 lugares, aplicada indistintamente a h1,
+   h2, h3 e h4 -- todos saiam com o mesmo 1.35rem, entao a pagina nao tinha
+   hierarquia: "Meus orientandos" e "Orientacoes ativas" pesavam igual.
+
+   Em vez de editar os 148 usos, a escala vem do proprio elemento. O tamanho
+   cai a cada nivel e o entrelinhamento acompanha; o espacamento inferior
+   tambem diminui, para o titulo grudar na secao que ele nomeia.
+
+   O letter-spacing negativo so vale nos tamanhos grandes: em texto pequeno
+   ele atrapalha a leitura em vez de ajudar. */
+/* Sem color aqui de proposito: o titulo herda a cor do contexto. Fixar
+   var(--color-text) nesta regra deixava escuro qualquer titulo sobre fundo
+   escuro -- foi o que aconteceu com a chamada do painel de acesso, que ficou
+   quase invisivel sobre o azul. Quem precisa da cor de texto e a
+   .section-title, que so aparece sobre cartao claro. */
+h1, h2, h3, h4 {
+    margin: 0 0 0.6rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+h1, h1.section-title {
+    font-size: 1.5rem;
+    font-weight: 650;
+    line-height: 1.2;
+    letter-spacing: -0.018em;
+    margin-bottom: 0.85rem;
+}
+
+h2, h2.section-title {
+    font-size: 1.125rem;
+    letter-spacing: -0.008em;
+    margin-bottom: 0.7rem;
+}
+
+h3, h3.section-title {
+    font-size: 0.975rem;
+    margin-bottom: 0.45rem;
+}
+
+h4, h4.section-title {
+    font-size: 0.9rem;
+    color: var(--color-muted);
+    margin-bottom: 0.4rem;
+}
+
+/* Um h2 logo apos o h1 e subtitulo da mesma area, nao uma secao nova:
+   encosta nele em vez de abrir espaco. */
+h1 + h2 {
+    margin-top: -0.2rem;
+}
+
+/* Titulo de secao a seguir de conteudo precisa de ar acima, senao cola no
+   bloco anterior -- e o caso de "Coorientacoes" logo abaixo da lista. */
+* + h2 {
+    margin-top: 1.75rem;
+}
+
+* + h3 {
+    margin-top: 1.15rem;
 }
 
 [hidden] {
@@ -61,62 +178,124 @@ input[type="checkbox"] {
 }
 
 .container {
-    width: min(1540px, calc(100vw - 48px));
+    width: 100%;
+    max-width: 1540px;
     margin: 0 auto;
+    padding: 0 24px;
 }
 
+/* ==========================================================================
+   Casca da aplicacao
+   Duas colunas: barra lateral em altura total e coluna de conteudo. A barra
+   superior vive dentro da coluna de conteudo, nao acima de tudo -- assim a
+   lateral usa a tela inteira e as duas barras tem papeis distintos:
+   lateral = identidade e navegacao, superior = alertas e conta.
+   ========================================================================== */
+
 .app-shell {
+    display: flex;
+    align-items: flex-start;
+    min-height: 100vh;
+}
+
+.app-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
     min-height: 100vh;
 }
 
 .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    flex: 0 0 auto;
     height: var(--topbar-height);
-    background: rgba(255, 255, 255, 0.96);
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: saturate(180%) blur(12px);
     border-bottom: 1px solid var(--color-border);
 }
 
 .topbar-content {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 24px;
+    gap: 16px;
     height: 100%;
+    max-width: 1540px;
+    margin: 0 auto;
+    padding: 0 24px;
 }
 
-.brand {
+.topbar-acoes {
     display: flex;
     align-items: center;
-    gap: 14px;
-    min-width: 230px;
-    text-decoration: none;
+    gap: 12px;
+    margin-left: auto;
 }
 
-.brand-logo {
-    width: 200px;
-    max-width: 24vw;
+/* Logo so aparece na barra superior no mobile, onde a lateral esta fechada. */
+.brand-mobile {
+    display: none;
+    align-items: center;
+}
+
+.brand-mobile img {
+    width: 132px;
     height: auto;
     display: block;
 }
 
+/* Alerta de processos atrasados. Em zero fica neutro: antes ficava sempre
+   vermelho com borda de alerta, ocupando o ponto de maior destaque da tela
+   para nao comunicar nada. */
 .overdue-link {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    min-height: 46px;
-    padding: 0.6rem 1rem;
-    border: 1px solid #f5c2ca;
-    border-radius: var(--radius-sm);
+    gap: 7px;
+    min-height: 36px;
+    padding: 0.34rem 0.75rem;
+    border: 1px solid #f3c6cd;
+    border-radius: 999px;
     color: var(--color-danger);
     background: #fff5f6;
-    font-weight: 800;
+    font-size: 0.83rem;
+    font-weight: 500;
     text-decoration: none;
+    transition: background-color 0.14s ease, border-color 0.14s ease;
+}
+
+.overdue-link strong {
+    font-weight: 650;
+}
+
+.overdue-link .nav-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.overdue-link.is-vazio {
+    border-color: var(--color-border);
+    color: var(--color-muted);
+    background: transparent;
+}
+
+.overdue-link.is-vazio .nav-icon {
+    display: none;
 }
 
 .overdue-link:hover,
 .overdue-link:focus-visible {
     border-color: var(--color-danger);
+    background: #ffeaee;
     outline: none;
+}
+
+.overdue-link.is-vazio:hover,
+.overdue-link.is-vazio:focus-visible {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
 }
 
 .nav-btn,
@@ -131,7 +310,7 @@ input[type="checkbox"] {
     padding: 0.62rem 1rem;
     background: var(--color-primary);
     color: #ffffff;
-    font-weight: 700;
+    font-weight: 560;
     font-size: 0.95rem;
     line-height: 1;
     text-decoration: none;
@@ -139,17 +318,16 @@ input[type="checkbox"] {
     box-shadow: var(--shadow-control);
 }
 
-.nav-icon,
-.side-icon {
-    width: 24px;
-    height: 24px;
-    display: inline-grid;
-    place-items: center;
+/* Icones do sprite SVG (templates/includes/icons.html). Herdam a cor do texto
+   via currentColor, entao acompanham hover/ativo sem regra extra. */
+.nav-icon {
+    width: 22px;
+    height: 22px;
     flex: 0 0 auto;
-    border: 2px solid currentColor;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 800;
+}
+
+.icon-sprite {
+    display: none;
 }
 
 .user-menu {
@@ -167,12 +345,11 @@ input[type="checkbox"] {
 .user-chip {
     display: flex;
     align-items: center;
-    gap: 12px;
-    min-width: 220px;
-    justify-content: flex-end;
-    padding: 0.35rem 0.45rem;
-    border-radius: var(--radius-sm);
+    gap: 9px;
+    padding: 0.28rem 0.4rem;
+    border-radius: 999px;
     cursor: pointer;
+    transition: background-color 0.14s ease;
 }
 
 .user-chip:hover,
@@ -180,25 +357,34 @@ input[type="checkbox"] {
     background: var(--color-primary-soft);
 }
 
+.user-chip:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
+
 .avatar {
-    width: 42px;
-    height: 42px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     display: inline-grid;
     place-items: center;
     background: linear-gradient(135deg, var(--color-accent), #73d8b3);
     color: #ffffff;
-    font-weight: 800;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
 }
 
 .user-meta {
     display: grid;
-    gap: 2px;
+    gap: 1px;
     min-width: 0;
+    line-height: 1.25;
 }
 
 .user-name {
-    font-weight: 800;
+    font-size: 0.85rem;
+    font-weight: 560;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -206,7 +392,26 @@ input[type="checkbox"] {
 
 .user-role {
     color: var(--color-muted);
-    font-size: 0.86rem;
+    font-size: 0.75rem;
+}
+
+.user-chevron {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    color: var(--color-muted);
+    transition: transform 0.16s ease;
+}
+
+.user-menu[open] .user-chevron {
+    transform: rotate(180deg);
+}
+
+.user-menu-panel .nav-icon {
+    width: 17px;
+    height: 17px;
+    margin-right: 9px;
+    color: var(--color-muted);
 }
 
 .user-menu-panel {
@@ -233,7 +438,7 @@ input[type="checkbox"] {
     border-radius: var(--radius-sm);
     color: var(--color-text);
     background: transparent;
-    font-weight: 800;
+    font-weight: 600;
     text-align: left;
     text-decoration: none;
     cursor: pointer;
@@ -282,92 +487,262 @@ input[type="checkbox"] {
 }
 
 .main-area {
+    flex: 1 1 auto;
     padding: 26px 0 38px;
-}
-
-.layout {
-    display: grid;
-    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-    gap: 28px;
-    align-items: start;
 }
 
 .content-area {
     min-width: 0;
 }
 
+/* ==========================================================================
+   Menu lateral
+   Layout em 3 faixas: cabecalho fixo, lista rolavel e rodape de conta fixo.
+   So a faixa do meio rola, entao Perfil/Sair ficam sempre alcancaveis mesmo
+   nos perfis com menu longo (o superusuario tem ~25 itens).
+   ========================================================================== */
+
 .sidebar {
     position: sticky;
-    top: 24px;
-    min-height: calc(100vh - 48px);
-    max-height: calc(100dvh - 48px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-gutter: stable;
-    padding: 34px 28px;
-    border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 var(--sidebar-width);
+    width: var(--sidebar-width);
+    height: 100vh;
+    height: 100dvh;
+    padding: 18px 12px 14px;
     background:
-        radial-gradient(circle at 20% 8%, rgba(88, 201, 141, 0.16), transparent 34%),
+        radial-gradient(circle at 20% 3%, rgba(88, 201, 141, 0.15), transparent 40%),
         linear-gradient(180deg, #063a78 0%, #002b63 100%);
     color: #ffffff;
-    box-shadow: 0 22px 44px rgba(0, 47, 105, 0.22);
 }
 
 .sidebar-program {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    flex: 0 0 auto;
+    padding: 0 var(--recuo-lateral) 14px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.sidebar-brand {
     display: grid;
     gap: 8px;
-    margin-bottom: 42px;
+    min-width: 0;
+    text-decoration: none;
+    border-radius: var(--radius-sm);
 }
 
-.sidebar-program strong {
-    font-size: 1.35rem;
+.sidebar-brand:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 4px;
 }
 
-.sidebar-program span {
-    color: rgba(255, 255, 255, 0.78);
+/* Versao branca da marca, ja recortada. O arquivo original tem um halo
+   difuso que ocupa 78% da area -- ele empurrava a logo para dentro (quebrando
+   o alinhamento com os icones do menu) e, com filtro CSS, virava uma nevoa
+   branca sobre o azul. */
+.sidebar-brand-logo {
+    width: 138px;
+    height: auto;
+    display: block;
+    opacity: 0.96;
+}
+
+.sidebar-programa {
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 0.7rem;
+    line-height: 1.4;
+    letter-spacing: 0.005em;
+}
+
+/* Versao e aviso de direitos, presentes em todas as telas. Discreto por
+   padrao; a versao ganha contraste ao passar o mouse porque e o dado que
+   alguem procura de fato (para reportar um problema, por exemplo). */
+.sidebar-rodape {
+    flex: 0 0 auto;
+    display: grid;
+    gap: 1px;
+    margin: 6px 0 0;
+    padding: 10px var(--recuo-lateral) 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.38);
+    font-size: 0.67rem;
     line-height: 1.45;
 }
 
-.sidebar-rule {
-    width: 30px;
-    height: 2px;
-    margin-top: 20px;
-    background: var(--color-accent);
+.sidebar-rodape a {
+    color: rgba(255, 255, 255, 0.55);
+    font-variant-numeric: tabular-nums;
+    text-decoration: none;
+    justify-self: start;
 }
 
+.sidebar-rodape a:hover,
+.sidebar-rodape a:focus-visible {
+    color: #ffffff;
+    outline: none;
+    text-decoration: underline;
+}
+
+/* Faixa rolavel. A mascara cria um esmaecimento nas bordas quando ha
+   conteudo fora de vista -- sem ela o corte e abrupto e o usuario nao
+   percebe que o menu continua. */
+.sidebar-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    /* O respiro nas pontas existe para o esmaecimento cair sobre espaco vazio.
+       Sem ele, ao rolar ate o fim o ultimo item terminava exatamente na borda
+       e seus 16px finais ficavam apagados -- o esmaecimento passava a comer
+       conteudo em vez de apenas sinalizar o corte. */
+    padding: 10px 0 20px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+    mask-image: linear-gradient(180deg, transparent 0, #000 6px, #000 calc(100% - 16px), transparent 100%);
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.26);
+    border-radius: 3px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.42);
+}
+
+/* Todos os elementos da barra usam o mesmo recuo horizontal, entao a logo, os
+   rotulos de secao e os icones do menu ficam alinhados no mesmo eixo. */
 .sidebar-label {
-    margin: 0 0 18px;
-    color: rgba(255, 255, 255, 0.68);
-    font-size: 0.78rem;
-    font-weight: 800;
-    letter-spacing: 0;
+    margin: 18px 0 6px;
+    padding: 0 var(--recuo-lateral);
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.67rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
 }
 
+/* O respiro do topo ja vem do padding do .sidebar-scroll. */
+.sidebar-scroll > .sidebar-label:first-child {
+    margin-top: 0;
+}
+
+/* Folga entre itens: com 2px o realce do hover encostava na pastilha do item
+   ativo e os dois liam como um bloco unico. */
 .side-menu {
     display: grid;
-    gap: 12px;
+    gap: 6px;
     margin: 0;
     padding: 0;
     list-style: none;
 }
 
-.side-menu a,
-.side-submenu summary {
+.side-link {
     display: flex;
     align-items: center;
-    gap: 14px;
-    min-height: 56px;
-    padding: 0.78rem 1rem;
-    color: #ffffff;
-    font-weight: 800;
+    gap: 11px;
+    width: 100%;
+    min-height: 42px;
+    padding: 0.4rem var(--recuo-lateral);
+    color: rgba(255, 255, 255, 0.9);
+    font-family: inherit;
+    text-align: left;
     text-decoration: none;
+    background: transparent;
+    border: 0;
     border-radius: var(--radius-sm);
-    border-left: 4px solid transparent;
+    cursor: pointer;
+    transition: background-color 0.14s ease, color 0.14s ease;
 }
 
+.side-texto {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+}
+
+.side-label {
+    font-size: 0.855rem;
+    font-weight: 560;
+    line-height: 1.3;
+}
+
+/* A descricao diz o que ha no destino sem obrigar o usuario a entrar para
+   descobrir. Fica subordinada ao rotulo: menor, mais clara e sem peso. */
+.side-descricao {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.715rem;
+    font-weight: 400;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 0.14s ease;
+}
+
+.side-icon {
+    width: 19px;
+    height: 19px;
+    flex: 0 0 auto;
+    color: rgba(255, 255, 255, 0.6);
+    transition: color 0.14s ease;
+}
+
+.side-link:hover,
+.side-link:focus-visible {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+
+.side-link:focus-visible {
+    box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+.side-link:hover .side-icon,
+.side-link:focus-visible .side-icon {
+    color: #ffffff;
+}
+
+/* Estado ativo: pastilha branca. O contraste alto marca a posicao atual sem
+   depender de cor sozinha (o icone e o peso da fonte tambem mudam). */
+.side-link.is-active {
+    color: var(--color-primary);
+    font-weight: 600;
+    background: #ffffff;
+    box-shadow: 0 6px 16px rgba(0, 20, 50, 0.22);
+}
+
+.side-link.is-active .side-icon {
+    color: var(--color-accent-strong);
+}
+
+/* Sem isto a descricao do item ativo fica branca sobre a pastilha branca. */
+.side-link.is-active .side-descricao {
+    color: var(--color-muted);
+}
+
+.side-link:hover .side-descricao,
+.side-link:focus-visible .side-descricao {
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.side-link.is-active:hover .side-descricao {
+    color: var(--color-muted);
+}
+
+/* --- Submenus --- */
+
 .side-submenu summary {
-    cursor: pointer;
     list-style: none;
 }
 
@@ -375,67 +750,109 @@ input[type="checkbox"] {
     display: none;
 }
 
-.side-submenu summary::after {
-    content: "v";
+.side-chevron {
+    width: 15px;
+    height: 15px;
     margin-left: auto;
-    font-size: 0.72rem;
+    flex: 0 0 auto;
+    color: rgba(255, 255, 255, 0.5);
+    transition: transform 0.18s ease, color 0.14s ease;
 }
 
-.side-submenu[open] summary::after {
-    content: "^";
+.side-submenu[open] .side-chevron {
+    transform: rotate(180deg);
 }
 
-.side-submenu ul {
+.side-link.is-active .side-chevron {
+    color: var(--color-primary);
+}
+
+/* A guia vertical liga os filhos ao pai -- sem ela o recuo sozinho nao deixa
+   claro onde o submenu comeca e termina. */
+.side-submenu-lista {
     display: grid;
-    gap: 8px;
-    margin: 8px 0 0;
-    padding: 0 0 0 20px;
+    gap: 2px;
+    margin: 2px 0 6px;
+    padding: 0 0 0 18px;
+    border-left: 1.5px solid rgba(255, 255, 255, 0.16);
+    margin-left: 18px;
     list-style: none;
 }
 
-.side-submenu ul a {
-    min-height: 44px;
-    padding: 0.62rem 0.84rem;
-    font-size: 0.92rem;
+.side-link-filho {
+    min-height: 34px;
+    padding: 0.32rem 0.55rem;
+    font-size: 0.825rem;
+    font-weight: 500;
 }
 
-.side-form {
-    margin: 0;
+.side-link-filho .side-icon {
+    width: 16px;
+    height: 16px;
 }
 
-.side-form button {
-    display: flex;
+/* --- Rodape de conta --- */
+
+
+
+/* --- Gaveta no mobile --- */
+
+.menu-toggle,
+.menu-fechar {
+    display: none;
     align-items: center;
-    gap: 14px;
-    width: 100%;
-    min-height: 56px;
-    padding: 0.78rem 1rem;
-    color: #ffffff;
-    font-weight: 800;
-    text-align: left;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    color: var(--color-primary);
     background: transparent;
-    border: 0;
-    border-left: 4px solid transparent;
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     cursor: pointer;
 }
 
-.side-menu a:hover,
-.side-menu a.is-active,
-.side-submenu summary:hover,
-.side-submenu summary.is-active,
-.side-form button:hover,
-.side-form button:focus-visible {
-    color: var(--color-primary);
-    background: #ffffff;
-    border-left-color: var(--color-accent);
-    outline: none;
+.menu-toggle:focus-visible,
+.menu-fechar:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
 }
 
-.sidebar-footer {
-    margin-top: 56px;
-    padding-top: 24px;
-    border-top: 1px solid rgba(255, 255, 255, 0.22);
+.menu-fechar {
+    margin-left: auto;
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.28);
+}
+
+.sidebar-overlay {
+    display: none;
+}
+
+/* Ritmo vertical da coluna de conteudo.
+
+   Cada bloco irmao se afasta do anterior sozinho. Antes o respiro dependia de
+   cada template lembrar de um style="margin-bottom" inline -- onde ninguem
+   lembrou, os blocos ficaram colados; onde dois lembraram, dobrou.
+
+   O seletor pega o irmao seguinte, entao o primeiro bloco nao ganha margem
+   superior indevida. */
+.content-area > * + * {
+    margin-top: var(--espaco-bloco);
+}
+
+/* Filho de grid nao entra no ritmo: o espacamento ali e do gap. Uma margem
+   aqui empurra so o segundo item e desalinha o topo da fileira -- foi o que
+   aconteceu com "Trajetoria academica", que nascia 20px abaixo do vizinho. */
+.metric-grid > *,
+.dashboard-grid > * {
+    margin-top: 0;
+}
+
+/* Titulo de secao abrindo um bloco novo pede mais ar que dois blocos
+   irmaos -- senao ele cola no cartao anterior e parece legenda dele. */
+.content-area > * + h2,
+.content-area > * + .overview-title {
+    margin-top: var(--espaco-6);
 }
 
 .card {
@@ -446,11 +863,11 @@ input[type="checkbox"] {
     padding: 1.35rem;
 }
 
+/* Tamanho e margem vem da escala por elemento, logo acima. A classe segue
+   existindo por estar espalhada pelos templates e por marcar "titulo de
+   secao" -- mas nao dita mais o tamanho. */
 .section-title {
-    margin: 0 0 0.85rem;
     color: var(--color-text);
-    font-size: 1.35rem;
-    line-height: 1.2;
 }
 
 .muted {
@@ -499,11 +916,18 @@ input[type="checkbox"] {
     list-style: none;
 }
 
-.list li {
+/* Filho direto, nao descendente.
+
+   Como ".list li" a regra alcancava qualquer li aninhado. Na ficha do aluno,
+   cada trajetoria e um item de .list e dentro dela ha uma .info-list com onze
+   linhas: as onze recebiam moldura, fundo e padding de cartao, e a tela virava
+   uma pilha de caixas dentro de caixas. Quem e cartao e o item da lista, nao o
+   conteudo dele. */
+.list > li {
     padding: 0.9rem;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    background: #ffffff;
+    background: var(--color-surface);
 }
 
 .room-list > li {
@@ -604,7 +1028,7 @@ textarea:focus {
 label {
     color: var(--color-text);
     font-size: 0.92rem;
-    font-weight: 800;
+    font-weight: 600;
 }
 
 .field {
@@ -646,7 +1070,7 @@ label {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     background: #ffffff;
-    font-weight: 700;
+    font-weight: 560;
 }
 
 .check-chip input {
@@ -731,7 +1155,7 @@ label {
 
 .info-label {
     color: var(--color-muted);
-    font-weight: 800;
+    font-weight: 600;
 }
 
 .calendar-shell {
@@ -751,14 +1175,6 @@ label {
     table-layout: fixed;
 }
 
-.week-calendar-time-col {
-    width: 64px;
-}
-
-.week-calendar-day-col {
-    width: calc((100% - 64px) / 6);
-}
-
 .week-calendar th,
 .week-calendar td {
     padding: 0.5rem;
@@ -768,14 +1184,18 @@ label {
     overflow: hidden;
 }
 
+/* A primeira coluna guarda o nome do ambiente ("Laboratório 101", "Sala de
+   Reuniões"), nao um horario. Os 64px vinham de uma versao anterior em que ela
+   era coluna de hora -- com table-layout:fixed, nowrap e overflow:hidden, o
+   nome era cortado em silencio: precisava de 135px e recebia 64. */
 .week-calendar th:first-child,
 .week-calendar td:first-child {
-    width: 64px;
+    width: 11rem;
 }
 
 .week-calendar thead th {
     color: var(--color-muted);
-    background: #f7fbff;
+    background: var(--color-surface-soft);
     font-size: 0.76rem;
     text-align: left;
     overflow-wrap: anywhere;
@@ -783,9 +1203,12 @@ label {
 
 .week-calendar tbody th {
     color: var(--color-text);
-    background: #fbfdff;
+    background: var(--color-surface-soft);
     text-align: left;
-    white-space: nowrap;
+    /* Cortar o nome do ambiente e pior do que quebra-lo em duas linhas: a
+       tabela existe justamente para dizer qual sala esta ocupada. */
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .week-calendar tbody th span {
@@ -802,7 +1225,7 @@ label {
     padding: 0.34rem 0.38rem;
     border-radius: var(--radius-sm);
     font-size: 0.76rem;
-    font-weight: 700;
+    font-weight: 560;
     line-height: 1.25;
     overflow-wrap: anywhere;
 }
@@ -888,7 +1311,7 @@ dialog::backdrop {
     background: var(--color-primary);
     color: #ffffff;
     font-size: 1.6rem;
-    font-weight: 900;
+    font-weight: 650;
 }
 
 .field-tooltip {
@@ -903,97 +1326,41 @@ dialog::backdrop {
     flex-wrap: wrap;
 }
 
+/* Faixa de abertura. Substitui um bloco de 245px que repetia a marca da
+   barra lateral, com um documento desenhado em CSS e um padrao de circulos
+   ancorado fora da area visivel -- que aparecia cortado. */
 .hero-card {
-    position: relative;
-    display: grid;
-    grid-template-columns: 190px minmax(0, 1fr);
-    gap: 32px;
+    display: flex;
     align-items: center;
-    min-height: 245px;
-    margin-bottom: 26px;
-    overflow: hidden;
-    border-radius: var(--radius-lg);
-    background: #ffffff;
-}
-
-.hero-card::after {
-    content: "";
-    position: absolute;
-    inset: 0 0 0 auto;
-    width: 34%;
-    opacity: 0.5;
-    background:
-        repeating-radial-gradient(ellipse at 100% 50%, transparent 0 13px, rgba(0, 72, 154, 0.24) 14px 15px, transparent 16px 28px);
-}
-
-.hero-mark {
-    position: relative;
-    width: 150px;
-    height: 150px;
-    margin-left: 18px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--color-primary-soft);
-    color: var(--color-primary);
-}
-
-.hero-mark::before {
-    content: "";
-    width: 70px;
-    height: 86px;
-    border: 4px solid currentColor;
-    border-radius: 12px;
-    background:
-        linear-gradient(currentColor, currentColor) 18px 24px / 34px 4px no-repeat,
-        linear-gradient(currentColor, currentColor) 18px 42px / 34px 4px no-repeat,
-        linear-gradient(currentColor, currentColor) 18px 60px / 34px 4px no-repeat;
-}
-
-.hero-mark::after {
-    content: "";
-    position: absolute;
-    right: 22px;
-    bottom: 28px;
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-    background: var(--color-accent);
-    box-shadow: 0 0 0 7px #ffffff;
-}
-
-.hero-content {
-    position: relative;
-    z-index: 1;
-}
-
-.hero-kicker {
-    margin: 0 0 6px;
-    font-size: 1.55rem;
-    font-weight: 800;
+    justify-content: space-between;
+    gap: var(--espaco-4);
+    flex-wrap: wrap;
+    padding: 1.1rem 1.35rem;
 }
 
 .hero-title {
     margin: 0;
-    color: var(--color-primary);
-    font-size: clamp(2.5rem, 6vw, 4.35rem);
-    line-height: 0.95;
-}
-
-.hero-title span {
-    color: var(--color-accent);
-}
-
-.hero-subtitle {
-    margin: 18px 0 6px;
-    font-weight: 800;
+    font-size: 1.45rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
 }
 
 .hero-copy {
-    max-width: 520px;
+    margin: 0.2rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.87rem;
+}
+
+.hero-data {
     margin: 0;
     color: var(--color-muted);
-    line-height: 1.55;
+    font-size: 0.83rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* capitalize deixaria "29 De Julho De 2026"; so a primeira letra sobe. */
+.hero-data::first-letter {
+    text-transform: uppercase;
 }
 
 .overview-title {
@@ -1004,16 +1371,31 @@ dialog::backdrop {
 .metric-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 18px;
-    margin-bottom: 20px;
+    gap: var(--espaco-4);
 }
 
+/* O cartao inteiro virou link: antes so o "Ver todos ->" no rodape levava a
+   algum lugar, e era o menor alvo do cartao. */
 .metric-card {
     display: grid;
-    grid-template-columns: 54px minmax(0, 1fr);
-    gap: 14px;
-    align-items: center;
-    min-height: 134px;
+    grid-template-rows: auto auto auto;
+    justify-items: start;
+    gap: 0.35rem;
+    min-height: 128px;
+    padding: 1.1rem;
+    text-decoration: none;
+    transition: border-color 0.14s ease, transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+.metric-card:hover,
+.metric-card:focus-visible {
+    border-color: var(--metric-color, var(--color-primary));
+    transform: translateY(-2px);
+    outline: none;
+}
+
+.metric-card:focus-visible {
+    box-shadow: 0 0 0 3px rgba(0, 72, 154, 0.16);
 }
 
 .metric-card.is-green {
@@ -1032,41 +1414,99 @@ dialog::backdrop {
 }
 
 .metric-icon {
-    width: 54px;
-    height: 54px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    margin-bottom: 0.25rem;
+    padding: 7px;
+    border-radius: var(--radius-sm);
     color: var(--metric-color, var(--color-primary));
     background: var(--metric-bg, var(--color-primary-soft));
-    font-weight: 900;
 }
 
+/* Altura fixa para o valor: numero (1.9rem) e palavra (1.15rem) tem caixas
+   de texto diferentes, e sem isso o rotulo de cada cartao parava numa altura
+   propria -- a fileira ficava com a base serrilhada em 3px. */
 .metric-value {
+    display: flex;
+    align-items: center;
+    min-height: 2.1rem;
     margin: 0;
     color: var(--metric-color, var(--color-primary));
-    font-size: 2.2rem;
-    line-height: 1;
-    font-weight: 900;
+    font-size: 1.9rem;
+    line-height: 1.05;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+/* Cartao cujo valor e palavra, nao numero ("Deferida", "Emitir"). O tamanho
+   de numero deixaria a palavra maior que o proprio rotulo. */
+.metric-card-texto .metric-value {
+    font-size: 1.15rem;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+}
+
+/* Contagem que pede acao: so ganha o tom de alerta quando ha algo pendente.
+   Em zero fica igual aos demais -- vermelho permanente vira paisagem. */
+.metric-card.is-alerta {
+    --metric-color: var(--color-danger);
+    --metric-bg: #fff0f1;
+    border-color: #f3c6cd;
 }
 
 .metric-label {
+    color: var(--color-muted);
     margin: 5px 0 0;
-    font-weight: 700;
+    font-weight: 560;
 }
 
+/* Mantida para outros usos da home; nos cartoes o link agora e o cartao. */
 .metric-link {
-    grid-column: 2;
     color: var(--color-primary);
     font-size: 0.85rem;
-    font-weight: 900;
+    font-weight: 600;
     text-decoration: none;
 }
 
+/* Duas colunas de mesmo peso e mesma altura. Antes eram 2fr/1fr com altura
+   propria cada uma: o cartao largo com pouco conteudo ficava com uma area
+   morta grande, e a fileira terminava em degrau. */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
-    gap: 20px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--espaco-4);
+    align-items: stretch;
+}
+
+/* Grid interno do checklist de integralizacao.
+
+   O gap padrao deixava o "Pendente" da coluna esquerda quase encostando no
+   titulo da direita -- sem separacao, os dois blocos liam como um so. Alem do
+   respiro maior, a segunda coluna ganha um fio, que e o que de fato divide. */
+.checklist-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(240px, 1fr);
+    gap: var(--espaco-5) var(--espaco-7);
+    align-items: start;
+}
+
+.checklist-grid > *:nth-child(even) {
+    padding-left: var(--espaco-6);
+    border-left: 1px solid var(--color-border);
+}
+
+@media (max-width: 920px) {
+    .checklist-grid {
+        grid-template-columns: 1fr;
+        gap: var(--espaco-5);
+    }
+
+    /* Em coluna unica o fio a esquerda nao divide nada -- vira so um risco. */
+    .checklist-grid > *:nth-child(even) {
+        padding-left: 0;
+        border-left: 0;
+    }
 }
 
 .activity-list,
@@ -1081,10 +1521,10 @@ dialog::backdrop {
 .activity-list li,
 .quick-list a {
     display: grid;
-    grid-template-columns: 42px minmax(0, 1fr) auto;
-    gap: 14px;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    gap: 12px;
     align-items: center;
-    min-height: 58px;
+    min-height: 46px;
     color: var(--color-text);
     text-decoration: none;
     border-bottom: 1px solid var(--color-border);
@@ -1095,61 +1535,626 @@ dialog::backdrop {
     border-bottom: 0;
 }
 
+/* Marcador de item em lista. Era um circulo de 34px com uma letra dentro
+   ("OK", "!", "N", "C"); agora recebe icone e encolhe -- em lista, o
+   marcador nao deve competir com o texto que ele acompanha. */
 .soft-icon {
-    width: 34px;
-    height: 34px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--color-primary-soft);
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
     color: var(--color-primary);
-    font-weight: 900;
 }
 
 .text-link {
     color: var(--color-primary);
-    font-weight: 900;
+    font-weight: 650;
     text-decoration: none;
 }
 
-.login-page {
-    min-height: calc(100vh - 52px);
+/* ==========================================================================
+   Telas de acesso (login, cadastro, recuperacao de senha)
+   Duas colunas: painel institucional fixo e coluna do formulario. Antes eram
+   cartoes centralizados repetindo a marca dentro do proprio cartao, sem
+   hierarquia entre titulo, campos e acoes.
+   ========================================================================== */
+
+/* As telas de acesso ocupam a janela inteira, sem a caixa central e os
+   respiros que o base.html aplica ao conteudo autenticado. */
+.pagina-auth .app-shell {
+    display: block;
+}
+
+.pagina-auth .main-area {
+    padding: 0;
+}
+
+.pagina-auth .container {
+    max-width: none;
+    padding: 0;
+}
+
+/* Altura travada na janela: o painel institucional fica parado e so a coluna
+   do formulario rola. Antes o .auth-shell usava min-height, entao o cadastro
+   (o formulario mais longo) rolava a pagina inteira e levava a marca junto. */
+.auth-shell {
     display: grid;
-    place-items: center;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
 }
 
-.login-card {
-    width: min(520px, 100%);
-    padding: 2rem;
+.auth-institucional {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 2.5rem;
+    padding: 3rem 3.25rem;
+    background:
+        radial-gradient(circle at 22% 12%, rgba(88, 201, 141, 0.2), transparent 45%),
+        linear-gradient(160deg, #063a78 0%, #002b63 100%);
+    color: #ffffff;
+    overflow-y: auto;
 }
 
-.login-brand {
-    display: grid;
-    justify-items: center;
-    gap: 12px;
-    margin-bottom: 1.4rem;
-    text-align: center;
-}
-
-.login-brand img {
-    width: min(310px, 100%);
+.auth-logo {
+    width: 168px;
     height: auto;
+    display: block;
 }
 
-.form-footer-link {
-    margin: 1rem 0 0 0;
+.auth-programa {
+    max-width: 24ch;
+    margin: 0.9rem 0 0;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.auth-chamada {
+    color: inherit;
+    max-width: 17ch;
+    margin: 0 0 1.75rem;
+    font-size: clamp(1.65rem, 2.4vw, 2.2rem);
+    font-weight: 650;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+.auth-lista {
+    display: grid;
+    gap: 0.85rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.auth-lista li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.88rem;
+}
+
+.auth-lista svg {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    color: var(--color-accent);
+}
+
+.auth-institucional-rodape {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 0.72rem;
+}
+
+.auth-institucional-rodape span:first-child {
+    font-variant-numeric: tabular-nums;
+}
+
+.auth-formulario {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 3rem 2rem;
+    background: var(--color-surface);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #c8d2e0 transparent;
+}
+
+/* Conteudo mais alto que a coluna sobe ate o topo em vez de ficar centralizado
+   e cortado nas duas pontas. */
+.auth-formulario.rola-acima,
+.auth-formulario.rola-abaixo {
+    justify-content: flex-start;
+}
+
+/* Sombra interna nas bordas: nao acompanha a rolagem, entao marca exatamente
+   onde o conteudo esta sendo cortado. */
+.auth-formulario.rola-acima {
+    box-shadow: inset 0 14px 12px -12px rgba(18, 35, 61, 0.22);
+}
+
+.auth-formulario.rola-abaixo {
+    box-shadow: inset 0 -14px 12px -12px rgba(18, 35, 61, 0.22);
+}
+
+.auth-formulario.rola-acima.rola-abaixo {
+    box-shadow:
+        inset 0 14px 12px -12px rgba(18, 35, 61, 0.22),
+        inset 0 -14px 12px -12px rgba(18, 35, 61, 0.22);
+}
+
+.auth-formulario::-webkit-scrollbar {
+    width: 8px;
+}
+
+.auth-formulario::-webkit-scrollbar-thumb {
+    background: #c8d2e0;
+    border-radius: 4px;
+}
+
+.auth-formulario::-webkit-scrollbar-thumb:hover {
+    background: #a8b6ca;
+}
+
+/* Botao de descer. Sticky no rodape da coluna, alinhado a direita para nao
+   cobrir campo nenhum. So aparece quando ha conteudo abaixo. */
+.auth-indicador {
+    position: sticky;
+    bottom: 1rem;
+    align-self: flex-end;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    /* Sem isto o flex do container espreme a altura do botao (38px viravam 21). */
+    flex: 0 0 auto;
+    width: 38px;
+    height: 38px;
+    margin: -38px 0 0;
+    padding: 0;
+    color: var(--color-primary);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    box-shadow: 0 6px 18px rgba(18, 35, 61, 0.16);
+    cursor: pointer;
+    /* Tres pulsos e para. Em repeticao infinita vira ruido permanente no canto
+       da tela -- e um alvo que nunca fica parado para receber o clique. */
+    animation: auth-indicador-pulso 2s ease-in-out 3;
+}
+
+.auth-formulario.rola-abaixo .auth-indicador {
+    display: inline-flex;
+}
+
+.auth-indicador svg {
+    width: 19px;
+    height: 19px;
+}
+
+.auth-indicador:hover {
+    background: var(--color-primary-soft);
+}
+
+.auth-indicador:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+@keyframes auth-indicador-pulso {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-indicador {
+        animation: none;
+    }
+}
+
+.auth-cartao {
+    width: min(400px, 100%);
+}
+
+.auth-cartao-largo {
+    width: min(620px, 100%);
+}
+
+.auth-cabecalho {
+    margin-bottom: 1.6rem;
+}
+
+.auth-cabecalho h1 {
+    margin: 0;
+    font-size: 1.65rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+}
+
+.auth-apoio {
+    margin: 0.45rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.885rem;
+    line-height: 1.55;
+}
+
+.auth-rodape-mobile {
+    display: none;
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.72rem;
     text-align: center;
 }
 
-.form-footer-link a {
+/* --- Campos --- */
+
+/* align-content: start impede que as linhas internas estiquem quando o campo
+   vizinho da mesma .campo-linha tem texto de ajuda -- sem isso os dois inputs
+   ficam em alturas diferentes. */
+.campo {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+    margin-bottom: 1.05rem;
+}
+
+.campo label {
+    color: var(--color-text);
+    font-size: 0.845rem;
+    font-weight: 560;
+}
+
+.campo-cabecalho {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.campo-link {
     color: var(--color-primary);
-    font-weight: 800;
+    font-size: 0.79rem;
+    font-weight: 500;
     text-decoration: none;
 }
 
-.form-footer-link a:hover,
-.form-footer-link a:focus-visible {
+.campo-link:hover,
+.campo-link:focus-visible {
     text-decoration: underline;
+}
+
+.campo input,
+.campo select,
+.campo textarea {
+    width: 100%;
+    min-height: 44px;
+    /* A regra generica de input tem margin-top: 0.3rem para separar do rotulo.
+       Aqui quem cuida disso e o gap do .campo, e a margem sobrando deixava o
+       container 4,8px mais alto que o input -- o que desalinhava o botao de
+       revelar senha, centrado em relacao ao container. */
+    margin-top: 0;
+    padding: 0.6rem 0.8rem;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: 0.925rem;
+    transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.campo input::placeholder {
+    color: #9aa6b8;
+}
+
+.campo input:focus,
+.campo select:focus,
+.campo textarea:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(0, 72, 154, 0.14);
+    outline: none;
+}
+
+.campo.tem-erro input,
+.campo.tem-erro select,
+.campo.tem-erro textarea {
+    border-color: var(--color-danger);
+}
+
+.campo.tem-erro input:focus,
+.campo.tem-erro select:focus {
+    box-shadow: 0 0 0 3px rgba(180, 35, 54, 0.14);
+}
+
+.campo-erro {
+    margin: 0;
+    color: var(--color-danger);
+    font-size: 0.79rem;
+}
+
+.campo-ajuda {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.775rem;
+    line-height: 1.45;
+}
+
+.campo-ajuda ul {
+    margin: 0.2rem 0 0;
+    padding-left: 1.1rem;
+}
+
+/* Largura de formulario de tarefa.
+
+   O sistema tinha duas regras convivendo: telas de formulario com max-width
+   inventado no proprio template (760px numa, 860px noutra, centralizado numa
+   e nao na outra), e outras ocupando a coluna inteira -- onde um select para
+   escolher "Mestrado" ou "Doutorado" esticava por 1070px.
+
+   A regra passa a ser: o cartao sempre ocupa a coluna, para a moldura da
+   pagina ser a mesma em todas; os campos e que ficam numa medida legivel.
+   Campo largo demais afasta o rotulo do conteudo e obriga o olho a varrer
+   vazio ate encontrar o dado. */
+.form-coluna {
+    max-width: 42rem;
+}
+
+/* Botoes do formulario acompanham a largura dos campos, senao ficam soltos
+   na outra ponta do cartao. */
+.form-coluna .form-actions,
+.form-coluna .actions-row {
+    max-width: 42rem;
+}
+
+.campo-linha {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 1rem;
+}
+
+/* Botao de revelar a senha, dentro do proprio campo.
+
+   O flex existe para o container ter exatamente a altura do input. Como
+   bloco comum ele ganhava ~5px de entrelinha acima (input e inline-block e
+   assenta na linha de base), e o botao, centrado em 50% do container, ficava
+   2,4px acima do centro do campo. */
+.campo-senha {
+    position: relative;
+    display: flex;
+}
+
+.campo-senha input {
+    padding-right: 2.9rem;
+}
+
+.campo-senha-alternar {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    color: var(--color-muted);
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.campo-senha-alternar svg {
+    width: 19px;
+    height: 19px;
+}
+
+.campo-senha-alternar:hover {
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+}
+
+.campo-senha-alternar:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
+
+/* --- Agrupamento de campos --- */
+
+.campo-grupo {
+    margin: 0 0 1.5rem;
+    padding: 0;
+    border: 0;
+}
+
+.campo-grupo legend {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 0.85rem;
+    padding: 0 0 0.5rem;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.legend-opcional {
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    font-size: 0.66rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: none;
+}
+
+.campo-ajuda-grupo {
+    margin: -0.35rem 0 0.9rem;
+}
+
+.obrigatorio-marca {
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
+/* --- Alertas e estados --- */
+
+.auth-alerta {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 1.1rem;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid #f3c6cd;
+    border-radius: var(--radius-sm);
+    background: #fff5f6;
+    color: var(--color-danger);
+    font-size: 0.855rem;
+    line-height: 1.5;
+}
+
+.auth-alerta svg {
+    width: 19px;
+    height: 19px;
+    flex: 0 0 auto;
+    margin-top: 1px;
+}
+
+.auth-alerta p {
+    margin: 0;
+}
+
+.auth-estado {
+    margin-bottom: 1.5rem;
+}
+
+.auth-estado p {
+    margin: 0 0 0.5rem;
+    line-height: 1.6;
+}
+
+.auth-estado-icone {
+    display: inline-grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+    border-radius: 50%;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+}
+
+.auth-estado-icone svg {
+    width: 24px;
+    height: 24px;
+}
+
+.auth-estado-ok .auth-estado-icone {
+    background: #e8f7ef;
+    color: var(--color-accent-strong);
+}
+
+.auth-estado-erro .auth-estado-icone {
+    background: #fff5f6;
+    color: var(--color-danger);
+}
+
+/* --- Links secundarios --- */
+
+.auth-secundario {
+    margin: 1.4rem 0 0;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.865rem;
+    text-align: center;
+}
+
+.auth-secundario a {
+    color: var(--color-primary);
+    font-weight: 560;
+    text-decoration: none;
+}
+
+.auth-secundario a:hover,
+.auth-secundario a:focus-visible {
+    text-decoration: underline;
+}
+
+.auth-voltar {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.auth-voltar svg {
+    width: 17px;
+    height: 17px;
+}
+
+@media (max-width: 900px) {
+    /* Em coluna unica quem rola e a pagina, nao a coluna: travar a altura aqui
+       criaria duas areas de rolagem aninhadas. */
+    .auth-shell {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow: visible;
+    }
+
+    .auth-formulario {
+        overflow: visible;
+        box-shadow: none;
+    }
+
+    .auth-indicador {
+        display: none !important;
+    }
+
+    /* No mobile o painel institucional vira uma faixa de identificacao: mantem
+       a marca e o programa, dispensa a chamada e a lista de recursos. */
+    .auth-institucional {
+        gap: 0;
+        padding: 1.75rem 1.5rem 1.5rem;
+    }
+
+    .auth-institucional-meio,
+    .auth-institucional-rodape {
+        display: none;
+    }
+
+    .auth-logo {
+        width: 142px;
+    }
+
+    .auth-formulario {
+        justify-content: flex-start;
+        padding: 2rem 1.5rem 2.5rem;
+    }
+
+    .auth-rodape-mobile {
+        display: block;
+    }
+}
+
+@media (max-width: 560px) {
+    .campo-linha {
+        grid-template-columns: 1fr;
+    }
 }
 
 .badge {
@@ -1157,7 +2162,7 @@ dialog::backdrop {
     padding: 0.22rem 0.58rem;
     border-radius: 999px;
     font-size: 0.82rem;
-    font-weight: 800;
+    font-weight: 600;
     border: 1px solid transparent;
 }
 
@@ -1179,6 +2184,13 @@ dialog::backdrop {
     border-color: #c9dcf5;
 }
 
+/* "Aguardando algo de fora" -- nem concluido, nem problema: pendente. */
+.badge-aviso {
+    background: #fff6e9;
+    color: #92510a;
+    border-color: #f7ddb8;
+}
+
 .alert-danger {
     border-color: #fac7cf;
     background: #fff5f6;
@@ -1189,41 +2201,96 @@ dialog::backdrop {
     background: #f7fbff;
 }
 
+.error-page {
+    display: flex;
+    justify-content: center;
+    padding: 3rem 0;
+}
+
+.error-card {
+    max-width: 520px;
+    padding: 2.5rem;
+    text-align: center;
+}
+
+.error-code {
+    margin: 0 0 0.5rem;
+    color: var(--color-primary);
+    font-size: 4rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+.error-message {
+    margin: 0 0 1.75rem;
+    line-height: 1.6;
+}
+
+.error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+}
+
 @media (max-width: 1120px) {
-    .topbar {
-        height: auto;
-    }
-
+    .container,
     .topbar-content {
-        flex-wrap: wrap;
-        padding: 14px 0;
+        padding: 0 18px;
     }
-
-    .brand,
-    .user-chip {
-        min-width: 0;
-    }
-
 }
 
 @media (max-width: 920px) {
-    .container {
-        width: min(100% - 28px, 760px);
+    .dashboard-grid,
+
+    /* Abaixo de 920px a barra vira gaveta. Antes ela ficava estatica no topo,
+       empilhada acima do conteudo: em toda pagina o usuario rolava ~470px de
+       menu antes de ver qualquer coisa. */
+    .menu-toggle,
+    .menu-fechar {
+        display: inline-flex;
     }
 
-    .layout,
-    .dashboard-grid,
-    .hero-card {
-        grid-template-columns: 1fr;
+    .brand-mobile {
+        display: flex;
     }
 
     .sidebar {
-        position: static;
-        min-height: auto;
-        max-height: none;
-        overflow-y: visible;
-        scrollbar-gutter: auto;
-        border-radius: var(--radius-lg);
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 60;
+        flex-basis: auto;
+        width: min(86vw, 320px);
+        transform: translateX(-100%);
+        transition: transform 0.24s ease;
+        visibility: hidden;
+    }
+
+    .menu-aberto .sidebar {
+        transform: translateX(0);
+        visibility: visible;
+    }
+
+    .sidebar-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background: rgba(4, 22, 48, 0.5);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.24s ease;
+    }
+
+    .menu-aberto .sidebar-overlay {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .menu-aberto {
+        overflow: hidden;
     }
 
     .metric-grid,
@@ -1236,22 +2303,31 @@ dialog::backdrop {
         grid-template-columns: 1fr;
     }
 
-    .hero-mark {
-        margin: 0;
-    }
 
-    .hero-card::after {
-        width: 60%;
-    }
 }
 
 @media (max-width: 640px) {
-    .brand-logo {
-        width: 170px;
-        max-width: 60vw;
+    .brand-mobile img {
+        width: 112px;
     }
 
-    .user-meta {
+    .user-meta,
+    .user-chevron {
+        display: none;
+    }
+
+    /* Em tela estreita o alerta vira so o numero: o rotulo quebrava em duas
+       linhas e esticava a barra superior. */
+    .overdue-link span {
+        display: none;
+    }
+
+    .overdue-link {
+        gap: 5px;
+        padding: 0.34rem 0.6rem;
+    }
+
+    .overdue-link.is-vazio {
         display: none;
     }
 
@@ -1260,20 +2336,15 @@ dialog::backdrop {
         width: 100%;
     }
 
-    .hero-card {
-        padding: 1.1rem;
-    }
 
-    .hero-title {
-        font-size: 2.55rem;
-    }
 
     .activity-list li,
     .quick-list a {
-        grid-template-columns: 36px minmax(0, 1fr);
+        grid-template-columns: 22px minmax(0, 1fr);
     }
 
     .activity-list time,
+    .activity-list .estado-item,
     .quick-list span:last-child {
         grid-column: 2;
     }
@@ -1281,4 +2352,1518 @@ dialog::backdrop {
     .weekday-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* ==========================================================================
+   Tabela de listagem
+
+   Substitui o padrao de "frase com pipes" que estava em 97 linhas da
+   interface -- cada registro era uma frase do tipo
+   "email | Matricula: X | Nivel: Y | Trajetoria: Z | Ingresso: W | Orientador: V".
+   Sem cabecalho de coluna nao ha como escanear uma informacao especifica nem
+   comparar registros; o olho tem que reler a frase inteira a cada linha.
+
+   O invólucro rola na horizontal em tela estreita, para a pagina nunca rolar
+   de lado -- so a tabela.
+   ========================================================================== */
+
+.tabela-envolvido {
+    overflow-x: auto;
+    margin: 0 -0.35rem;
+    padding: 0 0.35rem;
+}
+
+.tabela {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+/* Sem position: sticky de proposito. O invólucro tem overflow-x, o que faz
+   dele um contexto de rolagem: o cabecalho grudaria nele, e nao na janela,
+   descendo var(--topbar-height) e cobrindo a primeira linha. Com paginacao a
+   tabela nao fica alta o bastante para justificar a complicacao. */
+.tabela thead th {
+    padding: 0.5rem 0.7rem;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.tabela tbody td {
+    padding: 0.62rem 0.7rem;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: middle;
+}
+
+.tabela tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.tabela tbody tr {
+    transition: background-color 0.12s ease;
+}
+
+.tabela tbody tr:hover {
+    background: var(--color-surface-soft);
+}
+
+/* O nome/numero do registro e o link; a linha inteira nao vira clicavel por
+   JS de proposito -- isso quebraria selecao de texto, abrir em nova aba e a
+   navegacao por teclado. */
+.tabela .celula-principal {
+    font-weight: 560;
+}
+
+.tabela .celula-principal a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.tabela .celula-principal a:hover,
+.tabela .celula-principal a:focus-visible {
+    text-decoration: underline;
+}
+
+.tabela .celula-apoio {
+    color: var(--color-muted);
+}
+
+/* Prazo vencido: a data em si ja e o alerta, sem precisar de um badge extra
+   competindo com o de status na mesma linha. */
+.tabela .celula-atrasada {
+    color: var(--color-danger);
+    font-weight: 560;
+}
+
+.tabela .celula-atrasada .celula-secundaria {
+    color: var(--color-danger);
+    opacity: 0.85;
+}
+
+/* Dado de apoio do registro (e-mail, setor) sob o nome, em vez de virar mais
+   uma coluna: mantem a tabela estreita sem esconder a informacao. */
+.tabela .celula-secundaria {
+    display: block;
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    font-weight: 400;
+}
+
+/* Badge dentro de tabela acompanha a escala menor da linha. */
+.tabela .badge {
+    font-size: 0.74rem;
+    font-weight: 560;
+    padding: 0.14rem 0.5rem;
+}
+
+/* Numeros, matriculas e datas alinham em coluna com algarismos de mesma
+   largura -- fica possivel comparar de relance. */
+.tabela .celula-numero {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.tabela .celula-acoes {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* Visivel so para leitor de tela. Serve para o cabecalho da coluna de acoes:
+   a coluna precisa de nome na estrutura da tabela, mas o rotulo na tela nao
+   acrescenta nada -- os botoes se explicam. */
+.apenas-leitor {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Cabecalho da listagem: titulo, contagem e acao principal na mesma faixa. */
+.lista-cabecalho {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.9rem;
+}
+
+.lista-cabecalho h1,
+.lista-cabecalho h2 {
+    margin: 0;
+}
+
+.lista-contagem {
+    color: var(--color-muted);
+    font-size: 0.83rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Navegacao entre paginas. So aparece com mais de uma pagina -- um "1 de 1"
+   e ruido. Sem numeros de pagina clicaveis de proposito: com filtro aplicado,
+   saltar para a pagina 7 raramente e o que se quer, e a fileira de numeros
+   ocupa espaco proporcional ao total de paginas. */
+.paginacao {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.paginacao-passo {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 36px;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-primary);
+    font-size: 0.85rem;
+    font-weight: 560;
+    text-decoration: none;
+    transition: background-color 0.14s ease, border-color 0.14s ease;
+}
+
+.paginacao-passo svg {
+    width: 16px;
+    height: 16px;
+}
+
+.paginacao-passo:hover,
+.paginacao-passo:focus-visible {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+    outline: none;
+}
+
+/* Extremo da lista: o passo continua ocupando o lugar, para os botoes nao
+   pularem de posicao entre uma pagina e outra. */
+.paginacao-passo.is-inativo {
+    color: #a8b3c4;
+    background: transparent;
+    cursor: default;
+}
+
+.paginacao-posicao {
+    color: var(--color-muted);
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.paginacao-posicao strong {
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+.paginacao-total {
+    color: #90a0b5;
+}
+
+/* Fileira de valores rotulados. Substitui resumos escritos em linha unica
+   separada por pipes: o numero ganha destaque e o rotulo fica abaixo, no
+   mesmo padrao dos cartoes da visao geral. */
+.resumo-linha {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espaco-6);
+    margin: 0 0 var(--espaco-5);
+    padding-bottom: var(--espaco-4);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.resumo-linha dt {
+    color: var(--color-muted);
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.resumo-linha dd {
+    margin: 0.15rem 0 0;
+    color: var(--color-text);
+    font-size: 1.05rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Cabecalho de registro: titulo, identificacao e situacao na mesma faixa. */
+.processo-cabecalho {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--espaco-4);
+    flex-wrap: wrap;
+    margin-bottom: var(--espaco-4);
+}
+
+.processo-cabecalho h1 {
+    margin: 0;
+}
+
+.processo-identificacao {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.3rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.86rem;
+}
+
+/* Grade de dados rotulados. Substitui sequencias de "<strong>Rotulo:</strong>
+   valor" empilhadas: em coluna unica, onze linhas iguais nao tem hierarquia e
+   obrigam a ler tudo para achar um dado. */
+.dados-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: var(--espaco-4) var(--espaco-5);
+    margin: 0 0 var(--espaco-5);
+    padding-bottom: var(--espaco-4);
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* A borda e a margem inferiores separam a grade do bloco seguinte. Quando a
+   grade e a ultima coisa do cartao -- na ficha vista pelo aluno, que nao tem a
+   faixa de acoes da coordenacao -- elas viravam uma linha solta seguida de um
+   vao vazio, e o cartao parecia cortado no meio. */
+.dados-grid:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.dados-grid dt {
+    color: var(--color-muted);
+    font-size: 0.73rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.dados-grid dd {
+    margin: 0.2rem 0 0;
+    font-size: 0.92rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.dados-grid .dado-nota {
+    display: block;
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    font-weight: 400;
+    font-variant-numeric: normal;
+}
+
+.dados-grid .dado-alerta dd {
+    color: var(--color-danger);
+}
+
+.dados-grid .dado-alerta .dado-nota {
+    color: var(--color-danger);
+}
+
+/* Acoes de uma tela de detalhe, agrupadas no fim do cabecalho.
+
+   Estavam soltas ao lado do titulo, num flex inline, disputando a linha com
+   ele: em nome longo os botoes desciam e o cabecalho quebrava em duas alturas
+   diferentes. Embaixo, alinhadas a esquerda, elas leem como "o que da pra
+   fazer aqui" e o titulo fica livre. */
+.acoes-cabecalho {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espaco-3);
+    align-items: center;
+    margin-top: var(--espaco-5);
+    padding-top: var(--espaco-5);
+    border-top: 1px solid var(--color-border);
+}
+
+.acoes-cabecalho form {
+    margin: 0;
+}
+
+/* Cabecalho de secao dentro de um card: titulo a esquerda, acao a direita.
+   Vinha repetido como estilo inline em cada secao da ficha do aluno. */
+.secao-cabecalho {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--espaco-4);
+    flex-wrap: wrap;
+    margin-bottom: var(--espaco-4);
+}
+
+.secao-cabecalho > .section-title {
+    margin: 0;
+}
+
+/* Linha de metadados de um item de lista (ano, veiculo, conceito, creditos).
+
+   Substitui o formato "{{ a }} {% if b %} | {{ b }}{% endif %}", que tem dois
+   defeitos: o pipe fica coberto de espacos e vira ruido visual, e quando o
+   primeiro campo esta vazio sobra um separador solto no inicio da linha -- cada
+   template resolvia isso na mao, e nem todos resolviam.
+
+   Aqui o separador e gerado pelo CSS entre irmaos existentes. Campo ausente e
+   um <span> que o template nao renderiza, entao nao ha separador para sobrar. */
+.meta-linha {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--espaco-3);
+    margin: var(--espaco-2) 0 0;
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.meta-linha > * + *::before {
+    content: "·";
+    margin-right: var(--espaco-3);
+}
+
+.meta-linha a {
+    color: inherit;
+}
+
+/* Estado vazio de uma sub-secao (Publicacoes, Disciplinas, Estagios dentro de
+   uma trajetoria).
+
+   O .estado-vazio cheio, com icone e titulo, e para uma tela que nao tem o que
+   mostrar. Repetido cinco vezes dentro do mesmo card, viraria um card de
+   icones. Aqui basta distinguir "esta secao esta vazia" de um paragrafo solto,
+   e o recuo com a barra a esquerda faz isso sem ocupar espaco. */
+.estado-vazio-inline {
+    margin: 0;
+    padding: var(--espaco-3) var(--espaco-4);
+    border-left: 2px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.875rem;
+}
+
+/* Texto complementar de um item de lista: autores de uma publicacao, observacao
+   da secretaria. Nao e metadado (nao entra na meta-linha) nem titulo. */
+.item-autores,
+.item-observacao {
+    margin: var(--espaco-2) 0 0;
+    color: var(--color-muted);
+    font-size: 0.875rem;
+}
+
+/* Botoes que agem sobre a mesma coisa, mantidos juntos. */
+.grupo-acoes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espaco-3);
+    align-items: center;
+}
+
+/* Titulo de uma trajetoria: nivel do curso e o status, lado a lado. */
+.trajetoria-titulo {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    flex-wrap: wrap;
+}
+
+/* Sub-secao dentro de um card (Publicacoes, Disciplinas, Horas dentro de uma
+   trajetoria). Precisa de folga acima para nao colar no bloco anterior. */
+.secao-cabecalho-interna {
+    margin-top: var(--espaco-6);
+    padding-top: var(--espaco-5);
+    border-top: 1px solid var(--color-border);
+}
+
+/* Variante da info-list em que cada linha tem uma acao propria ("Alterar").
+   A info-list padrao e de duas colunas; aqui a terceira coluna guarda o botao,
+   senao ele quebra para a linha de baixo e a lista perde o alinhamento. */
+.info-list-editavel li {
+    grid-template-columns: 190px minmax(0, 1fr) auto;
+    align-items: center;
+}
+
+@media (max-width: 900px) {
+    .info-list-editavel li {
+        grid-template-columns: 1fr;
+        gap: var(--espaco-2);
+    }
+}
+
+/* Bloco de texto corrido dentro do registro (descricao, termo, observacoes).
+   pre-wrap preserva as quebras que o requerente digitou. */
+.processo-texto + .processo-texto {
+    margin-top: var(--espaco-5);
+}
+
+.processo-texto p {
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+/* Anotacao de uso interno: nao e do requerente, e da secretaria. Ficava
+   misturada aos demais dados, sem indicar que tem outro publico. */
+.processo-interno {
+    padding: var(--espaco-4);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-soft);
+    border: 1px dashed var(--color-border);
+}
+
+/* Linha do tempo de tramitacao.
+
+   Cada evento era uma frase com pipes, sem indicar sequencia. Num processo
+   que anda entre setores, a ordem e justamente o que se quer ler -- o fio
+   vertical e as marcas dao essa leitura de relance. Ordem decrescente: o
+   ultimo movimento no topo, que e onde o processo esta agora. */
+.linha-tempo {
+    display: grid;
+    gap: var(--espaco-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.linha-tempo li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr);
+    gap: var(--espaco-4);
+}
+
+/* O fio liga uma marca a seguinte; o ultimo item nao tem proximo. */
+.linha-tempo li:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 16px;
+    bottom: calc(-1 * var(--espaco-5));
+    width: 1px;
+    background: var(--color-border);
+}
+
+.linha-tempo-marca {
+    width: 11px;
+    height: 11px;
+    margin-top: 5px;
+    border-radius: 50%;
+    border: 2px solid var(--color-primary);
+    background: var(--color-surface);
+}
+
+/* A abertura do processo fecha a linha: marca preenchida, nao vazada. */
+.linha-tempo-marca.is-inicio {
+    background: var(--color-primary);
+}
+
+.linha-tempo-titulo {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin: 0;
+    font-size: 0.93rem;
+    font-weight: 560;
+}
+
+.linha-tempo-seta {
+    width: 15px;
+    height: 15px;
+    color: var(--color-muted);
+}
+
+.linha-tempo-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin: 0.25rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.81rem;
+}
+
+.linha-tempo-observacao {
+    margin: 0.5rem 0 0;
+    padding: 0.55rem 0.75rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-soft);
+    font-size: 0.87rem;
+    white-space: pre-wrap;
+}
+
+/* Fileira de acoes do processo. */
+.acoes-processo {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.acoes-divisoria {
+    width: 1px;
+    height: 26px;
+    margin: 0 0.35rem;
+    background: var(--color-border);
+}
+
+/* Acao que encerra o processo. Nao e destrutiva a ponto de pedir vermelho
+   cheio, mas nao pode parecer mais uma acao do dia a dia: fica em contorno,
+   depois da divisoria. */
+.btn-encerrar {
+    color: var(--color-danger);
+    background: transparent;
+    border-color: #f3c6cd;
+    box-shadow: none;
+}
+
+.btn-encerrar:hover,
+.btn-encerrar:focus-visible {
+    color: var(--color-danger);
+    background: #fff5f6;
+    border-color: var(--color-danger);
+}
+
+/* Barra de progresso. Estava escrita em style inline dentro do template. */
+/* Progresso geral da integralizacao, no cabecalho do checklist. */
+.resumo-destaque dd {
+    color: var(--color-primary);
+}
+
+.barra-progresso-larga {
+    margin-bottom: var(--espaco-5);
+}
+
+.barra-progresso {
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--color-border);
+    overflow: hidden;
+}
+
+.barra-progresso span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--color-primary);
+}
+
+.progresso-rotulo {
+    margin: 0 0 var(--espaco-2);
+    font-size: 0.88rem;
+}
+
+.progresso-rotulo strong {
+    font-size: 1.05rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.progresso-percentual {
+    margin: var(--espaco-2) 0 0;
+    color: var(--color-muted);
+    font-size: 0.79rem;
+}
+
+/* Estado do item de checklist. O texto sozinho, repetido em cada linha, nao
+   se distingue do proprio item; a cor separa cumprido de pendente sem exigir
+   leitura -- e o rotulo continua escrito. */
+.estado-item {
+    color: var(--color-muted);
+    font-size: 0.79rem;
+    white-space: nowrap;
+}
+
+.activity-list .is-cumprido .estado-item {
+    color: var(--color-accent-strong);
+}
+
+.activity-list .is-cumprido .soft-icon,
+.soft-icon.is-ok {
+    color: var(--color-accent-strong);
+}
+
+.soft-icon.is-aviso {
+    color: var(--color-warning);
+}
+
+.quick-seta {
+    width: 16px;
+    height: 16px;
+    color: var(--color-muted);
+}
+
+/* Estado vazio: antes era um <p> solto com o texto em cinza. */
+.estado-vazio {
+    display: grid;
+    justify-items: center;
+    gap: 0.3rem;
+    padding: 2.5rem 1rem;
+    text-align: center;
+}
+
+.estado-vazio svg {
+    width: 30px;
+    height: 30px;
+    margin-bottom: 0.2rem;
+    color: #b6c2d4;
+}
+
+.estado-vazio p {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.9rem;
+}
+
+.estado-vazio .estado-vazio-titulo {
+    color: var(--color-text);
+    font-size: 0.95rem;
+    font-weight: 560;
+}
+
+/* ==========================================================================
+   Transicoes entre telas
+
+   Usa a View Transitions API entre documentos: o navegador tira um retrato da
+   pagina que sai, outro da que entra, e interpola os dois. Nao ha JS nem
+   roteamento no cliente -- continua sendo navegacao comum, com URL, botao
+   voltar e recarregamento normais.
+
+   Onde nao ha suporte (Firefox, Safari antigo) a navegacao acontece direto,
+   sem animacao e sem nada quebrado. O bloco @supports ao final da secao dá a
+   esses navegadores uma entrada simples de conteudo.
+
+   ATENCAO: o @view-transition precisa ficar no nivel superior da folha. Dentro
+   de um @media ele ate e parseado (vira um CSSViewTransitionRule valido), mas
+   nao tem efeito nenhum -- e a falha e silenciosa. Por isso o respeito a
+   prefers-reduced-motion vem depois, zerando as animacoes, e nao envolvendo
+   este bloco num @media.
+   ========================================================================== */
+
+@view-transition {
+    navigation: auto;
+}
+
+/* Elementos nomeados sao capturados em separado e animados por conta propria,
+   em vez de entrarem no retrato geral da pagina. */
+.auth-institucional {
+    view-transition-name: painel-acesso;
+}
+
+.auth-formulario {
+    view-transition-name: form-acesso;
+}
+
+/* Molduras da aplicacao trocam sem cross-fade: sao praticamente iguais entre
+   as telas, e o cross-fade so produziria um piscar sutil. */
+::view-transition-old(painel-acesso) {
+    display: none;
+}
+
+::view-transition-new(painel-acesso) {
+    animation: none;
+}
+
+/* Conteudo: o antigo recua e some, o novo sobe e aparece. Entrada mais longa
+   que a saida para a tela nova parecer chegando, nao empurrada. */
+::view-transition-old(form-acesso) {
+    animation: tela-sai 130ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+::view-transition-new(form-acesso) {
+    animation: tela-entra 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 200ms;
+}
+
+/* Abertura de submenu. Fechamento nao e animavel sem JS: o <details> remove o
+   conteudo do fluxo imediatamente. */
+.side-submenu[open] > .side-submenu-lista {
+    animation: submenu-abre 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tela-sai {
+    to {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+}
+
+@keyframes tela-entra {
+    from {
+        opacity: 0;
+        transform: translateY(9px);
+    }
+}
+
+@keyframes pastilha-assenta {
+    from {
+        background-color: rgba(255, 255, 255, 0);
+        box-shadow: none;
+        transform: translateX(-6px);
+    }
+}
+
+@keyframes submenu-abre {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+}
+
+/* Entrada do conteudo a cada carregamento.
+
+   Nas telas autenticadas e daqui que vem o movimento ao trocar de tela: a
+   transicao entre documentos nao dispara nelas (dispara nas telas de acesso,
+   com a mesma folha de estilo e a mesma regra -- nao identifiquei o motivo da
+   diferenca). Como isto e uma animacao CSS comum no carregamento, funciona em
+   qualquer navegador, inclusive nos que nao tem View Transitions.
+
+   .content-area nao tem view-transition-name justamente para nao concorrer com
+   esta animacao onde a transicao entre documentos funcionar. */
+@media (prefers-reduced-motion: no-preference) {
+    .content-area {
+        animation: tela-entra 240ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* A pastilha do item ativo se assenta ao carregar, marcando onde a
+       navegacao parou. Um pouco mais lenta que o conteudo, para o olho chegar
+       nela depois de reconhecer a tela. */
+    .side-link.is-active {
+        animation: pastilha-assenta 340ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Nas telas de acesso a coluna do formulario ja e animada pela transicao
+       entre documentos; o cartao so anima onde nao ha suporte. */
+    @supports not (view-transition-name: none) {
+        .auth-cartao {
+            animation: tela-entra 260ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+    }
+}
+
+/* Quem pede menos movimento no sistema: a troca de tela continua acontecendo,
+   mas sem deslocamento nem fade -- corta direto. */
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+        animation: none !important;
+    }
+
+    .side-submenu[open] > .side-submenu-lista,
+    .side-link.is-active,
+    .content-area,
+    .auth-cartao {
+        animation: none !important;
+    }
+}
+
+/* ==========================================================================
+   Modal
+
+   Vivia num bloco <style> dentro de aluno_detalhe.html, servindo as 19 caixas
+   de edicao daquela ficha. Enquanto o unico consumidor fosse aquele template
+   isso passava, mas e um componente -- e um <style> solto no meio do content
+   nao e revisavel nem reaproveitavel. A regra que importa e o display:none do
+   backdrop: sem ela, todos os formularios de edicao aparecem empilhados na
+   pagina de uma vez.
+   ========================================================================== */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 20, 38, 0.48);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: var(--espaco-4);
+}
+
+.modal-backdrop.open {
+    display: flex;
+}
+
+.modal-card {
+    width: min(720px, 96vw);
+    max-height: 92vh;
+    overflow: auto;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--espaco-5);
+    box-shadow: var(--shadow-card);
+}
+
+.modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--espaco-3);
+    margin-bottom: var(--espaco-5);
+    padding-bottom: var(--espaco-4);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.modal-head > .section-title {
+    margin: 0;
+}
+
+.modal-close {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    border-radius: var(--radius-sm);
+    padding: 0.35rem 0.6rem;
+    cursor: pointer;
+    color: var(--color-muted);
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.modal-close:hover {
+    color: var(--color-text);
+    border-color: var(--color-text-soft, var(--color-muted));
+}
+
+/* ==========================================================================
+   Grade de horario semanal
+
+   Estava num bloco <style> de matriculas_ofertas.html, com todos os seletores
+   presos a .matriculas-ofertas-page e as cores em hexadecimal solto
+   (#f7fbff, #fbfdff, #bdd4f3, #174d90). Como componente ela serve tambem a
+   tela de matricula do aluno, entao vem para ca sem prefixo de pagina e com os
+   tokens do tema.
+
+   Geometria: as marcas de hora e os eventos vem da view em porcentagem da
+   altura total; --altura-hora, tambem calculado la, diz de quanto em quanto
+   repetir a linha divisoria.
+   ========================================================================== */
+.grade-horario-envolvido {
+    margin-top: var(--espaco-5);
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.grade-horario {
+    display: grid;
+    grid-template-columns: 3.5rem repeat(6, minmax(6rem, 1fr));
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-surface);
+}
+
+.grade-horario-cabecalho {
+    min-height: 2.5rem;
+    display: flex;
+    align-items: center;
+    padding: var(--espaco-3) var(--espaco-3);
+    border-right: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface-soft);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.grade-horario-eixo {
+    position: relative;
+    border-right: 1px solid var(--color-border);
+    background: var(--color-surface-soft);
+}
+
+.grade-horario-marca {
+    position: absolute;
+    right: var(--espaco-2);
+    transform: translateY(-50%);
+    color: var(--color-muted);
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* A ultima marca fica em top:100%: centrada, metade dela cairia fora da grade
+   e seria cortada pelo overflow:hidden do contorno arredondado. */
+.grade-horario-marca.no-fim {
+    transform: translateY(-100%);
+}
+
+.grade-horario-dia {
+    position: relative;
+    min-width: 0;
+    border-right: 1px solid var(--color-border);
+    background: repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent calc(var(--altura-hora) - 1px),
+        var(--color-border) calc(var(--altura-hora) - 1px),
+        var(--color-border) var(--altura-hora)
+    );
+}
+
+.grade-horario-dia:last-child,
+.grade-horario-cabecalho:last-child {
+    border-right: 0;
+}
+
+.grade-horario-evento {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-height: 2rem;
+    padding: var(--espaco-2) var(--espaco-3);
+    border: 1px solid var(--color-primary);
+    border-left-width: 3px;
+    border-radius: var(--radius-sm);
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    line-height: 1.25;
+    overflow: hidden;
+}
+
+.grade-horario-evento strong {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.grade-horario-evento-nome {
+    font-weight: 500;
+}
+
+/* Horario e docente sao apoio: identificam o encontro, mas quem procura a
+   disciplina na grade procura pelo codigo e pelo nome. */
+.grade-horario-evento-meta {
+    color: var(--color-primary);
+    opacity: 0.75;
+    font-size: 0.6875rem;
+}
+
+@media (max-width: 700px) {
+    .grade-horario {
+        grid-template-columns: 3rem repeat(6, minmax(5rem, 1fr));
+    }
+}
+
+/* Item selecionavel de disciplina na solicitacao de matricula.
+
+   Usava .checkbox-field com align-items:flex-start inline. O bloco a direita
+   tem tres alturas (titulo, metadados, horarios), entao a caixa precisa alinhar
+   pelo topo -- centralizada, ela descia para o meio do paragrafo. */
+.opcao-disciplina {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--espaco-3);
+    cursor: pointer;
+}
+
+.opcao-disciplina input {
+    width: auto;
+    margin: 0.2rem 0 0;
+    flex: 0 0 auto;
+}
+
+.opcao-disciplina > span {
+    display: block;
+    min-width: 0;
+}
+
+.lista-encontros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espaco-2);
+    margin-top: var(--espaco-3);
+}
+
+/* Bloco que o usuario abre quando quer -- ementa de uma disciplina, detalhe
+   secundario de um registro.
+
+   Era um <details> cru: triangulo do navegador e o resumo em cinza de
+   paragrafo, sem parecer clicavel. Ganha marcador proprio, que gira ao abrir,
+   e o resumo passa a ler como acao. */
+.revelar {
+    margin-top: var(--espaco-4);
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--espaco-3);
+}
+
+.revelar > summary {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-2);
+    list-style: none;
+    cursor: pointer;
+    color: var(--color-primary);
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.revelar > summary::-webkit-details-marker {
+    display: none;
+}
+
+.revelar > summary::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg) translate(-0.1rem, -0.05rem);
+    transition: transform 0.15s ease;
+}
+
+.revelar[open] > summary::before {
+    transform: rotate(45deg) translate(0.05rem, -0.1rem);
+}
+
+.revelar > summary:hover {
+    text-decoration: underline;
+}
+
+.revelar > *:not(summary) {
+    margin-top: var(--espaco-4);
+}
+
+/* Variante da grade rotulada para valores longos (ementa, bibliografia): uma
+   coluna, para o texto nao ficar espremido numa celula estreita. */
+.dados-grid-texto {
+    grid-template-columns: 1fr;
+}
+
+.dados-grid-texto dd {
+    font-weight: 400;
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+
+/* Nota em bloco abaixo do titulo de um item: percentual presencial, aviso de
+   conformidade. Era <small class="muted"> com display:block e margem inline,
+   repetido em varias telas. */
+.nota-bloco {
+    display: block;
+    margin-top: var(--espaco-3);
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+}
+
+/* Formulario de filtro no topo de uma listagem (busca, tipo, status).
+
+   Cada tela repetia a margem em estilo inline, com valores diferentes --
+   0.8rem numa, 1rem noutra. A separacao do cabecalho e sempre a mesma coisa. */
+.form-filtros {
+    margin: var(--espaco-5) 0;
+}
+
+/* Linha da info-list que abre para mostrar uma lista inteira (os estagios de
+   docencia de uma trajetoria). Ocupa a largura toda da grade, nao uma celula. */
+.linha-expansivel > div {
+    grid-column: 1 / -1;
+}
+
+.pilha-estagios {
+    display: flex;
+    flex-direction: column;
+    gap: var(--espaco-4);
+}
+
+/* Cartao dentro de outro cartao. Usava .card com box-shadow:none inline; o
+   problema nao era so a sombra -- um cartao aninhado nao deve ter o mesmo peso
+   visual do que o contem. */
+.cartao-interno {
+    padding: var(--espaco-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-soft);
+}
+
+/* Titulo de terceiro nivel, dentro de uma sub-secao. */
+.titulo-interno {
+    margin-top: var(--espaco-5);
+}
+
+/* Cabecalho e corpo de um <dialog>.
+
+   O padding vinha inline, partido em dois blocos complementares
+   ("1rem 1rem 0 1rem" no titulo, "0 1rem 1rem 1rem" no formulario) para que o
+   formulario encostasse no titulo. Sao duas partes de um mesmo corpo. */
+.modal-cabecalho {
+    padding: var(--espaco-5) var(--espaco-5) 0;
+}
+
+.modal-formulario {
+    padding: 0 var(--espaco-5) var(--espaco-5);
+}
+
+/* Nota que introduz a lista logo abaixo dela. */
+.nota-antes-lista {
+    margin: 0 0 var(--espaco-4);
+}
+
+.nota-espacada {
+    margin: var(--espaco-3) 0;
+}
+
+/* Formulario de uma acao so, na mesma linha do campo (registrar ciencia,
+   devolver ao setor). Alinha pela base para o botao acompanhar o input. */
+.form-em-linha {
+    display: flex;
+    gap: var(--espaco-3);
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+/* Texto digitado por um usuario: preserva as quebras de linha originais. */
+.texto-preservado {
+    white-space: pre-wrap;
+}
+
+/* Documentos anexados antes de enviar o formulario, montados pelo JS. */
+.pilha-documentos {
+    display: grid;
+    gap: var(--espaco-4);
+    margin-bottom: var(--espaco-5);
+}
+
+.pilha-documentos:empty {
+    display: none;
+}
+
+/* Lista de atividades logo abaixo de uma grade de dados, no mesmo cartao. */
+.activity-list-apos-dados {
+    margin-top: var(--espaco-5);
+}
+
+/* ==========================================================================
+   Trajetoria academica como bloco que abre e fecha
+
+   As trajetorias vinham todas abertas, uma embaixo da outra, cada uma com onze
+   linhas de dados mais publicacoes, disciplinas e horas complementares. Com uma
+   trajetoria a tela passava de 3000px; um aluno que concluiu o mestrado e esta
+   no doutorado tem duas, e a que esta em curso -- que e o motivo da visita --
+   ficava soterrada pelo historico.
+
+   A ativa abre sozinha; as demais ficam fechadas com o resumo no cabecalho.
+   Reaproveita o marcador do .revelar, mas aqui o cabecalho e um item de lista
+   clicavel, nao um link discreto.
+   ========================================================================== */
+.pilha-trajetorias {
+    display: grid;
+    gap: var(--espaco-4);
+}
+
+.trajetoria {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+}
+
+.trajetoria[open] {
+    border-color: var(--color-primary-soft);
+    box-shadow: var(--shadow-card);
+}
+
+.trajetoria-resumo {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-4);
+    flex-wrap: wrap;
+    padding: var(--espaco-4);
+    list-style: none;
+    cursor: pointer;
+    border-radius: var(--radius-md);
+}
+
+.trajetoria-resumo::-webkit-details-marker {
+    display: none;
+}
+
+.trajetoria-resumo:hover {
+    background: var(--color-surface-soft);
+}
+
+/* Marcador antes do titulo: aponta para baixo quando aberto. */
+.trajetoria-resumo::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-right: 1.5px solid var(--color-muted);
+    border-bottom: 1.5px solid var(--color-muted);
+    transform: rotate(-45deg);
+    transition: transform 0.15s ease;
+}
+
+.trajetoria[open] > .trajetoria-resumo::before {
+    transform: rotate(45deg);
+}
+
+/* O resumo empurra os metadados para a direita, longe do titulo: o que
+   identifica a trajetoria fica junto, e o apoio fica no fim da linha. */
+.trajetoria-resumo > .meta-linha {
+    margin: 0 0 0 auto;
+}
+
+.trajetoria-corpo {
+    padding: 0 var(--espaco-4) var(--espaco-4);
+    border-top: 1px solid var(--color-border);
+    margin-top: 0;
+    padding-top: var(--espaco-5);
+}
+
+.trajetoria-corpo > .grupo-acoes {
+    margin-bottom: var(--espaco-5);
+}
+
+/* Coluna de numeros numa tabela: alinhada a direita, com digitos de largura
+   fixa, para que as casas fiquem uma sobre a outra e os valores possam ser
+   comparados de relance. */
+.tabela .celula-numerica {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   Ritmo e agrupamentos que cada tela resolvia com margem inline
+
+   Os valores divergiam entre telas para a mesma situacao -- 0.4rem numa,
+   0.55rem noutra, 0.8rem numa terceira -- porque cada um era escolhido no
+   momento de escrever aquele HTML.
+   ========================================================================== */
+
+/* Aviso dentro de um bloco. Cada tela dava a ele uma margem propria, em direcao
+   e valor diferentes: margin-bottom numa listagem, margin-top num item de
+   lista. E o mesmo componente na mesma situacao. */
+.card > .alert,
+.list > li > .alert {
+    margin-block: var(--espaco-4);
+}
+
+.card > .alert:first-child {
+    margin-top: 0;
+}
+
+.card > .alert:last-child {
+    margin-bottom: 0;
+}
+
+/* Formulario de busca de um campo so, no topo de uma listagem. Largura limitada
+   porque um campo de texto ocupando 1160px nao ajuda a ler nem a preencher. */
+.form-busca {
+    max-width: 21rem;
+    margin: 0 0 var(--espaco-5);
+}
+
+/* Filtros que sao links (por status, por setor), nao campos de formulario. */
+.filtros-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espaco-3);
+    margin: var(--espaco-4) 0 var(--espaco-5);
+}
+
+/* Campo de um grid de formulario que contem so o botao de aplicar: alinha ao
+   fim para o botao ficar na linha de base dos campos ao lado, em vez de subir
+   para o meio da altura da celula. */
+.field-acao {
+    justify-content: flex-end;
+}
+
+/* Formulario que existe so para envolver um botao dentro de uma frase
+   ("Encerrar" ao lado do nome do membro). Sem isso ele quebra a linha. */
+.form-botao {
+    display: inline;
+}
+
+/* Faixa de marcadores dentro de um item de lista (tipo, status, recorrencia). */
+.list > li .grupo-marcadores {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--espaco-3);
+    margin-top: var(--espaco-3);
+}
+
+/* Lista simples aninhada dentro de um bloco expansivel. */
+.revelar ul,
+.lista-aninhada {
+    margin: var(--espaco-3) 0 0;
+    padding-left: var(--espaco-5);
+}
+
+.trajectory-panel {
+    margin-top: var(--espaco-5);
+}
+
+/* ==========================================================================
+   Painel da coordenacao: docente que abre para mostrar os orientandos
+
+   Vivia num <style> dentro de coordenacao_dashboard.html, com fundo em
+   hexadecimal solto e o marcador feito com os caracteres "+" e "-" via content.
+   Passa a usar o mesmo marcador em seta das outras aberturas do sistema.
+   ========================================================================== */
+.docente-item {
+    margin-bottom: var(--espaco-4);
+}
+
+.docente-item > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--espaco-4);
+    padding: var(--espaco-3) var(--espaco-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    list-style: none;
+    cursor: pointer;
+}
+
+.docente-item > summary::-webkit-details-marker {
+    display: none;
+}
+
+.docente-item > summary:hover {
+    background: var(--color-surface-soft);
+}
+
+/* Seta, nao "+"/"-": e o mesmo gesto de abrir das trajetorias e dos blocos
+   .revelar, e usar tres marcadores diferentes para a mesma acao obriga o usuario
+   a aprender cada um. */
+.docente-toggle {
+    flex: 0 0 auto;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-right: 1.5px solid var(--color-muted);
+    border-bottom: 1.5px solid var(--color-muted);
+    transform: rotate(-45deg);
+    transition: transform 0.15s ease;
+}
+
+.docente-item[open] > summary .docente-toggle {
+    transform: rotate(45deg);
+}
+
+.orientandos-lista {
+    margin: var(--espaco-3) 0 0 var(--espaco-5);
+    padding-left: var(--espaco-4);
+}
+
+.orientandos-lista li {
+    margin: var(--espaco-2) 0;
+}
+
+/* ==========================================================================
+   Formulario de setor e comissao: busca de pessoas e selecao multipla
+
+   Vivia num <style> dentro do include, com tres fundos "#ffffff" e uma copia da
+   classe de texto para leitor de tela que o app.css ja tem (.apenas-leitor).
+   ========================================================================== */
+.checkbox-list ul {
+    display: grid;
+    gap: var(--espaco-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.checkbox-list label {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--espaco-3);
+    font-weight: 600;
+}
+
+.checkbox-list-scroll {
+    max-height: 16rem;
+    overflow: auto;
+    margin-top: var(--espaco-3);
+    padding: var(--espaco-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+}
+
+.search-results {
+    display: none;
+    max-height: 16rem;
+    overflow-y: auto;
+    margin-top: var(--espaco-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+}
+
+.search-results.is-open {
+    display: block;
+}
+
+.search-result-button {
+    width: 100%;
+    padding: var(--espaco-3) var(--espaco-4);
+    border: 0;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+
+.search-result-button:hover {
+    background: var(--color-surface-soft);
+}
+
+.search-result-button:last-child {
+    border-bottom: 0;
+}
+
+.selected-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espaco-3);
+    margin: var(--espaco-3) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.selected-list li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--espaco-2);
+    padding: var(--espaco-2) var(--espaco-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+}
+
+.selected-list button {
+    padding: 0 var(--espaco-1);
+    border: 0;
+    background: transparent;
+    color: var(--color-muted);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.selected-list button:hover {
+    color: var(--color-text);
 }

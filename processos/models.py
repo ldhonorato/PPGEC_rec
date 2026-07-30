@@ -54,8 +54,8 @@ class User(AbstractUser):
     first_name = None
     last_name = None
 
-    nome = models.CharField(max_length=255)
-    email = models.EmailField(unique=True)
+    nome = models.CharField(max_length=255, verbose_name="Nome completo")
+    email = models.EmailField(unique=True, verbose_name="E-mail")
     polo_atuacao = models.ForeignKey(
         "Polo",
         on_delete=models.SET_NULL,
@@ -91,7 +91,7 @@ class Aluno(User):
     class SexoAtribuidoNascimento(models.TextChoices):
         FEMININO = "FEMININO", "Feminino"
         MASCULINO = "MASCULINO", "Masculino"
-        NAO_INFORMAR = "NAO_INFORMAR", "Prefiro nao informar"
+        NAO_INFORMAR = "NAO_INFORMAR", "Prefiro não informar"
 
     class Genero(models.TextChoices):
         MULHER = "MULHER", "Mulher"
@@ -101,7 +101,7 @@ class Aluno(User):
         NAO_INFORMAR = "NAO_INFORMAR", "Prefiro não informar"
 
     class StatusAluno(models.TextChoices):
-        EM_AVALIACAO = "EM_AVALIACAO", "Em avaliacao"
+        EM_AVALIACAO = "EM_AVALIACAO", "Em avaliação"
         ATIVO = "ATIVO", "Ativo"
         DESLIGADO = "DESLIGADO", "Desligado"
         DEFENDEU = "DEFENDEU", "Defendeu"
@@ -207,9 +207,9 @@ class Docente(User):
 
 class TrajetoriaAcademica(models.Model):
     class Status(models.TextChoices):
-        EM_HOMOLOGACAO = "EM_HOMOLOGACAO", "Em homologacao"
+        EM_HOMOLOGACAO = "EM_HOMOLOGACAO", "Em homologação"
         ATIVA = "ATIVA", "Ativa"
-        CONCLUIDA = "CONCLUIDA", "Concluida"
+        CONCLUIDA = "CONCLUIDA", "Concluída"
         DESLIGADA = "DESLIGADA", "Desligada"
         TRANCADA = "TRANCADA", "Trancado"
         REMOVIDA = "REMOVIDA", "Removida"
@@ -286,7 +286,7 @@ class TrajetoriaAcademica(models.Model):
     @property
     def conclusao_label(self) -> str:
         if self.nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
-            return "Relatorio final"
+            return "Relatório final"
         return "Defesa"
 
     @property
@@ -296,13 +296,13 @@ class TrajetoriaAcademica(models.Model):
     @property
     def numero_conclusao_label(self) -> str:
         if self.nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
-            return "Numero do relatorio final"
-        return "Numero da defesa"
+            return "Número do relatório final"
+        return "Número da defesa"
 
     @property
     def data_conclusao_label(self) -> str:
         if self.nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
-            return "Data do relatorio final"
+            return "Data do relatório final"
         return "Data da defesa"
 
     def _normalizar_campos_por_nivel(self):
@@ -329,12 +329,12 @@ class TrajetoriaAcademica(models.Model):
         self._normalizar_campos_por_nivel()
 
         if self.orientador and self.orientador.tipo_usuario != User.TipoUsuario.DOCENTE:
-            errors["orientador"] = "Orientador deve ser um usuario do tipo DOCENTE."
+            errors["orientador"] = "Orientador deve ser um usuário do tipo DOCENTE."
         if self.coorientador and self.coorientador.tipo_usuario != User.TipoUsuario.DOCENTE:
-            errors["coorientador"] = "Coorientador deve ser um usuario do tipo DOCENTE."
+            errors["coorientador"] = "Coorientador deve ser um usuário do tipo DOCENTE."
         if self.coorientador and self.coorientador_externo_nome.strip():
-            errors["coorientador"] = "Informe coorientador cadastrado ou coorientador externo, nao ambos."
-            errors["coorientador_externo_nome"] = "Informe coorientador cadastrado ou coorientador externo, nao ambos."
+            errors["coorientador"] = "Informe coorientador cadastrado ou coorientador externo, não ambos."
+            errors["coorientador_externo_nome"] = "Informe coorientador cadastrado ou coorientador externo, não ambos."
         if self.coorientador and self.orientador_id == self.coorientador_id:
             errors["coorientador"] = "Coorientador deve ser diferente do orientador."
 
@@ -343,12 +343,19 @@ class TrajetoriaAcademica(models.Model):
             self.coorientador_externo_instituicao = ""
 
         if self.status == self.Status.CONCLUIDA and self.usa_conclusao:
+            # Usa os rotulos proprios de cada campo. Com conclusao_label_lower
+            # a mensagem saia como "Informe o defesa" -- genero errado e
+            # apontando para a defesa, quando o que falta e o numero dela.
             if not (self.numero_defesa or "").strip():
-                errors["numero_defesa"] = f"Informe o {self.conclusao_label_lower} para trajetoria concluida."
+                errors["numero_defesa"] = (
+                    f"Informe o {self.numero_conclusao_label.lower()} para concluir a trajetória."
+                )
             if not self.data_defesa:
-                errors["data_defesa"] = f"Informe a data do {self.conclusao_label_lower} para trajetoria concluida."
+                errors["data_defesa"] = (
+                    f"Informe a {self.data_conclusao_label.lower()} para concluir a trajetória."
+                )
         elif self.deposito_versao_final:
-            errors["deposito_versao_final"] = "Deposito da versao final so pode ser marcado apos conclusao."
+            errors["deposito_versao_final"] = "Depósito da versão final só pode ser marcado após conclusão."
 
         if errors:
             raise ValidationError(errors)
@@ -386,7 +393,7 @@ class PublicacaoTrajetoria(models.Model):
         OUTRO = "OUTRO", "Outro"
 
     trajetoria = models.ForeignKey(TrajetoriaAcademica, on_delete=models.CASCADE, related_name="publicacoes")
-    titulo = models.CharField(max_length=255)
+    titulo = models.CharField(max_length=255, verbose_name="Título")
     tipo = models.CharField(max_length=25, choices=TipoPublicacao.choices, default=TipoPublicacao.ARTIGO_PERIODICO)
     autores = models.TextField(blank=True)
     veiculo = models.CharField(max_length=255, blank=True)
@@ -422,13 +429,13 @@ class DisciplinaTrajetoria(models.Model):
         TRANCADA = "TRANCADA", "Trancada"
 
     trajetoria = models.ForeignKey(TrajetoriaAcademica, on_delete=models.CASCADE, related_name="disciplinas")
-    codigo = models.CharField(max_length=40, blank=True)
+    codigo = models.CharField(max_length=40, blank=True, verbose_name="Código")
     nome = models.CharField(max_length=255)
     semestre = models.CharField(max_length=6, blank=True, validators=[Aluno.semestre_validator])
     conceito = models.CharField(max_length=20, blank=True)
     creditos = models.PositiveSmallIntegerField(null=True, blank=True)
     carga_horaria = models.PositiveSmallIntegerField(null=True, blank=True)
-    situacao = models.CharField(max_length=15, choices=Situacao.choices, default=Situacao.CURSANDO)
+    situacao = models.CharField(max_length=15, choices=Situacao.choices, default=Situacao.CURSANDO, verbose_name="Situação")
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -447,9 +454,26 @@ class DisciplinaTrajetoria(models.Model):
 
 
 class Disciplina(models.Model):
-    codigo = models.CharField(max_length=40, unique=True)
+    class Tipo(models.TextChoices):
+        """Categoria da disciplina na estrutura curricular do programa.
+
+        O campo era texto livre de 120 caracteres, digitado a mao no formulario
+        de cadastro. Com 47 disciplinas cadastradas, ja havia cinco grafias para
+        tres categorias: "Disciplina Basica" sem acento ao lado de "Disciplina
+        Básica", "Disciplina Eletiva Área" e um "Obrigatória" solto.
+
+        Isso nao e so inconsistencia de escrita: enquanto o tipo e texto livre
+        nao ha como filtrar por categoria nem contar quantas eletivas o aluno
+        cursou, que e o que a integralizacao precisa saber.
+        """
+
+        BASICA = "BASICA", "Básica"
+        ELETIVA_GERAL = "ELETIVA_GERAL", "Eletiva geral"
+        ELETIVA_ESPECIFICA = "ELETIVA_ESPECIFICA", "Eletiva específica"
+
+    codigo = models.CharField(max_length=40, unique=True, verbose_name="Código")
     nome = models.CharField(max_length=255)
-    tipo = models.CharField(max_length=120, blank=True)
+    tipo = models.CharField(max_length=25, choices=Tipo.choices, blank=True)
     creditos = models.PositiveSmallIntegerField(null=True, blank=True)
     carga_horaria = models.PositiveSmallIntegerField(null=True, blank=True)
     pre_requisitos = models.TextField(blank=True)
@@ -598,7 +622,7 @@ class OfertaDisciplina(models.Model):
         PRESENCIAL = "PRESENCIAL", "Presencial"
         HIBRIDA = "HIBRIDA", "Híbrida"
 
-    periodo = models.ForeignKey(PeriodoLetivo, on_delete=models.CASCADE, related_name="ofertas")
+    periodo = models.ForeignKey(PeriodoLetivo, on_delete=models.CASCADE, related_name="ofertas", verbose_name="Período")
     disciplina = models.ForeignKey(Disciplina, on_delete=models.PROTECT, related_name="ofertas")
     docente_responsavel = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -801,7 +825,7 @@ class SolicitacaoMatricula(models.Model):
         INDEFERIDA = "INDEFERIDA", "Indeferida"
         CANCELADA = "CANCELADA", "Cancelada"
 
-    periodo = models.ForeignKey(PeriodoLetivo, on_delete=models.PROTECT, related_name="solicitacoes_matricula")
+    periodo = models.ForeignKey(PeriodoLetivo, on_delete=models.PROTECT, related_name="solicitacoes_matricula", verbose_name="Período")
     aluno = models.ForeignKey(Aluno, on_delete=models.PROTECT, related_name="solicitacoes_matricula")
     tipo_matricula = models.CharField(max_length=12, choices=TipoMatricula.choices, default=TipoMatricula.DISCIPLINAS)
     tipo_aluno = models.CharField(max_length=10, choices=TipoAluno.choices, default=TipoAluno.REGULAR)
@@ -936,17 +960,17 @@ class ItemSolicitacaoMatricula(models.Model):
 class AlteracaoAluno(models.Model):
     class TipoAlteracao(models.TextChoices):
         STATUS = "STATUS", "Status"
-        QUALIFICACAO = "QUALIFICACAO", "Qualificacao"
+        QUALIFICACAO = "QUALIFICACAO", "Qualificação"
         HORAS_COMPLEMENTARES = "HORAS_COMPLEMENTARES", "Horas complementares"
         DEFESA = "DEFESA", "Defesa"
-        DEPOSITO_FINAL = "DEPOSITO_FINAL", "Deposito versao final"
-        PRAZO_QUALIFICACAO = "PRAZO_QUALIFICACAO", "Prazo qualificacao"
+        DEPOSITO_FINAL = "DEPOSITO_FINAL", "Depósito versão final"
+        PRAZO_QUALIFICACAO = "PRAZO_QUALIFICACAO", "Prazo qualificação"
         PRAZO_DEFESA = "PRAZO_DEFESA", "Prazo defesa"
         ORIENTADOR = "ORIENTADOR", "Orientador"
         COORIENTADOR = "COORIENTADOR", "Coorientador"
         REINGRESSO = "REINGRESSO", "Reingresso"
-        TRAJETORIA = "TRAJETORIA", "Trajetoria academica"
-        ESTAGIO_DOCENCIA = "ESTAGIO_DOCENCIA", "Estagio docencia"
+        TRAJETORIA = "TRAJETORIA", "Trajetória acadêmica"
+        ESTAGIO_DOCENCIA = "ESTAGIO_DOCENCIA", "Estágio docência"
 
     aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="alteracoes")
     tipo = models.CharField(max_length=25, choices=TipoAlteracao.choices)
@@ -975,7 +999,7 @@ class NormaHorasComplementares(models.Model):
 
     nome = models.CharField(max_length=255)
     identificacao = models.CharField(max_length=80)
-    descricao = models.TextField(blank=True)
+    descricao = models.TextField(blank=True, verbose_name="Descrição")
     inicio_vigencia = models.DateField()
     fim_vigencia = models.DateField(null=True, blank=True)
     carga_horaria_exigida = models.PositiveIntegerField(default=45)
@@ -999,7 +1023,7 @@ class GrupoLimiteHorasComplementares(models.Model):
         related_name="grupos_limite",
     )
     nome = models.CharField(max_length=120)
-    descricao = models.TextField(blank=True)
+    descricao = models.TextField(blank=True, verbose_name="Descrição")
     limite_maximo = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     ordem = models.PositiveIntegerField(default=0)
 
@@ -1025,7 +1049,7 @@ class TipoAtividadeHorasComplementares(models.Model):
         blank=True,
     )
     nome = models.CharField(max_length=180)
-    descricao = models.TextField(blank=True)
+    descricao = models.TextField(blank=True, verbose_name="Descrição")
     unidade_calculo = models.CharField(max_length=40)
     horas_por_unidade = models.DecimalField(max_digits=6, decimal_places=2)
     limite_individual = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
@@ -1075,7 +1099,7 @@ class LancamentoHorasComplementares(models.Model):
         null=True,
         blank=True,
     )
-    descricao = models.CharField(max_length=255)
+    descricao = models.CharField(max_length=255, verbose_name="Descrição")
     periodo_realizacao = models.CharField(max_length=120, blank=True)
     quantidade = models.DecimalField(max_digits=8, decimal_places=2)
     unidade_quantidade = models.CharField(max_length=40)
@@ -1200,7 +1224,7 @@ class LancamentoHorasComplementares(models.Model):
                 self.tipo_atividade.grupo_limite.limite_maximo if self.tipo_atividade.grupo_limite else None
             )
         if not self.processo_origem_id and not self.origem_migracao and not self.justificativa_sem_processo:
-            errors["processo_origem"] = "Informe o processo de origem ou justifique o lancamento sem processo."
+            errors["processo_origem"] = "Informe o processo de origem ou justifique o lançamento sem processo."
         if self.processo_origem_id and self.processo_origem.usuario_criado_por_id != self.trajetoria.aluno_id:
             errors["processo_origem"] = "O processo de origem deve pertencer ao discente informado."
         if self.horas_aprovadas is not None and self.horas_calculadas and self.horas_aprovadas != self.horas_calculadas:
@@ -1214,9 +1238,9 @@ class LancamentoHorasComplementares(models.Model):
             and self.horas_aprovadas > maximo
             and not self.excepcional_autorizado
         ):
-            errors["horas_aprovadas"] = f"O maximo aprovavel pelas regras vigentes e {maximo}h."
+            errors["horas_aprovadas"] = f"O máximo aprovável pelas regras vigentes e {maximo}h."
         if self.excepcional_autorizado and not (self.justificativa_excepcional or "").strip():
-            errors["justificativa_excepcional"] = "Justifique a aprovacao excepcional acima do limite normativo."
+            errors["justificativa_excepcional"] = "Justifique a aprovação excepcional acima do limite normativo."
         if errors:
             raise ValidationError(errors)
 
@@ -1327,7 +1351,7 @@ class SolicitacaoBanca(models.Model):
         related_name="solicitacoes_banca",
     )
     tipo_defesa = models.CharField(max_length=30, choices=TipoDefesa.choices)
-    titulo = models.CharField(max_length=255, blank=True)
+    titulo = models.CharField(max_length=255, blank=True, verbose_name="Título")
     resumo = models.TextField(blank=True)
     palavras_chave = models.CharField(max_length=255, blank=True)
     data_prevista = models.DateField(null=True, blank=True)
@@ -1368,15 +1392,15 @@ class SolicitacaoBanca(models.Model):
     def clean(self):
         errors = {}
         if self.docente and self.docente.tipo_usuario != User.TipoUsuario.DOCENTE:
-            errors["docente"] = "Solicitacao de banca deve ser criada por docente."
+            errors["docente"] = "Solicitação de banca deve ser criada por docente."
         if self.trajetoria_id and self.aluno_id and self.trajetoria.aluno_id != self.aluno_id:
-            errors["trajetoria"] = "A trajetoria selecionada nao pertence ao aluno informado."
+            errors["trajetoria"] = "A trajetória selecionada não pertence ao aluno informado."
         if self.trajetoria_id and self.docente_id:
             docente_vinculado = self.trajetoria.orientador_id == self.docente_id or self.trajetoria.coorientador_id == self.docente_id
             if not docente_vinculado:
-                errors["trajetoria"] = "A trajetoria deve estar vinculada ao docente por orientacao ou coorientacao."
+                errors["trajetoria"] = "A trajetória deve estar vinculada ao docente por orientação ou coorientação."
         if self.trajetoria_id and self.trajetoria.status != TrajetoriaAcademica.Status.ATIVA:
-            errors["trajetoria"] = "A trajetoria deve estar ativa."
+            errors["trajetoria"] = "A trajetória deve estar ativa."
 
         if self.status == self.Status.FINALIZADA:
             campos_obrigatorios = {
@@ -1387,19 +1411,19 @@ class SolicitacaoBanca(models.Model):
             }
             for campo, valor in campos_obrigatorios.items():
                 if not (valor or "").strip():
-                    errors[campo] = "Campo obrigatorio para finalizar a solicitacao."
+                    errors[campo] = "Campo obrigatório para finalizar a solicitação."
             if not self.data_prevista:
-                errors["data_prevista"] = "Campo obrigatorio para finalizar a solicitacao."
+                errors["data_prevista"] = "Campo obrigatório para finalizar a solicitação."
             if not self.horario_previsto:
-                errors["horario_previsto"] = "Campo obrigatorio para finalizar a solicitacao."
+                errors["horario_previsto"] = "Campo obrigatório para finalizar a solicitação."
             if not self.requisitos_cumpridos:
                 errors["requisitos_cumpridos"] = "Confirme que o discente cumpre os requisitos."
             if not self.ciencia_recomendacao_mpf:
-                errors["ciencia_recomendacao_mpf"] = "Confirme a ciencia da recomendacao."
+                errors["ciencia_recomendacao_mpf"] = "Confirme a ciência da recomendação."
             if not self.finalizado_por_id:
-                errors["finalizado_por"] = "Informe o usuario responsavel pela finalizacao."
+                errors["finalizado_por"] = "Informe o usuário responsável pela finalização."
             if not self.finalizado_em:
-                errors["finalizado_em"] = "Informe a data de finalizacao."
+                errors["finalizado_em"] = "Informe a data de finalização."
 
         if errors:
             raise ValidationError(errors)
@@ -1477,7 +1501,7 @@ class MembroBanca(models.Model):
     solicitacao = models.ForeignKey(SolicitacaoBanca, on_delete=models.CASCADE, related_name="membros")
     papel = models.CharField(max_length=30, choices=Papel.choices)
     nome = models.CharField(max_length=255, blank=True)
-    instituicao = models.CharField(max_length=255, blank=True)
+    instituicao = models.CharField(max_length=255, blank=True, verbose_name="Instituição")
     cpf = models.CharField(max_length=14, blank=True)
 
     class Meta:
@@ -1512,7 +1536,7 @@ class MembroBanca(models.Model):
         if self.papel and self.solicitacao_id:
             papeis_validos = self.papeis_para_tipo(self.solicitacao.tipo_defesa)
             if self.papel not in papeis_validos:
-                errors["papel"] = "Papel de banca incompativel com o tipo de defesa."
+                errors["papel"] = "Papel de banca incompatível com o tipo de defesa."
         if self.cpf and not validar_cpf_brasileiro(self.cpf):
             errors["cpf"] = "Informe um CPF valido."
         if errors:
@@ -1531,8 +1555,15 @@ class Setor(models.Model):
         SETOR = "SETOR", "Setor"
         COMISSAO = "COMISSAO", "Comissao"
 
+    # O colegiado pleno e o unico setor que o codigo precisa reconhecer pelo
+    # nome: e ele que define quem ve "Processos no Pleno" e quem pode deliberar
+    # ali. O nome estava escrito a mao em quatro lugares, o que fez com que um
+    # erro de digitacao -- "Colegiando" -- se espalhasse e ficasse dificil de
+    # corrigir sem quebrar as comparacoes. Como constante, o nome tem um lugar so.
+    NOME_PLENO = "Colegiado PPGEC (Pleno)"
+
     nome = models.CharField(max_length=120, unique=True)
-    descricao = models.CharField(max_length=255, blank=True)
+    descricao = models.CharField(max_length=255, blank=True, verbose_name="Descrição")
     ativo = models.BooleanField(default=True)
     email = models.EmailField(max_length=255, blank=True, null=True, help_text="E-mail institucional do setor")
     tipo = models.CharField(max_length=20, choices=TipoSetor.choices, default=TipoSetor.SETOR)
@@ -1576,7 +1607,7 @@ class SetorMembro(models.Model):
         self.save(update_fields=["data_saida"])
 
     def __str__(self) -> str:
-        status = "ativo" if self.ativo else f"ate {self.data_saida:%Y-%m-%d}"
+        status = "ativo" if self.ativo else f"até {self.data_saida:%Y-%m-%d}"
         return f"{self.usuario} em {self.setor} ({status})"
 
 
@@ -1620,7 +1651,7 @@ class SolicitacaoAssinatura(models.Model):
     numero_bloco_sei = models.CharField(max_length=80, blank=True)
     documento_pdf = models.FileField(upload_to="assinaturas/originais/%Y/%m/", blank=True)
     documento_assinado_pdf = models.FileField(upload_to="assinaturas/assinados/%Y/%m/", blank=True)
-    observacao = models.TextField(blank=True)
+    observacao = models.TextField(blank=True, verbose_name="Observação")
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDENTE)
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
@@ -1672,21 +1703,21 @@ class SolicitacaoAssinatura(models.Model):
             if not self.docente_id:
                 errors["docente"] = "Selecione o docente requisitado."
             if self.setor_id:
-                errors["setor"] = "Nao informe setor para solicitacao destinada a docente."
+                errors["setor"] = "Não informe setor para solicitação destinada a docente."
         elif self.destinatario_tipo == self.DestinatarioTipo.SETOR:
             if not self.setor_id:
-                errors["setor"] = "Selecione o setor ou comissao requisitado."
+                errors["setor"] = "Selecione o setor ou comissão requisitado."
             if self.docente_id:
-                errors["docente"] = "Nao informe docente para solicitacao destinada a setor."
+                errors["docente"] = "Não informe docente para solicitação destinada a setor."
 
         if self.tipo_documento == self.TipoDocumento.DOCUMENTO_SEI:
             if not (self.numero_documento_sei or "").strip():
-                errors["numero_documento_sei"] = "Informe o numero do documento no SEI."
+                errors["numero_documento_sei"] = "Informe o número do documento no SEI."
             if self.numero_bloco_sei or self.documento_pdf:
                 errors["tipo_documento"] = "Informe apenas uma origem para assinatura."
         elif self.tipo_documento == self.TipoDocumento.BLOCO_SEI:
             if not (self.numero_bloco_sei or "").strip():
-                errors["numero_bloco_sei"] = "Informe o numero do bloco de assinatura no SEI."
+                errors["numero_bloco_sei"] = "Informe o número do bloco de assinatura no SEI."
             if self.numero_documento_sei or self.documento_pdf:
                 errors["tipo_documento"] = "Informe apenas uma origem para assinatura."
         elif self.tipo_documento == self.TipoDocumento.PDF:
@@ -1751,9 +1782,9 @@ class Processo(models.Model):
         OUTRO = "OUTRO", "Outro"
 
     class StatusProcesso(models.TextChoices):
-        EM_ANALISE = "EM_ANALISE", "Em analise"
+        EM_ANALISE = "EM_ANALISE", "Em análise"
         AGUARDANDO_DOCUMENTO = "AGUARDANDO_DOCUMENTO", "Aguardando documento"
-        AGUARDANDO_CIENCIA = "AGUARDANDO_CIENCIA", "Aguardando ciencia"
+        AGUARDANDO_CIENCIA = "AGUARDANDO_CIENCIA", "Aguardando ciência"
         EM_DEBATE = "EM_DEBATE", "Em debate"
         FINALIZADO = "FINALIZADO", "Finalizado"
 
@@ -1764,7 +1795,7 @@ class Processo(models.Model):
     )
     tipo = models.CharField(max_length=40, choices=TipoProcesso.choices)
     assunto = models.CharField(max_length=255)
-    descricao = models.TextField()
+    descricao = models.TextField(verbose_name="Descrição")
     data_criacao = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
     status_inicial = models.CharField(
@@ -1783,7 +1814,7 @@ class Processo(models.Model):
         on_delete=models.PROTECT,
         related_name="processos_atuais",
     )
-    numero = models.CharField(max_length=20, unique=True, editable=False, blank=True)
+    numero = models.CharField(max_length=20, unique=True, editable=False, blank=True, verbose_name="Número")
     prazo_limite = models.DateField(null=True, blank=True)
     finalizado_em = models.DateTimeField(null=True, blank=True)
     termo_finalizacao = models.TextField(blank=True)
@@ -1833,7 +1864,7 @@ class Processo(models.Model):
             self.StatusProcesso.AGUARDANDO_CIENCIA,
         }:
             raise ValidationError(
-                {"status": "Status em andamento nao pode ter data de finalizacao."}
+                {"status": "Status em andamento não pode ter data de finalização."}
             )
 
     def save(self, *args, **kwargs):
@@ -1851,7 +1882,7 @@ class Processo(models.Model):
                         return super().save(*args, **kwargs)
                 except IntegrityError:
                     self.numero = ""
-            raise ValidationError("Nao foi possivel gerar numero unico para o processo.")
+            raise ValidationError("Não foi possível gerar número único para o processo.")
 
         return super().save(*args, **kwargs)
 
@@ -1899,7 +1930,7 @@ class Processo(models.Model):
             status=ManifestacaoProcesso.StatusManifestacao.PENDENTE,
         ).exists()
         if pendente:
-            raise ValidationError("Ja existe solicitacao de ciente do orientador pendente.")
+            raise ValidationError("Já existe solicitação de ciente do orientador pendente.")
 
         manifestacao = ManifestacaoProcesso.objects.create(
             processo=self,
@@ -1924,12 +1955,12 @@ class Processo(models.Model):
         prazo_limite: models.DateField | None = None,  #Parâmetro para receber a data exata
     ):
         if self.esta_finalizado:
-            raise ValidationError("Nao e permitido encaminhar processo finalizado.")
+            raise ValidationError("Não e permitido encaminhar processo finalizado.")
         if self.manifestacoes.filter(
             tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
             status=ManifestacaoProcesso.StatusManifestacao.PENDENTE,
         ).exists():
-            raise ValidationError("Nao e permitido encaminhar com ciente do orientador pendente.")
+            raise ValidationError("Não e permitido encaminhar com ciente do orientador pendente.")
 
         # Exige data limite se o destino for o Pleno 
         if setor_destino and "pleno" in (setor_destino.nome or "").lower():
@@ -1965,10 +1996,10 @@ class Processo(models.Model):
 
     def finalizar(self, *, termo_finalizacao: str, status_final: str | None = None):
         if self.esta_finalizado:
-            raise ValidationError("Processo ja finalizado.")
+            raise ValidationError("Processo já finalizado.")
         termo_finalizacao = (termo_finalizacao or "").strip()
         if not termo_finalizacao:
-            raise ValidationError("Informe o termo de finalizacao do processo.")
+            raise ValidationError("Informe o termo de finalização do processo.")
 
         self.status = status_final or self.StatusProcesso.FINALIZADO
         self.finalizado_em = timezone.now()
@@ -2032,7 +2063,7 @@ class Documento(models.Model):
         on_delete=models.CASCADE,
         related_name="documentos",
     )
-    titulo = models.CharField(max_length=255)
+    titulo = models.CharField(max_length=255, verbose_name="Título")
     texto = models.TextField(blank=True)
     arquivo = models.FileField(upload_to="documentos/processos/", blank=True, null=True)
     restrito = models.BooleanField(default=False)
@@ -2111,7 +2142,7 @@ class Documento(models.Model):
 
         motivo = (motivo or "").strip()
         if not motivo:
-            raise ValidationError("Informe o motivo da remocao do arquivo.")
+            raise ValidationError("Informe o motivo da remoção do arquivo.")
 
         self.arquivo_removido = True
         self.arquivo_removido_em = timezone.now()
@@ -2154,7 +2185,7 @@ class TramitacaoProcesso(models.Model):
         on_delete=models.PROTECT,
         related_name="tramitacoes_realizadas",
     )
-    observacao = models.TextField(blank=True)
+    observacao = models.TextField(blank=True, verbose_name="Observação")
     status_resultante = models.CharField(
         max_length=25,
         choices=Processo.StatusProcesso.choices,
@@ -2167,7 +2198,7 @@ class TramitacaoProcesso(models.Model):
         ordering = ["-data_encaminhamento"]
 
     def __str__(self) -> str:
-        return f"Tramitacao {self.processo.numero} -> {self.setor_destino.nome}"
+        return f"Tramitação {self.processo.numero} -> {self.setor_destino.nome}"
 
 
 class ManifestacaoProcesso(models.Model):
@@ -2213,9 +2244,9 @@ class ManifestacaoProcesso(models.Model):
 
     def registrar_manifestacao(self, *, autor, aceito: bool, mensagem: str = ""):
         if self.status != self.StatusManifestacao.PENDENTE:
-            raise ValidationError("Manifestacao ja concluida.")
+            raise ValidationError("Manifestação já concluída.")
         if autor.id != self.responsavel_id:
-            raise ValidationError("Apenas o responsavel pode se manifestar.")
+            raise ValidationError("Apenas o responsável pode se manifestar.")
 
         self.status = self.StatusManifestacao.CIENTE if aceito else self.StatusManifestacao.RECUSADO
         self.mensagem_manifestacao = (mensagem or "").strip()
@@ -2248,12 +2279,12 @@ class ComentarioProcesso(models.Model):
         ordering = ["-data_criacao"]
 
     def __str__(self) -> str:
-        return f"Comentario em {self.processo.numero}"
+        return f"Comentário em {self.processo.numero}"
 
 
 class Polo(models.Model):
     nome = models.CharField(max_length=120, unique=True)
-    descricao = models.CharField(max_length=255, blank=True)
+    descricao = models.CharField(max_length=255, blank=True, verbose_name="Descrição")
     ativo = models.BooleanField(default=True)
 
     class Meta:
@@ -2286,7 +2317,7 @@ class DisponibilidadeSala(models.Model):
         QUARTA = 2, "Quarta-feira"
         QUINTA = 3, "Quinta-feira"
         SEXTA = 4, "Sexta-feira"
-        SABADO = 5, "Sabado"
+        SABADO = 5, "Sábado"
         DOMINGO = 6, "Domingo"
 
     sala = models.ForeignKey(Sala, on_delete=models.CASCADE, related_name="disponibilidades")
@@ -2302,7 +2333,7 @@ class DisponibilidadeSala(models.Model):
 
     def clean(self):
         if self.hora_fim <= self.hora_inicio:
-            raise ValidationError({"hora_fim": "O horario final deve ser posterior ao horario inicial."})
+            raise ValidationError({"hora_fim": "O horário final deve ser posterior ao horário inicial."})
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -2332,7 +2363,7 @@ class ReservaAmbiente(models.Model):
         related_name="reservas_criadas",
     )
     tipo = models.CharField(max_length=20, choices=TipoReserva.choices)
-    titulo = models.CharField(max_length=255, blank=True)
+    titulo = models.CharField(max_length=255, blank=True, verbose_name="Título")
     inicio = models.DateTimeField()
     fim = models.DateTimeField()
     recorrente = models.BooleanField(default=False)
@@ -2401,17 +2432,17 @@ class ReservaAmbiente(models.Model):
         if self.docente and self.docente.tipo_usuario != User.TipoUsuario.DOCENTE:
             errors["docente"] = "A reserva deve estar vinculada a um docente."
         if self.fim <= self.inicio:
-            errors["fim"] = "O termino deve ser posterior ao inicio."
+            errors["fim"] = "O término deve ser posterior ao inicio."
         elif self.inicio.date() != self.fim.date():
             errors["fim"] = "A reserva deve comecar e terminar no mesmo dia."
         if self.sala_id and self.inicio and self.fim:
             if self.status == self.StatusReserva.ATIVA and not self.horario_disponivel_na_sala():
-                errors["inicio"] = "A sala nao esta disponivel neste horario."
+                errors["inicio"] = "A sala não está disponível neste horário."
             conflito = self.reserva_conflitante() if self.status == self.StatusReserva.ATIVA else None
             if conflito:
                 errors["inicio"] = self.mensagem_conflito(conflito)
         if self.status == self.StatusReserva.EXCLUIDA and not (self.justificativa_exclusao or "").strip():
-            errors["justificativa_exclusao"] = "Informe a justificativa da exclusao."
+            errors["justificativa_exclusao"] = "Informe a justificativa da exclusão."
         if errors:
             raise ValidationError(errors)
 
@@ -2433,9 +2464,9 @@ class ReservaAmbiente(models.Model):
             if not duracao_recorrencia_meses:
                 raise ValidationError("Informe por quantos meses repetir.")
             if duracao_recorrencia_meses > 6:
-                raise ValidationError("A recorrencia nao pode ser superior a 6 meses.")
+                raise ValidationError("A recorrência não pode ser superior a 6 meses.")
             if duracao_recorrencia_meses < 1:
-                raise ValidationError("A duracao da recorrencia deve ser de pelo menos 1 mes.")
+                raise ValidationError("A duração da recorrência deve ser de pelo menos 1 mês.")
             recorrencia_ate = cls._somar_meses(inicio, duracao_recorrencia_meses).date()
             atual_inicio, atual_fim = cls._proxima_ocorrencia(inicio, fim, recorrencia)
             while atual_inicio.date() <= recorrencia_ate:
@@ -2470,7 +2501,7 @@ class ReservaAmbiente(models.Model):
             return inicio + timedelta(days=7), fim + timedelta(days=7)
         if recorrencia == "MENSAL":
             return cls._somar_um_mes(inicio), cls._somar_um_mes(fim)
-        raise ValidationError("Recorrencia invalida.")
+        raise ValidationError("Recorrência inválida.")
 
     @staticmethod
     def _somar_um_mes(valor):

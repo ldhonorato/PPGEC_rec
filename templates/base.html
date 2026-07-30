@@ -10,40 +10,136 @@
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_classe %}{% endblock %}">
+{% include "includes/icons.html" %}
 <div class="app-shell">
     {% if user.is_authenticated %}
-        <header class="topbar">
-            <div class="container topbar-content">
-                <a class="brand" href="{% url 'home' %}" aria-label="AcadFlow">
-                    <img class="brand-logo" src="{% static 'img/acadflow-logo.png' %}" alt="AcadFlow">
+        {% comment %}
+        Casca da aplicacao: barra lateral em altura total a esquerda, barra
+        superior apenas sobre a coluna de conteudo.
+
+        Responsabilidades separadas -- a lateral cuida de identidade e
+        navegacao, a superior cuida de alertas e conta. Perfil/Sair ficam so na
+        superior; antes apareciam nos dois lugares.
+        {% endcomment %}
+        <div class="sidebar-overlay" data-fechar-menu></div>
+        <nav id="menu-lateral" class="sidebar" aria-label="Menu principal">
+            <div class="sidebar-program">
+                <a class="sidebar-brand" href="{% url 'home' %}" aria-label="AcadFlow — ir para o início">
+                    <img class="sidebar-brand-logo" src="{% static 'img/acadflow-wordmark-branco.png' %}" alt="AcadFlow">
+                    <span class="sidebar-programa">PPGEC · Pós-Graduação em Engenharia de Computação</span>
                 </a>
-                <a class="overdue-link" href="{{ processos_atrasados_url }}">
-                    <strong>{{ processos_atrasados_count|default:0 }}</strong>
-                    <span>processos atrasados</span>
-                </a>
-                <details class="user-menu">
-                    <summary class="user-chip">
-                        <span class="avatar" aria-hidden="true">{{ user.nome|default:user.email|slice:":2"|upper }}</span>
-                        <span class="user-meta">
-                            <span class="user-name">{{ user.nome }}</span>
-                            <span class="user-role">{{ user.get_tipo_usuario_display }}</span>
-                        </span>
-                    </summary>
-                    <div class="user-menu-panel">
-                        <a href="{% url 'me' %}">Perfil</a>
-                        <form method="post" action="{% url 'logout' %}">
-                            {% csrf_token %}
-                            <button type="submit">Sair</button>
-                        </form>
-                    </div>
-                </details>
+                <button type="button" class="menu-fechar" data-fechar-menu aria-label="Fechar menu">
+                    <svg class="nav-icon" aria-hidden="true"><use href="#i-fechar"></use></svg>
+                </button>
             </div>
-        </header>
+
+        <div class="sidebar-scroll">
+            {% for section in nav_menu_sections %}
+                <p class="sidebar-label" id="secao-{{ forloop.counter }}">{{ section.label }}</p>
+                <ul class="side-menu" aria-labelledby="secao-{{ forloop.counter }}">
+                    {% for item in section.items %}
+                        {% if item.children %}
+                            <li>
+                                <details class="side-submenu"{% if request.resolver_match.url_name in item.url_names %} open{% endif %}>
+                                    <summary class="side-link{% if request.resolver_match.url_name in item.url_names %} is-active{% endif %}">
+                                        <svg class="side-icon" aria-hidden="true"><use href="#i-{{ item.icon }}"></use></svg>
+                                        <span class="side-texto">
+                                            <span class="side-label">{{ item.label }}</span>
+                                            {% if item.descricao %}<span class="side-descricao">{{ item.descricao }}</span>{% endif %}
+                                        </span>
+                                        <svg class="side-chevron" aria-hidden="true"><use href="#i-chevron"></use></svg>
+                                    </summary>
+                                    <ul class="side-submenu-lista">
+                                        {% for child in item.children %}
+                                            <li>
+                                                <a class="side-link side-link-filho{% if request.resolver_match.url_name in child.url_names %} is-active{% endif %}"
+                                                   href="{{ child.href }}"
+                                                   {% if request.resolver_match.url_name in child.url_names %}aria-current="page"{% endif %}>
+                                                    <svg class="side-icon" aria-hidden="true"><use href="#i-{{ child.icon }}"></use></svg>
+                                                    <span class="side-texto">
+                                                        <span class="side-label">{{ child.label }}</span>
+                                                        {% if child.descricao %}<span class="side-descricao">{{ child.descricao }}</span>{% endif %}
+                                                    </span>
+                                                </a>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </details>
+                            </li>
+                        {% else %}
+                            <li>
+                                <a class="side-link{% if request.resolver_match.url_name in item.url_names %} is-active{% endif %}"
+                                   href="{{ item.href }}"
+                                   {% if request.resolver_match.url_name in item.url_names %}aria-current="page"{% endif %}>
+                                    <svg class="side-icon" aria-hidden="true"><use href="#i-{{ item.icon }}"></use></svg>
+                                    <span class="side-texto">
+                                        <span class="side-label">{{ item.label }}</span>
+                                        {% if item.descricao %}<span class="side-descricao">{{ item.descricao }}</span>{% endif %}
+                                    </span>
+                                </a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            {% endfor %}
+        </div>
+
+        <p class="sidebar-rodape">
+            <a href="{% url 'version' %}">v{{ app_versao }}</a>
+            <span>{{ app_copyright }}</span>
+        </p>
+
+        </nav>
+
+        <div class="app-main">
+            <header class="topbar">
+                <div class="topbar-content">
+                    <button type="button" class="menu-toggle" data-abrir-menu
+                            aria-label="Abrir menu de navegação" aria-expanded="false" aria-controls="menu-lateral">
+                        <svg class="nav-icon" aria-hidden="true"><use href="#i-menu"></use></svg>
+                    </button>
+                    <a class="brand-mobile" href="{% url 'home' %}" aria-label="AcadFlow">
+                        <img src="{% static 'img/acadflow-wordmark.png' %}" alt="AcadFlow">
+                    </a>
+                    <div class="topbar-acoes">
+                        <a class="overdue-link{% if not processos_atrasados_count %} is-vazio{% endif %}"
+                           href="{{ processos_atrasados_url }}">
+                            <svg class="nav-icon" aria-hidden="true"><use href="#i-alerta"></use></svg>
+                            <strong>{{ processos_atrasados_count|default:0 }}</strong>
+                            <span>processo{{ processos_atrasados_count|pluralize }} atrasado{{ processos_atrasados_count|pluralize }}</span>
+                        </a>
+                        <details class="user-menu">
+                            <summary class="user-chip">
+                                <span class="avatar" aria-hidden="true">{{ user.nome|default:user.email|slice:":2"|upper }}</span>
+                                <span class="user-meta">
+                                    <span class="user-name">{{ user.nome }}</span>
+                                    <span class="user-role">{{ user.get_tipo_usuario_display }}</span>
+                                </span>
+                                <svg class="user-chevron" aria-hidden="true"><use href="#i-chevron"></use></svg>
+                            </summary>
+                            <div class="user-menu-panel">
+                                <a href="{% url 'me' %}">
+                                    <svg class="nav-icon" aria-hidden="true"><use href="#i-perfil"></use></svg>
+                                    Perfil
+                                </a>
+                                <form method="post" action="{% url 'logout' %}">
+                                    {% csrf_token %}
+                                    <button type="submit">
+                                        <svg class="nav-icon" aria-hidden="true"><use href="#i-sair"></use></svg>
+                                        Sair
+                                    </button>
+                                </form>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </header>
+
     {% endif %}
 
     <main class="main-area">
-        <div class="container">
+        <div class="container{% if user.is_authenticated %} content-area{% endif %}">
             {% if messages %}
                 <ul class="messages">
                     {% for message in messages %}
@@ -51,84 +147,67 @@
                     {% endfor %}
                 </ul>
             {% endif %}
-
-            {% if user.is_authenticated %}
-                <div class="layout">
-                    <aside class="sidebar" aria-label="Menu principal">
-                        <div class="sidebar-program">
-                            <strong>PPGEC</strong>
-                            <span>Programa de Pos-Graduacao em Engenharia de Computacao</span>
-                            <span class="sidebar-rule"></span>
-                        </div>
-
-                        {% for section in nav_menu_sections %}
-                            <p class="sidebar-label">{{ section.label }}</p>
-                            <ul class="side-menu">
-                                {% for item in section.items %}
-                                    {% if item.label != "Reservas de Salas" %}
-                                        <li>
-                                            {% if item.children %}
-                                                <details class="side-submenu" {% if request.resolver_match.url_name in item.url_names %}open{% endif %}>
-                                                    <summary class="{% if request.resolver_match.url_name in item.url_names %}is-active{% endif %}">
-                                                        <span class="side-icon">{{ item.icon }}</span>
-                                                        {{ item.label }}
-                                                    </summary>
-                                                    <ul>
-                                                        {% for child in item.children %}
-                                                            <li>
-                                                                <a class="{% if request.resolver_match.url_name in child.url_names %}is-active{% endif %}" href="{{ child.href }}">
-                                                                    <span class="side-icon">{{ child.icon }}</span>
-                                                                    {{ child.label }}
-                                                                </a>
-                                                            </li>
-                                                        {% endfor %}
-                                                    </ul>
-                                                </details>
-                                            {% else %}
-                                                <a class="{% if request.resolver_match.url_name in item.url_names %}is-active{% endif %}" href="{{ item.href }}">
-                                                    <span class="side-icon">{{ item.icon }}</span>
-                                                    {{ item.label }}
-                                                </a>
-                                            {% endif %}
-                                        </li>
-                                    {% endif %}
-                                {% endfor %}
-                            </ul>
-                        {% endfor %}
-
-                        <div class="sidebar-footer">
-                            <p class="sidebar-label">Conta</p>
-                            <ul class="side-menu">
-                                <li>
-                                    <a class="{% if request.resolver_match.url_name == 'me' %}is-active{% endif %}" href="{% url 'me' %}">
-                                        <span class="side-icon">U</span>
-                                        Perfil
-                                    </a>
-                                </li>
-                                <li>
-                                    <form method="post" action="{% url 'logout' %}" class="side-form">
-                                        {% csrf_token %}
-                                        <button type="submit">
-                                            <span class="side-icon">S</span>
-                                            Sair
-                                        </button>
-                                    </form>
-                                </li>
-                            </ul>
-                        </div>
-                    </aside>
-                    <section class="content-area">
-            {% endif %}
-
             {% block content %}{% endblock %}
-
-            {% if user.is_authenticated %}
-                    </section>
-                </div>
-            {% endif %}
         </div>
     </main>
+
+    {% if user.is_authenticated %}
+        </div>{# .app-main -- aberta antes da barra superior #}
+    {% endif %}
 </div>
+{% if user.is_authenticated %}
+<script>
+    // Menu lateral como gaveta no mobile. Em telas largas o CSS mantem a barra
+    // sempre visivel e nada aqui tem efeito.
+    (function () {
+        const menu = document.getElementById("menu-lateral");
+        const abrir = document.querySelector("[data-abrir-menu]");
+        if (!menu || !abrir) return;
+
+        const focaveis = 'a[href], button:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+
+        function estaAberto() {
+            return document.body.classList.contains("menu-aberto");
+        }
+
+        function abrirMenu() {
+            document.body.classList.add("menu-aberto");
+            abrir.setAttribute("aria-expanded", "true");
+            const primeiro = menu.querySelector(focaveis);
+            if (primeiro) primeiro.focus();
+        }
+
+        function fecharMenu(devolverFoco) {
+            document.body.classList.remove("menu-aberto");
+            abrir.setAttribute("aria-expanded", "false");
+            if (devolverFoco) abrir.focus();
+        }
+
+        abrir.addEventListener("click", function () {
+            estaAberto() ? fecharMenu(true) : abrirMenu();
+        });
+
+        document.querySelectorAll("[data-fechar-menu]").forEach(function (el) {
+            el.addEventListener("click", function () { fecharMenu(true); });
+        });
+
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape" && estaAberto()) fecharMenu(true);
+        });
+
+        // Navegar fecha a gaveta; sem isso ela ficaria aberta sobre a pagina nova.
+        menu.addEventListener("click", function (e) {
+            if (e.target.closest("a[href]") && estaAberto()) fecharMenu(false);
+        });
+
+        // Voltar ao desktop com a gaveta aberta deixaria o body travado.
+        const largura = window.matchMedia("(min-width: 921px)");
+        largura.addEventListener("change", function (e) {
+            if (e.matches && estaAberto()) fecharMenu(false);
+        });
+    })();
+</script>
+{% endif %}
 {% if solicitar_cpf_aluno %}
 <dialog id="modal-informar-cpf" class="modal-dialog cpf-pendente-modal">
     <div class="modal-body">
@@ -160,6 +239,24 @@
     })();
 </script>
 {% endif %}
+<script>
+    // Mostrar/ocultar senha. O botao troca o tipo do input e o icone; o estado
+    // vai em aria-pressed para leitores de tela.
+    (function () {
+        document.querySelectorAll("[data-alternar-senha]").forEach(function (botao) {
+            const campo = botao.parentElement.querySelector("input");
+            if (!campo) return;
+            botao.addEventListener("click", function () {
+                const revelando = campo.type === "password";
+                campo.type = revelando ? "text" : "password";
+                botao.setAttribute("aria-pressed", String(revelando));
+                botao.setAttribute("aria-label", revelando ? "Ocultar senha" : "Mostrar senha");
+                botao.querySelector("use").setAttribute("href", revelando ? "#i-olho-fechado" : "#i-olho");
+                campo.focus();
+            });
+        });
+    })();
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

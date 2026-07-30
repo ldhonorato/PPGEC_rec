@@ -1,0 +1,29 @@
+{% extends "errors/base_error.html" %}
+
+{% block title %}Acesso não permitido · AcadFlow{% endblock %}
+
+{% block error_code %}403{% endblock %}
+
+{% block error_heading %}Acesso não permitido{% endblock %}
+
+{% block error_message %}
+{% comment %}
+As views levantam PermissionDenied com uma mensagem que diz quem tem acesso
+("Acesso restrito a membros do Colegiado PPGEC (Pleno)", por exemplo). O
+Django entrega essa mensagem aqui em `exception`, e ela estava sendo
+descartada -- o usuário via só uma negativa genérica, sem saber o motivo nem
+o que fazer.
+
+O texto genérico continua como reserva, para as negativas que não trazem
+mensagem própria.
+{% endcomment %}
+{% if exception %}
+    {{ exception }}
+{% else %}
+    Seu perfil não tem permissão para acessar esta página.
+{% endif %}
+{% endblock %}
+
+{% block error_actions %}
+<a class="btn btn-secondary" href="{% url 'me' %}">Ver meu perfil</a>
+{% endblock %}

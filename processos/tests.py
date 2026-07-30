@@ -1,16 +1,23 @@
+import ast
+import re
 import tempfile
 from datetime import date, datetime, time, timedelta
 from io import BytesIO
+from pathlib import Path
 from unittest.mock import patch
 from zipfile import ZipFile
 
+from django.conf import settings
 from django.core import mail
+from django.templatetags.static import static
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+
+from .views import _linhas_trajetoria
 from .models import (
     AlteracaoAluno,
     Aluno,
@@ -92,12 +99,12 @@ class MatriculaDomainTests(TestCase):
         self.docente = Docente.objects.create(
             email="docente.matricula@example.com",
             password="senha-segura-123",
-            nome="Docente Matricula",
+            nome="Docente Matrícula",
         )
         self.aluno = Aluno.objects.create(
             email="aluno.matricula@example.com",
             password="senha-segura-123",
-            nome="Aluno Matricula",
+            nome="Aluno Matrícula",
         )
         criar_trajetoria(self.aluno)
         self.periodo = PeriodoLetivo.objects.create(
@@ -202,7 +209,7 @@ class MatriculaDomainTests(TestCase):
         aluno_sem_matricula = Aluno.objects.create(
             email="sem.matricula@example.com",
             password="senha-segura-123",
-            nome="Aluno Sem Matricula",
+            nome="Aluno Sem Matrícula",
         )
         criar_trajetoria(aluno_sem_matricula)
 
@@ -362,9 +369,12 @@ class MatriculaViewsTests(TestCase):
         response = self.client.get(reverse("matriculas_ofertas"), {"periodo": self.periodo.pk})
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Matrículas solicitadas: 2")
+        # A linha separava os campos por pipe, inclusive dentro dos parenteses
+        # ("(regulares: 1 | especiais: 1)"), o que tornava a contagem ilegivel.
+        # Os numeros conferidos aqui sao os mesmos; muda so como sao escritos.
+        self.assertContains(response, "Solicitadas: 2")
         self.assertContains(response, "Espera: 2")
-        self.assertContains(response, "regulares: 1 | especiais: 1", count=2)
+        self.assertContains(response, "1 regulares, 1 especiais", count=2)
 
     def test_gestao_indefere_item_de_matricula(self):
         solicitacao = SolicitacaoMatricula.objects.create(
@@ -387,8 +397,12 @@ class MatriculaViewsTests(TestCase):
         self.assertContains(response, self.disciplina.nome)
         self.assertNotContains(response, "Homologar")
         self.assertContains(response, "Indeferir")
-        self.assertContains(response, "Matrículas solicitadas: regulares 1")
-        self.assertContains(response, "Lista de espera: regulares 0")
+        # O resumo virou grade rotulada: o rotulo esta no <dt> e os numeros no
+        # <dd>, em vez de uma frase com pipes separando os pares.
+        self.assertContains(response, "Matrículas solicitadas")
+        self.assertContains(response, "1 regulares")
+        self.assertContains(response, "Lista de espera")
+        self.assertContains(response, "0 regulares")
 
         response = self.client.post(
             reverse("matriculas_solicitacoes"),
@@ -572,7 +586,7 @@ class MatriculaViewsTests(TestCase):
         aluno_sem_trajetoria = Aluno.objects.create(
             email="sem.trajetoria.matricula@example.com",
             password="senha-segura-123",
-            nome="Aluno Sem Trajetoria",
+            nome="Aluno Sem Trajetória",
         )
         self.client.force_login(aluno_sem_trajetoria)
 
@@ -755,8 +769,8 @@ class MatriculaViewsTests(TestCase):
     def test_planejamento_presencial_cria_reserva_para_oferta_hibrida(self, mock_email):
         self.oferta.modalidade = OfertaDisciplina.Modalidade.HIBRIDA
         self.oferta.save(update_fields=["modalidade"])
-        polo = Polo.objects.create(nome="Polo Matricula")
-        sala = Sala.objects.create(polo=polo, nome="Sala Hibrida", capacidade=30)
+        polo = Polo.objects.create(nome="Polo Matrícula")
+        sala = Sala.objects.create(polo=polo, nome="Sala Híbrida", capacidade=30)
         DisponibilidadeSala.objects.create(
             sala=sala,
             dia_semana=EncontroOferta.DiaSemana.TERCA,
@@ -830,8 +844,9 @@ class MatriculaViewsTests(TestCase):
         self.assertEqual(aula.hora_inicio, time(10, 0))
         self.assertEqual(aula.hora_fim, time(12, 30))
         self.assertEqual(aula.carga_horaria_minutos, 150)
-        self.assertEqual(aula.reserva.inicio.time(), time(10, 0))
-        self.assertEqual(aula.reserva.fim.time(), time(12, 30))
+        # A reserva e gravada em UTC; compara no fuso local, como faz a aplicacao.
+        self.assertEqual(timezone.localtime(aula.reserva.inicio).time(), time(10, 0))
+        self.assertEqual(timezone.localtime(aula.reserva.fim).time(), time(12, 30))
         mock_email.assert_called_once_with(self.oferta.pk, self.docente.pk)
 
     @patch("processos.views.send_email_alunos_sem_matricula.delay")
@@ -839,15 +854,15 @@ class MatriculaViewsTests(TestCase):
         aluno_sem_matricula = Aluno.objects.create(
             email="pendente.matricula@example.com",
             password="senha-segura-123",
-            nome="Aluno Pendente Matricula",
+            nome="Aluno Pendente Matrícula",
         )
         criar_trajetoria(aluno_sem_matricula)
         self.client.force_login(self.secretaria)
         total_pendentes = alunos_ativos_sem_matricula(self.periodo).count()
 
         response = self.client.get(reverse("matriculas_periodos"))
-        self.assertContains(response, f"Alunos sem matrícula: {total_pendentes}")
-        self.assertContains(response, "Aluno Pendente Matricula")
+        self.assertContains(response, f"{total_pendentes} alunos sem matrícula")
+        self.assertContains(response, "Aluno Pendente Matrícula")
 
         post = self.client.post(
             reverse("matriculas_periodos"),
@@ -926,7 +941,7 @@ class MatriculaViewsTests(TestCase):
         aluno_especial = Aluno.objects.create(
             email="especial.matricula@example.com",
             password="senha-segura-123",
-            nome="Aluno Especial Matricula",
+            nome="Aluno Especial Matrícula",
         )
         criar_trajetoria(aluno_especial, nivel_curso=Aluno.NivelCurso.ALUNO_ESPECIAL)
         self.client.force_login(aluno_especial)
@@ -1098,7 +1113,7 @@ class AlunosViewTests(TestCase):
         url = reverse("aluno_detalhe", args=[aluno_pendente.pk])
 
         response = self.client.get(url)
-        self.assertContains(response, "Aprovar Cadastro")
+        self.assertContains(response, "Aprovar cadastro")
         self.assertNotContains(response, '<p class="aluno-kv"><strong>CPF:</strong>', html=False)
         self.assertNotContains(response, '<p class="aluno-kv"><strong>Gênero:</strong>', html=False)
         self.assertContains(response, 'name="cpf"')
@@ -1163,8 +1178,8 @@ class AlunosViewTests(TestCase):
         response = self.client.post(
             reverse("criar_comissao"),
             {
-                "nome": "Comissao de Bolsas",
-                "descricao": "Analise de bolsas",
+                "nome": "Comissão de Bolsas",
+                "descricao": "Análise de bolsas",
                 "email": "bolsas@example.com",
                 "ativo": "on",
                 "docentes": [self.docente.id],
@@ -1173,7 +1188,7 @@ class AlunosViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        setor = Setor.objects.get(nome="Comissao de Bolsas")
+        setor = Setor.objects.get(nome="Comissão de Bolsas")
         self.assertEqual(setor.tipo, Setor.TipoSetor.COMISSAO)
         self.assertTrue(SetorMembro.objects.filter(setor=setor, usuario=self.docente, data_saida__isnull=True).exists())
         self.assertTrue(SetorMembro.objects.filter(setor=setor, usuario=self.aluno, data_saida__isnull=True).exists())
@@ -1199,7 +1214,7 @@ class AlunosViewTests(TestCase):
         self.assertContains(response, "resultados-alunos-comissao")
 
     def test_coordenador_edita_comissao_em_setores(self):
-        setor = Setor.objects.create(nome="Comissao Editavel", tipo=Setor.TipoSetor.COMISSAO)
+        setor = Setor.objects.create(nome="Comissão Editavel", tipo=Setor.TipoSetor.COMISSAO)
         SetorMembro.objects.create(setor=setor, usuario=self.docente, designado_por=self.coordenador)
 
         self.client.force_login(self.coordenador)
@@ -1211,7 +1226,7 @@ class AlunosViewTests(TestCase):
             reverse("setores_comissoes"),
             {
                 "setor_id": setor.id,
-                "nome": "Comissao Editada",
+                "nome": "Comissão Editada",
                 "descricao": "Atualizada",
                 "email": "",
                 "ativo": "on",
@@ -1221,18 +1236,18 @@ class AlunosViewTests(TestCase):
         )
         self.assertEqual(post_response.status_code, 302)
         setor.refresh_from_db()
-        self.assertEqual(setor.nome, "Comissao Editada")
+        self.assertEqual(setor.nome, "Comissão Editada")
         self.assertTrue(SetorMembro.objects.filter(setor=setor, usuario=self.servidor, data_saida__isnull=True).exists())
 
     def test_servidor_visualiza_setores_sem_acoes_de_edicao(self):
-        setor = Setor.objects.create(nome="Comissao Visivel", tipo=Setor.TipoSetor.COMISSAO)
+        setor = Setor.objects.create(nome="Comissão Visivel", tipo=Setor.TipoSetor.COMISSAO)
         SetorMembro.objects.create(setor=setor, usuario=self.docente, designado_por=self.coordenador)
 
         self.client.force_login(self.servidor)
         response = self.client.get(reverse("setores_comissoes"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Comissao Visivel")
+        self.assertContains(response, "Comissão Visivel")
         self.assertNotContains(response, "Membros alunos")
         self.assertNotContains(response, "Editar</a>", html=False)
         self.assertNotContains(response, "Encerrar</button>", html=False)
@@ -1242,13 +1257,13 @@ class AlunosViewTests(TestCase):
         response = self.client.post(
             reverse("setores_comissoes"),
             {
-                "nome": "Comissao Indevida",
+                "nome": "Comissão Indevida",
                 "ativo": "on",
             },
         )
 
         self.assertEqual(response.status_code, 403)
-        self.assertFalse(Setor.objects.filter(nome="Comissao Indevida").exists())
+        self.assertFalse(Setor.objects.filter(nome="Comissão Indevida").exists())
 
     def test_servidor_nao_acessa_criacao_de_comissao(self):
         self.client.force_login(self.servidor)
@@ -1257,18 +1272,18 @@ class AlunosViewTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_membro_de_setor_acessa_caixa_e_detalhe_do_setor(self):
-        setor = Setor.objects.create(nome="Comissao de Recursos", tipo=Setor.TipoSetor.COMISSAO)
+        setor = Setor.objects.create(nome="Comissão de Recursos", tipo=Setor.TipoSetor.COMISSAO)
         membro = Docente.objects.create(
             email="membro.comissao@example.com",
             password="senha-segura-123",
-            nome="Membro Comissao",
+            nome="Membro Comissão",
         )
         SetorMembro.objects.create(setor=setor, usuario=membro, designado_por=self.coordenador)
         processo = Processo.objects.create(
             usuario_criado_por=self.aluno,
             tipo=Processo.TipoProcesso.OUTRO,
-            assunto="Processo da comissao",
-            descricao="Analise pela comissao",
+            assunto="Processo da comissão",
+            descricao="Análise pela comissão",
             setor_atual=setor,
         )
 
@@ -1321,7 +1336,7 @@ class AlunosViewTests(TestCase):
         self.assertEqual(reservas.status_code, 200)
 
     def test_aluno_membro_de_comissao_nao_recebe_acesso_global_de_secretaria(self):
-        setor = Setor.objects.create(nome="Comissao Discente Sem Gestao", tipo=Setor.TipoSetor.COMISSAO)
+        setor = Setor.objects.create(nome="Comissão Discente Sem Gestão", tipo=Setor.TipoSetor.COMISSAO)
         SetorMembro.objects.create(setor=setor, usuario=self.aluno, designado_por=self.coordenador)
 
         self.client.force_login(self.aluno)
@@ -1331,13 +1346,13 @@ class AlunosViewTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_aluno_nao_acessa_detalhe_de_processo_que_nao_criou(self):
-        setor = Setor.objects.create(nome="Comissao Discente", tipo=Setor.TipoSetor.COMISSAO)
+        setor = Setor.objects.create(nome="Comissão Discente", tipo=Setor.TipoSetor.COMISSAO)
         SetorMembro.objects.create(setor=setor, usuario=self.aluno, designado_por=self.coordenador)
         processo = Processo.objects.create(
             usuario_criado_por=self.docente,
             tipo=Processo.TipoProcesso.OUTRO,
-            assunto="Processo de outro usuario",
-            descricao="Aluno membro nao deve visualizar",
+            assunto="Processo de outro usuário",
+            descricao="Aluno membro não deve visualizar",
             setor_atual=setor,
         )
 
@@ -1347,14 +1362,14 @@ class AlunosViewTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_historico_exibe_tramitacoes_da_mais_recente_para_a_mais_antiga(self):
-        secretaria = Setor.objects.create(nome="Setor Historico Secretaria")
-        coordenacao = Setor.objects.create(nome="Setor Historico Coordenacao")
-        pleno = Setor.objects.create(nome="Setor Historico Pleno")
+        secretaria = Setor.objects.create(nome="Setor Histórico Secretaria")
+        coordenacao = Setor.objects.create(nome="Setor Histórico Coordenação")
+        pleno = Setor.objects.create(nome="Setor Histórico Pleno")
         processo = Processo.objects.create(
             usuario_criado_por=self.aluno,
             tipo=Processo.TipoProcesso.OUTRO,
-            assunto="Processo com historico",
-            descricao="Ordem de tramitacoes",
+            assunto="Processo com histórico",
+            descricao="Ordem de tramitações",
             setor_atual=pleno,
         )
         antiga = TramitacaoProcesso.objects.create(
@@ -1362,14 +1377,14 @@ class AlunosViewTests(TestCase):
             setor_origem=secretaria,
             setor_destino=coordenacao,
             encaminhado_por=self.servidor,
-            observacao="Tramitacao antiga",
+            observacao="Tramitação antiga",
         )
         recente = TramitacaoProcesso.objects.create(
             processo=processo,
             setor_origem=coordenacao,
             setor_destino=pleno,
             encaminhado_por=self.coordenador,
-            observacao="Tramitacao recente",
+            observacao="Tramitação recente",
         )
         TramitacaoProcesso.objects.filter(pk=antiga.pk).update(
             data_encaminhamento=timezone.make_aware(datetime(2026, 6, 1, 9, 0))
@@ -1383,11 +1398,11 @@ class AlunosViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         conteudo = response.content.decode()
-        self.assertLess(conteudo.index("Tramitacao recente"), conteudo.index("Tramitacao antiga"))
+        self.assertLess(conteudo.index("Tramitação recente"), conteudo.index("Tramitação antiga"))
 
     def test_perfil_exibe_participacoes_ativas_e_historico(self):
-        setor_ativo = Setor.objects.create(nome="Comissao Ativa", tipo=Setor.TipoSetor.COMISSAO)
-        setor_encerrado = Setor.objects.create(nome="Comissao Encerrada", tipo=Setor.TipoSetor.COMISSAO)
+        setor_ativo = Setor.objects.create(nome="Comissão Ativa", tipo=Setor.TipoSetor.COMISSAO)
+        setor_encerrado = Setor.objects.create(nome="Comissão Encerrada", tipo=Setor.TipoSetor.COMISSAO)
         SetorMembro.objects.create(setor=setor_ativo, usuario=self.docente, designado_por=self.coordenador)
         SetorMembro.objects.create(
             setor=setor_encerrado,
@@ -1401,9 +1416,9 @@ class AlunosViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Setores e comissões atuais")
-        self.assertContains(response, "Comissao Ativa")
+        self.assertContains(response, "Comissão Ativa")
         self.assertContains(response, "Histórico de participação")
-        self.assertContains(response, "Comissao Encerrada")
+        self.assertContains(response, "Comissão Encerrada")
 
     def test_filtros_por_nome_ingresso_e_status(self):
         aluno_inativo = Aluno.objects.create(
@@ -1480,8 +1495,8 @@ class AlunosViewTests(TestCase):
         processo = Processo.objects.create(
             usuario_criado_por=self.aluno,
             tipo=Processo.TipoProcesso.QUALIFICACAO_DOUTORADO,
-            assunto="Exame de qualificacao",
-            descricao="Solicitacao de banca",
+            assunto="Exame de qualificação",
+            descricao="Solicitação de banca",
             setor_atual=self.setor_requerente,
         )
 
@@ -1574,7 +1589,7 @@ class AlunosViewTests(TestCase):
         trajetoria = self.aluno.trajetorias.get(status=TrajetoriaAcademica.Status.ATIVA)
         publicacao = PublicacaoTrajetoria.objects.create(
             trajetoria=trajetoria,
-            titulo="Titulo antigo",
+            titulo="Título antigo",
             tipo=PublicacaoTrajetoria.TipoPublicacao.OUTRO,
             criado_por=self.aluno,
         )
@@ -1586,7 +1601,7 @@ class AlunosViewTests(TestCase):
                 "acao": "salvar_publicacao",
                 "trajetoria_id": trajetoria.id,
                 "publicacao_id": publicacao.id,
-                "titulo": "Titulo atualizado",
+                "titulo": "Título atualizado",
                 "tipo": PublicacaoTrajetoria.TipoPublicacao.ARTIGO_PERIODICO,
                 "autores": "Aluno Teste",
                 "veiculo": "Revista PPGEC",
@@ -1597,7 +1612,7 @@ class AlunosViewTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         publicacao.refresh_from_db()
-        self.assertEqual(publicacao.titulo, "Titulo atualizado")
+        self.assertEqual(publicacao.titulo, "Título atualizado")
         self.assertEqual(publicacao.criado_por_id, self.aluno.id)
 
     def test_lista_alunos_filtra_por_nivel(self):
@@ -1620,7 +1635,7 @@ class AlunosViewTests(TestCase):
         aluno_concluido = Aluno.objects.create(
             email="aluno.concluido@example.com",
             password="senha-segura-123",
-            nome="Aluno Concluido",
+            nome="Aluno Concluído",
             matricula="2025A0002",
             status_aluno=Aluno.StatusAluno.DEFENDEU,
         )
@@ -1650,11 +1665,15 @@ class AlunosViewTests(TestCase):
         self.assertEqual(len(alunos), 1)
         self.assertEqual(alunos[0].id, aluno_concluido.id)
         self.assertEqual(alunos[0].trajetoria_atual.status, TrajetoriaAcademica.Status.CONCLUIDA)
-        self.assertContains(response, "Matricula: 2025A0002")
-        self.assertContains(response, "Nivel: Doutorado")
-        self.assertContains(response, "Ingresso: 2025.1")
-        self.assertContains(response, "Orientador: Orientador")
-        self.assertNotContains(response, "Status: Concluido")
+        # A listagem virou tabela: os rotulos ficam no cabecalho das colunas e a
+        # linha carrega so os valores. O que o teste prova continua o mesmo --
+        # sem trajetoria ativa, os dados vem da ultima concluida.
+        self.assertContains(response, "Aluno Concluído")
+        self.assertContains(response, "2025A0002")
+        self.assertContains(response, "Doutorado")
+        self.assertContains(response, "2025.1")
+        self.assertContains(response, "Concluída")
+        # dados de outras secoes nao vazam para a listagem
         self.assertNotContains(response, "Prazo defesa")
         self.assertNotContains(response, "Qualifica")
         self.assertNotContains(response, "Coorientador:")
@@ -1663,7 +1682,7 @@ class AlunosViewTests(TestCase):
         aluno_concluido = Aluno.objects.create(
             email="aluno.dashboard.concluido@example.com",
             password="senha-segura-123",
-            nome="Aluno Dashboard Concluido",
+            nome="Aluno Dashboard Concluído",
         )
         criar_trajetoria(
             aluno_concluido,
@@ -1696,7 +1715,7 @@ class AlunosViewTests(TestCase):
         aluno_concluido = Aluno.objects.create(
             email="aluno.vinculo.concluido@example.com",
             password="senha-segura-123",
-            nome="Aluno Vinculo Concluido",
+            nome="Aluno Vínculo Concluído",
         )
         criar_trajetoria(
             aluno_concluido,
@@ -1710,19 +1729,26 @@ class AlunosViewTests(TestCase):
         response = self.client.get(reverse("menu_meus_orientandos"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Orientacoes ativas")
-        self.assertContains(response, "Coorientacoes")
-        self.assertContains(response, "Orientacoes/coorientacoes concluidas")
+        self.assertContains(response, "Orientações ativas")
+        self.assertContains(response, "Coorientações")
+        self.assertContains(response, "Concluídas")
         self.assertContains(response, self.aluno.nome)
         self.assertContains(response, aluno_coorientado.nome)
         self.assertContains(response, aluno_concluido.nome)
-        self.assertContains(response, "Coorientador")
+        # As tres secoes viraram tabelas com colunas proprias. Na de
+        # coorientacoes, a coluna "Orientador" diz quem orienta de fato -- antes
+        # a linha so trazia a palavra "Coorientador" solta entre pipes, sem
+        # nomear o orientador. Na de concluidas, a coluna "Seu papel" diz qual
+        # foi o vinculo do docente naquela trajetoria.
+        self.assertContains(response, "Orientador")
+        self.assertContains(response, self.coordenador.nome)
+        self.assertContains(response, "Seu papel")
 
     def test_coorientador_cadastrado_acessa_processo_do_aluno(self):
         processo = Processo.objects.create(
             usuario_criado_por=self.aluno,
             tipo=Processo.TipoProcesso.OUTRO,
-            assunto="Solicitacao com coorientador",
+            assunto="Solicitação com coorientador",
             descricao="Acompanhamento do coorientador",
             setor_atual=self.setor_requerente,
         )
@@ -1776,7 +1802,7 @@ class AlunosViewTests(TestCase):
                 "orientador": novo_orientador.id,
                 "tipo_coorientador": "CADASTRADO",
                 "coorientador": self.coorientador.id,
-                "comentario": "Troca aprovada pela coordenacao.",
+                "comentario": "Troca aprovada pela coordenação.",
             },
         )
 
@@ -1808,7 +1834,7 @@ class AlunosViewTests(TestCase):
                 "coorientador_externo_nome": "Prof. Visitante",
                 "coorientador_externo_email": "visitante@example.com",
                 "coorientador_externo_instituicao": "Instituto Visitante",
-                "comentario": "Coorientacao externa aprovada.",
+                "comentario": "Coorientação externa aprovada.",
             },
         )
 
@@ -1901,7 +1927,7 @@ class AlunosViewTests(TestCase):
         aluno_invalido = Aluno.objects.create(
             email="invalido@example.com",
             password="senha-segura-123",
-            nome="Aluno Invalido",
+            nome="Aluno Inválido",
         )
         with self.assertRaises(ValidationError):
             TrajetoriaAcademica.objects.create(
@@ -1971,7 +1997,7 @@ class AlunosViewTests(TestCase):
             deposito_versao_final=True,
         )
 
-        self.assertEqual(trajetoria.conclusao_label, "Relatorio final")
+        self.assertEqual(trajetoria.conclusao_label, "Relatório final")
         self.assertEqual(trajetoria.numero_defesa, "RF-2026-01")
         self.assertEqual(trajetoria.prazo_qualificacao, "")
         self.assertEqual(trajetoria.prazo_defesa, "")
@@ -1999,7 +2025,7 @@ class AlunosViewTests(TestCase):
             {
                 "acao": "alterar_status",
                 "status_aluno": Aluno.StatusAluno.DESLIGADO,
-                "comentario": "Desligamento por solicitacao formal.",
+                "comentario": "Desligamento por solicitação formal.",
             },
         )
         self.assertEqual(response_ok.status_code, 302)
@@ -2062,12 +2088,18 @@ class FrontendIdentityTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "AcadFlow")
-        self.assertContains(response, "css/app.css")
-        self.assertContains(response, "img/acadflow-logo.png")
+        # resolve pelo mesmo caminho do template: com collectstatic o nome
+        # ganha o hash do conteudo (css/app.<hash>.css)
+        self.assertContains(response, static("css/app.css"))
+        self.assertContains(response, "img/acadflow-wordmark")
         self.assertContains(response, 'rel="icon"')
-        self.assertContains(response, 'class="card login-card"')
+        self.assertContains(response, "auth-shell")
+        self.assertContains(response, "auth-cartao")
         self.assertContains(response, reverse("password_reset"))
         self.assertContains(response, reverse("cadastro_aluno"))
+        # rodape institucional presente em todas as telas
+        self.assertContains(response, "Todos os direitos reservados ao PPGEC")
+        self.assertContains(response, f"v{settings.APP_VERSION}")
 
     def test_logout_sem_usuario_redireciona_para_login(self):
         response = self.client.get(reverse("logout"))
@@ -2089,16 +2121,19 @@ class FrontendIdentityTests(TestCase):
         response = self.client.get(reverse("cadastro_aluno"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Cadastro de aluno")
-        self.assertContains(response, "img/acadflow-logo.png")
-        self.assertContains(response, "Email institucional")
+        self.assertContains(response, "cadastro de aluno")
+        self.assertContains(response, "img/acadflow-wordmark")
+        self.assertContains(response, "e-mail institucional")
         self.assertContains(response, "Polo do aluno")
         self.assertContains(response, "CPF")
         self.assertContains(response, "Gênero")
-        self.assertContains(response, "Sexo atribuido ao nascer")
-        self.assertContains(response, "informações opcionais")
-        self.assertContains(response, "tratadas de forma confidencial")
-        self.assertContains(response, 'class="card login-card"')
+        self.assertContains(response, "Sexo atribuído ao nascer")
+        # os dados estatisticos seguem marcados como opcionais e com o aviso
+        # de confidencialidade, agora no cabecalho do proprio grupo de campos
+        self.assertContains(response, "Dados estatísticos")
+        self.assertContains(response, "opcional")
+        self.assertContains(response, "tratados de forma confidencial")
+        self.assertContains(response, "auth-shell")
 
     def test_cadastro_aluno_cria_conta_em_avaliacao(self):
         response = self.client.post(
@@ -2225,8 +2260,9 @@ class FrontendIdentityTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Recuperar senha")
-        self.assertContains(response, "img/acadflow-logo.png")
-        self.assertContains(response, 'class="card login-card"')
+        self.assertContains(response, "img/acadflow-wordmark")
+        self.assertContains(response, "auth-shell")
+        self.assertContains(response, "Todos os direitos reservados ao PPGEC")
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -2236,7 +2272,7 @@ class FrontendIdentityTests(TestCase):
         usuario = User.objects.create_user(
             email="recuperar.senha@example.com",
             password="senha-antiga-123",
-            nome="Usuario Recuperacao",
+            nome="Usuário Recuperacao",
             tipo_usuario=User.TipoUsuario.SERVIDOR,
         )
 
@@ -2247,7 +2283,7 @@ class FrontendIdentityTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         mensagem = mail.outbox[0]
         self.assertEqual(mensagem.to, [usuario.email])
-        self.assertIn("Alteracao de senha", mensagem.subject)
+        self.assertIn("Alteração de senha", mensagem.subject)
         self.assertIn("/senha/redefinir/", mensagem.body)
         self.assertEqual(len(mensagem.alternatives), 1)
         html, content_type = mensagem.alternatives[0]
@@ -2298,11 +2334,14 @@ class FrontendIdentityTests(TestCase):
         response = self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Bem-vindo ao")
-        self.assertContains(response, "Acad<span>Flow</span>", html=True)
+        # A faixa de abertura deixou de repetir a marca -- que ja esta na barra
+        # lateral, em toda tela -- e passou a cumprimentar pelo nome.
+        self.assertContains(response, "Olá,")
+        self.assertContains(response, self.docente.nome.split()[0])
+        self.assertContains(response, "img/acadflow-wordmark")
         self.assertContains(response, 'class="sidebar"')
         self.assertContains(response, 'class="metric-grid"')
-        self.assertContains(response, 'class="overdue-link"')
+        self.assertContains(response, "overdue-link")
         self.assertContains(response, 'class="user-menu"')
         self.assertContains(response, "Meus Processos")
         self.assertNotContains(response, "Processos no Pleno")
@@ -2311,7 +2350,7 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "Sair")
 
     def test_membro_do_pleno_ve_menu_e_rota_de_processos_do_pleno(self):
-        pleno = Setor.objects.get(nome="Colegiando PPGEC (Pleno)")
+        pleno = Setor.objects.get(nome=Setor.NOME_PLENO)
         SetorMembro.objects.create(setor=pleno, usuario=self.docente)
 
         self.client.force_login(self.docente)
@@ -2329,13 +2368,20 @@ class FrontendIdentityTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_home_aluno_mantem_acesso_rapido_para_novo_processo(self):
+        """A home do aluno leva a abrir processo e a consultar os existentes.
+
+        O bloco "Acesso rapido" foi removido: os tres atalhos dele repetiam o
+        menu lateral, e ficavam 420px abaixo da dobra. Os caminhos seguem na
+        tela, pelos cartoes da visao geral -- por isso a verificacao e pelo
+        destino, nao pelo rotulo que existia no bloco antigo.
+        """
         self.client.force_login(self.aluno)
         response = self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Novo requerimento")
-        self.assertContains(response, "Consultar processos")
-        self.assertContains(response, "Programa de Pos-Graduacao")
+        self.assertContains(response, reverse("novo_processo"))
+        self.assertContains(response, reverse("menu_meus_processos"))
+        self.assertContains(response, "Pós-Graduação em Engenharia de Computação")
 
     def test_home_servidor_exibe_menu_completo_de_reservas(self):
         servidor = User.objects.create_user(
@@ -2379,7 +2425,7 @@ class FrontendIdentityTests(TestCase):
         self.assertNotContains(response, "Processos no Pleno")
         self.assertContains(response, "Processos dos Orientandos")
         self.assertContains(response, "Ciências")
-        self.assertNotContains(response, "Ciencias manifestadas")
+        self.assertNotContains(response, "Ciências manifestadas")
         self.assertContains(response, "Meus Orientandos")
         self.assertContains(response, "Cadastro de Salas")
 
@@ -2387,20 +2433,20 @@ class FrontendIdentityTests(TestCase):
         servidor = User.objects.create_user(
             email="servidor.ciencias@example.com",
             password="senha-segura-123",
-            nome="Servidor Ciencias",
+            nome="Servidor Ciências",
             tipo_usuario=User.TipoUsuario.SERVIDOR,
         )
         processo_pendente = Processo.objects.create(
             usuario_criado_por=self.aluno,
             tipo=Processo.TipoProcesso.OUTRO,
-            assunto="Processo com ciencia pendente",
+            assunto="Processo com ciência pendente",
             descricao="Solicitacao",
             setor_atual=Setor.objects.get(nome="Requerente"),
         )
         processo_manifestado = Processo.objects.create(
             usuario_criado_por=self.aluno,
             tipo=Processo.TipoProcesso.OUTRO,
-            assunto="Processo com ciencia manifestada",
+            assunto="Processo com ciência manifestada",
             descricao="Solicitacao",
             setor_atual=Setor.objects.get(nome="Requerente"),
         )
@@ -2409,7 +2455,7 @@ class FrontendIdentityTests(TestCase):
             tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
             responsavel=self.docente,
             solicitado_por=servidor,
-            mensagem_solicitacao="Favor manifestar ciencia.",
+            mensagem_solicitacao="Favor manifestar ciência.",
         )
         manifestada = ManifestacaoProcesso.objects.create(
             processo=processo_manifestado,
@@ -2427,14 +2473,14 @@ class FrontendIdentityTests(TestCase):
         response = self.client.get(reverse("menu_ciencias_manifestadas"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "<h1 class=\"section-title\">Ciencias</h1>", html=True)
-        self.assertContains(response, "Pendencias de ciencia")
-        self.assertContains(response, "Ciencias ja manifestadas")
+        self.assertContains(response, "<h1 class=\"section-title\">Ciências</h1>", html=True)
+        self.assertContains(response, "Pendências de ciência")
+        self.assertContains(response, "Ciências já manifestadas")
         self.assertContains(response, processo_pendente.assunto)
-        self.assertContains(response, "Manifestar ciencia")
-        self.assertContains(response, "Favor manifestar ciencia.")
+        self.assertContains(response, "Manifestar ciência")
+        self.assertContains(response, "Favor manifestar ciência.")
         self.assertContains(response, processo_manifestado.assunto)
-        self.assertContains(response, "Manifestacao: Ciente.")
+        self.assertContains(response, "Manifestação: Ciente.")
 
 
 class ProcessoPrazoTests(TestCase):
@@ -2492,7 +2538,8 @@ class ProcessoPrazoTests(TestCase):
         self.client.force_login(self.servidor)
         home = self.client.get(reverse("home"))
         self.assertContains(home, "1")
-        self.assertContains(home, "processos atrasados")
+        self.assertContains(home, "processo atrasado")
+        self.assertNotContains(home, "1 processos atrasados")
 
         response = self.client.get(reverse("coordenacao_processos"), {"atrasados": "1"})
         self.assertEqual(response.status_code, 200)
@@ -2564,7 +2611,7 @@ class SolicitacaoBancaTests(TestCase):
             "trajetoria": self.trajetoria_mestrado.id,
             "tipo_defesa": SolicitacaoBanca.TipoDefesa.DEFESA_MESTRADO,
             "titulo": "Arquitetura de sistemas distribuidos",
-            "resumo": "Resumo da dissertacao.",
+            "resumo": "Resumo da dissertação.",
             "palavras_chave": "sistemas, distribuidos",
             "data_prevista": "2026-08-20",
             "horario_previsto": "14:00",
@@ -2624,7 +2671,7 @@ class SolicitacaoBancaTests(TestCase):
         aluno_sem_vinculo = Aluno.objects.create(
             email="sem.vinculo@example.com",
             password="senha-segura-123",
-            nome="Aluno Sem Vinculo",
+            nome="Aluno Sem Vínculo",
         )
         TrajetoriaAcademica.objects.create(
             aluno=aluno_sem_vinculo,
@@ -2640,7 +2687,7 @@ class SolicitacaoBancaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Mestrando Banca")
         self.assertContains(response, "Doutorando Banca")
-        self.assertNotContains(response, "Aluno Sem Vinculo")
+        self.assertNotContains(response, "Aluno Sem Vínculo")
 
     def test_docente_salva_rascunho_de_solicitacao(self):
         self.client.force_login(self.docente)
@@ -2651,7 +2698,7 @@ class SolicitacaoBancaTests(TestCase):
                 "aluno": self.aluno_mestrado.id,
                 "trajetoria": self.trajetoria_mestrado.id,
                 "tipo_defesa": SolicitacaoBanca.TipoDefesa.DEFESA_MESTRADO,
-                "titulo": "Rascunho de dissertacao",
+                "titulo": "Rascunho de dissertação",
             },
         )
 
@@ -2721,7 +2768,7 @@ class SolicitacaoBancaTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Informe um CPF valido.")
+        self.assertContains(response, "Informe um CPF válido.")
         self.assertEqual(SolicitacaoBanca.objects.count(), 0)
 
     def test_novo_processo_nao_lista_formularios_de_banca(self):
@@ -2730,21 +2777,21 @@ class SolicitacaoBancaTests(TestCase):
             aluno=self.aluno_mestrado,
             trajetoria=self.trajetoria_mestrado,
             tipo_defesa=SolicitacaoBanca.TipoDefesa.DEFESA_MESTRADO,
-            titulo="Solicitacao propria",
+            titulo="Solicitação própria",
         )
         outra = SolicitacaoBanca.objects.create(
             docente=self.outro_docente,
             aluno=self.aluno_doutorado,
             trajetoria=self.trajetoria_doutorado,
             tipo_defesa=SolicitacaoBanca.TipoDefesa.QUALIFICACAO_DOUTORADO,
-            titulo="Solicitacao de outro docente",
+            titulo="Solicitação de outro docente",
         )
 
         self.client.force_login(self.docente)
         response = self.client.get(reverse("novo_processo"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Formularios salvos")
+        self.assertNotContains(response, "Formulários salvos")
         self.assertNotContains(response, str(propria))
         self.assertNotContains(response, str(outra))
 
@@ -2801,7 +2848,7 @@ class SolicitacaoAssinaturaTests(TestCase):
             nome="Membro Assinatura",
         )
         self.setor = Setor.objects.create(
-            nome="Comissao de Assinaturas",
+            nome="Comissão de Assinaturas",
             tipo=Setor.TipoSetor.COMISSAO,
             email="comissao.assinatura@example.com",
         )
@@ -2831,8 +2878,8 @@ class SolicitacaoAssinaturaTests(TestCase):
         lista = self.client.get(reverse("solicitacoes_assinatura"))
         nova = self.client.get(reverse("nova_solicitacao_assinatura"))
         self.assertContains(lista, "Acompanhe assinaturas")
-        self.assertNotContains(lista, "Enviar solicitacao")
-        self.assertContains(nova, "Nova Solicitacao de Assinatura")
+        self.assertNotContains(lista, "Enviar solicitação")
+        self.assertContains(nova, "Nova Solicitação de Assinatura")
         self.assertContains(nova, 'data-destinatario-field="DOCENTE"')
         self.assertContains(nova, 'data-destinatario-field="SETOR"')
         self.assertContains(nova, 'data-documento-field="DOCUMENTO_SEI"')
@@ -2863,9 +2910,9 @@ class SolicitacaoAssinaturaTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Assinaturas")
-        self.assertContains(response, "Nova solicitacao")
-        self.assertContains(response, "Pendencias de assinatura")
-        self.assertContains(response, "Solicitacoes feitas")
+        self.assertContains(response, "Nova solicitação")
+        self.assertContains(response, "Pendências de assinatura")
+        self.assertContains(response, "Solicitações feitas")
 
     def test_docente_ve_assinatura_pendente_na_home(self):
         solicitacao = SolicitacaoAssinatura.objects.create(
@@ -2913,7 +2960,7 @@ class SolicitacaoAssinaturaTests(TestCase):
         response = self.client.get(reverse("pendencias_assinatura"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Pendencias de Assinatura")
+        self.assertContains(response, "Pendências de Assinatura")
         self.assertContains(response, propria.referencia_documento)
         self.assertNotContains(response, "SEI-DE-OUTRO")
         self.assertNotContains(response, "BLOCO-ASSINADO")
@@ -2965,7 +3012,7 @@ class SolicitacaoAssinaturaTests(TestCase):
 
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn(self.docente.email, mail.outbox[0].to)
-        self.assertIn("Solicitacao de assinatura", mail.outbox[0].subject)
+        self.assertIn("Solicitação de assinatura", mail.outbox[0].subject)
 
 
 class ReservaAmbienteTests(TestCase):
@@ -3009,7 +3056,7 @@ class ReservaAmbienteTests(TestCase):
             {
                 "sala": self.sala.id,
                 "tipo": ReservaAmbiente.TipoReserva.AULA,
-                "titulo": "Aula de pos-graduacao",
+                "titulo": "Aula de pós-graduação",
                 "data_inicio": "2026-06-08",
                 "hora_inicio": "09:00",
                 "hora_fim": "10:00",
@@ -3269,7 +3316,7 @@ class ReservaAmbienteTests(TestCase):
             {
                 "acao": "excluir_reserva",
                 "reserva_id": reserva.id,
-                "justificativa": "Reserva cancelada pela coordenacao.",
+                "justificativa": "Reserva cancelada pela coordenação.",
             },
         )
 
@@ -3278,7 +3325,7 @@ class ReservaAmbienteTests(TestCase):
         self.assertEqual(reserva.status, ReservaAmbiente.StatusReserva.EXCLUIDA)
         self.assertEqual(reserva.excluida_por_id, coordenador.id)
         self.assertIsNotNone(reserva.excluida_em)
-        self.assertEqual(reserva.justificativa_exclusao, "Reserva cancelada pela coordenacao.")
+        self.assertEqual(reserva.justificativa_exclusao, "Reserva cancelada pela coordenação.")
 
     def test_docente_da_reserva_pode_exclui_la(self):
         reserva = ReservaAmbiente.objects.create(
@@ -3355,7 +3402,7 @@ class ReservaAmbienteTests(TestCase):
             docente=self.docente,
             criado_por=self.docente,
             tipo=ReservaAmbiente.TipoReserva.DEFESA,
-            titulo="Nova reserva no mesmo horario",
+            titulo="Nova reserva no mesmo horário",
             inicio=self._dt(8, 9, 30),
             fim=self._dt(8, 10, 30),
         )
@@ -3410,7 +3457,7 @@ class ReservaAmbienteTests(TestCase):
         outro_docente = Docente.objects.create(
             email="outro.docente.calendario@example.com",
             password="senha-segura-123",
-            nome="Outro Docente Calendario",
+            nome="Outro Docente Calendário",
         )
         ReservaAmbiente.objects.create(
             sala=self.outra_sala,
@@ -3428,7 +3475,7 @@ class ReservaAmbienteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Disponibilidade semanal")
         self.assertContains(response, "Livre 08:00-12:00")
-        self.assertContains(response, "Ocupado 10:00-11:00 | Defesa")
+        self.assertContains(response, "Ocupado 10:00–11:00 · Defesa")
         self.assertNotContains(response, "Reserva privada de outro docente")
 
     def test_formulario_informa_choque_e_nao_cria_reserva(self):
@@ -3467,7 +3514,7 @@ class ReservaAmbienteTests(TestCase):
             {
                 "sala": self.sala.id,
                 "tipo": ReservaAmbiente.TipoReserva.AULA,
-                "titulo": "Horario invalido",
+                "titulo": "Horário inválido",
                 "data_inicio": "2026-06-08",
                 "hora_inicio": "10:00",
                 "hora_fim": "10:00",
@@ -3580,3 +3627,885 @@ class ReservaAmbienteTests(TestCase):
         )
 
         self.assertEqual(ReservaAmbiente.objects.count(), 2)
+
+
+class MenuLateralIconesTests(SimpleTestCase):
+    """Garante que todo icone referenciado no menu existe no sprite SVG.
+
+    Um icone inexistente nao quebra nada: o <use> simplesmente nao renderiza e
+    o item aparece sem icone -- falha silenciosa, facil de passar em revisao.
+
+    A verificacao le a arvore sintatica do context_processors em vez de montar
+    menus para usuarios de teste. Motivo: o menu tem varios ramos condicionais
+    (vinculo com setor, coordenador, membro do Pleno) e uma bateria de perfis
+    sinteticos nunca cobre todos -- a primeira versao deste teste passava com
+    um icone comprovadamente quebrado.
+    """
+
+    @staticmethod
+    def _icones_do_sprite():
+        caminho = Path(settings.BASE_DIR) / "templates" / "includes" / "icons.html"
+        return set(re.findall(r'<symbol id="i-([\w-]+)"', caminho.read_text(encoding="utf-8")))
+
+    @staticmethod
+    def _icones_declarados():
+        """Todo 4o argumento posicional de _menu_item(...), em qualquer ramo."""
+        origem = Path(settings.BASE_DIR) / "processos" / "context_processors.py"
+        arvore = ast.parse(origem.read_text(encoding="utf-8"))
+        icones = {}
+        for no in ast.walk(arvore):
+            if not isinstance(no, ast.Call):
+                continue
+            if not (isinstance(no.func, ast.Name) and no.func.id == "_menu_item"):
+                continue
+            if len(no.args) < 4:
+                continue
+            rotulo, icone = no.args[0], no.args[3]
+            if isinstance(icone, ast.Constant) and isinstance(icone.value, str):
+                nome = rotulo.value if isinstance(rotulo, ast.Constant) else f"linha {no.lineno}"
+                icones[(nome, no.lineno)] = icone.value
+        return icones
+
+    def test_todos_os_icones_do_menu_existem_no_sprite(self):
+        disponiveis = self._icones_do_sprite()
+        declarados = self._icones_declarados()
+
+        self.assertTrue(disponiveis, "sprite de icones vazio ou nao encontrado")
+        self.assertGreaterEqual(
+            len(declarados), 25,
+            "poucos itens de menu encontrados -- a leitura do context_processors falhou?",
+        )
+
+        ausentes = {
+            f"{rotulo} (linha {linha}) -> {icone}"
+            for (rotulo, linha), icone in declarados.items()
+            if icone not in disponiveis
+        }
+        self.assertEqual(
+            ausentes, set(),
+            "icones sem <symbol> correspondente em templates/includes/icons.html:\n  "
+            + "\n  ".join(sorted(ausentes)),
+        )
+
+    def test_nomes_de_icone_seguem_o_padrao(self):
+        fora_do_padrao = {
+            f"{rotulo} -> {icone!r}"
+            for (rotulo, _), icone in self._icones_declarados().items()
+            if not re.fullmatch(r"[a-z][a-z-]*", icone)
+        }
+        self.assertEqual(
+            fora_do_padrao, set(),
+            "nome de icone deve ser minusculo com hifens (ex.: novo-processo):\n  "
+            + "\n  ".join(sorted(fora_do_padrao)),
+        )
+
+
+class TemplatesSintaxeTests(SimpleTestCase):
+    """Guardas de sintaxe que o Django nao acusa como erro."""
+
+    @staticmethod
+    def _templates():
+        return sorted(Path(settings.BASE_DIR).joinpath("templates").rglob("*.html"))
+
+    def test_comentario_de_uma_linha_nao_abre_sem_fechar(self):
+        """{# ... #} e sempre de uma linha so.
+
+        Se abrir numa linha e fechar em outra, o Django nao acusa erro: o texto
+        do "comentario" e renderizado na pagina. Dentro de um container flex ele
+        ainda vira um item de layout e desloca a tela inteira. Use
+        {% templatetag openblock %} comment {% templatetag closeblock %} para
+        varias linhas.
+        """
+        infracoes = []
+        for caminho in self._templates():
+            for numero, linha in enumerate(caminho.read_text(encoding="utf-8").split("\n"), 1):
+                if "{#" in linha and "#}" not in linha:
+                    relativo = caminho.relative_to(settings.BASE_DIR)
+                    infracoes.append(f"{relativo}:{numero}: {linha.strip()[:70]}")
+        self.assertEqual(
+            infracoes, [],
+            "comentario {# #} aberto sem fechar na mesma linha:\n  " + "\n  ".join(infracoes),
+        )
+
+    def test_nome_de_bloco_nao_se_repete_no_mesmo_template(self):
+        """Bloco repetido derruba o template com TemplateSyntaxError."""
+        infracoes = []
+        for caminho in self._templates():
+            nomes = re.findall(r"{%\s*block\s+([\w-]+)\s*%}", caminho.read_text(encoding="utf-8"))
+            repetidos = {n for n in nomes if nomes.count(n) > 1}
+            if repetidos:
+                infracoes.append(f"{caminho.relative_to(settings.BASE_DIR)}: {sorted(repetidos)}")
+        self.assertEqual(infracoes, [], "nomes de bloco repetidos:\n  " + "\n  ".join(infracoes))
+
+
+class PaginacaoListagensTests(TestCase):
+    """Paginacao das listagens de gestao.
+
+    Com poucos registros a navegacao nem aparece, entao os testes reduzem o
+    tamanho da pagina para exercitar o comportamento real: preservar filtros
+    ao trocar de pagina, tolerar page invalido e contar o total do filtro --
+    nao o tamanho da pagina.
+    """
+
+    def setUp(self):
+        self.servidor = User.objects.create_user(
+            email="servidor.paginacao@example.com", password="senha-segura-123",
+            nome="Servidor Paginacao", tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.setor = Setor.objects.create(nome="Setor Paginacao")
+        for i in range(12):
+            Processo.objects.create(
+                numero=f"202607-99{i:04d}",
+                usuario_criado_por=self.servidor,
+                tipo=Processo.TipoProcesso.OUTRO,
+                assunto=("Alvo do filtro" if i < 4 else f"Processo comum {i}"),
+                descricao="Descricao",
+                status_inicial="ABERTO",
+                status=Processo.StatusProcesso.EM_ANALISE,
+                setor_atual=self.setor,
+            )
+        self.client.force_login(self.servidor)
+        # a seed da migracao 0003 ja deixa processos no banco de teste, entao o
+        # total nao e so o que este setUp criou
+        self.total = Processo.objects.count()
+
+    def _pagina(self, resposta):
+        return resposta.context["pagina"]
+
+    @patch("processos.views.ITENS_POR_PAGINA", 5)
+    def test_divide_em_paginas_e_conta_o_total(self):
+        resposta = self.client.get(reverse("coordenacao_processos"))
+        pagina = self._pagina(resposta)
+
+        self.assertGreater(self.total, 5, "o cenario precisa de mais de uma pagina")
+        self.assertEqual(pagina.number, 1)
+        self.assertEqual(pagina.paginator.num_pages, -(-self.total // 5))
+        self.assertEqual(pagina.paginator.count, self.total)
+        self.assertEqual(len(pagina.object_list), 5)
+        # a contagem exibida e do total filtrado, nao das 5 linhas da pagina
+        self.assertContains(resposta, f"{self.total} processos")
+
+    @patch("processos.views.ITENS_POR_PAGINA", 5)
+    def test_filtro_sobrevive_a_troca_de_pagina(self):
+        """O erro classico e o filtro sumir ao clicar em "proxima"."""
+        primeira = self.client.get(reverse("coordenacao_processos"), {"q": "Alvo do filtro"})
+        self.assertEqual(self._pagina(primeira).paginator.count, 4)
+
+        segunda = self.client.get(reverse("coordenacao_processos"), {"q": "Alvo do filtro", "page": 1})
+        self.assertEqual(self._pagina(segunda).paginator.count, 4)
+        # o link de paginacao carrega o filtro junto
+        self.assertNotContains(segunda, 'href="?page=')
+
+    @patch("processos.views.ITENS_POR_PAGINA", 5)
+    def test_pagina_invalida_cai_na_primeira(self):
+        """page vem da URL: pode chegar editada a mao ou apontando para uma
+        pagina que sumiu depois de um filtro."""
+        for valor in ["99", "abc", "0", "-3", ""]:
+            with self.subTest(page=valor):
+                resposta = self.client.get(reverse("coordenacao_processos"), {"page": valor})
+                self.assertEqual(resposta.status_code, 200)
+                self.assertEqual(self._pagina(resposta).number, 1)
+
+    @patch("processos.views.ITENS_POR_PAGINA", 5)
+    def test_navegacao_so_aparece_com_mais_de_uma_pagina(self):
+        com_varias = self.client.get(reverse("coordenacao_processos"))
+        self.assertContains(com_varias, "paginacao-passo")
+
+        uma_so = self.client.get(reverse("coordenacao_processos"), {"q": "Alvo do filtro"})
+        self.assertEqual(self._pagina(uma_so).paginator.num_pages, 1)
+        self.assertNotContains(uma_so, "paginacao-passo")
+
+
+class OrientadorAcessaOrientandoTests(TestCase):
+    """O orientador precisa alcancar a ficha do proprio orientando.
+
+    A tela "Meus Orientandos" lista os alunos dele, mas abrir qualquer um dava
+    403: a verificacao so considerava gestao e o proprio aluno. Nao havia
+    caminho nenhum para a trajetoria do orientando.
+
+    O acesso e de leitura -- alterar a ficha continua sendo da coordenacao.
+    """
+
+    def setUp(self):
+        senha = "senha-segura-123"
+        self.orientador = Docente.objects.create_user(
+            email="orientador.acesso@example.com", password=senha, nome="Orientador Acesso",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        self.coorientador = Docente.objects.create_user(
+            email="coorientador.acesso@example.com", password=senha, nome="Coorientador Acesso",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        self.outro_docente = Docente.objects.create_user(
+            email="alheio.acesso@example.com", password=senha, nome="Docente Alheio",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        self.aluno = Aluno.objects.create_user(
+            email="orientando.acesso@example.com", password=senha, nome="Orientando Acesso",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026B0001",
+        )
+        self.trajetoria = TrajetoriaAcademica.objects.create(
+            aluno=self.aluno, orientador=self.orientador, coorientador=self.coorientador,
+            nivel_curso="MESTRADO", ingresso="2026.1",
+            status=TrajetoriaAcademica.Status.ATIVA,
+        )
+        self.url = reverse("aluno_detalhe", args=[self.aluno.id])
+
+    def test_orientador_abre_a_ficha(self):
+        self.client.force_login(self.orientador)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_coorientador_abre_a_ficha(self):
+        self.client.force_login(self.coorientador)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_docente_sem_vinculo_continua_barrado(self):
+        self.client.force_login(self.outro_docente)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+
+    def test_orientacao_encerrada_mantem_o_acesso(self):
+        """O orientador continua respondendo pelo historico de quem concluiu."""
+        self.trajetoria.status = TrajetoriaAcademica.Status.CONCLUIDA
+        self.trajetoria.numero_defesa = "ATA-2026-07"
+        self.trajetoria.data_defesa = timezone.localdate()
+        self.trajetoria.save()
+
+        self.client.force_login(self.orientador)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_orientador_nao_altera_a_ficha(self):
+        """Leitura nao pode virar escrita: o aluno pode editar as proprias
+        publicacoes, e sem a guarda explicita o orientador herdaria isso."""
+        self.client.force_login(self.orientador)
+        resposta = self.client.post(self.url, {"acao": "salvar_publicacao"})
+        self.assertEqual(resposta.status_code, 403)
+
+    # Formularios so da coordenacao, identificados pelo valor de "acao" que
+    # enviam. O modal-close nao serve: ele existe nos modais de publicacao, que
+    # o proprio aluno pode abrir legitimamente.
+    ACOES_DA_COORDENACAO = [
+        "nova_trajetoria",
+        "alterar_trajetoria_campo",
+        "registrar_horas_complementares",
+        "novo_estagio_docencia",
+    ]
+
+    def _formularios_de_coordenacao(self, corpo):
+        return [acao for acao in self.ACOES_DA_COORDENACAO if f'value="{acao}"' in corpo]
+
+    def test_leitor_nao_recebe_os_formularios_da_coordenacao(self):
+        """Os modais de edicao nao podem ir no HTML de quem so le.
+
+        Os botoes que abrem esses modais sempre estiveram atras de
+        can_manage_aluno, mas o modal em si nao estava: o markup ia para todo
+        mundo que abrisse a ficha. O POST e barrado no servidor -- o que vazava
+        era o conteudo dos formularios, entre eles o <select> de orientador com
+        a lista de docentes cadastrados.
+        """
+        for quem, usuario in (("orientador", self.orientador), ("proprio aluno", self.aluno)):
+            with self.subTest(leitor=quem):
+                self.client.force_login(usuario)
+                corpo = self.client.get(self.url).content.decode()
+                self.assertEqual(
+                    self._formularios_de_coordenacao(corpo), [],
+                    f"{quem} recebeu formularios que so a coordenacao usa",
+                )
+                self.assertNotContains(
+                    self.client.get(self.url), self.outro_docente.nome,
+                    msg_prefix="a lista de docentes vazou pelo select de orientador",
+                )
+
+    def test_coordenacao_continua_recebendo_os_formularios(self):
+        """A guarda nao pode ter escondido os modais de quem edita de fato."""
+        servidor = User.objects.create_user(
+            email="servidor.modais@example.com", password="senha-segura-123",
+            nome="Servidor Modais", tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.client.force_login(servidor)
+        corpo = self.client.get(self.url).content.decode()
+        self.assertEqual(sorted(self._formularios_de_coordenacao(corpo)), sorted(self.ACOES_DA_COORDENACAO))
+
+    def test_lista_de_orientandos_leva_a_ficha(self):
+        """Antes o nome era texto solto -- nao havia link para lugar nenhum."""
+        self.client.force_login(self.orientador)
+        resposta = self.client.get(reverse("menu_meus_orientandos"))
+        self.assertContains(resposta, f'href="{self.url}"')
+
+
+class MensagemDeAcessoNegadoTests(TestCase):
+    """A tela de 403 deve dizer o motivo, nao so negar.
+
+    As views levantam PermissionDenied com uma mensagem que identifica quem
+    tem acesso; ela era descartada e o usuario via um texto generico.
+    """
+
+    def setUp(self):
+        self.aluno = Aluno.objects.create_user(
+            email="aluno.negado@example.com", password="senha-segura-123",
+            nome="Aluno Negado", tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026B0002",
+        )
+
+    def test_403_mostra_o_motivo_da_recusa(self):
+        self.client.force_login(self.aluno)
+        with self.settings(DEBUG=False):
+            resposta = self.client.get(reverse("coordenacao_dashboard"))
+
+        self.assertEqual(resposta.status_code, 403)
+        self.assertContains(resposta, "Acesso restrito", status_code=403)
+
+    def test_403_do_pleno_identifica_o_colegiado(self):
+        self.client.force_login(self.aluno)
+        with self.settings(DEBUG=False):
+            resposta = self.client.get(reverse("menu_processos_pleno"))
+
+        self.assertContains(resposta, "Colegiado", status_code=403)
+
+
+class TodasAsTelasRenderizamTests(TestCase):
+    """Abre cada tela com cada perfil e verifica que ela responde.
+
+    Existe porque a suite passou verde com /menu/meus-processos/ quebrada: uma
+    conversao de template deixou marcacao orfa e a pagina levantava
+    TemplateSyntaxError. Nenhum teste abria aquela URL -- o defeito so
+    apareceu quando um usuario tentou usar o sistema.
+
+    Nao verifica conteudo, so que a tela nao explode e que o codigo de resposta
+    e o esperado para aquele perfil. E a rede de seguranca mais rasa possivel,
+    e teria pego aquele caso.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        senha = "senha-segura-123"
+        cls.aluno = Aluno.objects.create_user(
+            email="aluno.telas@example.com", password=senha, nome="Aluno Telas",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026C0001",
+        )
+        cls.docente = Docente.objects.create_user(
+            email="docente.telas@example.com", password=senha, nome="Docente Telas",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        cls.servidor = User.objects.create_user(
+            email="servidor.telas@example.com", password=senha, nome="Servidor Telas",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        TrajetoriaAcademica.objects.create(
+            aluno=cls.aluno, orientador=cls.docente, nivel_curso="MESTRADO",
+            ingresso="2026.1", status=TrajetoriaAcademica.Status.ATIVA,
+        )
+
+    # (rota, perfis que devem receber 200)
+    TELAS = [
+        ("home", {"aluno", "docente", "servidor"}),
+        ("me", {"aluno", "docente", "servidor"}),
+        ("menu_meus_processos", {"aluno", "docente"}),
+        ("novo_processo", {"aluno", "docente"}),
+        ("matriculas_minhas", {"aluno"}),
+        ("matricula_solicitar", {"aluno"}),
+        ("aluno_documento_vinculo", {"aluno"}),
+        ("menu_meus_orientandos", {"docente"}),
+        ("menu_processos_orientandos", {"docente"}),
+        ("menu_ciencias_manifestadas", {"docente"}),
+        ("solicitacoes_banca", {"docente"}),
+        ("solicitacao_banca_nova", {"docente"}),
+        ("reservas_ambientes", {"docente", "servidor"}),
+        ("disponibilidade_ambientes", {"docente", "servidor"}),
+        ("reservas_ambientes_feitas", {"docente", "servidor"}),
+        ("salas_ambientes", {"servidor"}),
+        ("coordenacao_dashboard", {"servidor"}),
+        ("coordenacao_alunos", {"servidor"}),
+        ("validar_cadastros_alunos", {"servidor"}),
+        ("coordenacao_processos", {"servidor"}),
+        ("coordenacao_caixa_processos", {"servidor"}),
+        ("setores_comissoes", {"servidor"}),
+        ("solicitacoes_assinatura", {"docente", "servidor"}),
+        ("nova_solicitacao_assinatura", {"servidor"}),
+        ("pendencias_assinatura", {"docente", "servidor"}),
+        ("matriculas_periodos", {"servidor"}),
+        ("matriculas_solicitacoes", {"servidor"}),
+        ("matriculas_disciplinas", {"servidor"}),
+        ("matriculas_ofertas", {"docente", "servidor"}),
+    ]
+
+    def test_toda_tela_responde_para_todo_perfil(self):
+        usuarios = {"aluno": self.aluno, "docente": self.docente, "servidor": self.servidor}
+
+        for nome_rota, perfis_com_acesso in self.TELAS:
+            for perfil, usuario in usuarios.items():
+                with self.subTest(tela=nome_rota, perfil=perfil):
+                    self.client.force_login(usuario)
+                    resposta = self.client.get(reverse(nome_rota))
+                    esperado = 200 if perfil in perfis_com_acesso else 403
+                    self.assertEqual(
+                        resposta.status_code, esperado,
+                        f"{nome_rota} devolveu {resposta.status_code} para {perfil}",
+                    )
+
+
+class TrajetoriasNaFichaDoAlunoTests(TestCase):
+    """Como as trajetorias sao apresentadas na ficha.
+
+    Um aluno pode ter varias: mestrado concluido e doutorado em curso, um
+    trancamento, um reingresso. Todas vinham abertas, uma embaixo da outra, cada
+    uma com onze linhas de dados mais publicacoes, disciplinas e horas
+    complementares -- a trajetoria em curso, que e o motivo da visita, ficava
+    soterrada pelo historico.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        senha = "senha-segura-123"
+        cls.docente = Docente.objects.create_user(
+            email="orientador.traj@example.com", password=senha, nome="Orientador Traj",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        cls.aluno = Aluno.objects.create_user(
+            email="aluno.traj@example.com", password=senha, nome="Aluno Traj",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026T0001",
+        )
+        cls.servidor = User.objects.create_user(
+            email="servidor.traj@example.com", password=senha, nome="Servidor Traj",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        cls.concluida = TrajetoriaAcademica.objects.create(
+            aluno=cls.aluno, orientador=cls.docente, nivel_curso="MESTRADO",
+            ingresso="2021.1", status=TrajetoriaAcademica.Status.CONCLUIDA,
+            numero_defesa="ATA-2023-14", data_defesa=date(2023, 8, 18),
+        )
+        cls.ativa = TrajetoriaAcademica.objects.create(
+            aluno=cls.aluno, orientador=cls.docente, nivel_curso="DOUTORADO",
+            ingresso="2024.1", status=TrajetoriaAcademica.Status.ATIVA,
+        )
+        cls.url = reverse("aluno_detalhe", args=[cls.aluno.id])
+
+    def test_as_trajetorias_comecam_fechadas(self):
+        """A tela abre mostrando quantas existem, nao o conteudo de todas."""
+        self.client.force_login(self.aluno)
+        corpo = self.client.get(self.url).content.decode()
+
+        blocos = re.findall(r"<details class=\"trajetoria\"[^>]*>", corpo)
+        self.assertEqual(len(blocos), 2, "as duas trajetorias devem estar na tela")
+        self.assertEqual(
+            [bloco for bloco in blocos if "open" in bloco], [],
+            f"nenhuma trajetoria abre sozinha; abertas: {blocos}",
+        )
+
+    def test_a_trajetoria_ativa_vem_primeiro(self):
+        """Fechadas, a ordem e o que coloca a trajetoria em curso a um clique.
+
+        A ordenacao era so por data de criacao; a que esta em curso podia cair
+        no fim, atras de mestrados concluidos anos antes.
+        """
+        self.client.force_login(self.aluno)
+        resposta = self.client.get(self.url)
+        ordem = [card["obj"].id for card in resposta.context["trajetoria_cards"]]
+        self.assertEqual(ordem[0], self.ativa.id, "a trajetoria ativa deve ser a primeira")
+
+    def test_o_resumo_fechado_identifica_a_trajetoria(self):
+        """Fechada, a trajetoria ainda precisa dizer qual e.
+
+        Sem isso o retraimento troca uma tela longa por uma lista de blocos
+        indistinguiveis.
+        """
+        self.client.force_login(self.aluno)
+        corpo = self.client.get(self.url).content.decode()
+
+        resumos = re.findall(r"<summary class=\"trajetoria-resumo\">(.*?)</summary>", corpo, re.S)
+        self.assertEqual(len(resumos), 2)
+        for resumo, trajetoria in zip(resumos, (self.ativa, self.concluida)):
+            with self.subTest(trajetoria=trajetoria.id):
+                self.assertIn(trajetoria.get_nivel_curso_display(), resumo)
+                self.assertIn(trajetoria.get_status_display(), resumo)
+                self.assertIn(trajetoria.ingresso, resumo)
+                self.assertIn(trajetoria.orientador.nome, resumo)
+
+    def test_leitor_recebe_grade_em_vez_de_linhas_com_botao(self):
+        """Quem nao edita nao precisa de uma coluna de acoes vazia por linha.
+
+        Os onze campos cabem em quatro linhas de tres colunas. Como lista
+        editavel, sao onze linhas com o lado direito em branco.
+        """
+        for quem, usuario in (("aluno", self.aluno), ("orientador", self.docente)):
+            with self.subTest(leitor=quem):
+                self.client.force_login(usuario)
+                corpo = self.client.get(self.url).content.decode()
+                self.assertNotIn("info-list-editavel", corpo)
+                self.assertIn("dados-grid", corpo)
+
+    def test_coordenacao_continua_editando_campo_por_campo(self):
+        self.client.force_login(self.servidor)
+        corpo = self.client.get(self.url).content.decode()
+        self.assertIn("info-list-editavel", corpo)
+        self.assertIn(f"modal-trajetoria-orientador-{self.ativa.id}", corpo)
+
+    def test_as_duas_leituras_mostram_os_mesmos_campos(self):
+        """A lista de campos vem da view, nao escrita duas vezes no template.
+
+        Enquanto o template listava os campos na mao em cada ramo, era possivel
+        acrescentar um campo para a coordenacao e esquecer o do aluno.
+        """
+        rotulos = [linha["rotulo"] for linha in _linhas_trajetoria(self.ativa)]
+
+        corpos = {}
+        for quem, usuario in (("aluno", self.aluno), ("servidor", self.servidor)):
+            self.client.force_login(usuario)
+            corpos[quem] = self.client.get(self.url).content.decode()
+
+        for rotulo in rotulos:
+            for quem, corpo in corpos.items():
+                with self.subTest(campo=rotulo, leitor=quem):
+                    self.assertIn(rotulo, corpo)
+
+    def test_campos_seguem_o_nivel_do_curso(self):
+        """Nivel sem prazos academicos nao ganha linhas de prazo em branco."""
+        rotulos_doutorado = {linha["rotulo"] for linha in _linhas_trajetoria(self.ativa)}
+        self.assertIn("Orientador", rotulos_doutorado)
+        self.assertIn("Prazo defesa", rotulos_doutorado)
+        # "Nivel" saiu: o titulo do bloco ja e o nivel do curso.
+        self.assertNotIn("Nível", rotulos_doutorado)
+
+    def test_conclusao_junta_numero_e_data_da_ata(self):
+        linhas = {linha["rotulo"]: linha["valor"] for linha in _linhas_trajetoria(self.concluida)}
+        valor = linhas[self.concluida.conclusao_label]
+        self.assertIn("ATA-2023-14", valor)
+        self.assertIn("18/08/2023", valor)
+
+    def test_campo_sem_valor_mostra_travessao(self):
+        """Nao string vazia nem "None": a ficha e lida como documento."""
+        linhas = {linha["rotulo"]: linha["valor"] for linha in _linhas_trajetoria(self.ativa)}
+        self.assertEqual(linhas["Coorientador"], "—")
+
+
+class CategoriaDaDisciplinaTests(TestCase):
+    """A categoria da disciplina passou a ser um conjunto fechado.
+
+    Era um CharField de 120 caracteres sem choices, digitado a mao no cadastro.
+    Em 47 disciplinas isso produziu cinco grafias para tres categorias --
+    "Disciplina Basica" sem acento ao lado de "Disciplina Básica", mais um
+    "Obrigatória" solto. Enquanto o tipo for texto livre nao ha como filtrar por
+    categoria nem contar eletivas cursadas, que a integralizacao precisa saber.
+    """
+
+    def test_o_campo_nao_aceita_texto_livre(self):
+        """A garantia que impede as grafias de voltarem."""
+        with self.assertRaises(ValidationError):
+            Disciplina.objects.create(codigo="PPGEC900", nome="Teste", tipo="Disciplina Basica")
+
+    def test_as_tres_categorias_do_programa(self):
+        self.assertEqual(
+            [valor for valor, _ in Disciplina.Tipo.choices],
+            ["BASICA", "ELETIVA_GERAL", "ELETIVA_ESPECIFICA"],
+        )
+
+    def test_a_tela_mostra_o_rotulo_e_nao_a_chave(self):
+        """Sem get_tipo_display a tabela mostraria "ELETIVA_ESPECIFICA"."""
+        Disciplina.objects.create(
+            codigo="PPGEC901", nome="Disciplina de teste",
+            tipo=Disciplina.Tipo.ELETIVA_ESPECIFICA,
+        )
+        servidor = User.objects.create_user(
+            email="servidor.disc@example.com", password="senha-segura-123",
+            nome="Servidor Disc", tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.client.force_login(servidor)
+        resposta = self.client.get(reverse("matriculas_disciplinas"))
+
+        # A chave aparece legitimamente no value do <option> do formulario de
+        # edicao; o que nao pode e vazar para a celula da tabela.
+        celulas = re.findall(r"<td[^>]*>(.*?)</td>", resposta.content.decode(), re.S)
+        self.assertTrue(
+            any("Eletiva específica" in celula for celula in celulas),
+            "a tabela deve mostrar o rotulo da categoria",
+        )
+        self.assertFalse(
+            any("ELETIVA_ESPECIFICA" in celula for celula in celulas),
+            "a chave do choice nao deve aparecer na tabela",
+        )
+
+    def test_categoria_em_branco_continua_valida(self):
+        """Disciplina antiga sem classificacao nao bloqueia o cadastro.
+
+        A migracao deixa em branco o que nao reconhece, para que a coordenacao
+        veja o que falta classificar em vez de a leitura quebrar.
+        """
+        disciplina = Disciplina.objects.create(codigo="PPGEC902", nome="Sem categoria")
+        self.assertEqual(disciplina.tipo, "")
+        self.assertEqual(disciplina.get_tipo_display(), "")
+
+
+class NomeDoColegiadoTests(TestCase):
+    """O colegiado pleno e reconhecido pelo nome, e o nome estava errado.
+
+    "Colegiando" e erro de digitacao -- a descricao do proprio setor sempre disse
+    "Deliberacoes do colegiado pleno." O erro entrou pela migracao 0005, que
+    listava o nome correto entre os apelidos a renomear.
+    """
+
+    ARQUIVOS_DE_CODIGO = ["views.py", "context_processors.py", "models.py", "forms.py", "services.py"]
+
+    def test_nenhum_codigo_compara_com_a_grafia_errada(self):
+        """O nome tem um lugar so: Setor.NOME_PLENO.
+
+        Enquanto estava escrito a mao em quatro comparacoes, corrigir o dado sem
+        corrigir todas as copias faria o sistema deixar de reconhecer o pleno --
+        nenhum docente veria "Processos no Pleno" e ninguem poderia deliberar.
+        """
+        base = Path(settings.BASE_DIR) / "processos"
+        culpados = []
+        for nome in self.ARQUIVOS_DE_CODIGO:
+            caminho = base / nome
+            if not caminho.exists():
+                continue
+            for numero, linha in enumerate(caminho.read_text(encoding="utf-8").splitlines(), 1):
+                if "Colegiando" in linha and not linha.lstrip().startswith("#"):
+                    culpados.append(f"{nome}:{numero}")
+        self.assertEqual(culpados, [], f"grafia errada no codigo: {culpados}")
+
+    def test_a_constante_diz_colegiado(self):
+        self.assertEqual(Setor.NOME_PLENO, "Colegiado PPGEC (Pleno)")
+
+    def test_o_pleno_continua_sendo_reconhecido(self):
+        """A correcao do dado nao pode ter desligado o acesso ao pleno."""
+        docente = Docente.objects.create_user(
+            email="docente.pleno.nome@example.com", password="senha-segura-123",
+            nome="Docente Pleno", tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        pleno, _ = Setor.objects.get_or_create(
+            nome=Setor.NOME_PLENO,
+            defaults={"descricao": "Deliberações do colegiado pleno."},
+        )
+        SetorMembro.objects.create(setor=pleno, usuario=docente)
+
+        self.client.force_login(docente)
+        resposta = self.client.get(reverse("menu_processos_pleno"))
+
+        self.assertEqual(resposta.status_code, 200)
+        rotulos = [
+            item["label"]
+            for secao in resposta.context["nav_menu_sections"]
+            for item in secao["items"]
+        ]
+        self.assertIn("Processos no Pleno", rotulos)
+
+
+class PadraoVisualDosTemplatesTests(SimpleTestCase):
+    """Guarda os padroes que a revisao visual estabeleceu.
+
+    Cada um destes ja foi corrigido tela por tela e volta sozinho na proxima
+    tela nova, porque escrever "a | b | c" e mais rapido do que montar a
+    meta-linha. Como sao verificaveis no proprio texto do template, ficam aqui.
+
+    Nao e um teste de aparencia -- e de consistencia: o que ele impede e que
+    duas telas resolvam a mesma coisa de dois jeitos.
+    """
+
+    DIRETORIO = Path(settings.BASE_DIR) / "templates"
+
+    # Templates de e-mail ficam de fora: cliente de e-mail ignora <style>, e o
+    # estilo inline ali e o unico que funciona. A regra vale para as telas.
+    EXCECOES = ("emails",)
+
+    def _templates(self):
+        for caminho in sorted(self.DIRETORIO.rglob("*.html")):
+            if any(parte in caminho.parts for parte in self.EXCECOES):
+                continue
+            yield caminho, caminho.read_text(encoding="utf-8")
+
+    def _sem_comentarios(self, texto):
+        """Comentarios explicam o que foi corrigido e costumam citar o defeito."""
+        return re.sub(r"{%\s*comment\s*%}.*?{%\s*endcomment\s*%}", "", texto, flags=re.S)
+
+    def _somente_texto_visivel(self, texto):
+        """Deixa so o que o usuario le.
+
+        Tira comentarios, <script>, <style>, o titulo da aba e toda a sintaxe do
+        Django. Sem isso, procurar "|" acha filtro de template ({{ x|date }}),
+        "||" de JavaScript e barra de CSS -- nada disso e separador de dado.
+        """
+        def apagar(match):
+            # Preserva as quebras de linha do trecho removido, senao o numero de
+            # linha reportado nao corresponde ao arquivo e o teste aponta para o
+            # lugar errado.
+            return "\n" * match.group(0).count("\n")
+
+        for padrao in (
+            r"{%\s*comment\s*%}.*?{%\s*endcomment\s*%}",
+            r"<script\b.*?</script>",
+            r"<style\b.*?</style>",
+            r"<!--.*?-->",
+            # "Pagina | Sistema" no <title> e convencao de aba, nao dado numa linha.
+            r"{%\s*block title\s*%}.*?{%\s*endblock\s*%}",
+            r"{{.*?}}",
+            r"{%.*?%}",
+        ):
+            texto = re.sub(padrao, apagar, texto, flags=re.S)
+        return texto
+
+    def test_nenhum_template_usa_bloco_style(self):
+        """CSS de tela vive no app.css.
+
+        Um <style> dentro do template so vale na pagina que o renderiza. A ficha
+        do aluno guardava assim o componente de modal, e a tela de ofertas
+        guardava a grade de horario -- ambos usados em mais de um lugar, ambos
+        invisiveis para quem procurasse a regra no app.css.
+        """
+        culpados = [
+            caminho.name
+            for caminho, texto in self._templates()
+            if "<style" in self._sem_comentarios(texto)
+        ]
+        self.assertEqual(culpados, [], f"templates com <style> proprio: {culpados}")
+
+    def test_nenhum_template_separa_dados_com_pipe(self):
+        """Metadados usam .meta-linha, nao "a | b | c".
+
+        Com pipe escrito na mao, um campo vazio deixa o separador solto na
+        linha, e cada template resolvia isso de um jeito -- ou nao resolvia.
+        """
+        culpados = []
+        for caminho, texto in self._templates():
+            for numero, linha in enumerate(self._somente_texto_visivel(texto).splitlines(), 1):
+                if "|" in linha:
+                    culpados.append(f"{caminho.name}:{numero}")
+        self.assertEqual(culpados, [], f"pipes separando dados: {culpados}")
+
+    def test_nenhum_template_envolve_os_cartoes_num_container_sem_classe(self):
+        """Os cartoes de uma tela precisam ser filhos diretos da area de conteudo.
+
+        O espacamento vertical entre blocos vem de ".content-area > * + *", que
+        por definicao alcanca so filhos diretos. Um envolvente entre a area e os
+        cartoes -- mesmo um <div> vazio -- tira todos eles do alcance da regra, e
+        a tela passa a ter os cartoes encostados.
+
+        Aconteceu duas vezes, e nas duas o envolvente nao fazia nada: na ficha do
+        aluno era um <section> sem atributo nenhum, e na tela de ofertas era um
+        <div class="matriculas-ofertas-page"> que havia servido para dar escopo a
+        um <style> ja removido.
+
+        E dificil de ver medindo a tela renderizada: com tudo dentro de um
+        envolvente, a area de conteudo tem um unico filho, e nao existe folga
+        alguma para medir como errada. Por isso a verificacao e no template.
+        """
+        # Um envolvente e legitimo quando ele mesmo espaca os filhos -- uma grade
+        # com gap, por exemplo (.grid-two, .dashboard-grid). O conjunto vem do
+        # proprio app.css, lendo quais classes declaram gap: assim uma grade nova
+        # passa a ser aceita sem precisar mexer neste teste.
+        css = (Path(settings.BASE_DIR) / "static" / "css" / "app.css").read_text(encoding="utf-8")
+        com_gap = set()
+        for seletor, corpo_regra in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+            if re.search(r"(^|[;\s])gap\s*:", corpo_regra):
+                com_gap.update(re.findall(r"\.([a-z0-9-]+)", seletor))
+
+        abertura = re.compile(r"<(div|section|main|article)\b([^>]*)>")
+        culpados = []
+        for caminho, texto in self._templates():
+            corpo = self._sem_comentarios(texto)
+            bloco = re.search(r"{%\s*block content\s*%}(.*?){%\s*endblock", corpo, re.S)
+            if not bloco:
+                continue
+            conteudo = bloco.group(1).lstrip()
+            primeiro = abertura.match(conteudo)
+            if not primeiro:
+                continue
+            classes = set(re.findall(r"[a-z0-9-]+", re.search(r'class="([^"]*)"', primeiro.group(2)).group(1))) \
+                if 'class="' in primeiro.group(2) else set()
+            # Problema quando o envolvente guarda mais de um cartao e nao espaca
+            # nada: e ai que o ritmo entre blocos deixa de existir.
+            if conteudo.count('class="card') > 1 and not (classes & (com_gap | {"card"})):
+                culpados.append(f"{caminho.name}: <{primeiro.group(1)}{primeiro.group(2)}>")
+        self.assertEqual(culpados, [], f"cartoes fora do alcance do ritmo vertical: {culpados}")
+
+    def test_nenhum_template_carrega_anotacao_de_desenvolvimento(self):
+        """TODO/FIXME nao sao conteudo de tela.
+
+        A tela de documento de vinculo exibia ao aluno, como texto da pagina,
+        "TODO: disponibilizar emissao do documento de vinculo."
+        """
+        culpados = [
+            caminho.name
+            for caminho, texto in self._templates()
+            if re.search(r"\b(TODO|FIXME|XXX)\b", self._sem_comentarios(texto))
+        ]
+        self.assertEqual(culpados, [], f"templates com anotacao de desenvolvimento: {culpados}")
+
+
+class MenuMarcaItemAtivoTests(TestCase):
+    """Toda tela acende exatamente um item da barra lateral.
+
+    A barra marca o item cujo `url_names` contem o url_name da requisicao. Telas
+    de detalhe (abrir um processo, abrir a trajetoria de um aluno) nao tem
+    entrada propria no menu, e ninguem as declarava na listagem de origem: abrir
+    um processo apagava a barra inteira e o usuario perdia a referencia de onde
+    estava.
+
+    O outro lado do defeito e igualmente possivel: declarar o mesmo detalhe em
+    dois itens acende os dois. Por isso a asercao e "exatamente um", nao "ao
+    menos um" -- e por isso o coordenador entra no teste, que e o perfil que
+    acumula as telas pessoais e as da Coordenacao.
+    """
+
+    # Telas alcancadas pela barra superior, nao pelo menu lateral. Nenhum item
+    # as reivindica, e marcar uma delas seria mentir sobre a origem.
+    SEM_ITEM_NO_MENU = {"me"}
+
+    @classmethod
+    def setUpTestData(cls):
+        senha = "senha-segura-123"
+        cls.aluno = Aluno.objects.create_user(
+            email="aluno.menu@example.com", password=senha, nome="Aluno Menu",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026M0001",
+        )
+        cls.docente = Docente.objects.create_user(
+            email="docente.menu@example.com", password=senha, nome="Docente Menu",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        cls.coordenador = Docente.objects.create_user(
+            email="coord.menu@example.com", password=senha, nome="Coordenador Menu",
+            tipo_usuario=User.TipoUsuario.DOCENTE, coordenador=True,
+        )
+        cls.servidor = User.objects.create_user(
+            email="servidor.menu@example.com", password=senha, nome="Servidor Menu",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+
+    def _itens_ativos(self, usuario, url_name):
+        from processos.context_processors import _menu_lateral_sections
+
+        ativos = []
+        for secao in _menu_lateral_sections(usuario):
+            for item in secao["items"]:
+                if url_name in item["url_names"]:
+                    ativos.append(item["label"])
+        return ativos
+
+    def test_telas_de_detalhe_acendem_exatamente_um_item(self):
+        """As duas telas que motivaram a correcao, em todos os perfis."""
+        usuarios = {
+            "aluno": self.aluno,
+            "docente": self.docente,
+            "coordenador": self.coordenador,
+            "servidor": self.servidor,
+        }
+        for perfil, usuario in usuarios.items():
+            for url_name in ("processo_detalhe", "aluno_detalhe"):
+                with self.subTest(perfil=perfil, tela=url_name):
+                    ativos = self._itens_ativos(usuario, url_name)
+                    self.assertEqual(
+                        len(ativos), 1,
+                        f"{url_name} acendeu {ativos or 'nenhum item'} para {perfil}",
+                    )
+
+    def test_toda_tela_do_menu_acende_exatamente_um_item(self):
+        """Nenhuma tela alcancavel deixa a barra sem marcacao (nem com duas)."""
+        usuarios = {"aluno": self.aluno, "docente": self.docente, "servidor": self.servidor}
+
+        for nome_rota, perfis_com_acesso in TodasAsTelasRenderizamTests.TELAS:
+            if nome_rota in self.SEM_ITEM_NO_MENU:
+                continue
+            for perfil in perfis_com_acesso:
+                with self.subTest(tela=nome_rota, perfil=perfil):
+                    ativos = self._itens_ativos(usuarios[perfil], nome_rota)
+                    self.assertEqual(
+                        len(ativos), 1,
+                        f"{nome_rota} acendeu {ativos or 'nenhum item'} para {perfil}",
+                    )

@@ -1,100 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Ofertas de Disciplinas | AcadFlow{% endblock %}
-{% block extra_head %}
-<style>
-@media (min-width: 1121px) {
-    body:has(.matriculas-ofertas-page) .container {
-        width: min(1720px, calc(100vw - 48px)) !important;
-    }
-
-    body:has(.matriculas-ofertas-page) .layout {
-        grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-    }
-
-    body:has(.matriculas-ofertas-page) .content-area {
-        width: min(1280px, calc(100vw - var(--sidebar-width) - 104px));
-        max-width: none;
-    }
-}
-
-.matriculas-ofertas-page .schedule-calendar {
-    display: grid;
-    grid-template-columns: 42px repeat(6, minmax(0, 1fr));
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    background: #ffffff;
-}
-
-.matriculas-ofertas-page .schedule-head {
-    min-height: 38px;
-    padding: 0.55rem 0.45rem;
-    border-right: 1px solid var(--color-border);
-    border-bottom: 1px solid var(--color-border);
-    background: #f7fbff;
-    color: var(--color-muted);
-    font-size: 0.78rem;
-    font-weight: 800;
-}
-
-.matriculas-ofertas-page .schedule-time-axis {
-    position: relative;
-    border-right: 1px solid var(--color-border);
-    background: #fbfdff;
-}
-
-.matriculas-ofertas-page .schedule-time-mark {
-    position: absolute;
-    left: 0.3rem;
-    transform: translateY(-50%);
-    color: var(--color-muted);
-    font-size: 0.72rem;
-    font-weight: 800;
-}
-
-.matriculas-ofertas-page .schedule-day {
-    position: relative;
-    min-width: 0;
-    border-right: 1px solid var(--color-border);
-    background:
-        repeating-linear-gradient(
-            to bottom,
-            transparent 0,
-            transparent 68px,
-            rgba(227, 233, 242, 0.75) 69px
-        );
-}
-
-.matriculas-ofertas-page .schedule-day:last-child,
-.matriculas-ofertas-page .schedule-head:last-child {
-    border-right: 0;
-}
-
-.matriculas-ofertas-page .schedule-event {
-    position: absolute;
-    min-height: 34px;
-    padding: 0.32rem 0.38rem;
-    border: 1px solid #bdd4f3;
-    border-radius: var(--radius-sm);
-    background: var(--color-primary-soft);
-    color: var(--color-primary);
-    font-size: 0.72rem;
-    font-weight: 800;
-    line-height: 1.18;
-    overflow: hidden;
-}
-
-.matriculas-ofertas-page .schedule-event small {
-    display: block;
-    margin-top: 0.12rem;
-    color: #174d90;
-    font-size: 0.64rem;
-    line-height: 1.15;
-}
-</style>
-{% endblock %}
 {% block content %}
-<div class="matriculas-ofertas-page">
+{% comment %}
+Esta tela alargava o .container com um !important para caber a grade de horario.
+A largura era calculada em 100vw sem descontar a barra lateral, entao a pagina
+inteira transbordava para a direita -- 1668px de conteudo numa janela de 1440.
+
+Nao e mais preciso: a grade agora rola dentro da propria caixa, e a tela volta a
+ter a largura das demais.
+{% endcomment %}
+{% comment %}
+Esta tela alargava o .container com um !important para caber a grade de
+horario, e o <div class="matriculas-ofertas-page"> existia para dar escopo a
+esse CSS. A grade virou componente compartilhado e o CSS foi para o app.css,
+mas o envolvente ficou -- sem nenhuma regra, e no caminho do ritmo vertical.
+
+O espacamento entre blocos vem de ".content-area > * + *", que alcanca so
+filhos diretos: com os tres cartoes dentro daquele div, a area de conteudo
+tinha um unico filho e os cartoes encostavam um no outro.
+{% endcomment %}
 <section class="card panel">
     <div class="actions-row">
         <div>
@@ -108,7 +32,7 @@
             <button class="btn" type="button" data-open-dialog="nova-oferta">Nova oferta</button>
         </div>
     </div>
-    <form method="get" class="grid-two" style="margin-top:1rem;" data-periodo-filter>
+    <form method="get" class="grid-two form-filtros" data-periodo-filter>
         <div class="field">
             <label for="periodo">Período letivo</label>
             <select id="periodo" name="periodo">
@@ -176,18 +100,24 @@
                 <li>
                     <div class="actions-row">
                         <div>
-                            <strong>{{ oferta.disciplina.codigo }} - {{ oferta.disciplina.nome }}</strong>
-                            <small class="muted" style="display:block; margin-top:0.35rem;">
-                                {{ oferta.periodo.nome }} | {{ oferta.docentes_display }} |
-                                {{ oferta.get_modalidade_display }} |
-                                Vagas regulares: {{ oferta.vagas_regulares }} | especiais: {{ oferta.vagas_especiais }} |
-                                Matrículas solicitadas: {{ oferta.matriculas_solicitadas }}
-                                (regulares: {{ oferta.matriculas_regulares }} | especiais: {{ oferta.matriculas_especiais }}) |
-                                Espera: {{ oferta.lista_espera }}
-                                (regulares: {{ oferta.lista_espera_regulares }} | especiais: {{ oferta.lista_espera_especiais }})
-                            </small>
+                            <strong>{{ oferta.disciplina.codigo }} — {{ oferta.disciplina.nome }}</strong>
+                            {% comment %}
+                            Eram doze numeros numa linha so, com pipes tanto entre os
+                            campos quanto dentro dos parenteses -- nao dava para saber
+                            onde um campo terminava. Separados, cada um carrega o
+                            proprio rotulo e a linha volta a ser legivel.
+                            {% endcomment %}
+                            <span class="meta-linha">
+                                <span>{{ oferta.periodo.nome }}</span>
+                                <span>{{ oferta.docentes_display }}</span>
+                                {% if oferta.disciplina.tipo %}<span>{{ oferta.disciplina.get_tipo_display }}</span>{% endif %}
+                                <span>{{ oferta.get_modalidade_display }}</span>
+                                <span>Vagas: {{ oferta.vagas_regulares }} regulares, {{ oferta.vagas_especiais }} especiais</span>
+                                <span>Solicitadas: {{ oferta.matriculas_solicitadas }} ({{ oferta.matriculas_regulares }} regulares, {{ oferta.matriculas_especiais }} especiais)</span>
+                                <span>Espera: {{ oferta.lista_espera }} ({{ oferta.lista_espera_regulares }} regulares, {{ oferta.lista_espera_especiais }} especiais)</span>
+                            </span>
                             {% if oferta.modalidade == "HIBRIDA" %}
-                                <small class="muted" style="display:block; margin-top:0.35rem;">
+                                <small class="nota-bloco">
                                     Presencial planejado: {{ oferta.percentual_presencial }}%.
                                     {% if oferta.presencial_conforme %}
                                         <span class="badge badge-ok">Conforme</span>
@@ -197,7 +127,7 @@
                                 </small>
                             {% endif %}
                             {% if oferta.encontros.all %}
-                                <ul class="availability-list" style="margin-top:0.55rem;">
+                                <ul class="availability-list lista-encontros">
                                     {% for encontro in oferta.encontros.all %}
                                         <li><strong>{{ encontro.get_dia_semana_display }}</strong> {{ encontro.hora_inicio|time:"H:i" }} - {{ encontro.hora_fim|time:"H:i" }}</li>
                                     {% endfor %}
@@ -221,7 +151,11 @@
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhuma oferta cadastrada.</p>
+        <div class="estado-vazio">
+    <svg aria-hidden="true"><use href="#i-ofertas"></use></svg>
+    <p class="estado-vazio-titulo">Nenhuma oferta cadastrada</p>
+    <p>Cadastre uma oferta para abrir turma neste período letivo.</p>
+</div>
     {% endif %}
 </section>
 
@@ -231,43 +165,16 @@
         <div class="stack">
             {% for horario in horarios_semanais_periodos %}
                 <div>
-                    <div class="actions-row" style="margin-bottom:0.65rem;">
+                    <div class="secao-cabecalho">
                         <strong>{{ horario.periodo.nome }}</strong>
                         <span class="badge badge-info">{{ horario.periodo.status_atual_display }}</span>
                     </div>
-                    {% if horario.dias %}
-                        <div class="calendar-shell">
-                            <div class="schedule-calendar">
-                                <div class="schedule-head">Hora</div>
-                                {% for dia in horario.dias %}
-                                    <div class="schedule-head">{{ dia.label }}</div>
-                                {% endfor %}
-                                <div class="schedule-time-axis" style="height: {{ horario.altura_horario }}px;">
-                                    {% for marca in horario.marcas_hora %}
-                                        <span class="schedule-time-mark" style="top: {{ marca.top }};">{{ marca.label }}</span>
-                                    {% endfor %}
-                                </div>
-                                {% for dia in horario.dias %}
-                                    <div class="schedule-day" style="height: {{ horario.altura_horario }}px;">
-                                        {% for evento in dia.eventos %}
-                                            <div class="schedule-event" style="top: {{ evento.top }}; height: {{ evento.height }}; left: {{ evento.left }}; width: {{ evento.width }};">
-                                                {{ evento.oferta.disciplina.codigo }} - {{ evento.oferta.disciplina.nome }}
-                                                <small>{{ evento.encontro.hora_inicio|time:"H:i" }}-{{ evento.encontro.hora_fim|time:"H:i" }}</small>
-                                                <small>{{ evento.oferta.docentes_display }}</small>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    {% else %}
-                        <p class="muted">Sem encontros cadastrados para este período.</p>
-                    {% endif %}
+                    {% include "includes/grade_horario.html" with horario=horario %}
                 </div>
             {% endfor %}
         </div>
     {% else %}
-        <p class="muted">Nenhuma oferta cadastrada para montar o horário semanal.</p>
+        <p class="estado-vazio-inline">Nenhuma oferta cadastrada para montar o horário semanal.</p>
     {% endif %}
 </section>
 
@@ -395,7 +302,6 @@
 </dialog>
 {% endfor %}
 
-</div>
 {% endblock %}
 
 {% block scripts %}

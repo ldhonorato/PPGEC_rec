@@ -4,19 +4,13 @@
 <section class="card">
     <h1 class="section-title">Processos dos orientandos</h1>
     {% if processos_orientandos %}
-        <ul class="list">
-            {% for processo in processos_orientandos %}
-                <li>
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
-                        <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
-                        <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
-                    </div>
-                    <small class="muted">Aluno: {{ processo.usuario_criado_por.nome }}{% if processo.usuario_criado_por.trajetoria_ativa %} | Nivel: {{ processo.usuario_criado_por.trajetoria_ativa.get_nivel_curso_display }}{% endif %} | Status: {{ processo.get_status_display }} | Setor: {{ processo.setor_atual.nome }}</small>
-                </li>
-            {% endfor %}
-        </ul>
+        {% include "includes/tabela_processos.html" with processos=processos_orientandos coluna_pessoa="Aluno" mostrar_setor=True mostrar_prazo=True vazio_titulo="Nenhum processo dos seus orientandos" vazio_texto="Processos abertos por quem você orienta aparecem aqui." %}
     {% else %}
-        <p class="muted">Nenhum processo de orientando encontrado.</p>
+        <div class="estado-vazio">
+    <svg aria-hidden="true"><use href="#i-processos-orientandos"></use></svg>
+    <p class="estado-vazio-titulo">Nenhum processo de orientando</p>
+    <p>Processos abertos pelos seus orientandos aparecem aqui.</p>
+</div>
     {% endif %}
 </section>
 {% endblock %}

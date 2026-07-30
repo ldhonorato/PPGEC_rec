@@ -57,13 +57,13 @@
                     <strong>{{ membro.get_papel_display }}: {{ membro.nome }}</strong><br>
                     <small class="muted">
                         {% if membro.instituicao %}Instituição/IES: {{ membro.instituicao }}{% endif %}
-                        {% if membro.cpf %}{% if membro.instituicao %} | {% endif %}CPF: {{ membro.cpf }}{% endif %}
+                        {% if membro.cpf %}<span>CPF {{ membro.cpf }}</span>{% endif %}
                     </small>
                 </li>
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhum membro informado.</p>
+        <p class="estado-vazio-inline">Nenhum membro informado.</p>
     {% endif %}
 </section>
 {% endblock %}

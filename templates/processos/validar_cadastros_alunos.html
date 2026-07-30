@@ -7,7 +7,7 @@
         <strong>{{ total_pendentes }}</strong> aluno{{ total_pendentes|pluralize }} aguardando aprovação.
         {% if filtro_polo %}Exibindo {{ total_filtrado }} no polo selecionado.{% endif %}
     </p>
-    <form method="get" class="grid-two" style="margin-bottom:1rem;">
+    <form method="get" class="grid-two form-filtros">
         <div class="field">
             <label for="polo">Polo</label>
             <select id="polo" name="polo">
@@ -17,7 +17,7 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="field" style="justify-content:end;">
+        <div class="field field-acao">
             <button class="btn btn-secondary" type="submit">Filtrar</button>
         </div>
     </form>
@@ -28,18 +28,18 @@
                     <div class="item-row">
                         <div>
                             <strong>{{ aluno.nome }}</strong><br>
-                            <small class="muted">
-                                {{ aluno.email }}
-                                {% if aluno.polo_atuacao %} | Polo: {{ aluno.polo_atuacao.nome }}{% endif %}
+                            <span class="meta-linha">
+                                <span>{{ aluno.email }}</span>
+                                {% if aluno.polo_atuacao %}<span>{{ aluno.polo_atuacao.nome }}</span>{% endif %}
                                 {% if aluno.trajetoria_atual %}
-                                    | {{ aluno.trajetoria_atual.get_nivel_curso_display }}
-                                    | Ingresso: {{ aluno.trajetoria_atual.ingresso }}
-                                    {% if aluno.trajetoria_atual.orientador %} | Orientador: {{ aluno.trajetoria_atual.orientador.nome }}{% endif %}
-                                    {% if aluno.trajetoria_atual.coorientador_display %} | Coorientador: {{ aluno.trajetoria_atual.coorientador_display }}{% endif %}
+                                    <span>{{ aluno.trajetoria_atual.get_nivel_curso_display }}</span>
+                                    {% if aluno.trajetoria_atual.ingresso %}<span>Ingresso {{ aluno.trajetoria_atual.ingresso }}</span>{% endif %}
+                                    {% if aluno.trajetoria_atual.orientador %}<span>Orientador: {{ aluno.trajetoria_atual.orientador.nome }}</span>{% endif %}
+                                    {% if aluno.trajetoria_atual.coorientador_display %}<span>Coorientador: {{ aluno.trajetoria_atual.coorientador_display }}</span>{% endif %}
                                 {% endif %}
-                            </small>
+                            </span>
                         </div>
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <div class="grupo-acoes">
                             <a class="btn btn-secondary" href="{% url 'aluno_detalhe' aluno.id %}">Revisar</a>
                             <form method="post">
                                 {% csrf_token %}
@@ -61,7 +61,7 @@
             {% endfor %}
         </ul>
         {% if page_obj.paginator.num_pages > 1 %}
-            <nav class="calendar-nav" aria-label="Paginação dos cadastros" style="margin-top:1rem;">
+            <nav class="calendar-nav form-filtros" aria-label="Paginação dos cadastros">
                 {% if page_obj.has_previous %}
                     <a class="btn btn-secondary" href="?polo={{ filtro_polo }}&page={{ page_obj.previous_page_number }}">Anterior</a>
                 {% endif %}
@@ -72,7 +72,11 @@
             </nav>
         {% endif %}
     {% else %}
-        <p class="muted">Não há cadastros de alunos em avaliação para o filtro selecionado.</p>
+        <div class="estado-vazio">
+            <svg aria-hidden="true"><use href="#i-validar"></use></svg>
+            <p class="estado-vazio-titulo">Nenhum cadastro a validar</p>
+            <p>Ajuste o filtro ou aguarde novos cadastros de alunos.</p>
+        </div>
     {% endif %}
 </section>
 {% endblock %}

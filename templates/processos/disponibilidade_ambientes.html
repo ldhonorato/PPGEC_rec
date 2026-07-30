@@ -9,7 +9,7 @@
         </div>
         <div class="calendar-nav">
             <a class="btn btn-secondary" href="{% url 'disponibilidade_ambientes' %}?semana={{ calendario_semana_anterior|date:'Y-m-d' }}{% if filtros_calendario.polo %}&cal_polo={{ filtros_calendario.polo }}{% endif %}{% if filtros_calendario.sala %}&cal_sala={{ filtros_calendario.sala }}{% endif %}">Semana anterior</a>
-            <a class="btn btn-secondary" href="{% url 'disponibilidade_ambientes' %}?semana={{ calendario_semana_proxima|date:'Y-m-d' }}{% if filtros_calendario.polo %}&cal_polo={{ filtros_calendario.polo }}{% endif %}{% if filtros_calendario.sala %}&cal_sala={{ filtros_calendario.sala }}{% endif %}">Proxima semana</a>
+            <a class="btn btn-secondary" href="{% url 'disponibilidade_ambientes' %}?semana={{ calendario_semana_proxima|date:'Y-m-d' }}{% if filtros_calendario.polo %}&cal_polo={{ filtros_calendario.polo }}{% endif %}{% if filtros_calendario.sala %}&cal_sala={{ filtros_calendario.sala }}{% endif %}">Próxima semana</a>
             <a class="btn btn-secondary" href="{% url 'reservas_ambientes' %}">Nova reserva</a>
         </div>
     </div>
@@ -40,11 +40,11 @@
             </div>
         </div>
         <div class="form-actions">
-            <button class="btn" type="submit">Atualizar calendario</button>
+            <button class="btn" type="submit">Atualizar calendário</button>
         </div>
     </form>
 
-    <div class="calendar-shell" aria-label="Calendario semanal de disponibilidade">
+    <div class="calendar-shell" aria-label="Calendário semanal de disponibilidade">
         <table class="week-calendar">
             <thead>
                 <tr>
@@ -70,11 +70,11 @@
                                         </span>
                                     {% endfor %}
                                 {% else %}
-                                    <span class="calendar-slot calendar-slot-closed">Indisponivel</span>
+                                    <span class="calendar-slot calendar-slot-closed">Indisponível</span>
                                 {% endif %}
                                 {% for reserva in celula.reservas %}
                                     <span class="calendar-slot calendar-slot-busy">
-                                        Ocupado {{ reserva.inicio|date:"H:i" }}-{{ reserva.fim|date:"H:i" }} | {{ reserva.tipo }}
+                                        Ocupado {{ reserva.inicio|date:"H:i" }}–{{ reserva.fim|date:"H:i" }} · {{ reserva.tipo }}
                                     </span>
                                 {% endfor %}
                             </td>

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Novo processo | PPGEC{% endblock %}
 {% block content %}
-<section class="card" style="max-width: 760px; margin: 0 auto;">
+<section class="card">
     <h1 class="section-title">Abrir novo processo</h1>
-    <p class="muted" style="margin-top: 0;">
-        Todo processo aberto e direcionado inicialmente para o setor <strong>Secretaria PPGEC</strong>.
+    <p class="muted">
+        Todo processo aberto é direcionado inicialmente para o setor <strong>Secretaria PPGEC</strong>.
     </p>
 
-   <form method="post" enctype="multipart/form-data">
+   <form class="form-coluna" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {% for field in form %}
             <div class="field">
@@ -17,32 +17,19 @@
             </div>
         {% endfor %}
 
-         <!-- RETIRANDO CAMPO SUPERVISOR E DISPENSA
-        <div id="campos-estagio" style="display: none">
-        <div class="field">
-           <label for="id_professor">Professor Supervisor</label> 
-            <input type="text" name="professor" id="id_professor" />
-        </div>
-
-        <div class="field">
-            <input type="checkbox" name="dispensa" id="id_dispensa" />
-            <label for="id_disciplina">Solicitar dispensa</label>
-        </div>
-        </div>
-        -->
 
         <div class="field">
             <label>Documentos</label>
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+            <div class="secao-cabecalho">
                 <span class="muted">Adicione um ou mais documentos para abrir o processo.</span>
                 <button type="button" class="btn" id="btn-abrir-modal-doc">Adicionar documento</button>
             </div>
         </div>
 
-        <div id="documentos-lista" style="display: grid; gap: 0.7rem; margin-bottom: 0.8rem;"></div>
-        <p class="muted" id="documentos-vazio" style="margin: 0 0 0.8rem 0;">Nenhum documento adicionado.</p>
+        <div id="documentos-lista" class="pilha-documentos"></div>
+        <p class="estado-vazio-inline" id="documentos-vazio">Nenhum documento adicionado.</p>
 
-        <div style="display: flex; gap: 0.7rem; justify-content: flex-end; flex-wrap: wrap;">
+        <div class="form-actions">
             <a class="btn btn-secondary" href="{% url 'home' %}">Cancelar</a>
             <button type="submit" class="btn">Abrir processo</button>
         </div>
@@ -50,10 +37,10 @@
 </section>
 
 <dialog id="modal-doc" class="modal-dialog">
-    <form method="dialog" id="form-modal-doc" style="padding: 1rem;">
+    <form method="dialog" id="form-modal-doc" class="modal-body">
         <h2 class="section-title">Adicionar documento</h2>
         <div class="field">
-            <label for="md_titulo">Titulo</label>
+            <label for="md_titulo">Título</label>
             <input id="md_titulo" type="text" required>
         </div>
         <div class="field">
@@ -71,9 +58,9 @@
         <div class="field">
             <label for="md_arquivo">Arquivo</label>
             <input id="md_arquivo" type="file" accept=".bmp,.doc,.docx,.gif,.jpeg,.jpg,.pdf,.png,.ppt,.pptx,.tif,.tiff,.webp,.xls,.xlsx" required>
-            <small class="muted">PDF, Office ou imagem. Tamanho maximo: 5 MB.</small>
+            <small class="muted">PDF, Office ou imagem. Tamanho máximo: 5 MB.</small>
         </div>
-        <div style="display: flex; gap: 0.7rem; justify-content: flex-end;">
+        <div class="form-actions">
             <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-doc">Cancelar</button>
             <button type="submit" class="btn">Adicionar</button>
         </div>
@@ -190,7 +177,7 @@
             titulo.textContent = inputTitulo.value;
             const detalhes = document.createElement("small");
             detalhes.className = "muted";
-            detalhes.textContent = `Tipo: ${inputTipo.options[inputTipo.selectedIndex].text} | Restricao: ${inputRestricao.options[inputRestricao.selectedIndex].text} | Arquivo: ${arquivoAtual.name}`;
+            detalhes.textContent = `${inputTipo.options[inputTipo.selectedIndex].text} · ${inputRestricao.options[inputRestricao.selectedIndex].text} · ${arquivoAtual.name}`;
             info.appendChild(titulo);
             info.appendChild(document.createElement("br"));
             info.appendChild(detalhes);

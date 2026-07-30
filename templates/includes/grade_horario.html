@@ -1,0 +1,52 @@
+{% comment %}
+Grade de horario semanal de um periodo letivo.
+
+Vivia dentro de matriculas_ofertas.html, com o CSS num bloco <style> preso a
+uma classe de pagina (.matriculas-ofertas-page). Era uma tela so que mostrava
+onde as disciplinas caem na semana -- justamente a informacao de que o aluno
+precisa na hora de escolher o que cursar.
+
+Parametros:
+
+  horario   dicionario montado por _montar_horarios_semanais_ofertas:
+            periodo, dias, marcas_hora, altura_horario, altura_hora
+  vazio     texto exibido quando o periodo nao tem encontros cadastrados
+
+A geometria vem da view: as marcas de hora e os eventos sao posicionados em
+porcentagem da altura total, e --altura-hora diz de quanto em quanto a faixa
+de uma hora se repete. Antes esse valor estava fixo em 69px no CSS; casava com
+a conta da view por coincidencia, e desalinhava quando o piso de altura minima
+entrava em acao.
+{% endcomment %}
+{% if horario.dias %}
+    <div class="grade-horario-envolvido">
+        <div class="grade-horario" style="--altura-hora: {{ horario.altura_hora }}px;">
+            <div class="grade-horario-cabecalho">Hora</div>
+            {% for dia in horario.dias %}
+                <div class="grade-horario-cabecalho">{{ dia.label }}</div>
+            {% endfor %}
+
+            <div class="grade-horario-eixo" style="height: {{ horario.altura_horario }}px;">
+                {% for marca in horario.marcas_hora %}
+                    <span class="grade-horario-marca{% if marca.no_fim %} no-fim{% endif %}" style="top: {{ marca.top }};">{{ marca.label }}</span>
+                {% endfor %}
+            </div>
+
+            {% for dia in horario.dias %}
+                <div class="grade-horario-dia" style="height: {{ horario.altura_horario }}px;">
+                    {% for evento in dia.eventos %}
+                        <div class="grade-horario-evento"
+                             style="top: {{ evento.top }}; height: {{ evento.height }}; left: {{ evento.left }}; width: {{ evento.width }};">
+                            <strong>{{ evento.oferta.disciplina.codigo }}</strong>
+                            <span class="grade-horario-evento-nome">{{ evento.oferta.disciplina.nome }}</span>
+                            <span class="grade-horario-evento-meta">{{ evento.encontro.hora_inicio|time:"H:i" }}–{{ evento.encontro.hora_fim|time:"H:i" }}</span>
+                            <span class="grade-horario-evento-meta">{{ evento.oferta.docentes_display }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% else %}
+    <p class="estado-vazio-inline">{{ vazio|default:"Sem encontros cadastrados para este período." }}</p>
+{% endif %}

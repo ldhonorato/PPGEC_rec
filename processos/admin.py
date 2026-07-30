@@ -61,7 +61,7 @@ class UserAdmin(EnsurePasswordHashedAdminMixin, BaseUserAdmin):
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("Informacoes pessoais", {"fields": ("nome", "tipo_usuario", "polo_atuacao")}),
+        ("Informações pessoais", {"fields": ("nome", "tipo_usuario", "polo_atuacao")}),
         (
             "Permissoes",
             {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")},

@@ -1,26 +1,29 @@
 {% extends "base.html" %}
-{% block title %}Processos no Pleno | PPGEC{% endblock %}
+{% block title %}Processos no Pleno{% endblock %}
 {% block content %}
+{% comment %}
+Passa a usar a tabela compartilhada de processos, como as outras telas que listam
+processos.
+
+Ficou de fora da conversao anterior porque, naquele momento, nenhum perfil
+alcancava esta tela: o docente so entra aqui se for membro do colegiado pleno, e
+nao havia ninguem vinculado ao setor nos dados de exemplo. A tela existia sem
+ninguem para abrir.
+
+O formato antigo era o mesmo que as demais telas de processo deixaram de usar:
+numero e assunto colados num <strong>, tres campos separados por pipe e um botao
+"Ver detalhes" por linha.
+{% endcomment %}
 <section class="card">
-    <h1 class="section-title">Processos no Colegiado PPGEC (Pleno)</h1>
-    {% if processos_pleno %}
-        <ul class="list">
-            {% for processo in processos_pleno %}
-                <li>
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
-                        <strong>{{ processo.numero }} - {{ processo.assunto }}</strong>
-                        <a class="btn" href="{% url 'processo_detalhe' processo.id %}">Ver detalhes</a>
-                    </div>
-                    <small class="muted">
-                        Requerente: {{ processo.usuario_criado_por.nome }} |
-                        Status: {{ processo.get_status_display }} |
-                        Setor: {{ processo.setor_atual.nome }}
-                    </small>
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p class="muted">Nao ha processos no setor do Pleno.</p>
-    {% endif %}
+    <div class="lista-cabecalho">
+        <div>
+            <h1 class="section-title">Processos no Colegiado</h1>
+            <p class="muted">Em deliberação no colegiado pleno do PPGEC.</p>
+        </div>
+        {% if processos_pleno %}
+            <span class="lista-contagem">{{ processos_pleno|length }} processo{{ processos_pleno|length|pluralize }}</span>
+        {% endif %}
+    </div>
+    {% include "includes/tabela_processos.html" with processos=processos_pleno coluna_pessoa="Requerente" mostrar_tipo=True mostrar_prazo=True vazio_titulo="Nenhum processo no colegiado" vazio_texto="Processos encaminhados ao pleno para deliberação aparecem aqui." %}
 </section>
 {% endblock %}

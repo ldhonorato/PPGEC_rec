@@ -1,9 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Setores e Comissões | Coordenação{% endblock %}
 {% block content %}
+{% comment %}
+O h1 da pagina fica aqui fora porque o painel de edicao so aparece as vezes;
+sem ele, a listagem comecava direto num h2 e a tela ficava sem titulo.
+{% endcomment %}
+<h1 class="section-title">Setores e comissões</h1>
+
 {% if can_edit_setores and setor_editado %}
-    <section class="card" style="margin-bottom: 1rem;">
-        <h1 class="section-title">Editar setor/comissão</h1>
+    <section class="card">
+        <h2 class="section-title">Editar setor/comissão</h2>
         {% url 'setores_comissoes' as setores_url %}
         {% include "processos/includes/setor_comissao_form.html" with submit_label="Salvar alterações" cancel_url=setores_url %}
     </section>
@@ -15,31 +21,31 @@
             <ul class="list">
                 {% for setor in setores %}
                     <li>
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                        <div class="secao-cabecalho">
                             <strong>{{ setor.nome }}</strong>
                             {% if can_edit_setores %}
                                 <a class="btn btn-secondary" href="?editar={{ setor.id }}">Editar</a>
                             {% endif %}
                         </div>
-                        <small class="muted">
-                            Tipo: {{ setor.get_tipo_display }} |
-                            Status: {% if setor.ativo %}Ativo{% else %}Inativo{% endif %}
-                            {% if setor.email %} | Email: {{ setor.email }}{% endif %}
-                        </small>
+                        <span class="meta-linha">
+                            <span>{{ setor.get_tipo_display }}</span>
+                            <span>{% if setor.ativo %}Ativo{% else %}Inativo{% endif %}</span>
+                            {% if setor.email %}<span>{{ setor.email }}</span>{% endif %}
+                        </span>
                         {% if setor.descricao %}
-                            <p class="muted" style="margin: 0.35rem 0 0 0;">{{ setor.descricao }}</p>
+                            <p class="item-observacao">{{ setor.descricao }}</p>
                         {% endif %}
-                        <details style="margin-top: 0.8rem;">
+                        <details class="revelar">
                             <summary class="text-link">Membros atuais</summary>
                             {% with membros_ativos=setor.participacoes_prefetch %}
                                 {% if membros_ativos %}
-                                    <ul style="margin-top: 0.5rem;">
+                                    <ul class="lista-aninhada">
                                         {% for membro in membros_ativos %}
                                             {% if membro.ativo %}
                                                 <li>
                                                     {{ membro.usuario.nome }} <span class="muted">({{ membro.usuario.get_tipo_usuario_display }})</span>
                                                     {% if can_edit_setores %}
-                                                        <form method="post" style="display: inline;">
+                                                        <form method="post" class="form-botao">
                                                             {% csrf_token %}
                                                             <input type="hidden" name="encerrar_membro" value="1">
                                                             <input type="hidden" name="membro_id" value="{{ membro.id }}">
@@ -51,7 +57,7 @@
                                         {% endfor %}
                                     </ul>
                                 {% else %}
-                                    <p class="muted">Nenhum membro ativo.</p>
+                                    <p class="estado-vazio-inline">Nenhum membro ativo.</p>
                                 {% endif %}
                             {% endwith %}
                         </details>
@@ -59,7 +65,11 @@
                 {% endfor %}
             </ul>
         {% else %}
-            <p class="muted">Nenhum setor/comissão cadastrado.</p>
+            <div class="estado-vazio">
+    <svg aria-hidden="true"><use href="#i-setores"></use></svg>
+    <p class="estado-vazio-titulo">Nenhum setor cadastrado</p>
+    <p>Os setores definem por onde os processos tramitam.</p>
+</div>
         {% endif %}
 </section>
 {% endblock %}

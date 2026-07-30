@@ -23,7 +23,7 @@
         <div class="grid-two">
             <div class="field">
                 <label for="reserva-q">Buscar</label>
-                <input id="reserva-q" type="search" name="q" value="{{ filtros_reservas.q }}" placeholder="Sala, polo, docente ou titulo">
+                <input id="reserva-q" type="search" name="q" value="{{ filtros_reservas.q }}" placeholder="Sala, polo, docente ou título">
             </div>
             <div class="field">
                 <label for="reserva-polo">Polo</label>
@@ -93,7 +93,7 @@
                     <div class="item-row">
                         <div>
                             <strong>{{ reserva.sala.nome }} - {{ reserva.sala.polo.nome }}</strong>
-                            <div class="actions-row" style="justify-content:flex-start; margin-top:0.4rem;">
+                            <div class="grupo-marcadores">
                                 <span class="badge badge-info">{{ reserva.get_tipo_display }}</span>
                                 {% if reserva.status == "EXCLUIDA" %}
                                     <span class="badge badge-no">{{ reserva.get_status_display }}</span>
@@ -106,30 +106,33 @@
                             <button class="btn btn-secondary" type="button" data-open-dialog="excluir-reserva-{{ reserva.id }}">Marcar como excluída</button>
                         {% endif %}
                     </div>
-                    <small class="muted">
-                        Docente: {{ reserva.docente.nome }} |
-                        Inicio: {{ reserva.inicio|date:"d/m/Y H:i" }} |
-                        Termino: {{ reserva.fim|date:"d/m/Y H:i" }}
-                        {% if reserva.recorrente %}| Recorrente{% endif %}
-                    </small>
+                    <span class="meta-linha">
+                        <span>{{ reserva.docente.nome }}</span>
+                        <span>{{ reserva.inicio|date:"d/m/Y H:i" }} a {{ reserva.fim|date:"H:i" }}</span>
+                        {% if reserva.recorrente %}<span>Recorrente</span>{% endif %}
+                    </span>
                     {% if reserva.titulo %}
                         <p>{{ reserva.titulo }}</p>
                     {% endif %}
                     {% if reserva.status == "EXCLUIDA" %}
-                        <div class="alert alert-danger" style="margin-top:0.8rem;">
+                        <div class="alert alert-danger">
                             <strong>Reserva excluída</strong>
-                            <p class="muted" style="margin:0.35rem 0 0;">
+                            <p class="item-observacao">
                                 {% if reserva.excluida_por %}Por {{ reserva.excluida_por.nome }}{% endif %}
                                 {% if reserva.excluida_em %} em {{ reserva.excluida_em|date:"d/m/Y H:i" }}{% endif %}
                             </p>
-                            <p style="margin:0.35rem 0 0;">{{ reserva.justificativa_exclusao }}</p>
+                            <p class="item-observacao">{{ reserva.justificativa_exclusao }}</p>
                         </div>
                     {% endif %}
                 </li>
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhuma reserva encontrada.</p>
+        <div class="estado-vazio">
+    <svg aria-hidden="true"><use href="#i-reservas-feitas"></use></svg>
+    <p class="estado-vazio-titulo">Nenhuma reserva encontrada</p>
+    <p>Ajuste o filtro ou registre uma nova reserva de ambiente.</p>
+</div>
     {% endif %}
 </section>
 

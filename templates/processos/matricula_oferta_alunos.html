@@ -5,10 +5,12 @@
     <div class="actions-row">
         <div>
             <h1 class="section-title">{{ oferta.disciplina.codigo }} - {{ oferta.disciplina.nome }}</h1>
-            <p class="muted">
-                {{ oferta.periodo.nome }} | {{ oferta.docentes_display }} |
-                Regulares: {{ vagas_regulares_disponiveis }}/{{ oferta.vagas_regulares }} disponíveis |
-                Especiais: {{ vagas_especiais_disponiveis }}/{{ oferta.vagas_especiais }} disponíveis
+            <p class="meta-linha">
+                <span>{{ oferta.periodo.nome }}</span>
+                <span>{{ oferta.docentes_display }}</span>
+                {% if oferta.disciplina.tipo %}<span>{{ oferta.disciplina.get_tipo_display }}</span>{% endif %}
+                <span>Regulares: {{ vagas_regulares_disponiveis }} de {{ oferta.vagas_regulares }}</span>
+                <span>Especiais: {{ vagas_especiais_disponiveis }} de {{ oferta.vagas_especiais }}</span>
             </p>
         </div>
         <div class="calendar-nav">
@@ -17,7 +19,7 @@
         </div>
     </div>
     {% if oferta.encontros.all %}
-        <ul class="availability-list" style="margin-top:0.7rem;">
+        <ul class="availability-list lista-encontros">
             {% for encontro in oferta.encontros.all %}
                 <li><strong>{{ encontro.get_dia_semana_display }}</strong> {{ encontro.hora_inicio|time:"H:i" }} - {{ encontro.hora_fim|time:"H:i" }}</li>
             {% endfor %}
@@ -37,12 +39,12 @@
                             <span class="badge {% if item.status == 'SOLICITADO' or item.status == 'HOMOLOGADO' %}badge-ok{% elif item.status == 'INDEFERIDO' or item.status == 'CANCELADO' %}badge-no{% else %}badge-info{% endif %}">
                                 {{ item.get_status_display }}
                             </span>
-                            <small class="muted" style="display:block; margin-top:0.35rem;">
-                                Matrícula: {{ item.solicitacao.aluno.matricula|default:"-" }} |
-                                {{ item.solicitacao.aluno.email }} |
-                                {{ item.solicitacao.get_tipo_aluno_display }} |
-                                Solicitado em {{ item.solicitado_em|date:"d/m/Y H:i" }}
-                            </small>
+                            <span class="meta-linha">
+                                {% if item.solicitacao.aluno.matricula %}<span>{{ item.solicitacao.aluno.matricula }}</span>{% endif %}
+                                <span>{{ item.solicitacao.aluno.email }}</span>
+                                <span>{{ item.solicitacao.get_tipo_aluno_display }}</span>
+                                <span>Solicitado em {{ item.solicitado_em|date:"d/m/Y H:i" }}</span>
+                            </span>
                             {% if item.motivo_indeferimento %}
                                 <small class="muted">Motivo: {{ item.motivo_indeferimento }}</small>
                             {% endif %}
@@ -63,7 +65,11 @@
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhum aluno solicitou matrícula nesta oferta.</p>
+        <div class="estado-vazio">
+    <svg aria-hidden="true"><use href="#i-matricula"></use></svg>
+    <p class="estado-vazio-titulo">Nenhuma matrícula solicitada</p>
+    <p>As solicitações dos alunos para esta oferta aparecem aqui.</p>
+</div>
     {% endif %}
 </section>
 
