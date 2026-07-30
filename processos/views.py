@@ -18,6 +18,7 @@ from django.utils.dateparse import parse_date, parse_time
 
 from .forms import (
     AlunoCadastroForm,
+    ImportacaoIngressantesForm,
     AlunoComentarioForm,
     AlunoCpfForm,
     AlunoDadosForm,
@@ -56,6 +57,7 @@ from .forms import (
     TrajetoriaStatusForm,
     UserProfileForm,
 )
+from .importacao_ingressantes import importar_ingressantes
 from .models import (
     AlteracaoAluno,
     Aluno,
@@ -2150,7 +2152,7 @@ def aluno_informar_cpf_view(request):
 @login_required
 def validar_cadastros_alunos_view(request):
     if not _has_gestao_access(request.user):
-        raise PermissionDenied("Acesso restrito a secretaria.")
+        raise PermissionDenied("Acesso restrito à coordenação e secretaria.")
 
     if request.method == "POST":
         aluno = get_object_or_404(
@@ -2216,6 +2218,29 @@ def validar_cadastros_alunos_view(request):
             "can_view_processos": _can_view_processos(request.user),
             "can_view_caixa": _can_view_caixa(request.user),
         },
+    )
+
+
+@login_required
+def importar_ingressantes_view(request):
+    if not _has_gestao_access(request.user):
+        raise PermissionDenied("Acesso restrito à coordenação e secretaria.")
+
+    resultados = None
+    if request.method == "POST":
+        form = ImportacaoIngressantesForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                resultados = importar_ingressantes(**form.cleaned_data)
+            except ValidationError as exc:
+                form.add_error("arquivo", exc)
+    else:
+        form = ImportacaoIngressantesForm()
+
+    return render(
+        request,
+        "processos/importar_ingressantes.html",
+        {"form": form, "resultados": resultados},
     )
 
 

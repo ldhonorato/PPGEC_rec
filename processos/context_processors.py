@@ -131,6 +131,8 @@ DESCRICOES_MENU = {
     "Ofertas de disciplinas": "Turmas abertas no período",
     "Alunos": "Cadastro e trajetória dos alunos",
     "Validar Cadastros": "Cadastros aguardando aprovação",
+    "Cadastro": "Inclusão e validação de pessoas",
+    "Cadastro de ingressantes": "Importar novos alunos por planilha",
     "Setores e Comissões": "Estrutura de tramitação",
     "Criar Comissão": "Montar uma nova comissão",
     # Assinaturas
@@ -331,18 +333,26 @@ def _menu_lateral_sections(user):
                     ),
                 ],
             ),
-            _menu_item("Alunos", "/coordenacao/alunos/", ["coordenacao_alunos", "aluno_detalhe"], "alunos"),
-            *(
-                [
+            _menu_item(
+                "Cadastro",
+                "/coordenacao/alunos/",
+                ["coordenacao_alunos", "aluno_detalhe", "validar_cadastros_alunos", "importar_ingressantes"],
+                "alunos",
+                children=[
+                    _menu_item("Alunos", "/coordenacao/alunos/", ["coordenacao_alunos", "aluno_detalhe"], "alunos"),
+                    _menu_item(
+                        "Cadastro de ingressantes",
+                        "/gestao/cadastro/ingressantes/",
+                        ["importar_ingressantes"],
+                        "novo-processo",
+                    ),
                     _menu_item(
                         "Validar Cadastros",
                         "/coordenacao/alunos/cadastros/",
                         ["validar_cadastros_alunos"],
                         "validar",
-                    )
-                ]
-                if _is_servidor(user) or _is_secretaria_member(user)
-                else []
+                    ),
+                ],
             ),
             _menu_item("Setores e Comissões", "/coordenacao/setores/", ["setores_comissoes"], "setores"),
         ])

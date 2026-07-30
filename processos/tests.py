@@ -1173,6 +1173,78 @@ class AlunosViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.aluno.nome)
 
+    def test_coordenador_acessa_validacao_e_ve_menu_de_cadastro(self):
+        self.client.force_login(self.coordenador)
+
+        response = self.client.get(reverse("validar_cadastros_alunos"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cadastro de ingressantes")
+        self.assertContains(response, reverse("importar_ingressantes"))
+
+    def test_importacao_csv_cadastra_e_resume_linhas_duplicadas(self):
+        existente = Aluno.objects.create_user(
+            email="existente.importacao@example.com",
+            password=None,
+            nome="Aluno Já Existente",
+            cpf="11144477735",
+        )
+        criar_trajetoria(existente, ingresso="2026.2")
+        arquivo = SimpleUploadedFile(
+            "ingressantes.csv",
+            (
+                "nome;cpf;e-mail;orientador\n"
+                "Nova Ingressante;52998224725;nova.ingressante@example.com;Orientador\n"
+                "Aluno Já Existente;11144477735;outro@example.com;Orientador\n"
+            ).encode("utf-8"),
+            content_type="text/csv",
+        )
+        self.client.force_login(self.coordenador)
+
+        response = self.client.post(
+            reverse("importar_ingressantes"),
+            {"arquivo": arquivo, "nivel_curso": Aluno.NivelCurso.MESTRADO, "ingresso": "2026.2"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Nova Ingressante")
+        self.assertContains(response, "O aluno já possui cadastro")
+        nova = Aluno.objects.get(email="nova.ingressante@example.com")
+        self.assertFalse(nova.has_usable_password())
+        self.assertTrue(
+            nova.trajetorias.filter(
+                nivel_curso=Aluno.NivelCurso.MESTRADO,
+                ingresso="2026.2",
+                orientador=self.docente,
+            ).exists()
+        )
+
+    def test_importacao_rejeita_nome_com_mesma_trajetoria_mesmo_sem_cpf_igual(self):
+        existente = Aluno.objects.create_user(
+            email="nome.duplicado@example.com",
+            password=None,
+            nome="Nome Duplicado",
+            cpf="11144477735",
+        )
+        criar_trajetoria(existente, ingresso="2026.2")
+        arquivo = SimpleUploadedFile(
+            "ingressantes.csv",
+            (
+                "nome,cpf,e-mail,orientador\n"
+                "Nome Duplicado,52998224725,novo.cpf@example.com,Orientador\n"
+            ).encode("utf-8"),
+            content_type="text/csv",
+        )
+        self.client.force_login(self.servidor)
+
+        response = self.client.post(
+            reverse("importar_ingressantes"),
+            {"arquivo": arquivo, "nivel_curso": Aluno.NivelCurso.DOUTORADO, "ingresso": "2026.2"},
+        )
+
+        self.assertContains(response, "O aluno já possui cadastro")
+        self.assertFalse(Aluno.objects.filter(email="novo.cpf@example.com").exists())
+
     def test_coordenador_cria_comissao_com_docente_e_aluno(self):
         self.client.force_login(self.coordenador)
         response = self.client.post(
@@ -4015,6 +4087,7 @@ class TodasAsTelasRenderizamTests(TestCase):
         ("coordenacao_dashboard", {"servidor"}),
         ("coordenacao_alunos", {"servidor"}),
         ("validar_cadastros_alunos", {"servidor"}),
+        ("importar_ingressantes", {"servidor"}),
         ("coordenacao_processos", {"servidor"}),
         ("coordenacao_caixa_processos", {"servidor"}),
         ("setores_comissoes", {"servidor"}),

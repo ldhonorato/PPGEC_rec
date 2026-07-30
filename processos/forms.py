@@ -1343,6 +1343,42 @@ class AlunoCadastroForm(forms.Form):
         return aluno
 
 
+class ImportacaoIngressantesForm(forms.Form):
+    arquivo = forms.FileField(
+        label="Planilha de ingressantes",
+        widget=forms.FileInput(attrs={"accept": ".csv,.xls,.xlsx"}),
+        help_text="Arquivo CSV, XLS ou XLSX com as colunas nome, cpf, e-mail e orientador.",
+    )
+    nivel_curso = forms.ChoiceField(
+        label="Ingresso do aluno",
+        choices=(
+            (Aluno.NivelCurso.ALUNO_ESPECIAL, "Aluno especial"),
+            (Aluno.NivelCurso.MESTRADO, "Mestrado"),
+            (Aluno.NivelCurso.DOUTORADO, "Doutorado"),
+        ),
+    )
+    ingresso = forms.CharField(
+        label="Semestre de ingresso",
+        max_length=6,
+        widget=forms.TextInput(attrs={"placeholder": "2026.2"}),
+    )
+
+    def clean_arquivo(self):
+        arquivo = self.cleaned_data["arquivo"]
+        extensao = Path(arquivo.name).suffix.lower()
+        if extensao not in {".csv", ".xls", ".xlsx"}:
+            raise forms.ValidationError("Envie um arquivo CSV, XLS ou XLSX.")
+        if arquivo.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("O arquivo deve ter no máximo 5 MB.")
+        return arquivo
+
+    def clean_ingresso(self):
+        ingresso = self.cleaned_data["ingresso"].strip()
+        if not re.fullmatch(r"\d{4}\.[12]", ingresso):
+            raise forms.ValidationError("Informe o semestre no formato YYYY.1 ou YYYY.2.")
+        return ingresso
+
+
 class AlunoQualificacaoForm(AlunoComentarioForm):
     isQualificado = forms.BooleanField(required=False, label="Aluno qualificado")
 
