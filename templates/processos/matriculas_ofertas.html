@@ -9,7 +9,16 @@ inteira transbordava para a direita -- 1668px de conteudo numa janela de 1440.
 Nao e mais preciso: a grade agora rola dentro da propria caixa, e a tela volta a
 ter a largura das demais.
 {% endcomment %}
-<div class="matriculas-ofertas-page">
+{% comment %}
+Esta tela alargava o .container com um !important para caber a grade de
+horario, e o <div class="matriculas-ofertas-page"> existia para dar escopo a
+esse CSS. A grade virou componente compartilhado e o CSS foi para o app.css,
+mas o envolvente ficou -- sem nenhuma regra, e no caminho do ritmo vertical.
+
+O espacamento entre blocos vem de ".content-area > * + *", que alcanca so
+filhos diretos: com os tres cartoes dentro daquele div, a area de conteudo
+tinha um unico filho e os cartoes encostavam um no outro.
+{% endcomment %}
 <section class="card panel">
     <div class="actions-row">
         <div>
@@ -293,7 +302,6 @@ ter a largura das demais.
 </dialog>
 {% endfor %}
 
-</div>
 {% endblock %}
 
 {% block scripts %}

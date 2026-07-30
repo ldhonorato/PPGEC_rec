@@ -4369,6 +4369,52 @@ class PadraoVisualDosTemplatesTests(SimpleTestCase):
                     culpados.append(f"{caminho.name}:{numero}")
         self.assertEqual(culpados, [], f"pipes separando dados: {culpados}")
 
+    def test_nenhum_template_envolve_os_cartoes_num_container_sem_classe(self):
+        """Os cartoes de uma tela precisam ser filhos diretos da area de conteudo.
+
+        O espacamento vertical entre blocos vem de ".content-area > * + *", que
+        por definicao alcanca so filhos diretos. Um envolvente entre a area e os
+        cartoes -- mesmo um <div> vazio -- tira todos eles do alcance da regra, e
+        a tela passa a ter os cartoes encostados.
+
+        Aconteceu duas vezes, e nas duas o envolvente nao fazia nada: na ficha do
+        aluno era um <section> sem atributo nenhum, e na tela de ofertas era um
+        <div class="matriculas-ofertas-page"> que havia servido para dar escopo a
+        um <style> ja removido.
+
+        E dificil de ver medindo a tela renderizada: com tudo dentro de um
+        envolvente, a area de conteudo tem um unico filho, e nao existe folga
+        alguma para medir como errada. Por isso a verificacao e no template.
+        """
+        # Um envolvente e legitimo quando ele mesmo espaca os filhos -- uma grade
+        # com gap, por exemplo (.grid-two, .dashboard-grid). O conjunto vem do
+        # proprio app.css, lendo quais classes declaram gap: assim uma grade nova
+        # passa a ser aceita sem precisar mexer neste teste.
+        css = (Path(settings.BASE_DIR) / "static" / "css" / "app.css").read_text(encoding="utf-8")
+        com_gap = set()
+        for seletor, corpo_regra in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+            if re.search(r"(^|[;\s])gap\s*:", corpo_regra):
+                com_gap.update(re.findall(r"\.([a-z0-9-]+)", seletor))
+
+        abertura = re.compile(r"<(div|section|main|article)\b([^>]*)>")
+        culpados = []
+        for caminho, texto in self._templates():
+            corpo = self._sem_comentarios(texto)
+            bloco = re.search(r"{%\s*block content\s*%}(.*?){%\s*endblock", corpo, re.S)
+            if not bloco:
+                continue
+            conteudo = bloco.group(1).lstrip()
+            primeiro = abertura.match(conteudo)
+            if not primeiro:
+                continue
+            classes = set(re.findall(r"[a-z0-9-]+", re.search(r'class="([^"]*)"', primeiro.group(2)).group(1))) \
+                if 'class="' in primeiro.group(2) else set()
+            # Problema quando o envolvente guarda mais de um cartao e nao espaca
+            # nada: e ai que o ritmo entre blocos deixa de existir.
+            if conteudo.count('class="card') > 1 and not (classes & (com_gap | {"card"})):
+                culpados.append(f"{caminho.name}: <{primeiro.group(1)}{primeiro.group(2)}>")
+        self.assertEqual(culpados, [], f"cartoes fora do alcance do ritmo vertical: {culpados}")
+
     def test_nenhum_template_carrega_anotacao_de_desenvolvimento(self):
         """TODO/FIXME nao sao conteudo de tela.
 
