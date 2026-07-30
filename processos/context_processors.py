@@ -1,7 +1,7 @@
 from django.db.models import Q
 
 from .services import processos_atrasados_queryset, processos_atrasados_url
-from .models import Aluno, Docente, SetorMembro, SolicitacaoAssinatura, User
+from .models import Aluno, Docente, Setor, SetorMembro, SolicitacaoAssinatura, User
 
 
 def processos_atrasados(request):
@@ -267,7 +267,7 @@ def _menu_lateral_sections(user):
                 "processos-orientandos",
             ),
         ]
-        if _is_membro_setor_nome(user, "Colegiando PPGEC (Pleno)"):
+        if _is_membro_setor_nome(user, Setor.NOME_PLENO):
             docente_items.insert(
                 0,
                 _menu_item("Processos no Pleno", "/menu/processos-pleno/", ["menu_processos_pleno"], "pleno"),

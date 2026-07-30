@@ -74,7 +74,7 @@
                                 {% endif %}
                                 {% for reserva in celula.reservas %}
                                     <span class="calendar-slot calendar-slot-busy">
-                                        Ocupado {{ reserva.inicio|date:"H:i" }}-{{ reserva.fim|date:"H:i" }} | {{ reserva.tipo }}
+                                        Ocupado {{ reserva.inicio|date:"H:i" }}–{{ reserva.fim|date:"H:i" }} · {{ reserva.tipo }}
                                     </span>
                                 {% endfor %}
                             </td>

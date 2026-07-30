@@ -44,7 +44,11 @@
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhuma solicitação de banca registrada.</p>
+        <div class="estado-vazio">
+    <svg aria-hidden="true"><use href="#i-banca"></use></svg>
+    <p class="estado-vazio-titulo">Nenhuma solicitação de banca</p>
+    <p>Abra uma solicitação para qualificação ou defesa de um orientando.</p>
+</div>
     {% endif %}
 </section>
 {% endblock %}

@@ -26,10 +26,11 @@
                     <div class="item-row">
                         <div>
                             <strong>{{ solicitacao.get_tipo_documento_display }}</strong>
-                            <small class="muted">
-                                {{ solicitacao.destinatario_display }} - {{ solicitacao.referencia_documento }}
-                                | Solicitada em {{ solicitacao.criado_em|date:"d/m/Y H:i" }}
-                            </small>
+                            <span class="meta-linha">
+                                <span>{{ solicitacao.destinatario_display }}</span>
+                                <span>{{ solicitacao.referencia_documento }}</span>
+                                <span>Solicitada em {{ solicitacao.criado_em|date:"d/m/Y H:i" }}</span>
+                            </span>
                         </div>
                         <div class="calendar-nav">
                             <span class="badge {% if solicitacao.status == 'ASSINADO' %}badge-ok{% else %}badge-info{% endif %}">
@@ -42,7 +43,11 @@
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhuma solicitação de assinatura encontrada.</p>
+        <div class="estado-vazio">
+    <svg aria-hidden="true"><use href="#i-assinaturas"></use></svg>
+    <p class="estado-vazio-titulo">Nenhuma solicitação de assinatura</p>
+    <p>Solicitações que você enviar ou receber aparecem aqui.</p>
+</div>
     {% endif %}
 </section>
 {% endblock %}

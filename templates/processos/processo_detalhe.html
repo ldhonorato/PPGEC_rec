@@ -140,7 +140,12 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                     {% for check in item.checklist.itens %}
                         <li>
                             <strong>{{ check.grupo }}</strong>
-                            <span class="badge badge-info">{% if check.cumprido %}OK{% else %}Pendente{% endif %}</span><br>
+                            {% comment %}
+                            "OK" nao e status: e o par de "Pendente", e a etiqueta
+                            usava o mesmo tom para os dois. O tom passa a distinguir
+                            cumprido de pendente, como no resto do sistema.
+                            {% endcomment %}
+                            <span class="badge badge-{% if check.cumprido %}ok{% else %}aviso{% endif %}">{% if check.cumprido %}Cumprido{% else %}Pendente{% endif %}</span><br>
                             <small class="muted">{{ check.texto }}</small>
                         </li>
                     {% endfor %}
@@ -166,7 +171,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                     {% endfor %}
                 </ul>
             {% else %}
-                <p class="muted">Nenhuma publicação registrada na trajetória.</p>
+                <p class="estado-vazio-inline">Nenhuma publicação registrada na trajetória.</p>
             {% endif %}
 
             <h3>Dados gerais</h3>
@@ -208,7 +213,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                     {% endfor %}
                 </ul>
             {% else %}
-                <p class="muted">Nenhum membro informado.</p>
+                <p class="estado-vazio-inline">Nenhum membro informado.</p>
             {% endif %}
         </div>
     </dialog>
@@ -307,7 +312,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhum lançamento de horas foi registrado neste processo.</p>
+        <p class="estado-vazio-inline">Nenhum lançamento de horas foi registrado neste processo.</p>
     {% endif %}
 </section>
 {% endif %}
@@ -341,7 +346,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhuma solicitação de ciente registrada.</p>
+        <p class="estado-vazio-inline">Nenhuma solicitação de ciente registrada.</p>
     {% endif %}
 </section>
 
@@ -588,7 +593,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhum comentário registrado para este processo.</p>
+        <p class="estado-vazio-inline">Nenhum comentário registrado para este processo.</p>
     {% endif %}
 </section>
 {% endif %}

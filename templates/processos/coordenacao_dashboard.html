@@ -6,36 +6,6 @@
     <p class="muted">Principal indicador: quantidade de alunos orientandos e coorientandos por docente.</p>
 
     {% if docentes %}
-        <style>
-            .docente-item { margin-bottom: 0.8rem; }
-            .docente-item summary {
-                list-style: none;
-                cursor: pointer;
-                border: 1px solid var(--color-border);
-                border-radius: var(--radius-sm);
-                padding: 0.7rem 0.85rem;
-                background: #ffffff;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 0.8rem;
-            }
-            .docente-item summary::-webkit-details-marker { display: none; }
-            .docente-toggle {
-                font-weight: 800;
-                color: var(--color-primary);
-                font-size: 1.1rem;
-                min-width: 1rem;
-                text-align: center;
-            }
-            .docente-item[open] .docente-toggle::before { content: "-"; }
-            .docente-item:not([open]) .docente-toggle::before { content: "+"; }
-            .orientandos-lista {
-                margin: 0.45rem 0 0 1.2rem;
-                padding-left: 1rem;
-            }
-            .orientandos-lista li { margin: 0.35rem 0; }
-        </style>
 
         {% for docente in docentes %}
             <details class="docente-item">
@@ -51,7 +21,11 @@
                         {% for trajetoria in docente.trajetorias_orientadas_ativas %}
                             <li>
                                 <strong><a class="text-link" href="{% url 'aluno_detalhe' trajetoria.aluno.id %}">{{ trajetoria.aluno.nome }}</a></strong>:
-                                <span class="muted">{{ trajetoria.aluno.email }} | {{ trajetoria.get_nivel_curso_display }}{% if trajetoria.aluno.matricula %} | Matrícula: {{ trajetoria.aluno.matricula }}{% endif %}</span>
+                                <span class="meta-linha">
+                                    <span>{{ trajetoria.aluno.email }}</span>
+                                    <span>{{ trajetoria.get_nivel_curso_display }}</span>
+                                    {% if trajetoria.aluno.matricula %}<span>{{ trajetoria.aluno.matricula }}</span>{% endif %}
+                                </span>
                             </li>
                         {% endfor %}
                     </ul>
@@ -61,18 +35,27 @@
                         {% for trajetoria in docente.trajetorias_coorientadas_ativas %}
                             <li>
                                 <strong><a class="text-link" href="{% url 'aluno_detalhe' trajetoria.aluno.id %}">{{ trajetoria.aluno.nome }}</a></strong>:
-                                <span class="muted">Coorientando | {{ trajetoria.aluno.email }} | {{ trajetoria.get_nivel_curso_display }}{% if trajetoria.aluno.matricula %} | Matrícula: {{ trajetoria.aluno.matricula }}{% endif %}</span>
+                                <span class="meta-linha">
+                                    <span>Coorientando</span>
+                                    <span>{{ trajetoria.aluno.email }}</span>
+                                    <span>{{ trajetoria.get_nivel_curso_display }}</span>
+                                    {% if trajetoria.aluno.matricula %}<span>{{ trajetoria.aluno.matricula }}</span>{% endif %}
+                                </span>
                             </li>
                         {% endfor %}
                     </ul>
                 {% endif %}
                 {% if not docente.trajetorias_orientadas_ativas and not docente.trajetorias_coorientadas_ativas %}
-                    <p class="muted" style="margin: 0.45rem 0 0 1.2rem;">Sem orientandos ou coorientandos.</p>
+                    <p class="estado-vazio-inline">Sem orientandos ou coorientandos.</p>
                 {% endif %}
             </details>
         {% endfor %}
     {% else %}
-        <p class="muted">Nenhum docente encontrado.</p>
+        <div class="estado-vazio">
+    <svg aria-hidden="true"><use href="#i-orientandos"></use></svg>
+    <p class="estado-vazio-titulo">Nenhum docente encontrado</p>
+    <p>Ajuste a busca ou verifique os cadastros de docentes.</p>
+</div>
     {% endif %}
 </section>
 {% endblock %}

@@ -238,7 +238,7 @@ def _can_view_processo_detalhe(user, processo):
     if processo.setor_atual_id in {setor.id for setor in _setores_caixa(user)}:
         return True
     if _is_docente(user):
-        if _is_processo_no_pleno(processo) and _is_membro_setor_nome(user, "Colegiando PPGEC (Pleno)"):
+        if _is_processo_no_pleno(processo) and _is_membro_setor_nome(user, Setor.NOME_PLENO):
             return True
         return Aluno.objects.filter(
             Q(trajetorias__orientador=user) | Q(trajetorias__coorientador=user),
@@ -765,7 +765,7 @@ def _menu_lateral_home(user):
             {"label": "Ciências manifestadas", "href": "/menu/ciencias-manifestadas/"},
             {"label": "Meus Orientandos", "href": "/menu/meus-orientandos/"},
         ]
-        if _is_membro_setor_nome(user, "Colegiando PPGEC (Pleno)"):
+        if _is_membro_setor_nome(user, Setor.NOME_PLENO):
             items.insert(1, {"label": "Processos no Pleno", "href": "/menu/processos-pleno/"})
         return items
     if user.tipo_usuario == User.TipoUsuario.ALUNO:
@@ -942,6 +942,7 @@ def matriculas_disciplinas_view(request):
             "disciplina_edit_form": disciplina_edit_form,
             "disciplina_editando": disciplina_editando,
             "disciplinas": disciplinas,
+            "tipos_disciplina": Disciplina.Tipo.choices,
             "modal_aberto": modal_aberto,
         },
     )
@@ -4824,7 +4825,7 @@ def menu_meus_orientandos_view(request):
 
 @login_required
 def menu_processos_pleno_view(request):
-    if not _is_membro_setor_nome(request.user, "Colegiando PPGEC (Pleno)"):
+    if not _is_membro_setor_nome(request.user, Setor.NOME_PLENO):
         raise PermissionDenied("Acesso restrito a membros do Colegiado PPGEC (Pleno).")
 
     processos_pleno = (

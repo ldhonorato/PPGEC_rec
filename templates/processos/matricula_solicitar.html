@@ -90,7 +90,7 @@ nenhum para mostrar.
                                     <span class="meta-linha">
                                         <span>{{ oferta.docentes_display }}</span>
                                         <span>{{ oferta.get_modalidade_display }}</span>
-                                        {% if oferta.disciplina.tipo %}<span>{{ oferta.disciplina.tipo }}</span>{% endif %}
+                                        {% if oferta.disciplina.tipo %}<span>{{ oferta.disciplina.get_tipo_display }}</span>{% endif %}
                                         {% if oferta.disciplina.carga_horaria %}<span>{{ oferta.disciplina.carga_horaria }}h</span>{% endif %}
                                         {% if oferta.disciplina.creditos %}<span>{{ oferta.disciplina.creditos }} créditos</span>{% endif %}
                                         <span>{{ oferta.vagas_regulares }} vagas regulares</span>

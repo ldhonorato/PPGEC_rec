@@ -30,7 +30,7 @@
     </ul>
 
     {% if solicitacao.documento_pdf %}
-        <p style="margin-top: 1rem;">
+        <p class="nota-espacada">
             <a class="btn btn-secondary" href="{{ solicitacao.documento_pdf.url }}">Baixar PDF original</a>
         </p>
     {% endif %}
@@ -77,7 +77,7 @@
             {{ form.observacao_assinatura.errors }}
         </div>
         {{ form.non_field_errors }}
-        <div style="display:flex; justify-content:flex-end;">
+        <div class="form-actions">
             <button class="btn" type="submit">Confirmar assinatura</button>
         </div>
     </form>

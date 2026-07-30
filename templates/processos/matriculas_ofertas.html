@@ -101,6 +101,7 @@ ter a largura das demais.
                             <span class="meta-linha">
                                 <span>{{ oferta.periodo.nome }}</span>
                                 <span>{{ oferta.docentes_display }}</span>
+                                {% if oferta.disciplina.tipo %}<span>{{ oferta.disciplina.get_tipo_display }}</span>{% endif %}
                                 <span>{{ oferta.get_modalidade_display }}</span>
                                 <span>Vagas: {{ oferta.vagas_regulares }} regulares, {{ oferta.vagas_especiais }} especiais</span>
                                 <span>Solicitadas: {{ oferta.matriculas_solicitadas }} ({{ oferta.matriculas_regulares }} regulares, {{ oferta.matriculas_especiais }} especiais)</span>
@@ -117,7 +118,7 @@ ter a largura das demais.
                                 </small>
                             {% endif %}
                             {% if oferta.encontros.all %}
-                                <ul class="availability-list" style="margin-top:0.55rem;">
+                                <ul class="availability-list lista-encontros">
                                     {% for encontro in oferta.encontros.all %}
                                         <li><strong>{{ encontro.get_dia_semana_display }}</strong> {{ encontro.hora_inicio|time:"H:i" }} - {{ encontro.hora_fim|time:"H:i" }}</li>
                                     {% endfor %}
@@ -141,7 +142,11 @@ ter a largura das demais.
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhuma oferta cadastrada.</p>
+        <div class="estado-vazio">
+    <svg aria-hidden="true"><use href="#i-ofertas"></use></svg>
+    <p class="estado-vazio-titulo">Nenhuma oferta cadastrada</p>
+    <p>Cadastre uma oferta para abrir turma neste período letivo.</p>
+</div>
     {% endif %}
 </section>
 
@@ -160,7 +165,7 @@ ter a largura das demais.
             {% endfor %}
         </div>
     {% else %}
-        <p class="muted">Nenhuma oferta cadastrada para montar o horário semanal.</p>
+        <p class="estado-vazio-inline">Nenhuma oferta cadastrada para montar o horário semanal.</p>
     {% endif %}
 </section>
 

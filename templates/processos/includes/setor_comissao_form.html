@@ -13,7 +13,7 @@
         {% endif %}
     {% endfor %}
 
-    <h2 class="section-title" style="font-size: 1rem; margin-top: 1rem;">Membros docentes</h2>
+    <h2 class="section-title" class="titulo-interno">Membros docentes</h2>
     <div class="field">
         {{ form.docentes.errors }}
         <div class="checkbox-list">
@@ -21,7 +21,7 @@
         </div>
     </div>
 
-    <h2 class="section-title" style="font-size: 1rem; margin-top: 1rem;">Membros servidores</h2>
+    <h2 class="section-title" class="titulo-interno">Membros servidores</h2>
     <div class="field">
         {{ form.servidores.errors }}
         <div class="checkbox-list">
@@ -29,7 +29,7 @@
         </div>
     </div>
 
-    <h2 class="section-title" style="font-size: 1rem; margin-top: 1rem;">Membros alunos</h2>
+    <h2 class="section-title" class="titulo-interno">Membros alunos</h2>
     <div class="field">
         <label for="busca-alunos-comissao">Buscar aluno por nome ou email</label>
         <input id="busca-alunos-comissao" type="search" placeholder="Digite para filtrar alunos">
@@ -40,7 +40,7 @@
             <ul id="alunos-selecionados-comissao" class="selected-list"></ul>
             <p id="alunos-selecionados-vazio" class="muted">Nenhum aluno selecionado.</p>
         </div>
-        <div id="lista-alunos-comissao" class="sr-only">
+        <div id="lista-alunos-comissao" class="apenas-leitor">
             {{ form.alunos }}
         </div>
     </div>
@@ -57,106 +57,6 @@
     {% endif %}
 </form>
 
-<style>
-    .checkbox-list ul {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: grid;
-        gap: 0.35rem;
-    }
-
-    .checkbox-list label {
-        display: flex;
-        gap: 0.45rem;
-        align-items: flex-start;
-        font-weight: 600;
-    }
-
-    .checkbox-list-scroll {
-        max-height: 260px;
-        overflow: auto;
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-sm);
-        padding: 0.65rem;
-        margin-top: 0.45rem;
-    }
-
-    .search-results {
-        display: none;
-        margin-top: 0.45rem;
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-sm);
-        overflow: hidden;
-        max-height: 260px;
-        overflow-y: auto;
-        background: #ffffff;
-    }
-
-    .search-results.is-open {
-        display: block;
-    }
-
-    .search-result-button {
-        width: 100%;
-        border: 0;
-        border-bottom: 1px solid var(--color-border);
-        background: #ffffff;
-        color: var(--color-text);
-        cursor: pointer;
-        padding: 0.65rem 0.75rem;
-        text-align: left;
-        font: inherit;
-    }
-
-    .search-result-button:hover {
-        background: var(--color-surface);
-    }
-
-    .search-result-button:last-child {
-        border-bottom: 0;
-    }
-
-    .selected-list {
-        list-style: none;
-        padding: 0;
-        margin: 0.5rem 0 0 0;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.45rem;
-    }
-
-    .selected-list li {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-sm);
-        padding: 0.35rem 0.45rem;
-        background: #ffffff;
-    }
-
-    .selected-list button {
-        border: 0;
-        background: transparent;
-        color: var(--color-muted);
-        cursor: pointer;
-        font-weight: 800;
-        padding: 0 0.2rem;
-    }
-
-    .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
-    }
-</style>
 <script>
     (function () {
         const input = document.getElementById("busca-alunos-comissao");

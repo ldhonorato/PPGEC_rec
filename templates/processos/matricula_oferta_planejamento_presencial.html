@@ -5,7 +5,11 @@
     <div class="actions-row">
         <div>
             <h1 class="section-title">Planejamento Presencial</h1>
-            <p class="muted">{{ oferta.disciplina }} | {{ oferta.periodo.nome }} | {{ oferta.docentes_display }}</p>
+            <p class="meta-linha">
+        <span>{{ oferta.disciplina }}</span>
+        <span>{{ oferta.periodo.nome }}</span>
+        <span>{{ oferta.docentes_display }}</span>
+    </p>
         </div>
         <a class="btn btn-secondary" href="{% url 'matriculas_ofertas' %}">Voltar</a>
     </div>
@@ -18,10 +22,10 @@
         Disciplinas híbridas devem possuir no mínimo 25% da carga horária ofertada de forma presencial
         {% if carga_minima_horas %}({{ carga_minima_horas }}h nesta oferta){% endif %}.
     </p>
-    <div class="progress-track" style="height:0.75rem; background:#e8eef7; border-radius:999px; overflow:hidden; margin:0.85rem 0 0.35rem;">
-        <div data-progress-bar style="height:100%; width:0%; background:#0f62b5; border-radius:999px;"></div>
+    <div class="barra-progresso barra-progresso-larga">
+        <span data-progress-bar></span>
     </div>
-    <p class="muted" data-progress-label style="margin:0;"></p>
+    <p class="muted" data-progress-label></p>
     <p class="muted">
         Disciplinas 100% presenciais terão prioridade no uso dos ambientes. Ajustes no ambiente reservado para a aula
         podem ser solicitados pela secretaria/coordenação.
@@ -40,10 +44,10 @@
             {% endfor %}
         </datalist>
 
-        <div class="actions-row" style="align-items:center; margin-bottom:1rem;">
+        <div class="actions-row" class="secao-cabecalho">
             <div>
-                <h2 class="section-title" style="margin:0;">Aulas presenciais</h2>
-                <p class="muted" style="margin:0.35rem 0 0;">Adicione uma linha para cada aula presencial planejada.</p>
+                <h2 class="section-title">Aulas presenciais</h2>
+                <p class="item-observacao">Adicione uma linha para cada aula presencial planejada.</p>
             </div>
             <button class="btn btn-secondary" type="button" data-add-aula>+ Aula presencial</button>
         </div>
@@ -75,7 +79,7 @@
                             <input type="time" name="aula_hora_fim" value="{{ aula.hora_fim }}" data-aula-fim required>
                         </div>
                     </div>
-                    <div class="form-actions" style="justify-content:flex-end;">
+                    <div class="form-actions">
                         <button class="btn btn-secondary" type="button" data-remove-aula>Remover</button>
                     </div>
                 </div>
@@ -137,7 +141,7 @@
                 <input type="time" name="aula_hora_fim" data-aula-fim required>
             </div>
         </div>
-        <div class="form-actions" style="justify-content:flex-end;">
+        <div class="form-actions">
             <button class="btn btn-secondary" type="button" data-remove-aula>Remover</button>
         </div>
     </div>

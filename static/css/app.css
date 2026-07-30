@@ -1175,14 +1175,6 @@ label {
     table-layout: fixed;
 }
 
-.week-calendar-time-col {
-    width: 64px;
-}
-
-.week-calendar-day-col {
-    width: calc((100% - 64px) / 6);
-}
-
 .week-calendar th,
 .week-calendar td {
     padding: 0.5rem;
@@ -1192,14 +1184,18 @@ label {
     overflow: hidden;
 }
 
+/* A primeira coluna guarda o nome do ambiente ("Laboratório 101", "Sala de
+   Reuniões"), nao um horario. Os 64px vinham de uma versao anterior em que ela
+   era coluna de hora -- com table-layout:fixed, nowrap e overflow:hidden, o
+   nome era cortado em silencio: precisava de 135px e recebia 64. */
 .week-calendar th:first-child,
 .week-calendar td:first-child {
-    width: 64px;
+    width: 11rem;
 }
 
 .week-calendar thead th {
     color: var(--color-muted);
-    background: #f7fbff;
+    background: var(--color-surface-soft);
     font-size: 0.76rem;
     text-align: left;
     overflow-wrap: anywhere;
@@ -1207,9 +1203,12 @@ label {
 
 .week-calendar tbody th {
     color: var(--color-text);
-    background: #fbfdff;
+    background: var(--color-surface-soft);
     text-align: left;
-    white-space: nowrap;
+    /* Cortar o nome do ambiente e pior do que quebra-lo em duas linhas: a
+       tabela existe justamente para dizer qual sala esta ocupada. */
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .week-calendar tbody th span {
@@ -3641,4 +3640,230 @@ dialog::backdrop {
     text-align: right;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+}
+
+/* ==========================================================================
+   Ritmo e agrupamentos que cada tela resolvia com margem inline
+
+   Os valores divergiam entre telas para a mesma situacao -- 0.4rem numa,
+   0.55rem noutra, 0.8rem numa terceira -- porque cada um era escolhido no
+   momento de escrever aquele HTML.
+   ========================================================================== */
+
+/* Aviso dentro de um bloco. Cada tela dava a ele uma margem propria, em direcao
+   e valor diferentes: margin-bottom numa listagem, margin-top num item de
+   lista. E o mesmo componente na mesma situacao. */
+.card > .alert,
+.list > li > .alert {
+    margin-block: var(--espaco-4);
+}
+
+.card > .alert:first-child {
+    margin-top: 0;
+}
+
+.card > .alert:last-child {
+    margin-bottom: 0;
+}
+
+/* Formulario de busca de um campo so, no topo de uma listagem. Largura limitada
+   porque um campo de texto ocupando 1160px nao ajuda a ler nem a preencher. */
+.form-busca {
+    max-width: 21rem;
+    margin: 0 0 var(--espaco-5);
+}
+
+/* Filtros que sao links (por status, por setor), nao campos de formulario. */
+.filtros-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espaco-3);
+    margin: var(--espaco-4) 0 var(--espaco-5);
+}
+
+/* Campo de um grid de formulario que contem so o botao de aplicar: alinha ao
+   fim para o botao ficar na linha de base dos campos ao lado, em vez de subir
+   para o meio da altura da celula. */
+.field-acao {
+    justify-content: flex-end;
+}
+
+/* Formulario que existe so para envolver um botao dentro de uma frase
+   ("Encerrar" ao lado do nome do membro). Sem isso ele quebra a linha. */
+.form-botao {
+    display: inline;
+}
+
+/* Faixa de marcadores dentro de um item de lista (tipo, status, recorrencia). */
+.list > li .grupo-marcadores {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--espaco-3);
+    margin-top: var(--espaco-3);
+}
+
+/* Lista simples aninhada dentro de um bloco expansivel. */
+.revelar ul,
+.lista-aninhada {
+    margin: var(--espaco-3) 0 0;
+    padding-left: var(--espaco-5);
+}
+
+.trajectory-panel {
+    margin-top: var(--espaco-5);
+}
+
+/* ==========================================================================
+   Painel da coordenacao: docente que abre para mostrar os orientandos
+
+   Vivia num <style> dentro de coordenacao_dashboard.html, com fundo em
+   hexadecimal solto e o marcador feito com os caracteres "+" e "-" via content.
+   Passa a usar o mesmo marcador em seta das outras aberturas do sistema.
+   ========================================================================== */
+.docente-item {
+    margin-bottom: var(--espaco-4);
+}
+
+.docente-item > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--espaco-4);
+    padding: var(--espaco-3) var(--espaco-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    list-style: none;
+    cursor: pointer;
+}
+
+.docente-item > summary::-webkit-details-marker {
+    display: none;
+}
+
+.docente-item > summary:hover {
+    background: var(--color-surface-soft);
+}
+
+/* Seta, nao "+"/"-": e o mesmo gesto de abrir das trajetorias e dos blocos
+   .revelar, e usar tres marcadores diferentes para a mesma acao obriga o usuario
+   a aprender cada um. */
+.docente-toggle {
+    flex: 0 0 auto;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-right: 1.5px solid var(--color-muted);
+    border-bottom: 1.5px solid var(--color-muted);
+    transform: rotate(-45deg);
+    transition: transform 0.15s ease;
+}
+
+.docente-item[open] > summary .docente-toggle {
+    transform: rotate(45deg);
+}
+
+.orientandos-lista {
+    margin: var(--espaco-3) 0 0 var(--espaco-5);
+    padding-left: var(--espaco-4);
+}
+
+.orientandos-lista li {
+    margin: var(--espaco-2) 0;
+}
+
+/* ==========================================================================
+   Formulario de setor e comissao: busca de pessoas e selecao multipla
+
+   Vivia num <style> dentro do include, com tres fundos "#ffffff" e uma copia da
+   classe de texto para leitor de tela que o app.css ja tem (.apenas-leitor).
+   ========================================================================== */
+.checkbox-list ul {
+    display: grid;
+    gap: var(--espaco-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.checkbox-list label {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--espaco-3);
+    font-weight: 600;
+}
+
+.checkbox-list-scroll {
+    max-height: 16rem;
+    overflow: auto;
+    margin-top: var(--espaco-3);
+    padding: var(--espaco-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+}
+
+.search-results {
+    display: none;
+    max-height: 16rem;
+    overflow-y: auto;
+    margin-top: var(--espaco-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+}
+
+.search-results.is-open {
+    display: block;
+}
+
+.search-result-button {
+    width: 100%;
+    padding: var(--espaco-3) var(--espaco-4);
+    border: 0;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+
+.search-result-button:hover {
+    background: var(--color-surface-soft);
+}
+
+.search-result-button:last-child {
+    border-bottom: 0;
+}
+
+.selected-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espaco-3);
+    margin: var(--espaco-3) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.selected-list li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--espaco-2);
+    padding: var(--espaco-2) var(--espaco-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+}
+
+.selected-list button {
+    padding: 0 var(--espaco-1);
+    border: 0;
+    background: transparent;
+    color: var(--color-muted);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.selected-list button:hover {
+    color: var(--color-text);
 }

@@ -46,17 +46,23 @@
                         <div>
                             <strong>{{ periodo.nome }}</strong>
                             <span class="badge badge-info">{{ periodo.status_atual_display }}</span>
-                            <small class="muted" style="display:block; margin-top:0.35rem;">
-                                Cadastro até {{ periodo.prazo_cadastro_disciplinas|date:"d/m/Y" }} |
-                                Período {{ periodo.data_inicio|date:"d/m/Y"|default:"-" }} a {{ periodo.data_fim|date:"d/m/Y"|default:"-" }} |
-                                Matrícula {{ periodo.matricula_inicio|date:"d/m/Y" }} a {{ periodo.matricula_fim|date:"d/m/Y" }} |
-                                Modificação {{ periodo.modificacao_inicio|date:"d/m/Y" }} a {{ periodo.modificacao_fim|date:"d/m/Y" }}
-                            </small>
-                            <small class="muted" style="display:block; margin-top:0.35rem;">
-                                Alunos sem matrícula: {{ periodo.alunos_sem_matricula|length }} |
-                                Solicitações de disciplinas: {{ periodo.solicitacoes_disciplinas_total }} |
-                                Matrículas vínculo: {{ periodo.solicitacoes_vinculo|length }}
-                            </small>
+                            {% comment %}
+                            Quatro janelas de data numa linha de pipes, e tres contagens
+                            noutra. Como janelas sao pares "de X a Y", os pipes ficavam no
+                            mesmo nivel do "a" e nao se sabia onde uma acabava. Viram grade
+                            rotulada: o rotulo diz de que janela se trata.
+                            {% endcomment %}
+                            <dl class="dados-grid">
+                                <div><dt>Cadastro de disciplinas</dt><dd>até {{ periodo.prazo_cadastro_disciplinas|date:"d/m/Y" }}</dd></div>
+                                <div><dt>Período letivo</dt><dd>{{ periodo.data_inicio|date:"d/m/Y"|default:"—" }} a {{ periodo.data_fim|date:"d/m/Y"|default:"—" }}</dd></div>
+                                <div><dt>Matrícula</dt><dd>{{ periodo.matricula_inicio|date:"d/m/Y" }} a {{ periodo.matricula_fim|date:"d/m/Y" }}</dd></div>
+                                <div><dt>Modificação</dt><dd>{{ periodo.modificacao_inicio|date:"d/m/Y" }} a {{ periodo.modificacao_fim|date:"d/m/Y" }}</dd></div>
+                            </dl>
+                            <span class="meta-linha">
+                                <span>{{ periodo.alunos_sem_matricula|length }} aluno{{ periodo.alunos_sem_matricula|length|pluralize }} sem matrícula</span>
+                                <span>{{ periodo.solicitacoes_disciplinas_total }} solicitaç{{ periodo.solicitacoes_disciplinas_total|pluralize:"ão,ões" }} de disciplinas</span>
+                                <span>{{ periodo.solicitacoes_vinculo|length }} matrícula{{ periodo.solicitacoes_vinculo|length|pluralize }} vínculo</span>
+                            </span>
                         </div>
                         <div class="calendar-nav">
                             <a class="btn" href="{% url 'matriculas_solicitacoes' %}?periodo={{ periodo.pk }}">Solicitações</a>
@@ -79,7 +85,11 @@
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhum período letivo cadastrado.</p>
+        <div class="estado-vazio">
+    <svg aria-hidden="true"><use href="#i-periodos"></use></svg>
+    <p class="estado-vazio-titulo">Nenhum período letivo</p>
+    <p>O período letivo define os prazos de cadastro de disciplinas e de matrícula.</p>
+</div>
     {% endif %}
 </section>
 
@@ -109,7 +119,10 @@
                     {% for aluno in periodo.alunos_sem_matricula %}
                         <li>
                             <strong>{{ aluno.nome }}</strong>
-                            <small class="muted" style="display:block;">{{ aluno.email }}{% if aluno.matricula %} | {{ aluno.matricula }}{% endif %}</small>
+                            <span class="meta-linha">
+                                <span>{{ aluno.email }}</span>
+                                {% if aluno.matricula %}<span>{{ aluno.matricula }}</span>{% endif %}
+                            </span>
                         </li>
                     {% endfor %}
                 </ul>
@@ -128,10 +141,10 @@
                                 <div>
                                     <strong>{{ solicitacao.aluno.nome }}</strong>
                                     <span class="badge badge-info">{{ solicitacao.get_status_display }}</span>
-                                    <small class="muted" style="display:block; margin-top:0.35rem;">
-                                        {{ solicitacao.aluno.email }} |
-                                        Solicitada em {{ solicitacao.solicitada_em|date:"d/m/Y H:i"|default:"-" }}
-                                    </small>
+                                    <span class="meta-linha">
+                                        <span>{{ solicitacao.aluno.email }}</span>
+                                        {% if solicitacao.solicitada_em %}<span>Solicitada em {{ solicitacao.solicitada_em|date:"d/m/Y H:i" }}</span>{% endif %}
+                                    </span>
                                     {% if solicitacao.observacao_aluno %}
                                         <p class="muted">{{ solicitacao.observacao_aluno }}</p>
                                     {% endif %}
@@ -152,7 +165,7 @@
                     {% endfor %}
                 </ul>
             {% else %}
-                <p class="muted">Nenhuma matrícula vínculo registrada neste período.</p>
+                <p class="estado-vazio-inline">Nenhuma matrícula vínculo registrada neste período.</p>
             {% endif %}
         </div>
     </div>

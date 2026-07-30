@@ -89,13 +89,17 @@
                             {% endfor %}
                         </ul>
                     {% else %}
-                        <p class="muted">Sem horários gerais cadastrados.</p>
+                        <p class="estado-vazio-inline">Sem horários gerais cadastrados.</p>
                     {% endif %}
                 </li>
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhuma sala cadastrada para este polo.</p>
+        <div class="estado-vazio">
+    <svg aria-hidden="true"><use href="#i-salas"></use></svg>
+    <p class="estado-vazio-titulo">Nenhuma sala neste polo</p>
+    <p>Cadastre as salas para que possam ser reservadas.</p>
+</div>
     {% endif %}
 </section>
 

@@ -454,9 +454,26 @@ class DisciplinaTrajetoria(models.Model):
 
 
 class Disciplina(models.Model):
+    class Tipo(models.TextChoices):
+        """Categoria da disciplina na estrutura curricular do programa.
+
+        O campo era texto livre de 120 caracteres, digitado a mao no formulario
+        de cadastro. Com 47 disciplinas cadastradas, ja havia cinco grafias para
+        tres categorias: "Disciplina Basica" sem acento ao lado de "Disciplina
+        Básica", "Disciplina Eletiva Área" e um "Obrigatória" solto.
+
+        Isso nao e so inconsistencia de escrita: enquanto o tipo e texto livre
+        nao ha como filtrar por categoria nem contar quantas eletivas o aluno
+        cursou, que e o que a integralizacao precisa saber.
+        """
+
+        BASICA = "BASICA", "Básica"
+        ELETIVA_GERAL = "ELETIVA_GERAL", "Eletiva geral"
+        ELETIVA_ESPECIFICA = "ELETIVA_ESPECIFICA", "Eletiva específica"
+
     codigo = models.CharField(max_length=40, unique=True, verbose_name="Código")
     nome = models.CharField(max_length=255)
-    tipo = models.CharField(max_length=120, blank=True)
+    tipo = models.CharField(max_length=25, choices=Tipo.choices, blank=True)
     creditos = models.PositiveSmallIntegerField(null=True, blank=True)
     carga_horaria = models.PositiveSmallIntegerField(null=True, blank=True)
     pre_requisitos = models.TextField(blank=True)
@@ -1537,6 +1554,13 @@ class Setor(models.Model):
     class TipoSetor(models.TextChoices):
         SETOR = "SETOR", "Setor"
         COMISSAO = "COMISSAO", "Comissao"
+
+    # O colegiado pleno e o unico setor que o codigo precisa reconhecer pelo
+    # nome: e ele que define quem ve "Processos no Pleno" e quem pode deliberar
+    # ali. O nome estava escrito a mao em quatro lugares, o que fez com que um
+    # erro de digitacao -- "Colegiando" -- se espalhasse e ficasse dificil de
+    # corrigir sem quebrar as comparacoes. Como constante, o nome tem um lugar so.
+    NOME_PLENO = "Colegiado PPGEC (Pleno)"
 
     nome = models.CharField(max_length=120, unique=True)
     descricao = models.CharField(max_length=255, blank=True, verbose_name="Descrição")

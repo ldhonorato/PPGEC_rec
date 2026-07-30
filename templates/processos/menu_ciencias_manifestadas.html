@@ -9,23 +9,27 @@
         <ul class="list">
             {% for manifestacao in ciencias_pendentes %}
                 <li>
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                    <div class="secao-cabecalho">
                         <strong>{{ manifestacao.processo.numero }} - {{ manifestacao.processo.assunto }}</strong>
                         <a class="btn" href="{% url 'processo_detalhe' manifestacao.processo.id %}">Manifestar ciência</a>
                     </div>
-                    <small class="muted">
-                        Status: {{ manifestacao.get_status_display }} |
-                        Solicitado por: {{ manifestacao.solicitado_por.nome }} |
-                        Solicitado em: {{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}
-                    </small>
+                    <span class="meta-linha">
+                        <span>{{ manifestacao.get_status_display }}</span>
+                        <span>Solicitado por {{ manifestacao.solicitado_por.nome }}</span>
+                        <span>{{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}</span>
+                    </span>
                     {% if manifestacao.mensagem_solicitacao %}
-                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Solicitação: {{ manifestacao.mensagem_solicitacao }}</small></p>
+                        <p class="item-observacao"><small class="muted">Solicitação: {{ manifestacao.mensagem_solicitacao }}</small></p>
                     {% endif %}
                 </li>
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhuma ciência pendente.</p>
+        <div class="estado-vazio">
+    <svg aria-hidden="true"><use href="#i-ciencias"></use></svg>
+    <p class="estado-vazio-titulo">Nenhuma ciência pendente</p>
+    <p>Quando a secretaria solicitar sua ciência em um processo, ela aparece aqui.</p>
+</div>
     {% endif %}
 
     <h2 class="section-title">Ciências já manifestadas</h2>
@@ -33,24 +37,24 @@
         <ul class="list">
             {% for manifestacao in ciencias_manifestadas %}
                 <li>
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;">
+                    <div class="secao-cabecalho">
                         <strong>{{ manifestacao.processo.numero }} - {{ manifestacao.processo.assunto }}</strong>
                         <a class="btn" href="{% url 'processo_detalhe' manifestacao.processo.id %}">Ver detalhes</a>
                     </div>
-                    <small class="muted">
-                        Status: {{ manifestacao.get_status_display }} |
-                        Solicitado por: {{ manifestacao.solicitado_por.nome }} |
-                        Solicitado em: {{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}
-                        {% if manifestacao.data_manifestacao %}| Manifestado em: {{ manifestacao.data_manifestacao|date:"d/m/Y H:i" }}{% endif %}
-                    </small>
+                    <span class="meta-linha">
+                        <span>{{ manifestacao.get_status_display }}</span>
+                        <span>Solicitado por {{ manifestacao.solicitado_por.nome }}</span>
+                        <span>Solicitado em {{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}</span>
+                        {% if manifestacao.data_manifestacao %}<span>Manifestado em {{ manifestacao.data_manifestacao|date:"d/m/Y H:i" }}</span>{% endif %}
+                    </span>
                     {% if manifestacao.mensagem_manifestacao %}
-                        <p style="margin: 0.35rem 0 0 0;"><small class="muted">Manifestação: {{ manifestacao.mensagem_manifestacao }}</small></p>
+                        <p class="item-observacao"><small class="muted">Manifestação: {{ manifestacao.mensagem_manifestacao }}</small></p>
                     {% endif %}
                 </li>
             {% endfor %}
         </ul>
     {% else %}
-        <p class="muted">Nenhuma ciência manifestada encontrada.</p>
+        <p class="estado-vazio-inline">Nenhuma ciência manifestada encontrada.</p>
     {% endif %}
 </section>
 {% endblock %}

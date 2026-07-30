@@ -1,0 +1,72 @@
+{% comment %}
+Tabela de alunos de uma trajetoria, compartilhada pelas telas que listam
+orientandos.
+
+Tres secoes de "Meus Orientandos" e dois blocos do painel da coordenacao
+repetiam os mesmos quatro campos do aluno, cada um com a sua propria linha de
+pipes e a sua propria ordem.
+
+Parametros (todos opcionais, exceto trajetorias):
+
+  trajetorias         iteravel de TrajetoriaAcademica
+  mostrar_orientador  inclui a coluna Orientador (usada nas coorientacoes, onde
+                      saber quem orienta e o dado que falta)
+  mostrar_papel       inclui a coluna Papel, calculada a partir do usuario da
+                      requisicao (usada nos vinculos concluidos, em que o docente
+                      pode ter sido orientador, coorientador ou os dois)
+  vazio_titulo        titulo do estado vazio
+  vazio_texto         texto de apoio do estado vazio
+{% endcomment %}
+{% if trajetorias %}
+    <div class="tabela-envolvido">
+        <table class="tabela">
+            <thead>
+                <tr>
+                    <th scope="col">Aluno</th>
+                    <th scope="col">Nível</th>
+                    <th scope="col">Ingresso</th>
+                    {% if mostrar_orientador %}<th scope="col">Orientador</th>{% endif %}
+                    {% if mostrar_papel %}<th scope="col">Seu papel</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for trajetoria in trajetorias %}
+                    <tr>
+                        <td class="celula-principal">
+                            <a href="{% url 'aluno_detalhe' trajetoria.aluno.id %}">{{ trajetoria.aluno.nome }}</a>
+                            <span class="celula-secundaria">
+                                {{ trajetoria.aluno.email }}{% if trajetoria.aluno.matricula %} · {{ trajetoria.aluno.matricula }}{% endif %}
+                            </span>
+                        </td>
+                        <td class="celula-apoio">{{ trajetoria.get_nivel_curso_display }}</td>
+                        <td class="celula-apoio celula-numero">{{ trajetoria.ingresso|default:"—" }}</td>
+                        {% if mostrar_orientador %}
+                            <td class="celula-apoio">{{ trajetoria.orientador.nome|default:"—" }}</td>
+                        {% endif %}
+                        {% if mostrar_papel %}
+                            <td class="celula-apoio">
+                                {% if trajetoria.orientador_id == user.id and trajetoria.coorientador_id == user.id %}
+                                    Orientador e coorientador
+                                {% elif trajetoria.orientador_id == user.id %}
+                                    Orientador
+                                {% elif trajetoria.coorientador_id == user.id %}
+                                    Coorientador
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    {% comment %}
+    Variante leve, nao o .estado-vazio com icone: as tres secoes de "Meus
+    Orientandos" vivem no mesmo cartao, e um docente sem coorientacoes e sem
+    concluidas -- o caso comum de quem esta comecando -- veria dois blocos de
+    260px de ar seguidos, num cartao cujo conteudo real sao duas linhas.
+    {% endcomment %}
+    <p class="estado-vazio-inline">{{ vazio_texto|default:vazio_titulo }}</p>
+{% endif %}

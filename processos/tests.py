@@ -397,8 +397,12 @@ class MatriculaViewsTests(TestCase):
         self.assertContains(response, self.disciplina.nome)
         self.assertNotContains(response, "Homologar")
         self.assertContains(response, "Indeferir")
-        self.assertContains(response, "Matrículas solicitadas: regulares 1")
-        self.assertContains(response, "Lista de espera: regulares 0")
+        # O resumo virou grade rotulada: o rotulo esta no <dt> e os numeros no
+        # <dd>, em vez de uma frase com pipes separando os pares.
+        self.assertContains(response, "Matrículas solicitadas")
+        self.assertContains(response, "1 regulares")
+        self.assertContains(response, "Lista de espera")
+        self.assertContains(response, "0 regulares")
 
         response = self.client.post(
             reverse("matriculas_solicitacoes"),
@@ -857,7 +861,7 @@ class MatriculaViewsTests(TestCase):
         total_pendentes = alunos_ativos_sem_matricula(self.periodo).count()
 
         response = self.client.get(reverse("matriculas_periodos"))
-        self.assertContains(response, f"Alunos sem matrícula: {total_pendentes}")
+        self.assertContains(response, f"{total_pendentes} alunos sem matrícula")
         self.assertContains(response, "Aluno Pendente Matrícula")
 
         post = self.client.post(
@@ -1727,11 +1731,18 @@ class AlunosViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Orientações ativas")
         self.assertContains(response, "Coorientações")
-        self.assertContains(response, "Orientações/coorientações concluídas")
+        self.assertContains(response, "Concluídas")
         self.assertContains(response, self.aluno.nome)
         self.assertContains(response, aluno_coorientado.nome)
         self.assertContains(response, aluno_concluido.nome)
-        self.assertContains(response, "Coorientador")
+        # As tres secoes viraram tabelas com colunas proprias. Na de
+        # coorientacoes, a coluna "Orientador" diz quem orienta de fato -- antes
+        # a linha so trazia a palavra "Coorientador" solta entre pipes, sem
+        # nomear o orientador. Na de concluidas, a coluna "Seu papel" diz qual
+        # foi o vinculo do docente naquela trajetoria.
+        self.assertContains(response, "Orientador")
+        self.assertContains(response, self.coordenador.nome)
+        self.assertContains(response, "Seu papel")
 
     def test_coorientador_cadastrado_acessa_processo_do_aluno(self):
         processo = Processo.objects.create(
@@ -2339,7 +2350,7 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "Sair")
 
     def test_membro_do_pleno_ve_menu_e_rota_de_processos_do_pleno(self):
-        pleno = Setor.objects.get(nome="Colegiando PPGEC (Pleno)")
+        pleno = Setor.objects.get(nome=Setor.NOME_PLENO)
         SetorMembro.objects.create(setor=pleno, usuario=self.docente)
 
         self.client.force_login(self.docente)
@@ -3464,7 +3475,7 @@ class ReservaAmbienteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Disponibilidade semanal")
         self.assertContains(response, "Livre 08:00-12:00")
-        self.assertContains(response, "Ocupado 10:00-11:00 | Defesa")
+        self.assertContains(response, "Ocupado 10:00–11:00 · Defesa")
         self.assertNotContains(response, "Reserva privada de outro docente")
 
     def test_formulario_informa_choque_e_nao_cria_reserva(self):
@@ -4165,6 +4176,118 @@ class TrajetoriasNaFichaDoAlunoTests(TestCase):
         self.assertEqual(linhas["Coorientador"], "—")
 
 
+class CategoriaDaDisciplinaTests(TestCase):
+    """A categoria da disciplina passou a ser um conjunto fechado.
+
+    Era um CharField de 120 caracteres sem choices, digitado a mao no cadastro.
+    Em 47 disciplinas isso produziu cinco grafias para tres categorias --
+    "Disciplina Basica" sem acento ao lado de "Disciplina Básica", mais um
+    "Obrigatória" solto. Enquanto o tipo for texto livre nao ha como filtrar por
+    categoria nem contar eletivas cursadas, que a integralizacao precisa saber.
+    """
+
+    def test_o_campo_nao_aceita_texto_livre(self):
+        """A garantia que impede as grafias de voltarem."""
+        with self.assertRaises(ValidationError):
+            Disciplina.objects.create(codigo="PPGEC900", nome="Teste", tipo="Disciplina Basica")
+
+    def test_as_tres_categorias_do_programa(self):
+        self.assertEqual(
+            [valor for valor, _ in Disciplina.Tipo.choices],
+            ["BASICA", "ELETIVA_GERAL", "ELETIVA_ESPECIFICA"],
+        )
+
+    def test_a_tela_mostra_o_rotulo_e_nao_a_chave(self):
+        """Sem get_tipo_display a tabela mostraria "ELETIVA_ESPECIFICA"."""
+        Disciplina.objects.create(
+            codigo="PPGEC901", nome="Disciplina de teste",
+            tipo=Disciplina.Tipo.ELETIVA_ESPECIFICA,
+        )
+        servidor = User.objects.create_user(
+            email="servidor.disc@example.com", password="senha-segura-123",
+            nome="Servidor Disc", tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.client.force_login(servidor)
+        resposta = self.client.get(reverse("matriculas_disciplinas"))
+
+        # A chave aparece legitimamente no value do <option> do formulario de
+        # edicao; o que nao pode e vazar para a celula da tabela.
+        celulas = re.findall(r"<td[^>]*>(.*?)</td>", resposta.content.decode(), re.S)
+        self.assertTrue(
+            any("Eletiva específica" in celula for celula in celulas),
+            "a tabela deve mostrar o rotulo da categoria",
+        )
+        self.assertFalse(
+            any("ELETIVA_ESPECIFICA" in celula for celula in celulas),
+            "a chave do choice nao deve aparecer na tabela",
+        )
+
+    def test_categoria_em_branco_continua_valida(self):
+        """Disciplina antiga sem classificacao nao bloqueia o cadastro.
+
+        A migracao deixa em branco o que nao reconhece, para que a coordenacao
+        veja o que falta classificar em vez de a leitura quebrar.
+        """
+        disciplina = Disciplina.objects.create(codigo="PPGEC902", nome="Sem categoria")
+        self.assertEqual(disciplina.tipo, "")
+        self.assertEqual(disciplina.get_tipo_display(), "")
+
+
+class NomeDoColegiadoTests(TestCase):
+    """O colegiado pleno e reconhecido pelo nome, e o nome estava errado.
+
+    "Colegiando" e erro de digitacao -- a descricao do proprio setor sempre disse
+    "Deliberacoes do colegiado pleno." O erro entrou pela migracao 0005, que
+    listava o nome correto entre os apelidos a renomear.
+    """
+
+    ARQUIVOS_DE_CODIGO = ["views.py", "context_processors.py", "models.py", "forms.py", "services.py"]
+
+    def test_nenhum_codigo_compara_com_a_grafia_errada(self):
+        """O nome tem um lugar so: Setor.NOME_PLENO.
+
+        Enquanto estava escrito a mao em quatro comparacoes, corrigir o dado sem
+        corrigir todas as copias faria o sistema deixar de reconhecer o pleno --
+        nenhum docente veria "Processos no Pleno" e ninguem poderia deliberar.
+        """
+        base = Path(settings.BASE_DIR) / "processos"
+        culpados = []
+        for nome in self.ARQUIVOS_DE_CODIGO:
+            caminho = base / nome
+            if not caminho.exists():
+                continue
+            for numero, linha in enumerate(caminho.read_text(encoding="utf-8").splitlines(), 1):
+                if "Colegiando" in linha and not linha.lstrip().startswith("#"):
+                    culpados.append(f"{nome}:{numero}")
+        self.assertEqual(culpados, [], f"grafia errada no codigo: {culpados}")
+
+    def test_a_constante_diz_colegiado(self):
+        self.assertEqual(Setor.NOME_PLENO, "Colegiado PPGEC (Pleno)")
+
+    def test_o_pleno_continua_sendo_reconhecido(self):
+        """A correcao do dado nao pode ter desligado o acesso ao pleno."""
+        docente = Docente.objects.create_user(
+            email="docente.pleno.nome@example.com", password="senha-segura-123",
+            nome="Docente Pleno", tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        pleno, _ = Setor.objects.get_or_create(
+            nome=Setor.NOME_PLENO,
+            defaults={"descricao": "Deliberações do colegiado pleno."},
+        )
+        SetorMembro.objects.create(setor=pleno, usuario=docente)
+
+        self.client.force_login(docente)
+        resposta = self.client.get(reverse("menu_processos_pleno"))
+
+        self.assertEqual(resposta.status_code, 200)
+        rotulos = [
+            item["label"]
+            for secao in resposta.context["nav_menu_sections"]
+            for item in secao["items"]
+        ]
+        self.assertIn("Processos no Pleno", rotulos)
+
+
 class PadraoVisualDosTemplatesTests(SimpleTestCase):
     """Guarda os padroes que a revisao visual estabeleceu.
 
@@ -4178,34 +4301,13 @@ class PadraoVisualDosTemplatesTests(SimpleTestCase):
 
     DIRETORIO = Path(settings.BASE_DIR) / "templates"
 
-    # Telas ainda nao revisadas, por perfil. A revisao vai por blocos -- aluno
-    # primeiro, depois docente, secretaria e ambientes -- e cada bloco esvazia a
-    # sua parte desta lista.
-    #
-    # A lista existe para que o teste proteja hoje o que ja foi feito, em vez de
-    # so poder entrar em vigor no fim. Um template novo nao esta aqui, entao
-    # nasce tendo que seguir o padrao.
-    PENDENTES_DE_REVISAO = {
-        # Docente
-        "menu_processos_pleno.html", "menu_meus_orientandos.html",
-        "menu_ciencias_manifestadas.html", "solicitacao_banca_form.html",
-        "solicitacao_banca_detalhe.html",
-        # Secretaria -- processos
-        "processos_lista.html", "setores_comissoes.html", "setor_comissao_form.html",
-        "solicitacoes_assinatura.html", "coordenacao_dashboard.html",
-        # Secretaria -- academico
-        "matriculas_periodos.html", "matriculas_solicitacoes.html",
-        "matricula_oferta_alunos.html", "matricula_oferta_planejamento_presencial.html",
-        "validar_cadastros_alunos.html",
-        # Ambientes
-        "disponibilidade_ambientes.html", "reservas_ambientes_feitas.html",
-        # Acesso
-        "cadastro_aluno.html",
-    }
+    # Templates de e-mail ficam de fora: cliente de e-mail ignora <style>, e o
+    # estilo inline ali e o unico que funciona. A regra vale para as telas.
+    EXCECOES = ("emails",)
 
     def _templates(self):
         for caminho in sorted(self.DIRETORIO.rglob("*.html")):
-            if caminho.name in self.PENDENTES_DE_REVISAO:
+            if any(parte in caminho.parts for parte in self.EXCECOES):
                 continue
             yield caminho, caminho.read_text(encoding="utf-8")
 

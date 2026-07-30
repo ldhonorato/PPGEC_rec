@@ -79,7 +79,7 @@
                                     <span class="celula-secundaria">{{ disciplina.ementa|truncatechars:90 }}</span>
                                 {% endif %}
                             </td>
-                            <td class="celula-apoio">{{ disciplina.tipo|default:"—" }}</td>
+                            <td class="celula-apoio">{{ disciplina.get_tipo_display|default:"—" }}</td>
                             <td class="celula-numero celula-apoio">{{ disciplina.creditos|default:"—" }}</td>
                             <td class="celula-numero celula-apoio">{{ disciplina.carga_horaria|default:"—" }}</td>
                             <td>
@@ -136,7 +136,20 @@
                 <div class="grid-two">
                     <div class="field"><label>Código</label><input name="codigo" value="{{ disciplina.codigo }}" maxlength="40" required></div>
                     <div class="field"><label>Nome</label><input name="nome" value="{{ disciplina.nome }}" maxlength="255" required></div>
-                    <div class="field"><label>Tipo</label><input name="tipo" value="{{ disciplina.tipo }}" maxlength="120"></div>
+                    {% comment %}
+                    Era <input> de texto livre -- a origem das cinco grafias para tres
+                    categorias que a migracao 0062 teve de unificar. Digitar a
+                    categoria a mao garante que ela divirja.
+                    {% endcomment %}
+                    <div class="field">
+                        <label for="tipo-{{ disciplina.pk }}">Tipo</label>
+                        <select id="tipo-{{ disciplina.pk }}" name="tipo">
+                            <option value="">Não classificada</option>
+                            {% for valor, rotulo in tipos_disciplina %}
+                                <option value="{{ valor }}" {% if disciplina.tipo == valor %}selected{% endif %}>{{ rotulo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     <div class="field"><label>Créditos</label><input type="number" name="creditos" min="0" value="{{ disciplina.creditos|default_if_none:'' }}"></div>
                     <div class="field"><label>Carga horária</label><input type="number" name="carga_horaria" min="0" value="{{ disciplina.carga_horaria|default_if_none:'' }}"></div>
                     <div class="field"><label>Pré-requisitos</label><textarea name="pre_requisitos" rows="3">{{ disciplina.pre_requisitos }}</textarea></div>
