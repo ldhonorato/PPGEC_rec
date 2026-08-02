@@ -2414,18 +2414,67 @@ dialog::backdrop {
         grid-row: 1;
         margin: 0;
         color: var(--color-text);
-        font-size: 0.9375rem;
+        /* Fluido em vez de mais um ponto de quebra: em 320px "Processos em
+           andamento" ainda pedia 183px numa faixa de 189, e quebrava. A 4.2vw a
+           fonte so encolhe abaixo de ~357px, onde a folga acaba -- de 360px
+           para cima fica nos 15px. */
+        font-size: clamp(0.875rem, 4.2vw, 0.9375rem);
     }
 
-    .metric-value,
-    .metric-card-texto .metric-value {
+    /* O valor nao e maior que o rotulo: numa lista quem nomeia a linha e o
+       rotulo, e um valor com corpo maior invertia a hierarquia -- a linha era
+       lida pelo numero antes de se saber do que ele era. Mesmo tamanho do
+       rotulo; o que distingue o valor e a cor e o peso. */
+    .metric-value {
         grid-column: 3;
         grid-row: 1;
         justify-content: flex-end;
         min-height: 0;
-        font-size: 1.0625rem;
-        line-height: 1.2;
+        font-size: 0.9375rem;
+        line-height: 1.35;
+        font-weight: 650;
         text-align: right;
+    }
+
+    /* Valor que e palavra, nao numero ("Sem solicitação", "Emitir"): desce para
+       uma segunda linha, sob o rotulo.
+
+       Na mesma linha os dois disputam a largura, e quem perde e o rotulo: a
+       coluna do valor pega o que precisa e sobra o resto. Em 412px "Matrícula
+       do período" pedia 147px e recebia 141 -- quebrava por 6px; em 360px
+       recebia 89. Um numero cabe em 10px e nao cria essa disputa, entao so os
+       cartoes de palavra mudam de forma.
+
+       Empilhado, o rotulo usa a linha inteira e o valor deixa de competir --
+       vale para qualquer largura, inclusive 320px. E a forma de lista com
+       subtitulo, comum em aplicativo: o rotulo diz do que se trata, a linha de
+       baixo diz como esta. */
+    .metric-card-texto {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        row-gap: 1px;
+    }
+
+    .metric-card-texto .metric-icon,
+    .metric-card-texto::after {
+        grid-row: 1 / span 2;
+        align-self: center;
+    }
+
+    .metric-card-texto::after {
+        grid-column: 3;
+    }
+
+    .metric-card-texto .metric-value {
+        grid-column: 2;
+        grid-row: 2;
+        justify-content: flex-start;
+        min-height: 0;
+        /* Um ponto abaixo do rotulo: aqui o valor e a linha de apoio, e a
+           hierarquia tambem se le de cima para baixo. */
+        font-size: 0.875rem;
+        line-height: 1.35;
+        font-weight: 650;
+        text-align: left;
     }
 
     /* A seta e do CSS: a marcacao dos cartoes nao tem esse elemento, e ele so
