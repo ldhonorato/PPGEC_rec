@@ -2322,7 +2322,129 @@ dialog::backdrop {
 
 }
 
+/* Faixa de tablet: larga demais para a lista do celular, estreita demais para
+   os quatro cartoes lado a lado. A regra de 920px acima colapsa tudo para uma
+   coluna, e a Visao geral ficava com quatro cartoes de 128px empilhados --
+   641px de rolagem numa tela que comporta duas colunas. Vem depois daquela
+   regra de proposito: as duas tem o mesmo peso, e quem vence e a ultima. */
+@media (min-width: 641px) and (max-width: 920px) {
+    .metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 640px) {
+    /* ======================================================================
+       Visao geral vira lista de navegacao
+
+       Em tela larga sao quatro cartoes lado a lado, cada um com icone, valor
+       grande e rotulo -- uma fileira que se le de relance. Empilhados no
+       celular, os mesmos quatro cartoes viravam quatro blocos de 128px: mais de
+       600px de rolagem antes de chegar ao proximo bloco da tela, para quatro
+       itens.
+
+       Os cartoes ja sao links; no celular eles se apresentam como o que sao. O
+       formato e o de lista de aplicativo: icone, rotulo, valor a direita e a
+       seta indicando que leva a algum lugar. Os quatro cabem em ~230px, e o
+       valor continua visivel -- nao se troca informacao por espaco.
+       ====================================================================== */
+    .metric-grid {
+        gap: 0;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+    }
+
+    .metric-card {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto auto;
+        grid-template-rows: auto;
+        align-items: center;
+        gap: var(--espaco-3);
+        min-height: 0;
+        padding: var(--espaco-4);
+        border: 0;
+        border-bottom: 1px solid var(--color-border);
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .metric-card:last-child {
+        border-bottom: 0;
+    }
+
+    /* O realce de foco e o toque -- e o pressionar, nao o pairar: no celular
+       nao ha cursor, e o deslocamento de 2px do hover so faria a lista tremer
+       durante a rolagem. */
+    .metric-card:hover {
+        transform: none;
+        border-color: transparent;
+        border-bottom-color: var(--color-border);
+    }
+
+    .metric-card:active {
+        background: var(--color-surface-soft);
+    }
+
+    .metric-card:focus-visible {
+        border-color: transparent;
+        border-bottom-color: var(--color-border);
+    }
+
+    /* Todos na mesma linha, explicitamente. O valor vem antes do rotulo na
+       marcacao, e o posicionamento automatico do grid nao anda para tras: ao
+       colocar o valor na coluna 3, o rotulo -- que pede a coluna 2 -- era
+       jogado para uma segunda linha, e cada item da lista media 98px em vez de
+       57px. */
+    .metric-icon {
+        grid-column: 1;
+        grid-row: 1;
+        width: 30px;
+        height: 30px;
+        margin: 0;
+        padding: 6px;
+    }
+
+    /* O rotulo vem antes do valor: e ele que diz do que se trata, e numa lista
+       a leitura e da esquerda para a direita, nao de cima para baixo. */
+    .metric-label {
+        grid-column: 2;
+        grid-row: 1;
+        margin: 0;
+        color: var(--color-text);
+        font-size: 0.9375rem;
+    }
+
+    .metric-value,
+    .metric-card-texto .metric-value {
+        grid-column: 3;
+        grid-row: 1;
+        justify-content: flex-end;
+        min-height: 0;
+        font-size: 1.0625rem;
+        line-height: 1.2;
+        text-align: right;
+    }
+
+    /* A seta e do CSS: a marcacao dos cartoes nao tem esse elemento, e ele so
+       faz sentido nesta forma de lista. */
+    .metric-card::after {
+        content: "";
+        grid-column: 4;
+        grid-row: 1;
+        width: 0.45rem;
+        height: 0.45rem;
+        border-right: 1.5px solid var(--color-muted);
+        border-top: 1.5px solid var(--color-muted);
+        transform: rotate(45deg);
+    }
+
+    .overview-title {
+        margin-bottom: var(--espaco-4);
+    }
+
     .brand-mobile img {
         width: 112px;
     }
