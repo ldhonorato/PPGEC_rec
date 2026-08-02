@@ -2242,8 +2242,6 @@ dialog::backdrop {
 }
 
 @media (max-width: 920px) {
-    .dashboard-grid,
-
     /* Abaixo de 920px a barra vira gaveta. Antes ela ficava estatica no topo,
        empilhada acima do conteudo: em toda pagina o usuario rolava ~470px de
        menu antes de ver qualquer coisa. */
@@ -2256,6 +2254,18 @@ dialog::backdrop {
         display: flex;
     }
 
+    /* A gaveta desliza nos dois sentidos.
+
+       O deslize de saida sempre existiu, mas ninguem o via: "visibility:
+       hidden" nao e animavel e valia no mesmo instante em que a classe saia do
+       body, entao a barra ficava invisivel enquanto percorria os 320px. Na tela
+       ela sumia de uma vez.
+
+       A visibilidade passa a esperar o fim do deslize para virar "hidden"
+       (delay de 0.24s ao fechar) e a mudar na hora ao abrir (delay 0), senao a
+       barra so apareceria depois de ja ter entrado. O elemento continua fora da
+       arvore de acessibilidade e do foco quando fechado, que e o motivo de o
+       visibility existir aqui. */
     .sidebar {
         position: fixed;
         top: 0;
@@ -2264,13 +2274,14 @@ dialog::backdrop {
         flex-basis: auto;
         width: min(86vw, 320px);
         transform: translateX(-100%);
-        transition: transform 0.24s ease;
         visibility: hidden;
+        transition: transform 0.24s ease, visibility 0s linear 0.24s;
     }
 
     .menu-aberto .sidebar {
         transform: translateX(0);
         visibility: visible;
+        transition: transform 0.24s ease, visibility 0s linear 0s;
     }
 
     .sidebar-overlay {
@@ -2293,6 +2304,11 @@ dialog::backdrop {
         overflow: hidden;
     }
 
+    /* .dashboard-grid estava, por engano, na lista da regra de display acima --
+       recebia "display: inline-flex" e deixava de ser grade. Como caixa
+       inline-flex ela passa a ter a largura do proprio conteudo, e nao a do pai:
+       em 412px de tela media 430px, e o segundo cartao aparecia cortado. */
+    .dashboard-grid,
     .metric-grid,
     .grid-two {
         grid-template-columns: 1fr;
@@ -3174,6 +3190,15 @@ dialog::backdrop {
     .content-area,
     .auth-cartao {
         animation: none !important;
+    }
+
+    /* A gaveta aparece e some sem deslizar. O delay da visibilidade cai junto:
+       mantido, ela continuaria visivel por 0.24s depois de fechada, sem
+       movimento nenhum -- o pior dos dois mundos. */
+    .sidebar,
+    .menu-aberto .sidebar,
+    .sidebar-overlay {
+        transition: none !important;
     }
 }
 

@@ -4289,6 +4289,76 @@ class NomeDoColegiadoTests(TestCase):
         self.assertIn("Processos no Pleno", rotulos)
 
 
+class LayoutResponsivoTests(SimpleTestCase):
+    """As grades de cartoes colapsam para uma coluna em tela estreita.
+
+    .dashboard-grid ficou preso, por engano, na lista de seletores de uma regra
+    de "display: inline-flex" -- a que transforma o botao do menu em gaveta
+    abaixo de 920px. Como caixa inline-flex a grade passa a ter a largura do
+    proprio conteudo, e nao a do pai: em 412px de tela ela media 430px, e o
+    segundo cartao aparecia cortado na borda da tela.
+
+    O defeito e dificil de ver de outra forma: nao ha transbordo de pagina para
+    medir (o corte acontece dentro do container) e a tela so quebra em largura de
+    celular. Aqui a intencao fica escrita -- estas grades sao grade, e em tela
+    estreita sao de uma coluna so.
+    """
+
+    GRADES = (".dashboard-grid", ".metric-grid", ".grid-two")
+    LARGURA_DE_CELULAR = 920
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        css = (Path(settings.BASE_DIR) / "static" / "css" / "app.css").read_text(encoding="utf-8")
+        cls.css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+
+    def _regras(self, dentro_de_media=None):
+        """(seletores, declaracoes) das regras do arquivo.
+
+        dentro_de_media=None percorre o arquivo inteiro; um inteiro restringe aos
+        blocos @media (max-width: N) com N menor ou igual ao valor dado.
+        """
+        if dentro_de_media is None:
+            fonte = re.sub(r"@media[^{]*\{", "", self.css)
+        else:
+            fonte = ""
+            for largura, bloco in re.findall(r"@media\s*\(max-width:\s*(\d+)px\)\s*\{(.*?)\n\}", self.css, re.S):
+                if int(largura) <= dentro_de_media:
+                    fonte += bloco
+        for seletores, declaracoes in re.findall(r"([^{}]+)\{([^{}]*)\}", fonte):
+            yield [s.strip() for s in seletores.split(",") if s.strip()], declaracoes
+
+    def test_as_grades_nunca_deixam_de_ser_grade(self):
+        """Nenhuma regra pode dar a elas um display que nao seja grid.
+
+        E a asercao que teria pego o defeito: o seletor caiu numa regra de
+        display, e a grade virou flex.
+        """
+        culpados = []
+        for seletores, declaracoes in self._regras():
+            display = re.search(r"(?:^|;)\s*display\s*:\s*([^;]+)", declaracoes)
+            if not display or display.group(1).strip() == "grid":
+                continue
+            for grade in self.GRADES:
+                if grade in seletores:
+                    culpados.append(f"{grade} recebe display:{display.group(1).strip()}")
+        self.assertEqual(culpados, [], f"grade com display trocado: {culpados}")
+
+    def test_as_grades_viram_uma_coluna_em_tela_estreita(self):
+        de_uma_coluna = set()
+        for seletores, declaracoes in self._regras(dentro_de_media=self.LARGURA_DE_CELULAR):
+            colunas = re.search(r"grid-template-columns\s*:\s*([^;]+)", declaracoes)
+            if colunas and colunas.group(1).strip() == "1fr":
+                de_uma_coluna.update(seletores)
+
+        faltando = [g for g in self.GRADES if g not in de_uma_coluna]
+        self.assertEqual(
+            faltando, [],
+            f"grades sem colapso para uma coluna ate {self.LARGURA_DE_CELULAR}px: {faltando}",
+        )
+
+
 class VersaoExibidaTests(SimpleTestCase):
     """A versao que aparece no rodape precisa ter forma de versao.
 
