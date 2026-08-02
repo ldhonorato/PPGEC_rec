@@ -1,4 +1,5 @@
 import ast
+import os
 import re
 import tempfile
 from datetime import date, datetime, time, timedelta
@@ -4286,6 +4287,69 @@ class NomeDoColegiadoTests(TestCase):
             for item in secao["items"]
         ]
         self.assertIn("Processos no Pleno", rotulos)
+
+
+class VersaoExibidaTests(SimpleTestCase):
+    """A versao que aparece no rodape precisa ter forma de versao.
+
+    Em producao o rodape de todas as telas exibiu "vmain". A esteira passava
+    github.ref_name como APP_VERSION, o que so vira uma versao quando o build
+    sai de uma tag; disparada por push em main -- o caso de todo merge de PR --
+    ela entregava o nome do branch.
+
+    A esteira passou a ler o arquivo VERSION. Estes testes cobrem o outro lado:
+    que a aplicacao nao aceite no lugar da versao um valor que nao seja uma.
+    """
+
+    def _resolver(self, valor):
+        from ppgec.settings import _versao_publicada
+
+        with patch.dict(os.environ, {"APP_VERSION": valor} if valor is not None else {}, clear=False):
+            if valor is None:
+                os.environ.pop("APP_VERSION", None)
+            return _versao_publicada()
+
+    def test_o_arquivo_version_tem_forma_de_versao(self):
+        """O arquivo e a fonte da verdade; se ele estiver errado, tudo esta."""
+        from ppgec.settings import _FORMATO_VERSAO
+
+        conteudo = (Path(settings.BASE_DIR) / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertTrue(
+            _FORMATO_VERSAO.match(conteudo),
+            f"VERSION contem {conteudo!r}, que nao tem forma de versao",
+        )
+
+    def test_nome_de_branch_no_ambiente_e_recusado(self):
+        """O caso exato que produziu o "vmain"."""
+        for nome in ("main", "master", "feature/melhorias-ux", "HEAD"):
+            with self.subTest(ref=nome):
+                with self.assertWarns(RuntimeWarning):
+                    resolvido = self._resolver(nome)
+                self.assertEqual(resolvido, "1.0.0", "deve cair para a versao do arquivo")
+
+    def test_versao_valida_no_ambiente_e_usada(self):
+        """A esteira precisa conseguir sobrescrever com uma versao de verdade."""
+        for valor, esperado in (("1.2.3", "1.2.3"), ("2.0", "2.0"), ("1.2.0-rc.1", "1.2.0-rc.1")):
+            with self.subTest(valor=valor):
+                self.assertEqual(self._resolver(valor), esperado)
+
+    def test_prefixo_v_e_descartado(self):
+        """Quem exibe ja escreve o "v".
+
+        Se o build vier de uma tag "v1.0.0" e esse valor passar adiante inteiro,
+        o rodape renderiza "vv1.0.0".
+        """
+        self.assertEqual(self._resolver("v1.0.0"), "1.0.0")
+
+    def test_ambiente_vazio_usa_o_arquivo(self):
+        self.assertEqual(self._resolver(""), "1.0.0")
+        self.assertEqual(self._resolver(None), "1.0.0")
+
+    def test_o_rodape_mostra_a_versao_do_arquivo(self):
+        """Ponta a ponta: o que o usuario le na tela."""
+        resposta = self.client.get(reverse("login"))
+        self.assertContains(resposta, f"v{settings.APP_VERSION}")
+        self.assertNotContains(resposta, "vmain")
 
 
 class PadraoVisualDosTemplatesTests(SimpleTestCase):
