@@ -2,12 +2,14 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordResetForm
 from django.contrib.auth.views import LogoutView, PasswordResetView
 from django.core.mail import EmailMultiAlternatives
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.template import loader
+from django.views.static import serve
 
 
 password_reset_logger = logging.getLogger("acadflow.password_reset")
@@ -124,3 +126,9 @@ def version_view(request):
             "build_run_id": settings.APP_BUILD_RUN_ID,
         }
     )
+
+
+@login_required
+def media_file_view(request, path):
+    """Serve uploads autenticados quando o proxy não possui rota de mídia."""
+    return serve(request, path, document_root=settings.MEDIA_ROOT)

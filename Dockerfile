@@ -28,7 +28,7 @@ RUN pip install --upgrade pip \
 COPY . .
 
 RUN adduser --disabled-password --gecos "" appuser || true
-RUN mkdir -p /home/appuser \
+RUN mkdir -p /home/appuser /app/media \
 	&& chown -R appuser:appuser /app /home/appuser
 
 ENV HOME=/home/appuser

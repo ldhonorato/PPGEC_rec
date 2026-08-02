@@ -82,6 +82,36 @@ class SessionExpirationSettingsTests(SimpleTestCase):
         self.assertTrue(settings.SESSION_SAVE_EVERY_REQUEST)
 
 
+@override_settings(SECURE_SSL_REDIRECT=False, DEBUG=False)
+class MediaFilesProductionTests(TestCase):
+    def setUp(self):
+        self.media_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.media_dir.cleanup)
+        self.settings_override = override_settings(MEDIA_ROOT=self.media_dir.name)
+        self.settings_override.enable()
+        self.addCleanup(self.settings_override.disable)
+        arquivo = Path(self.media_dir.name) / "documentos" / "processos" / "Email_Prorrogacao.pdf"
+        arquivo.parent.mkdir(parents=True)
+        arquivo.write_bytes(b"%PDF-1.4 arquivo de teste")
+        self.usuario = User.objects.create_user(
+            email="usuario.media@example.com",
+            password="senha-segura-123",
+            nome="Usuário de Mídia",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+
+    def test_midia_exige_login_e_e_servida_com_debug_desativado(self):
+        url = "/media/documentos/processos/Email_Prorrogacao.pdf"
+
+        anonimo = self.client.get(url)
+        self.assertRedirects(anonimo, f"{reverse('login')}?next={url}")
+
+        self.client.force_login(self.usuario)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b"".join(response.streaming_content), b"%PDF-1.4 arquivo de teste")
+
+
 def criar_trajetoria(aluno, **kwargs):
     defaults = {
         "nivel_curso": Aluno.NivelCurso.MESTRADO,

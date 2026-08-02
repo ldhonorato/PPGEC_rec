@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
-from django.urls import path, reverse_lazy
+from django.urls import path, re_path, reverse_lazy
 from django.contrib.auth.views import (
     LoginView,
     PasswordResetCompleteView,
@@ -25,7 +25,7 @@ from django.contrib.auth.views import (
     PasswordResetDoneView,
 )
 from django.views.generic import RedirectView
-from ppgec.views import AuditedPasswordResetView, SafeLogoutView, version_view
+from ppgec.views import AuditedPasswordResetView, SafeLogoutView, media_file_view, version_view
 
 from processos.views import (
     aluno_detalhe_view,
@@ -77,6 +77,7 @@ from processos.views import (
 )
 
 urlpatterns = [
+    re_path(r"^media/(?P<path>.+)$", media_file_view, name="media_file"),
     path("", home_view, name="home"),
     path("version/", version_view, name="version"),
     path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}img/acadflow-logo.png", permanent=True)),
