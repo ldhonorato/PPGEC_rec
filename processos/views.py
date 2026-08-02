@@ -4245,8 +4245,10 @@ def salas_ambientes_view(request):
     if not _has_gestao_access(request.user):
         raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
 
-    polo = request.user.polo_atuacao
-    can_choose_polo = _is_coordenador(request.user) and not polo
+    # Coordenadores administram todos os polos, mesmo quando possuem um polo de
+    # atuação no próprio cadastro. Servidores continuam restritos ao seu polo.
+    can_choose_polo = _is_coordenador(request.user)
+    polo = None if can_choose_polo else request.user.polo_atuacao
     sala_form = SalaForm(prefix="sala", can_choose_polo=can_choose_polo, include_ativa=False)
     disponibilidade_form = DisponibilidadeSalaLoteForm(prefix="disp")
     sala_edit_form = None

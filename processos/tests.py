@@ -3623,6 +3623,31 @@ class ReservaAmbienteTests(TestCase):
         self.assertContains(response, "Sala 101")
         self.assertContains(response, "Sala 201")
 
+    def test_coordenador_com_polo_de_atuacao_pode_cadastrar_sala_em_outro_polo(self):
+        coordenador = Docente.objects.create(
+            email="coordenador.polo.salas@example.com",
+            password="senha-segura-123",
+            nome="Coordenador com Polo",
+            coordenador=True,
+            polo_atuacao=self.polo,
+        )
+        self.client.force_login(coordenador)
+
+        response = self.client.post(
+            reverse("salas_ambientes"),
+            {
+                "acao": "criar_sala",
+                "sala-polo": self.outro_polo.pk,
+                "sala-nome": "Sala do Polo Norte",
+                "sala-capacidade": "18",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            Sala.objects.filter(polo=self.outro_polo, nome="Sala do Polo Norte").exists()
+        )
+
     def test_servidor_edita_sala_do_proprio_polo(self):
         self.client.force_login(self.servidor)
         response = self.client.post(
