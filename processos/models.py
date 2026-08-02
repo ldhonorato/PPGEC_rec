@@ -85,7 +85,7 @@ class Aluno(User):
     class NivelCurso(models.TextChoices):
         MESTRADO = "MESTRADO", "Mestrado"
         DOUTORADO = "DOUTORADO", "Doutorado"
-        POSDOUTORADO = "POSDOUTORADO", "Posdoutorado"
+        POSDOUTORADO = "POSDOUTORADO", "Pós-Doutorado"
         ALUNO_ESPECIAL = "ALUNO_ESPECIAL", "Aluno especial"
 
     class SexoAtribuidoNascimento(models.TextChoices):
@@ -269,6 +269,10 @@ class TrajetoriaAcademica(models.Model):
         return self.usa_prazos_academicos
 
     @property
+    def usa_supervisao(self) -> bool:
+        return self.nivel_curso == Aluno.NivelCurso.POSDOUTORADO
+
+    @property
     def usa_conclusao(self) -> bool:
         return self.nivel_curso in {
             Aluno.NivelCurso.MESTRADO,
@@ -313,11 +317,12 @@ class TrajetoriaAcademica(models.Model):
             self.prazo_defesa = ""
             self.reingressante = False
             self.isQualificado = False
-            self.orientador = None
             self.coorientador = None
             self.coorientador_externo_nome = ""
             self.coorientador_externo_email = ""
             self.coorientador_externo_instituicao = ""
+        if not self.usa_orientacao and not self.usa_supervisao:
+            self.orientador = None
         if not self.usa_conclusao or self.status != self.Status.CONCLUIDA:
             self.numero_defesa = ""
             self.data_defesa = None
@@ -329,7 +334,9 @@ class TrajetoriaAcademica(models.Model):
         self._normalizar_campos_por_nivel()
 
         if self.orientador and self.orientador.tipo_usuario != User.TipoUsuario.DOCENTE:
-            errors["orientador"] = "Orientador deve ser um usuário do tipo DOCENTE."
+            errors["orientador"] = "O responsável deve ser um docente do PPGEC."
+        if self.usa_supervisao and not self.orientador:
+            errors["orientador"] = "Informe o supervisor do Pós-Doutorado."
         if self.coorientador and self.coorientador.tipo_usuario != User.TipoUsuario.DOCENTE:
             errors["coorientador"] = "Coorientador deve ser um usuário do tipo DOCENTE."
         if self.coorientador and self.coorientador_externo_nome.strip():
@@ -1214,6 +1221,10 @@ class LancamentoHorasComplementares(models.Model):
 
     def clean(self):
         errors = {}
+        if self.trajetoria_id and self.trajetoria.nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
+            raise ValidationError(
+                {"trajetoria": "Trajetórias de Pós-Doutorado não possuem horas complementares."}
+            )
         if self.tipo_atividade_id:
             self.norma = self.tipo_atividade.norma
             self.grupo_limite = self.tipo_atividade.grupo_limite

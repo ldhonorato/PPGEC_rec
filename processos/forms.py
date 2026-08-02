@@ -1058,6 +1058,8 @@ class HorasComplementaresAdministrativoForm(forms.Form):
 
         if not self.trajetoria:
             raise forms.ValidationError("Trajetória acadêmica não encontrada.")
+        if self.trajetoria.nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
+            raise forms.ValidationError("Trajetórias de Pós-Doutorado não possuem horas complementares.")
         if not self.norma:
             raise forms.ValidationError("Não há norma vigente de horas complementares para esta trajetória.")
         if tipo and tipo.norma_id != self.norma.id:
@@ -1300,13 +1302,18 @@ class AlunoCadastroForm(forms.Form):
             Aluno.NivelCurso.MESTRADO,
             Aluno.NivelCurso.DOUTORADO,
         }
+        usa_supervisao = nivel_curso == Aluno.NivelCurso.POSDOUTORADO
         if not usa_orientacao:
-            cleaned_data["orientador"] = None
+            if not usa_supervisao:
+                cleaned_data["orientador"] = None
             cleaned_data["tipo_coorientador"] = "NENHUM"
             cleaned_data["coorientador"] = None
             cleaned_data["coorientador_externo_nome"] = ""
             cleaned_data["coorientador_externo_email"] = ""
             cleaned_data["coorientador_externo_instituicao"] = ""
+
+        if usa_supervisao and not cleaned_data.get("orientador"):
+            self.add_error("orientador", "Selecione o supervisor do Pós-Doutorado.")
         elif tipo_coorientador == "CADASTRADO" and not coorientador:
             self.add_error("coorientador", "Selecione um docente cadastrado.")
         elif tipo_coorientador == "EXTERNO" and not externo_nome:
@@ -1341,6 +1348,42 @@ class AlunoCadastroForm(forms.Form):
             trajetoria.coorientador_externo_instituicao = dados["coorientador_externo_instituicao"]
         trajetoria.save()
         return aluno
+
+
+class ImportacaoIngressantesForm(forms.Form):
+    arquivo = forms.FileField(
+        label="Planilha de ingressantes",
+        widget=forms.FileInput(attrs={"accept": ".csv,.xls,.xlsx"}),
+        help_text="Arquivo CSV, XLS ou XLSX com as colunas nome, cpf, e-mail e orientador.",
+    )
+    nivel_curso = forms.ChoiceField(
+        label="Ingresso do aluno",
+        choices=(
+            (Aluno.NivelCurso.ALUNO_ESPECIAL, "Aluno especial"),
+            (Aluno.NivelCurso.MESTRADO, "Mestrado"),
+            (Aluno.NivelCurso.DOUTORADO, "Doutorado"),
+        ),
+    )
+    ingresso = forms.CharField(
+        label="Semestre de ingresso",
+        max_length=6,
+        widget=forms.TextInput(attrs={"placeholder": "2026.2"}),
+    )
+
+    def clean_arquivo(self):
+        arquivo = self.cleaned_data["arquivo"]
+        extensao = Path(arquivo.name).suffix.lower()
+        if extensao not in {".csv", ".xls", ".xlsx"}:
+            raise forms.ValidationError("Envie um arquivo CSV, XLS ou XLSX.")
+        if arquivo.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("O arquivo deve ter no máximo 5 MB.")
+        return arquivo
+
+    def clean_ingresso(self):
+        ingresso = self.cleaned_data["ingresso"].strip()
+        if not re.fullmatch(r"\d{4}\.[12]", ingresso):
+            raise forms.ValidationError("Informe o semestre no formato YYYY.1 ou YYYY.2.")
+        return ingresso
 
 
 class AlunoQualificacaoForm(AlunoComentarioForm):
@@ -1515,6 +1558,7 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
             Aluno.NivelCurso.MESTRADO,
             Aluno.NivelCurso.DOUTORADO,
         }
+        usa_supervisao = nivel_curso == Aluno.NivelCurso.POSDOUTORADO
         usa_conclusao = nivel_curso in {
             Aluno.NivelCurso.MESTRADO,
             Aluno.NivelCurso.DOUTORADO,
@@ -1527,12 +1571,16 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
             cleaned_data["prazo_defesa"] = ""
             cleaned_data["reingressante"] = False
             cleaned_data["isQualificado"] = False
-            cleaned_data["orientador"] = None
+            if not usa_supervisao:
+                cleaned_data["orientador"] = None
             cleaned_data["tipo_coorientador"] = self.TipoCoorientador.NENHUM
             cleaned_data["coorientador"] = None
             cleaned_data["coorientador_externo_nome"] = ""
             cleaned_data["coorientador_externo_email"] = ""
             cleaned_data["coorientador_externo_instituicao"] = ""
+
+        if usa_supervisao and not cleaned_data.get("orientador"):
+            self.add_error("orientador", "Selecione o supervisor do Pós-Doutorado.")
 
         if not usa_conclusao:
             cleaned_data["numero_defesa"] = ""

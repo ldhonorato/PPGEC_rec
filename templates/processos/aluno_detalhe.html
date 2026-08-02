@@ -39,7 +39,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
             <div><dt>Matrícula</dt><dd>{{ aluno.matricula|default:"—" }}</dd></div>
             {% if trajetoria_atual %}
                 <div><dt>Ingresso</dt><dd>{{ trajetoria_atual.ingresso|default:"—" }}</dd></div>
-                <div><dt>Orientador</dt><dd>{{ trajetoria_atual.orientador.nome|default:"—" }}</dd></div>
+                <div><dt>{% if trajetoria_atual.nivel_curso == "POSDOUTORADO" %}Supervisor{% else %}Orientador{% endif %}</dt><dd>{{ trajetoria_atual.orientador.nome|default:"—" }}</dd></div>
             {% endif %}
         </dl>
 
@@ -291,6 +291,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
                             <p class="estado-vazio-inline">Nenhuma disciplina registrada nesta trajetória.</p>
                         {% endif %}
 
+                        {% if trajetoria.nivel_curso != "POSDOUTORADO" %}
                         {% with resumo=card.resumo_horas_complementares %}
                         <div class="secao-cabecalho secao-cabecalho-interna">
                             <h3 class="section-title">Horas complementares</h3>
@@ -381,6 +382,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
                             <p class="estado-vazio-inline">Nenhum lançamento de horas registrado nesta trajetória.</p>
                         {% endif %}
                         {% endwith %}
+                        {% endif %}
                         </div>
                     </details>
                     {% endwith %}
@@ -489,7 +491,7 @@ faltava a da coordenacao.
                 <div class="field"><label>Ingresso</label>{{ nova_trajetoria_form.ingresso }}</div>
                 <div class="field" data-nivel-section="PRAZOS"><label>Prazo de qualificação/projeto</label>{{ nova_trajetoria_form.prazo_qualificacao }}</div>
                 <div class="field" data-nivel-section="PRAZOS"><label>Prazo defesa</label>{{ nova_trajetoria_form.prazo_defesa }}</div>
-                <div class="field" data-nivel-section="ORIENTACAO"><label>Orientador</label>{{ nova_trajetoria_form.orientador }}</div>
+                <div class="field" data-nivel-section="VINCULO_DOCENTE"><label data-vinculo-docente-label>Orientador</label>{{ nova_trajetoria_form.orientador }}</div>
             </div>
             <div data-nivel-section="PRAZOS">
                 <label>{{ nova_trajetoria_form.reingressante }} Reingressante</label>
@@ -534,6 +536,7 @@ faltava a da coordenacao.
 {% for card in trajetoria_cards %}
 {% with trajetoria=card.obj form=card.form horas_form=card.horas_form %}
 {% if can_manage_aluno %}
+{% if trajetoria.nivel_curso != "POSDOUTORADO" %}
 <div id="modal-horas-complementares-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
         <div class="modal-head"><h3 class="section-title">Adicionar horas complementares</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
@@ -559,6 +562,7 @@ faltava a da coordenacao.
         </form>
     </div>
 </div>
+{% endif %}
 
 <div id="modal-trajetoria-status-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
@@ -801,18 +805,18 @@ faltava a da coordenacao.
 
 <div id="modal-trajetoria-orientador-{{ trajetoria.id }}" class="modal-backdrop">
     <div class="modal-card">
-        <div class="modal-head"><h3 class="section-title">Alterar orientador</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar {% if trajetoria.nivel_curso == "POSDOUTORADO" %}supervisor{% else %}orientador{% endif %}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
             <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
             <input type="hidden" name="campo" value="orientador">
-            <label>Orientador</label>
+            <label>{% if trajetoria.nivel_curso == "POSDOUTORADO" %}Supervisor{% else %}Orientador{% endif %}</label>
             {{ form.orientador }}
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
             <div class="form-actions">
-                <button class="btn" type="submit">Salvar orientador</button>
+                <button class="btn" type="submit">Salvar {% if trajetoria.nivel_curso == "POSDOUTORADO" %}supervisor{% else %}orientador{% endif %}</button>
             </div>
         </form>
     </div>
@@ -1062,9 +1066,13 @@ faltava a da coordenacao.
                     const mostrar =
                         (tipo === "PRAZOS" && usaAcademico) ||
                         (tipo === "ORIENTACAO" && usaAcademico) ||
+                        (tipo === "VINCULO_DOCENTE" && (usaAcademico || nivel === "POSDOUTORADO")) ||
                         (tipo === "CONCLUSAO" && usaConclusao) ||
                         (tipo === "DEPOSITO" && usaDeposito);
                     section.style.display = mostrar ? "" : "none";
+                });
+                modal.querySelectorAll("[data-vinculo-docente-label]").forEach((label) => {
+                    label.textContent = nivel === "POSDOUTORADO" ? "Supervisor" : "Orientador";
                 });
                 modal.querySelectorAll("[data-conclusao-numero-label]").forEach((label) => {
                     label.textContent = nivel === "POSDOUTORADO" ? "Numero do relatorio final" : "Numero da defesa";

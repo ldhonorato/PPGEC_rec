@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
-from django.urls import path, reverse_lazy
+from django.urls import path, re_path, reverse_lazy
 from django.contrib.auth.views import (
     LoginView,
     PasswordResetCompleteView,
@@ -25,7 +25,7 @@ from django.contrib.auth.views import (
     PasswordResetDoneView,
 )
 from django.views.generic import RedirectView
-from ppgec.views import AuditedPasswordResetView, SafeLogoutView, version_view
+from ppgec.views import AuditedPasswordResetView, SafeLogoutView, media_file_view, version_view
 
 from processos.views import (
     aluno_detalhe_view,
@@ -40,6 +40,7 @@ from processos.views import (
     criar_comissao_view,
     disponibilidade_ambientes_view,
     home_view,
+    importar_ingressantes_view,
     matricula_minha_solicitacao_view,
     matricula_oferta_alunos_view,
     matricula_oferta_exportar_view,
@@ -50,6 +51,7 @@ from processos.views import (
     matriculas_ofertas_view,
     matriculas_periodos_view,
     matriculas_solicitacoes_view,
+    matriculas_solicitacoes_exportar_view,
     menu_processos_pleno_view,
     menu_meus_orientandos_view,
     menu_meus_processos_view,
@@ -75,6 +77,7 @@ from processos.views import (
 )
 
 urlpatterns = [
+    re_path(r"^media/(?P<path>.+)$", media_file_view, name="media_file"),
     path("", home_view, name="home"),
     path("version/", version_view, name="version"),
     path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}img/acadflow-logo.png", permanent=True)),
@@ -131,6 +134,7 @@ urlpatterns = [
     path("bancas/<int:solicitacao_id>/", solicitacao_banca_detalhe_view, name="solicitacao_banca_detalhe"),
     path("coordenacao/dashboard/", coordenacao_dashboard_view, name="coordenacao_dashboard"),
     path("coordenacao/alunos/cadastros/", validar_cadastros_alunos_view, name="validar_cadastros_alunos"),
+    path("gestao/cadastro/ingressantes/", importar_ingressantes_view, name="importar_ingressantes"),
     path("coordenacao/alunos/", alunos_view, name="coordenacao_alunos"),
     path("coordenacao/alunos/<int:aluno_id>/", aluno_detalhe_view, name="aluno_detalhe"),
     path("coordenacao/processos/", processos_view, name="coordenacao_processos"),
@@ -144,6 +148,7 @@ urlpatterns = [
     path("assinaturas/<int:solicitacao_id>/", solicitacao_assinatura_detalhe_view, name="solicitacao_assinatura_detalhe"),
     path("gestao/matriculas/periodos/", matriculas_periodos_view, name="matriculas_periodos"),
     path("gestao/matriculas/solicitacoes/", matriculas_solicitacoes_view, name="matriculas_solicitacoes"),
+    path("gestao/matriculas/solicitacoes/exportar/", matriculas_solicitacoes_exportar_view, name="matriculas_solicitacoes_exportar"),
     path("gestao/matriculas/disciplinas/", matriculas_disciplinas_view, name="matriculas_disciplinas"),
     path("gestao/matriculas/ofertas/", matriculas_ofertas_view, name="matriculas_ofertas"),
     path("gestao/matriculas/ofertas/<int:oferta_id>/alunos/", matricula_oferta_alunos_view, name="matricula_oferta_alunos"),

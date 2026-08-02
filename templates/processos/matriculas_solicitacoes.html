@@ -5,132 +5,103 @@
     <div class="actions-row">
         <div>
             <h1 class="section-title">Solicitações de Matrícula</h1>
-            <p class="muted">Acompanhamento das solicitações e indeferimento manual quando necessário.</p>
+            <p class="muted">Selecione uma disciplina para consultar os alunos que solicitaram matrícula.</p>
         </div>
-        {% if periodo %}
-            <a class="btn btn-secondary" href="{% url 'matriculas_ofertas' %}?periodo={{ periodo.pk }}">Ver ofertas</a>
-        {% else %}
-            <a class="btn btn-secondary" href="{% url 'matriculas_ofertas' %}">Ver ofertas</a>
-        {% endif %}
+        <div class="calendar-nav">
+            {% if periodo %}
+                <a class="btn" href="{% url 'matriculas_solicitacoes_exportar' %}?periodo={{ periodo.pk }}">Baixar todas as planilhas</a>
+                <a class="btn btn-secondary" href="{% url 'matriculas_ofertas' %}?periodo={{ periodo.pk }}">Ver ofertas</a>
+            {% else %}
+                <a class="btn btn-secondary" href="{% url 'matriculas_ofertas' %}">Ver ofertas</a>
+            {% endif %}
+        </div>
     </div>
     <form method="get" class="grid-two form-filtros">
         <div class="field">
             <label for="periodo">Período letivo</label>
             <select id="periodo" name="periodo">
                 {% for periodo_opcao in periodos %}
-                    {% if periodo.pk == periodo_opcao.pk %}
-                        <option value="{{ periodo_opcao.pk }}" selected>{{ periodo_opcao.nome }} - {{ periodo_opcao.status_atual_display }}</option>
-                    {% else %}
-                        <option value="{{ periodo_opcao.pk }}">{{ periodo_opcao.nome }} - {{ periodo_opcao.status_atual_display }}</option>
-                    {% endif %}
+                    <option value="{{ periodo_opcao.pk }}" {% if periodo.pk == periodo_opcao.pk %}selected{% endif %}>{{ periodo_opcao.nome }} - {{ periodo_opcao.status_atual_display }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="field field-acao">
-            <button class="btn btn-secondary" type="submit">Alterar período</button>
+        <div class="field">
+            <label for="disciplina">Disciplina</label>
+            <select id="disciplina" name="disciplina">
+                <option value="">Selecione uma disciplina</option>
+                {% for disciplina in disciplinas %}
+                    <option value="{{ disciplina.pk }}" {% if disciplina_selecionada == disciplina.pk|stringformat:"s" %}selected{% endif %}>{{ disciplina.codigo }} - {{ disciplina.nome }} ({{ disciplina.total_solicitacoes }})</option>
+                {% endfor %}
+                <option value="vinculo" {% if disciplina_selecionada == "vinculo" %}selected{% endif %}>Matrícula vínculo ({{ total_vinculos }})</option>
+            </select>
         </div>
+        <div class="field field-acao"><button class="btn btn-secondary" type="submit">Exibir solicitações</button></div>
     </form>
 </section>
 
 <section class="card">
-    <h2 class="section-title">
-        Solicitações
-        {% if periodo %} - {{ periodo.nome }}{% endif %}
-    </h2>
-    {% comment %}
-    Quatro contagens numa frase, com pipes separando "regulares" de "especiais"
-    dentro de cada par -- lido de relance, nao se sabia qual numero pertencia a
-    qual. Sao dois pares de dados: viram grade rotulada.
-    {% endcomment %}
+    <h2 class="section-title">Resumo{% if periodo %} — {{ periodo.nome }}{% endif %}</h2>
     <dl class="dados-grid">
         <div><dt>Matrículas solicitadas</dt><dd>{{ resumo_solicitacoes.matriculas_regulares }} regulares · {{ resumo_solicitacoes.matriculas_especiais }} especiais</dd></div>
         <div><dt>Lista de espera</dt><dd>{{ resumo_solicitacoes.espera_regulares }} regulares · {{ resumo_solicitacoes.espera_especiais }} especiais</dd></div>
+        <div><dt>Matrículas vínculo</dt><dd>{{ total_vinculos }}</dd></div>
+        <div><dt>Disciplinas com solicitações</dt><dd>{{ disciplinas|length }}</dd></div>
     </dl>
-    {% if solicitacoes %}
+</section>
+
+{% if disciplina_obj %}
+<section class="card">
+    <h2 class="section-title">{{ disciplina_obj.codigo }} — {{ disciplina_obj.nome }}</h2>
+    <p class="muted">{{ itens_disciplina|length }} solicitação{{ itens_disciplina|length|pluralize }} de matrícula.</p>
+    {% if itens_disciplina %}
         <ul class="list">
-            {% for solicitacao in solicitacoes %}
+            {% for item in itens_disciplina %}
                 <li>
                     <div class="actions-row">
                         <div>
-                            <strong>{{ solicitacao.aluno.nome }}</strong>
-                            <span class="badge badge-info">{{ solicitacao.get_status_display }}</span>
+                            <strong>{{ item.solicitacao.aluno.nome }}</strong>
+                            <span class="badge {{ item.badge_class }}">{{ item.get_status_display }}</span>
                             <span class="meta-linha">
-                                <span>{{ solicitacao.aluno.email }}</span>
-                                {% if solicitacao.aluno.matricula %}<span>{{ solicitacao.aluno.matricula }}</span>{% endif %}
-                                <span>{{ solicitacao.get_tipo_aluno_display }}</span>
-                                {% if solicitacao.solicitada_em %}<span>Solicitada em {{ solicitacao.solicitada_em|date:"d/m/Y H:i" }}</span>{% endif %}
+                                <span>{{ item.solicitacao.aluno.email }}</span>
+                                {% if item.solicitacao.aluno.matricula %}<span>{{ item.solicitacao.aluno.matricula }}</span>{% endif %}
+                                <span>{{ item.solicitacao.get_tipo_aluno_display }}</span>
+                                <span>{{ item.oferta.docentes_display }}</span>
+                                <span>Solicitado em {{ item.solicitado_em|date:"d/m/Y H:i" }}</span>
                             </span>
-                            <span class="meta-linha">
-                                <span>{{ solicitacao.itens_matricula }} solicitada{{ solicitacao.itens_matricula|pluralize }}</span>
-                                <span>{{ solicitacao.itens_espera }} em espera</span>
-                            </span>
-                            {% if solicitacao.observacao_aluno %}
-                                <p class="muted">{{ solicitacao.observacao_aluno }}</p>
-                            {% endif %}
+                            {% if item.solicitacao.observacao_aluno %}<p class="muted">{{ item.solicitacao.observacao_aluno }}</p>{% endif %}
                         </div>
                         <div class="calendar-nav">
-                            <a class="btn btn-secondary" href="{% url 'matricula_minha_solicitacao' solicitacao.pk %}">Detalhes</a>
+                            <a class="btn btn-secondary" href="{% url 'matricula_minha_solicitacao' item.solicitacao.pk %}">Detalhes</a>
+                            {% if item.editavel %}
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="acao" value="indeferir_item">
+                                    <input type="hidden" name="periodo_id" value="{{ periodo.pk }}">
+                                    <input type="hidden" name="disciplina" value="{{ disciplina_obj.pk }}">
+                                    <input type="hidden" name="item_id" value="{{ item.pk }}">
+                                    <input type="hidden" name="motivo" value="Indeferida pela secretaria.">
+                                    <button class="btn btn-secondary" type="submit">Indeferir</button>
+                                </form>
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="acao" value="cancelar_item">
+                                    <input type="hidden" name="periodo_id" value="{{ periodo.pk }}">
+                                    <input type="hidden" name="disciplina" value="{{ disciplina_obj.pk }}">
+                                    <input type="hidden" name="item_id" value="{{ item.pk }}">
+                                    <button class="btn btn-secondary" type="submit">Cancelar</button>
+                                </form>
+                            {% endif %}
                         </div>
                     </div>
-
-                    <ul class="availability-list lista-encontros">
-                        {% for item in solicitacao.itens.all %}
-                            <li>
-                                <div class="actions-row">
-                                    <div>
-                                        <strong>{{ item.oferta.disciplina.codigo }} - {{ item.oferta.disciplina.nome }}</strong>
-                                        <span class="badge {{ item.badge_class }}">
-                                            {{ item.get_status_display }}
-                                        </span>
-                                        <span class="meta-linha">
-                                            <span>{{ item.oferta.docentes_display }}</span>
-                                            <span>Solicitado em {{ item.solicitado_em|date:"d/m/Y H:i" }}</span>
-                                        </span>
-                                    </div>
-                                    <div class="calendar-nav">
-                                        {% if item.editavel %}
-                                            <form method="post">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="acao" value="indeferir_item">
-                                                <input type="hidden" name="periodo_id" value="{{ periodo.pk }}">
-                                                <input type="hidden" name="item_id" value="{{ item.pk }}">
-                                                <input type="hidden" name="motivo" value="Indeferida pela secretaria.">
-                                                <button class="btn btn-secondary" type="submit">Indeferir</button>
-                                            </form>
-                                            <form method="post">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="acao" value="cancelar_item">
-                                                <input type="hidden" name="periodo_id" value="{{ periodo.pk }}">
-                                                <input type="hidden" name="item_id" value="{{ item.pk }}">
-                                                <button class="btn btn-secondary" type="submit">Cancelar</button>
-                                            </form>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </li>
-                        {% endfor %}
-                    </ul>
                 </li>
             {% endfor %}
         </ul>
-    {% else %}
-        <div class="estado-vazio">
-    <svg aria-hidden="true"><use href="#i-solicitacoes"></use></svg>
-    <p class="estado-vazio-titulo">Nenhuma solicitação em disciplinas</p>
-    <p>As solicitações enviadas pelos alunos no período aparecem aqui.</p>
-</div>
-    {% endif %}
+    {% else %}<p class="estado-vazio-inline">Nenhuma solicitação para esta disciplina.</p>{% endif %}
 </section>
-
+{% elif disciplina_selecionada == "vinculo" %}
 <section class="card">
-    <h2 class="section-title">
-        Matrículas vínculo
-        {% if periodo %} - {{ periodo.nome }}{% endif %}
-    </h2>
-    <p class="muted">
-        Alunos que solicitaram manutenção do vínculo sem matrícula em disciplinas neste período:
-        {{ solicitacoes_vinculo|length }}.
-    </p>
+    <h2 class="section-title">Matrícula vínculo</h2>
+    <p class="muted">Alunos que solicitaram manutenção do vínculo sem matrícula em disciplinas.</p>
     {% if solicitacoes_vinculo %}
         <ul class="list">
             {% for solicitacao in solicitacoes_vinculo %}
@@ -142,25 +113,25 @@
                             <span class="meta-linha">
                                 <span>{{ solicitacao.aluno.email }}</span>
                                 {% if solicitacao.aluno.matricula %}<span>{{ solicitacao.aluno.matricula }}</span>{% endif %}
+                                <span>{{ solicitacao.get_tipo_aluno_display }}</span>
                                 {% if solicitacao.solicitada_em %}<span>Solicitada em {{ solicitacao.solicitada_em|date:"d/m/Y H:i" }}</span>{% endif %}
                             </span>
-                            {% if solicitacao.observacao_aluno %}
-                                <p class="muted">{{ solicitacao.observacao_aluno }}</p>
-                            {% endif %}
+                            {% if solicitacao.observacao_aluno %}<p class="muted">{{ solicitacao.observacao_aluno }}</p>{% endif %}
                         </div>
-                        <div class="calendar-nav">
-                            <a class="btn btn-secondary" href="{% url 'matricula_minha_solicitacao' solicitacao.pk %}">Detalhes</a>
-                        </div>
+                        <a class="btn btn-secondary" href="{% url 'matricula_minha_solicitacao' solicitacao.pk %}">Detalhes</a>
                     </div>
                 </li>
             {% endfor %}
         </ul>
-    {% else %}
-        <div class="estado-vazio">
-    <svg aria-hidden="true"><use href="#i-matricula"></use></svg>
-    <p class="estado-vazio-titulo">Nenhuma matrícula vínculo</p>
-    <p>Alunos que renovam vínculo sem cursar disciplinas aparecem aqui.</p>
-</div>
-    {% endif %}
+    {% else %}<p class="estado-vazio-inline">Nenhuma matrícula vínculo neste período.</p>{% endif %}
 </section>
+{% else %}
+<section class="card">
+    <div class="estado-vazio">
+        <svg aria-hidden="true"><use href="#i-disciplinas"></use></svg>
+        <p class="estado-vazio-titulo">Selecione uma disciplina</p>
+        <p>A lista de alunos será carregada somente após a seleção.</p>
+    </div>
+</section>
+{% endif %}
 {% endblock %}

@@ -265,7 +265,7 @@ STORAGES = {
     },
 }
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", BASE_DIR / "media"))
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -276,6 +276,11 @@ AUTH_USER_MODEL = 'processos.User'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'login'
+
+# Encerra o login após 20 minutos sem uma requisição autenticada. Ao salvar a
+# sessão em cada requisição, o prazo é renovado enquanto o usuário está ativo.
+SESSION_COOKIE_AGE = 20 * 60
+SESSION_SAVE_EVERY_REQUEST = True
 
 # email config
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

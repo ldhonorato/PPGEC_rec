@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Cadastro de ingressantes | AcadFlow{% endblock %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <p class="eyebrow">Cadastro</p>
+        <h1 class="section-title">Cadastro de ingressantes</h1>
+        <p class="muted">Importe uma planilha com as colunas nome, cpf, e-mail e orientador.</p>
+    </div>
+</section>
+
+<section class="card form-card">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="form-grid">
+            <div class="field"><label for="{{ form.arquivo.id_for_label }}">{{ form.arquivo.label }}</label>{{ form.arquivo }}{{ form.arquivo.errors }}<p class="dado-nota">{{ form.arquivo.help_text }}</p></div>
+            <div class="field"><label for="{{ form.nivel_curso.id_for_label }}">{{ form.nivel_curso.label }}</label>{{ form.nivel_curso }}{{ form.nivel_curso.errors }}</div>
+            <div class="field"><label for="{{ form.ingresso.id_for_label }}">{{ form.ingresso.label }}</label>{{ form.ingresso }}{{ form.ingresso.errors }}</div>
+        </div>
+        <button class="btn" type="submit">Importar ingressantes</button>
+    </form>
+</section>
+
+{% if resultados is not None %}
+<section class="card">
+    <h2 class="section-title">Resumo da operação</h2>
+    <p><strong>{{ resultados|length }}</strong> registro{{ resultados|length|pluralize }} processado{{ resultados|length|pluralize }}.</p>
+    <div class="table-responsive">
+        <table>
+            <thead><tr><th>Linha</th><th>Aluno</th><th>Resultado</th><th>Detalhes</th></tr></thead>
+            <tbody>
+            {% for resultado in resultados %}
+                <tr>
+                    <td>{{ resultado.linha }}</td>
+                    <td>{{ resultado.nome }}</td>
+                    <td><span class="badge {% if resultado.cadastrado %}badge-success{% else %}badge-warning{% endif %}">{% if resultado.cadastrado %}Cadastrado{% else %}Não cadastrado{% endif %}</span></td>
+                    <td>{{ resultado.motivo }}</td>
+                </tr>
+            {% empty %}<tr><td colspan="4">A planilha não possui linhas de dados.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
