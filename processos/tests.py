@@ -28,6 +28,7 @@ from .models import (
     Docente,
     EncontroOferta,
     ItemSolicitacaoMatricula,
+    LancamentoHorasComplementares,
     ManifestacaoProcesso,
     MembroBanca,
     OfertaDisciplina,
@@ -73,6 +74,12 @@ class VersionViewTests(SimpleTestCase):
                 "build_run_id": "456",
             },
         )
+
+
+class SessionExpirationSettingsTests(SimpleTestCase):
+    def test_login_expira_apos_vinte_minutos_sem_atividade(self):
+        self.assertEqual(settings.SESSION_COOKIE_AGE, 20 * 60)
+        self.assertTrue(settings.SESSION_SAVE_EVERY_REQUEST)
 
 
 def criar_trajetoria(aluno, **kwargs):
@@ -389,7 +396,10 @@ class MatriculaViewsTests(TestCase):
         )
         self.client.force_login(self.secretaria)
 
-        response = self.client.get(reverse("matriculas_solicitacoes"), {"periodo": self.periodo.pk})
+        response = self.client.get(
+            reverse("matriculas_solicitacoes"),
+            {"periodo": self.periodo.pk, "disciplina": self.disciplina.pk},
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Solicitações de Matrícula")
@@ -409,6 +419,7 @@ class MatriculaViewsTests(TestCase):
             {
                 "acao": "indeferir_item",
                 "periodo_id": self.periodo.pk,
+                "disciplina": self.disciplina.pk,
                 "item_id": item.pk,
                 "motivo": "Indeferida em teste.",
             },
@@ -439,7 +450,10 @@ class MatriculaViewsTests(TestCase):
         )
         self.client.force_login(self.secretaria)
 
-        response = self.client.get(reverse("matriculas_solicitacoes"), {"periodo": self.periodo.pk})
+        response = self.client.get(
+            reverse("matriculas_solicitacoes"),
+            {"periodo": self.periodo.pk, "disciplina": "vinculo"},
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Matrículas vínculo")
@@ -448,6 +462,25 @@ class MatriculaViewsTests(TestCase):
         self.assertContains(response, aluno_vinculo.matricula)
         self.assertContains(response, solicitacao_vinculo.observacao_aluno)
         self.assertContains(response, reverse("matricula_minha_solicitacao", args=[solicitacao_vinculo.pk]))
+
+    def test_solicitacoes_sem_disciplina_nao_carrega_lista_de_alunos(self):
+        solicitacao = SolicitacaoMatricula.objects.create(
+            periodo=self.periodo,
+            aluno=self.aluno,
+            status=SolicitacaoMatricula.Status.SOLICITADA,
+        )
+        ItemSolicitacaoMatricula.objects.create(
+            solicitacao=solicitacao,
+            oferta=self.oferta,
+            status=ItemSolicitacaoMatricula.Status.SOLICITADO,
+        )
+        self.client.force_login(self.secretaria)
+
+        response = self.client.get(reverse("matriculas_solicitacoes"), {"periodo": self.periodo.pk})
+
+        self.assertContains(response, "Selecione uma disciplina")
+        self.assertContains(response, self.disciplina.nome)
+        self.assertNotContains(response, self.aluno.email)
 
     def test_ofertas_usa_periodo_mais_recente_e_permite_trocar_periodo(self):
         hoje = timezone.localdate()
@@ -765,6 +798,49 @@ class MatriculaViewsTests(TestCase):
         self.assertIn("Trajetória acadêmica mais recente", sheet_xml)
         self.assertIn("Mestrado", sheet_xml)
 
+    def test_exportacao_xlsx_de_todas_as_disciplinas_inclui_aba_de_vinculo(self):
+        solicitacao = SolicitacaoMatricula.objects.create(
+            periodo=self.periodo,
+            aluno=self.aluno,
+            status=SolicitacaoMatricula.Status.SOLICITADA,
+        )
+        ItemSolicitacaoMatricula.objects.create(
+            solicitacao=solicitacao,
+            oferta=self.oferta,
+            status=ItemSolicitacaoMatricula.Status.SOLICITADO,
+        )
+        aluno_vinculo = Aluno.objects.create(
+            email="exportacao.vinculo@example.com",
+            password="senha-segura-123",
+            nome="Aluno Exportação Vínculo",
+        )
+        SolicitacaoMatricula.objects.create(
+            periodo=self.periodo,
+            aluno=aluno_vinculo,
+            tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
+            status=SolicitacaoMatricula.Status.SOLICITADA,
+        )
+        self.client.force_login(self.secretaria)
+
+        response = self.client.get(
+            reverse("matriculas_solicitacoes_exportar"),
+            {"periodo": self.periodo.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        with ZipFile(BytesIO(response.content)) as xlsx:
+            workbook = xlsx.read("xl/workbook.xml").decode()
+            planilhas = [
+                xlsx.read(nome).decode()
+                for nome in xlsx.namelist()
+                if nome.startswith("xl/worksheets/sheet")
+            ]
+        self.assertIn(self.disciplina.nome, workbook)
+        self.assertIn("Matrícula vínculo", workbook)
+        self.assertTrue(any(self.aluno.nome in planilha for planilha in planilhas))
+        self.assertTrue(any(aluno_vinculo.nome in planilha for planilha in planilhas))
+
     @patch("processos.views.send_email_secretaria_planejamento_presencial.delay")
     def test_planejamento_presencial_cria_reserva_para_oferta_hibrida(self, mock_email):
         self.oferta.modalidade = OfertaDisciplina.Modalidade.HIBRIDA
@@ -981,13 +1057,17 @@ class MatriculaViewsTests(TestCase):
             password="senha-segura-123",
             nome="Aluno Posdoc",
         )
-        criar_trajetoria(aluno_posdoc, nivel_curso=Aluno.NivelCurso.POSDOUTORADO)
+        criar_trajetoria(
+            aluno_posdoc,
+            nivel_curso=Aluno.NivelCurso.POSDOUTORADO,
+            orientador=self.docente,
+        )
         self.client.force_login(aluno_posdoc)
 
         response = self.client.get(reverse("matricula_solicitar_periodo", args=[self.periodo.pk]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Alunos de pós-doutorado não realizam matrícula")
+        self.assertContains(response, "Alunos de Pós-Doutorado não realizam matrícula")
         self.assertNotContains(response, "Enviar solicitação")
 
 
@@ -1772,6 +1852,50 @@ class AlunosViewTests(TestCase):
         self.assertNotContains(response, aluno_concluido.nome)
         self.assertNotContains(response, aluno_concluido.email)
 
+    def test_dashboard_separa_supervisao_de_pos_doutorado_das_orientacoes(self):
+        posdoc = Aluno.objects.create(
+            email="posdoc.dashboard@example.com",
+            password="senha-segura-123",
+            nome="Pesquisadora Pós-Doutorado",
+        )
+        trajetoria = criar_trajetoria(
+            posdoc,
+            nivel_curso=Aluno.NivelCurso.POSDOUTORADO,
+            orientador=self.docente,
+        )
+
+        self.client.force_login(self.servidor)
+        response = self.client.get(reverse("coordenacao_dashboard"))
+
+        docente = next(item for item in response.context["docentes"] if item.pk == self.docente.pk)
+        self.assertEqual(docente.total_orientandos, 1)
+        self.assertEqual(docente.total_supervisoes, 1)
+        self.assertIn(trajetoria, docente.trajetorias_supervisionadas_ativas)
+        self.assertNotIn(trajetoria, docente.trajetorias_orientadas_ativas)
+        self.assertContains(response, "1 supervisão")
+        self.assertContains(response, posdoc.nome)
+
+    def test_ficha_pos_doutorado_exibe_supervisor_e_oculta_horas_complementares(self):
+        posdoc = Aluno.objects.create(
+            email="posdoc.ficha@example.com",
+            password="senha-segura-123",
+            nome="Pesquisador Pós-Doutorado",
+        )
+        criar_trajetoria(
+            posdoc,
+            nivel_curso=Aluno.NivelCurso.POSDOUTORADO,
+            orientador=self.docente,
+        )
+        self.client.force_login(self.servidor)
+
+        response = self.client.get(reverse("aluno_detalhe", args=[posdoc.pk]))
+
+        self.assertContains(response, "Pós-Doutorado")
+        self.assertContains(response, "Supervisor")
+        self.assertContains(response, self.docente.nome)
+        self.assertNotContains(response, "Horas complementares")
+        self.assertNotContains(response, "Adicionar lançamento")
+
     def test_meus_orientandos_separa_vinculos_por_status_e_papel(self):
         aluno_coorientado = Aluno.objects.create(
             email="aluno.coorientado@example.com",
@@ -2073,8 +2197,26 @@ class AlunosViewTests(TestCase):
         self.assertEqual(trajetoria.numero_defesa, "RF-2026-01")
         self.assertEqual(trajetoria.prazo_qualificacao, "")
         self.assertEqual(trajetoria.prazo_defesa, "")
-        self.assertIsNone(trajetoria.orientador)
+        self.assertEqual(trajetoria.orientador, self.docente)
         self.assertFalse(trajetoria.deposito_versao_final)
+
+    def test_pos_doutorado_rejeita_lancamento_de_horas_complementares(self):
+        posdoc = Aluno.objects.create(
+            email="posdoc.sem.horas@example.com",
+            password="senha-segura-123",
+            nome="Pós-Doutorado sem Horas",
+        )
+        trajetoria = criar_trajetoria(
+            posdoc,
+            nivel_curso=Aluno.NivelCurso.POSDOUTORADO,
+            orientador=self.docente,
+        )
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Trajetórias de Pós-Doutorado não possuem horas complementares.",
+        ):
+            LancamentoHorasComplementares(trajetoria=trajetoria).clean()
 
     def test_alterar_status_exige_comentario_e_cria_historico(self):
         self.client.force_login(self.servidor)
@@ -2985,6 +3127,60 @@ class SolicitacaoAssinaturaTests(TestCase):
         self.assertContains(response, "Nova solicitação")
         self.assertContains(response, "Pendências de assinatura")
         self.assertContains(response, "Solicitações feitas")
+
+    def test_busca_solicitacoes_por_referencias_pdf_e_observacoes(self):
+        casos = [
+            {
+                "tipo_documento": SolicitacaoAssinatura.TipoDocumento.DOCUMENTO_SEI,
+                "numero_documento_sei": "DOC-LOCALIZAVEL-123",
+                "observacao": "Primeiro pedido",
+            },
+            {
+                "tipo_documento": SolicitacaoAssinatura.TipoDocumento.BLOCO_SEI,
+                "numero_bloco_sei": "BLOCO-LOCALIZAVEL-456",
+                "observacao": "Segundo pedido",
+            },
+            {
+                "tipo_documento": SolicitacaoAssinatura.TipoDocumento.PDF,
+                "documento_pdf": "assinaturas/originais/2026/08/ata_localizavel.pdf",
+                "observacao": "Terceiro pedido",
+            },
+        ]
+        solicitacoes = [
+            SolicitacaoAssinatura.objects.create(
+                criado_por=self.servidor,
+                destinatario_tipo=SolicitacaoAssinatura.DestinatarioTipo.DOCENTE,
+                docente=self.docente,
+                **dados,
+            )
+            for dados in casos
+        ]
+        solicitacoes[2].observacao_assinatura = "Conferência final localizável"
+        solicitacoes[2].save(update_fields=["observacao_assinatura"])
+        self.client.force_login(self.servidor)
+
+        for termo, esperado in (
+            ("DOC-LOCALIZAVEL", solicitacoes[0]),
+            ("BLOCO-LOCALIZAVEL", solicitacoes[1]),
+            ("ata_localizavel.pdf", solicitacoes[2]),
+            ("Conferência final", solicitacoes[2]),
+        ):
+            with self.subTest(termo=termo):
+                response = self.client.get(reverse("solicitacoes_assinatura"), {"q": termo})
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, reverse("solicitacao_assinatura_detalhe", args=[esperado.pk]))
+                self.assertEqual(list(response.context["solicitacoes"]), [esperado])
+
+    def test_busca_preserva_filtro_de_status(self):
+        self.client.force_login(self.servidor)
+
+        response = self.client.get(
+            reverse("solicitacoes_assinatura"),
+            {"status": SolicitacaoAssinatura.Status.PENDENTE, "q": "documento importante"},
+        )
+
+        self.assertContains(response, 'name="status" value="PENDENTE"', html=False)
+        self.assertContains(response, "q=documento%20importante", html=False)
 
     def test_docente_ve_assinatura_pendente_na_home(self):
         solicitacao = SolicitacaoAssinatura.objects.create(

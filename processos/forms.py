@@ -1058,6 +1058,8 @@ class HorasComplementaresAdministrativoForm(forms.Form):
 
         if not self.trajetoria:
             raise forms.ValidationError("Trajetória acadêmica não encontrada.")
+        if self.trajetoria.nivel_curso == Aluno.NivelCurso.POSDOUTORADO:
+            raise forms.ValidationError("Trajetórias de Pós-Doutorado não possuem horas complementares.")
         if not self.norma:
             raise forms.ValidationError("Não há norma vigente de horas complementares para esta trajetória.")
         if tipo and tipo.norma_id != self.norma.id:
@@ -1300,13 +1302,18 @@ class AlunoCadastroForm(forms.Form):
             Aluno.NivelCurso.MESTRADO,
             Aluno.NivelCurso.DOUTORADO,
         }
+        usa_supervisao = nivel_curso == Aluno.NivelCurso.POSDOUTORADO
         if not usa_orientacao:
-            cleaned_data["orientador"] = None
+            if not usa_supervisao:
+                cleaned_data["orientador"] = None
             cleaned_data["tipo_coorientador"] = "NENHUM"
             cleaned_data["coorientador"] = None
             cleaned_data["coorientador_externo_nome"] = ""
             cleaned_data["coorientador_externo_email"] = ""
             cleaned_data["coorientador_externo_instituicao"] = ""
+
+        if usa_supervisao and not cleaned_data.get("orientador"):
+            self.add_error("orientador", "Selecione o supervisor do Pós-Doutorado.")
         elif tipo_coorientador == "CADASTRADO" and not coorientador:
             self.add_error("coorientador", "Selecione um docente cadastrado.")
         elif tipo_coorientador == "EXTERNO" and not externo_nome:
@@ -1551,6 +1558,7 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
             Aluno.NivelCurso.MESTRADO,
             Aluno.NivelCurso.DOUTORADO,
         }
+        usa_supervisao = nivel_curso == Aluno.NivelCurso.POSDOUTORADO
         usa_conclusao = nivel_curso in {
             Aluno.NivelCurso.MESTRADO,
             Aluno.NivelCurso.DOUTORADO,
@@ -1563,12 +1571,16 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
             cleaned_data["prazo_defesa"] = ""
             cleaned_data["reingressante"] = False
             cleaned_data["isQualificado"] = False
-            cleaned_data["orientador"] = None
+            if not usa_supervisao:
+                cleaned_data["orientador"] = None
             cleaned_data["tipo_coorientador"] = self.TipoCoorientador.NENHUM
             cleaned_data["coorientador"] = None
             cleaned_data["coorientador_externo_nome"] = ""
             cleaned_data["coorientador_externo_email"] = ""
             cleaned_data["coorientador_externo_instituicao"] = ""
+
+        if usa_supervisao and not cleaned_data.get("orientador"):
+            self.add_error("orientador", "Selecione o supervisor do Pós-Doutorado.")
 
         if not usa_conclusao:
             cleaned_data["numero_defesa"] = ""

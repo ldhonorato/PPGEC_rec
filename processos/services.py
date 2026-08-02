@@ -283,7 +283,7 @@ def salvar_solicitacao_matricula(
         raise ValidationError("A solicitação de matrícula exige trajetória acadêmica ativa.")
     tipo_aluno_esperado = tipo_aluno_matricula_por_trajetoria(trajetoria_ativa)
     if tipo_aluno_esperado is None:
-        raise ValidationError("Aluno de pós-doutorado não realiza matrícula em disciplinas.")
+        raise ValidationError("Aluno de Pós-Doutorado não realiza matrícula em disciplinas.")
     if tipo_aluno != tipo_aluno_esperado:
         raise ValidationError("O tipo de aluno deve ser obtido da trajetória acadêmica ativa.")
     if not periodo.aceita_solicitacao_matricula:
@@ -501,3 +501,114 @@ def gerar_xlsx_lista_oferta(oferta):
         ))
         xlsx.writestr("xl/worksheets/sheet1.xml", _xlsx_planilha_xml(linhas))
     return buffer.getvalue()
+
+
+def _gerar_xlsx_multiplas_planilhas(planilhas):
+    """Gera um XLSX simples, com uma planilha para cada par (nome, linhas)."""
+    nomes_usados = set()
+    planilhas_normalizadas = []
+    for indice, (nome, linhas) in enumerate(planilhas, start=1):
+        nome_limpo = "".join("-" if char in "[]:*?/\\" else char for char in nome).strip()[:31] or f"Planilha {indice}"
+        nome_base = nome_limpo
+        sufixo = 2
+        while nome_limpo.casefold() in nomes_usados:
+            complemento = f" ({sufixo})"
+            nome_limpo = f"{nome_base[:31-len(complemento)]}{complemento}"
+            sufixo += 1
+        nomes_usados.add(nome_limpo.casefold())
+        planilhas_normalizadas.append((nome_limpo, linhas))
+
+    buffer = BytesIO()
+    with ZipFile(buffer, "w", ZIP_DEFLATED) as xlsx:
+        overrides = "".join(
+            f'<Override PartName="/xl/worksheets/sheet{i}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+            for i in range(1, len(planilhas_normalizadas) + 1)
+        )
+        xlsx.writestr("[Content_Types].xml", (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            f'{overrides}</Types>'
+        ))
+        xlsx.writestr("_rels/.rels", (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+            '</Relationships>'
+        ))
+        sheets = "".join(
+            f'<sheet name="{escape(nome)}" sheetId="{i}" r:id="rId{i}"/>'
+            for i, (nome, _linhas) in enumerate(planilhas_normalizadas, start=1)
+        )
+        xlsx.writestr("xl/workbook.xml", (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            f'<sheets>{sheets}</sheets></workbook>'
+        ))
+        rels = "".join(
+            f'<Relationship Id="rId{i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet{i}.xml"/>'
+            for i in range(1, len(planilhas_normalizadas) + 1)
+        )
+        xlsx.writestr("xl/_rels/workbook.xml.rels", (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            f'{rels}</Relationships>'
+        ))
+        for i, (_nome, linhas) in enumerate(planilhas_normalizadas, start=1):
+            xlsx.writestr(f"xl/worksheets/sheet{i}.xml", _xlsx_planilha_xml(linhas))
+    return buffer.getvalue()
+
+
+def gerar_xlsx_solicitacoes_periodo(periodo):
+    cabecalho = ["Matrícula", "Nome", "E-mail", "Tipo de aluno", "Status", "Solicitado em", "Observação"]
+    planilhas = []
+    disciplinas = (
+        OfertaDisciplina.objects.filter(periodo=periodo, itens_matricula__isnull=False)
+        .select_related("disciplina")
+        .order_by("disciplina__codigo", "disciplina__nome")
+        .values_list("disciplina_id", "disciplina__codigo", "disciplina__nome")
+        .distinct()
+    )
+    for disciplina_id, codigo, nome in disciplinas:
+        linhas = [cabecalho]
+        itens = (
+            ItemSolicitacaoMatricula.objects.filter(
+                oferta__periodo=periodo,
+                oferta__disciplina_id=disciplina_id,
+            )
+            .select_related("solicitacao", "solicitacao__aluno")
+            .order_by("solicitacao__aluno__nome")
+        )
+        for item in itens:
+            solicitacao = item.solicitacao
+            linhas.append([
+                solicitacao.aluno.matricula,
+                solicitacao.aluno.nome,
+                solicitacao.aluno.email,
+                solicitacao.get_tipo_aluno_display(),
+                item.get_status_display(),
+                timezone.localtime(item.solicitado_em).strftime("%d/%m/%Y %H:%M") if item.solicitado_em else "",
+                solicitacao.observacao_aluno,
+            ])
+        planilhas.append((f"{codigo} {nome}".strip(), linhas))
+
+    vinculos = SolicitacaoMatricula.objects.filter(
+        periodo=periodo,
+        tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
+    ).select_related("aluno").order_by("aluno__nome")
+    linhas_vinculo = [cabecalho]
+    for solicitacao in vinculos:
+        linhas_vinculo.append([
+            solicitacao.aluno.matricula,
+            solicitacao.aluno.nome,
+            solicitacao.aluno.email,
+            solicitacao.get_tipo_aluno_display(),
+            solicitacao.get_status_display(),
+            timezone.localtime(solicitacao.solicitada_em).strftime("%d/%m/%Y %H:%M") if solicitacao.solicitada_em else "",
+            solicitacao.observacao_aluno,
+        ])
+    planilhas.append(("Matrícula vínculo", linhas_vinculo))
+    return _gerar_xlsx_multiplas_planilhas(planilhas)

@@ -114,6 +114,7 @@ from .services import (
     carga_horaria_presencial_oferta_minutos,
     carga_horaria_total_oferta_minutos,
     gerar_xlsx_lista_oferta,
+    gerar_xlsx_solicitacoes_periodo,
     indeferir_item_matricula,
     indeferir_solicitacao_vinculo,
     datas_encontro_no_periodo,
@@ -597,7 +598,8 @@ def _trajetoria_campo_historico(trajetoria: TrajetoriaAcademica, campo: str) -> 
     if campo == "isQualificado":
         return trajetoria.qualificacao_label, _bool_label(trajetoria.isQualificado)
     if campo == "orientador":
-        return "Orientador", _docente_label(trajetoria.orientador)
+        rotulo = "Supervisor" if trajetoria.usa_supervisao else "Orientador"
+        return rotulo, _docente_label(trajetoria.orientador)
     if campo == "coorientador":
         return "Coorientador", _coorientador_label(trajetoria)
     if campo == "defesa":
@@ -1300,11 +1302,18 @@ def matriculas_solicitacoes_view(request):
                     messages.success(request, "Item de matrícula cancelado.")
         except ValidationError as exc:
             messages.error(request, "; ".join(exc.messages))
-        periodo_param = f"?periodo={periodo.pk}" if periodo else ""
-        return redirect(f"{reverse('matriculas_solicitacoes')}{periodo_param}")
+        parametros = [f"periodo={periodo.pk}"] if periodo else []
+        disciplina_param = request.POST.get("disciplina", "").strip()
+        if disciplina_param:
+            parametros.append(f"disciplina={disciplina_param}")
+        query = f"?{'&'.join(parametros)}" if parametros else ""
+        return redirect(f"{reverse('matriculas_solicitacoes')}{query}")
 
-    solicitacoes = SolicitacaoMatricula.objects.none()
+    disciplinas = []
+    itens_disciplina = ItemSolicitacaoMatricula.objects.none()
     solicitacoes_vinculo = SolicitacaoMatricula.objects.none()
+    disciplina_selecionada = request.GET.get("disciplina", "").strip()
+    disciplina_obj = None
     resumo_solicitacoes = {
         "matriculas_regulares": 0,
         "matriculas_especiais": 0,
@@ -1312,54 +1321,50 @@ def matriculas_solicitacoes_view(request):
         "espera_especiais": 0,
     }
     if periodo:
-        solicitacoes_vinculo = list(
-            SolicitacaoMatricula.objects.filter(
+        itens_periodo = ItemSolicitacaoMatricula.objects.filter(oferta__periodo=periodo)
+        disciplinas = list(
+            Disciplina.objects.filter(ofertas__periodo=periodo, ofertas__itens_matricula__isnull=False)
+            .annotate(total_solicitacoes=Count("ofertas__itens_matricula", distinct=True))
+            .order_by("codigo", "nome")
+            .distinct()
+        )
+        total_vinculos = SolicitacaoMatricula.objects.filter(
+            periodo=periodo,
+            tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
+        ).count()
+        for tipo_aluno, chave_matricula, chave_espera in (
+            (SolicitacaoMatricula.TipoAluno.REGULAR, "matriculas_regulares", "espera_regulares"),
+            (SolicitacaoMatricula.TipoAluno.ESPECIAL, "matriculas_especiais", "espera_especiais"),
+        ):
+            itens_tipo = itens_periodo.filter(solicitacao__tipo_aluno=tipo_aluno)
+            resumo_solicitacoes[chave_matricula] = itens_tipo.filter(
+                status__in=[ItemSolicitacaoMatricula.Status.SOLICITADO, ItemSolicitacaoMatricula.Status.HOMOLOGADO]
+            ).count()
+            resumo_solicitacoes[chave_espera] = itens_tipo.filter(
+                status=ItemSolicitacaoMatricula.Status.EM_LISTA_ESPERA
+            ).count()
+
+        if disciplina_selecionada == "vinculo":
+            solicitacoes_vinculo = SolicitacaoMatricula.objects.filter(
                 periodo=periodo,
                 tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
+            ).select_related("aluno", "periodo").order_by("status", "aluno__nome")
+        elif disciplina_selecionada.isdigit():
+            disciplina_obj = next(
+                (disciplina for disciplina in disciplinas if disciplina.pk == int(disciplina_selecionada)),
+                None,
             )
-            .select_related("aluno", "periodo")
-            .order_by("status", "aluno__nome")
-        )
-        solicitacoes = (
-            SolicitacaoMatricula.objects.filter(
-                periodo=periodo,
-                tipo_matricula=SolicitacaoMatricula.TipoMatricula.DISCIPLINAS,
-            )
-            .select_related("aluno", "periodo")
-            .prefetch_related(
-                "itens__oferta__disciplina",
-                "itens__oferta__docente_responsavel",
-                "itens__oferta__docente_colaborador",
-                "itens__oferta__encontros",
-            )
-            .annotate(
-                itens_matricula=Count(
-                    "itens",
-                    filter=Q(
-                        itens__status__in=[
-                            ItemSolicitacaoMatricula.Status.SOLICITADO,
-                            ItemSolicitacaoMatricula.Status.HOMOLOGADO,
-                        ]
-                    ),
-                    distinct=True,
-                ),
-                itens_espera=Count(
-                    "itens",
-                    filter=Q(itens__status=ItemSolicitacaoMatricula.Status.EM_LISTA_ESPERA),
-                    distinct=True,
-                ),
-            )
-            .order_by("status", "aluno__nome")
-        )
-        solicitacoes = list(solicitacoes)
-        for solicitacao in solicitacoes:
-            if solicitacao.tipo_aluno == SolicitacaoMatricula.TipoAluno.ESPECIAL:
-                resumo_solicitacoes["matriculas_especiais"] += solicitacao.itens_matricula
-                resumo_solicitacoes["espera_especiais"] += solicitacao.itens_espera
-            else:
-                resumo_solicitacoes["matriculas_regulares"] += solicitacao.itens_matricula
-                resumo_solicitacoes["espera_regulares"] += solicitacao.itens_espera
-            for item in solicitacao.itens.all():
+            if disciplina_obj:
+                itens_disciplina = itens_periodo.filter(
+                    oferta__disciplina=disciplina_obj,
+                ).select_related(
+                    "solicitacao",
+                    "solicitacao__aluno",
+                    "oferta",
+                    "oferta__docente_responsavel",
+                    "oferta__docente_colaborador",
+                ).order_by("status", "solicitacao__aluno__nome")
+            for item in itens_disciplina:
                 item.editavel = item.status not in {
                     ItemSolicitacaoMatricula.Status.INDEFERIDO,
                     ItemSolicitacaoMatricula.Status.CANCELADO,
@@ -1383,11 +1388,29 @@ def matriculas_solicitacoes_view(request):
         {
             "periodos": periodos,
             "periodo": periodo,
-            "solicitacoes": solicitacoes,
+            "disciplinas": disciplinas,
+            "disciplina_selecionada": disciplina_selecionada,
+            "disciplina_obj": disciplina_obj,
+            "itens_disciplina": itens_disciplina,
             "solicitacoes_vinculo": solicitacoes_vinculo,
+            "total_vinculos": total_vinculos if periodo else 0,
             "resumo_solicitacoes": resumo_solicitacoes,
         },
     )
+
+
+@login_required
+def matriculas_solicitacoes_exportar_view(request):
+    if not _can_manage_matriculas(request.user):
+        raise PermissionDenied("Apenas secretaria e coordenação podem exportar solicitações de matrícula.")
+    periodo = get_object_or_404(PeriodoLetivo, pk=request.GET.get("periodo"))
+    conteudo = gerar_xlsx_solicitacoes_periodo(periodo)
+    response = HttpResponse(
+        conteudo,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="solicitacoes_matricula_{periodo.nome}.xlsx"'
+    return response
 
 
 @login_required
@@ -1984,11 +2007,17 @@ def coordenacao_dashboard_view(request):
     trajetorias_ativas = TrajetoriaAcademica.objects.filter(
         status=TrajetoriaAcademica.Status.ATIVA,
     ).select_related("aluno")
+    trajetorias_orientacao_ativas = trajetorias_ativas.exclude(
+        nivel_curso=Aluno.NivelCurso.POSDOUTORADO,
+    )
+    trajetorias_supervisao_ativas = trajetorias_ativas.filter(
+        nivel_curso=Aluno.NivelCurso.POSDOUTORADO,
+    )
     docentes = (
         Docente.objects.prefetch_related(
             Prefetch(
                 "trajetorias_orientadas",
-                queryset=trajetorias_ativas,
+                queryset=trajetorias_orientacao_ativas,
                 to_attr="trajetorias_orientadas_ativas",
             ),
             Prefetch(
@@ -1996,11 +2025,17 @@ def coordenacao_dashboard_view(request):
                 queryset=trajetorias_ativas,
                 to_attr="trajetorias_coorientadas_ativas",
             ),
+            Prefetch(
+                "trajetorias_orientadas",
+                queryset=trajetorias_supervisao_ativas,
+                to_attr="trajetorias_supervisionadas_ativas",
+            ),
         )
         .annotate(
             total_orientandos=Count(
                 "trajetorias_orientadas__aluno",
-                filter=Q(trajetorias_orientadas__status=TrajetoriaAcademica.Status.ATIVA),
+                filter=Q(trajetorias_orientadas__status=TrajetoriaAcademica.Status.ATIVA)
+                & ~Q(trajetorias_orientadas__nivel_curso=Aluno.NivelCurso.POSDOUTORADO),
                 distinct=True,
             ),
             total_coorientandos=Count(
@@ -2008,8 +2043,16 @@ def coordenacao_dashboard_view(request):
                 filter=Q(trajetorias_coorientadas__status=TrajetoriaAcademica.Status.ATIVA),
                 distinct=True,
             ),
+            total_supervisoes=Count(
+                "trajetorias_orientadas__aluno",
+                filter=Q(
+                    trajetorias_orientadas__status=TrajetoriaAcademica.Status.ATIVA,
+                    trajetorias_orientadas__nivel_curso=Aluno.NivelCurso.POSDOUTORADO,
+                ),
+                distinct=True,
+            ),
         )
-        .order_by("-total_orientandos", "nome")
+        .order_by("-total_orientandos", "-total_supervisoes", "nome")
     )
     return render(
         request,
@@ -2354,6 +2397,15 @@ def _linhas_trajetoria(trajetoria):
             },
             {"rotulo": "Coorientador", "valor": trajetoria.coorientador_display or "—", "campo": "coorientador"},
         ]
+
+    if trajetoria.usa_supervisao:
+        linhas.append(
+            {
+                "rotulo": "Supervisor",
+                "valor": trajetoria.orientador.nome if trajetoria.orientador else "—",
+                "campo": "orientador",
+            }
+        )
 
     if trajetoria.usa_conclusao:
         if trajetoria.numero_defesa or trajetoria.data_defesa:
@@ -3228,7 +3280,11 @@ def aluno_detalhe_view(request, aluno_id):
                 "linhas": _linhas_trajetoria(trajetoria),
                 "esta_ativa": trajetoria.status == TrajetoriaAcademica.Status.ATIVA,
                 "form": TrajetoriaAcademicaForm(initial=_trajetoria_form_initial(trajetoria)),
-                "resumo_horas_complementares": LancamentoHorasComplementares.resumo_trajetoria(trajetoria),
+                "resumo_horas_complementares": (
+                    None
+                    if trajetoria.nivel_curso == Aluno.NivelCurso.POSDOUTORADO
+                    else LancamentoHorasComplementares.resumo_trajetoria(trajetoria)
+                ),
                 "horas_form": HorasComplementaresAdministrativoForm(
                     trajetoria=trajetoria,
                     usuario=request.user,
@@ -4414,6 +4470,16 @@ def solicitacoes_assinatura_view(request):
     else:
         status = ""
 
+    termo_busca = request.GET.get("q", "").strip()
+    if termo_busca:
+        queryset = queryset.filter(
+            Q(numero_bloco_sei__icontains=termo_busca)
+            | Q(numero_documento_sei__icontains=termo_busca)
+            | Q(documento_pdf__icontains=termo_busca)
+            | Q(observacao__icontains=termo_busca)
+            | Q(observacao_assinatura__icontains=termo_busca)
+        )
+
     return render(
         request,
         "processos/solicitacoes_assinatura.html",
@@ -4423,6 +4489,7 @@ def solicitacoes_assinatura_view(request):
             "solicitacoes": queryset,
             "status_filtro": status,
             "status_choices": SolicitacaoAssinatura.Status.choices,
+            "termo_busca": termo_busca,
             "show_status_filters": True,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
@@ -4823,6 +4890,11 @@ def menu_meus_orientandos_view(request):
     orientacoes_ativas = trajetorias_docente.filter(
         orientador=request.user,
         status=TrajetoriaAcademica.Status.ATIVA,
+    ).exclude(nivel_curso=Aluno.NivelCurso.POSDOUTORADO)
+    supervisoes_ativas = trajetorias_docente.filter(
+        orientador=request.user,
+        status=TrajetoriaAcademica.Status.ATIVA,
+        nivel_curso=Aluno.NivelCurso.POSDOUTORADO,
     )
     coorientacoes_ativas = trajetorias_docente.filter(
         coorientador=request.user,
@@ -4837,6 +4909,7 @@ def menu_meus_orientandos_view(request):
         {
             "orientacoes_ativas": orientacoes_ativas,
             "coorientacoes_ativas": coorientacoes_ativas,
+            "supervisoes_ativas": supervisoes_ativas,
             "vinculos_concluidos": vinculos_concluidos,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),

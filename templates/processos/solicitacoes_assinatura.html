@@ -9,14 +9,30 @@
         </div>
         {% if show_status_filters %}
         <div class="calendar-nav">
-            <a class="btn {% if not status_filtro %}{% else %}btn-secondary{% endif %}" href="{% url 'solicitacoes_assinatura' %}">Todas</a>
+            <a class="btn {% if not status_filtro %}{% else %}btn-secondary{% endif %}" href="{% url 'solicitacoes_assinatura' %}{% if termo_busca %}?q={{ termo_busca|urlencode }}{% endif %}">Todas</a>
             {% for value,label in status_choices %}
-                <a class="btn {% if status_filtro == value %}{% else %}btn-secondary{% endif %}" href="?status={{ value }}">{{ label }}</a>
+                <a class="btn {% if status_filtro == value %}{% else %}btn-secondary{% endif %}" href="?status={{ value }}{% if termo_busca %}&amp;q={{ termo_busca|urlencode }}{% endif %}">{{ label }}</a>
             {% endfor %}
         </div>
         {% endif %}
     </div>
 </section>
+
+{% if show_status_filters %}
+<section class="card">
+    <form method="get" class="filter-form">
+        {% if status_filtro %}<input type="hidden" name="status" value="{{ status_filtro }}">{% endif %}
+        <div class="field">
+            <label for="assinaturas-q">Buscar pedidos de assinatura</label>
+            <input id="assinaturas-q" type="search" name="q" value="{{ termo_busca }}" placeholder="Número no SEI, nome do PDF ou observação">
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">Buscar</button>
+            {% if termo_busca %}<a class="btn btn-secondary" href="{% url 'solicitacoes_assinatura' %}{% if status_filtro %}?status={{ status_filtro }}{% endif %}">Limpar busca</a>{% endif %}
+        </div>
+    </form>
+</section>
+{% endif %}
 
 <section class="card">
     {% if solicitacoes %}

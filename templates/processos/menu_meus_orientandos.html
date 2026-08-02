@@ -16,7 +16,7 @@ separador ficava pendurado no fim da frase.
     <div class="lista-cabecalho">
         <div>
             <h1 class="section-title">Meus orientandos</h1>
-            <p class="muted">Alunos sob sua orientação e coorientação.</p>
+            <p class="muted">Alunos sob sua orientação, coorientação ou supervisão de Pós-Doutorado.</p>
         </div>
         <span class="lista-contagem">{{ orientacoes_ativas|length }} ativa{{ orientacoes_ativas|length|pluralize }}</span>
     </div>
@@ -26,6 +26,9 @@ separador ficava pendurado no fim da frase.
 
     <h2 class="section-title titulo-interno">Coorientações</h2>
     {% include "includes/tabela_orientandos.html" with trajetorias=coorientacoes_ativas mostrar_orientador=True vazio_titulo="Nenhuma coorientação ativa" vazio_texto="Coorientações aparecem aqui quando a coordenação registra o vínculo." %}
+
+    <h2 class="section-title titulo-interno">Supervisões de Pós-Doutorado</h2>
+    {% include "includes/tabela_orientandos.html" with trajetorias=supervisoes_ativas vazio_titulo="Nenhuma supervisão ativa" vazio_texto="Supervisões aparecem aqui quando a coordenação registra o supervisor da trajetória de Pós-Doutorado." %}
 
     <h2 class="section-title titulo-interno">Concluídas</h2>
     {% include "includes/tabela_orientandos.html" with trajetorias=vinculos_concluidos mostrar_papel=True vazio_titulo="Nenhuma orientação concluída" vazio_texto="Trajetórias que você orientou e que já foram concluídas ficam registradas aqui." %}

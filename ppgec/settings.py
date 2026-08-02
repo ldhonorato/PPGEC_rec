@@ -238,6 +238,11 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'login'
 
+# Encerra o login após 20 minutos sem uma requisição autenticada. Ao salvar a
+# sessão em cada requisição, o prazo é renovado enquanto o usuário está ativo.
+SESSION_COOKIE_AGE = 20 * 60
+SESSION_SAVE_EVERY_REQUEST = True
+
 # email config
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 

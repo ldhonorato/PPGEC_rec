@@ -76,10 +76,10 @@
     </fieldset>
 
     <fieldset class="campo-grupo" data-nivel-section="ORIENTACAO">
-        <legend>Orientação</legend>
+        <legend data-vinculo-docente-legend>Orientação</legend>
 
         <div class="campo{% if form.orientador.errors %} tem-erro{% endif %}">
-            <label for="{{ form.orientador.id_for_label }}">{{ form.orientador.label }}</label>
+            <label for="{{ form.orientador.id_for_label }}" data-vinculo-docente-label>{{ form.orientador.label }}</label>
             {{ form.orientador }}
             {% for erro in form.orientador.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
         </div>
@@ -191,14 +191,27 @@
         function atualizarNivel() {
             if (!nivel) return;
             const usaOrientacao = nivel.value === "MESTRADO" || nivel.value === "DOUTORADO";
+            const usaSupervisao = nivel.value === "POSDOUTORADO";
             document.querySelectorAll("[data-nivel-section='ORIENTACAO']").forEach((section) => {
-                section.style.display = usaOrientacao ? "" : "none";
+                section.style.display = usaOrientacao || usaSupervisao ? "" : "none";
             });
+            document.querySelectorAll("[data-vinculo-docente-legend]").forEach((legend) => {
+                legend.textContent = usaSupervisao ? "Supervisão" : "Orientação";
+            });
+            document.querySelectorAll("[data-vinculo-docente-label]").forEach((label) => {
+                label.textContent = usaSupervisao ? "Supervisor" : "Orientador";
+            });
+            if (tipoCoorientador) tipoCoorientador.closest(".campo").style.display = usaOrientacao ? "" : "none";
+            document.querySelectorAll("[data-coorientador-section]").forEach((section) => {
+                if (!usaOrientacao) section.style.display = "none";
+            });
+            atualizarCoorientador();
         }
         function atualizarCoorientador() {
             if (!tipoCoorientador) return;
+            const usaOrientacao = nivel && (nivel.value === "MESTRADO" || nivel.value === "DOUTORADO");
             document.querySelectorAll("[data-coorientador-section]").forEach((section) => {
-                section.style.display = section.dataset.coorientadorSection === tipoCoorientador.value ? "" : "none";
+                section.style.display = usaOrientacao && section.dataset.coorientadorSection === tipoCoorientador.value ? "" : "none";
             });
         }
         if (nivel) {
