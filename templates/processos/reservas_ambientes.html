@@ -5,7 +5,7 @@
     <div class="actions-row">
         <div>
             <h1 class="section-title">Nova reserva de ambiente</h1>
-            <p class="muted">Reserve salas disponíveis para aula, defesa ou reuniao de pesquisa.</p>
+            <p class="muted">Reserve salas disponíveis para aula, defesa ou reunião de pesquisa.</p>
         </div>
         <div class="actions-row">
             <a class="btn btn-secondary" href="{% url 'disponibilidade_ambientes' %}">Ver disponibilidade</a>
@@ -61,7 +61,7 @@
                     <label for="{{ form.hora_fim.id_for_label }}">{{ form.hora_fim.label }}</label>
                     {{ form.hora_fim }}
                     {{ form.hora_fim.errors }}
-                    <small class="muted">A reserva deve comecar e terminar no mesmo dia.</small>
+                    <small class="muted">A reserva deve começar e terminar no mesmo dia.</small>
                 </div>
                 <div class="field">
                     <label for="{{ form.recorrencia.id_for_label }}">{{ form.recorrencia.label }}</label>
@@ -72,7 +72,7 @@
                     <label for="{{ form.duracao_recorrencia_meses.id_for_label }}">{{ form.duracao_recorrencia_meses.label }}</label>
                     {{ form.duracao_recorrencia_meses }}
                     {{ form.duracao_recorrencia_meses.errors }}
-                    <small class="muted">Preencha apenas para recorrências diarias, semanais ou mensais. Limite de 6 meses.</small>
+                    <small class="muted">Preencha apenas para recorrências diárias, semanais ou mensais. Limite de 6 meses.</small>
                 </div>
             </div>
             <div class="form-actions">
