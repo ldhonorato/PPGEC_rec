@@ -14,13 +14,13 @@
         </div>
     </div>
 
-    <form method="get" class="stack">
-        <div class="grid-two">
-            <div class="field">
+    <form method="get" class="filtros">
+        <div class="filtros-linha">
+            <div class="filtros-campo filtros-campo-data">
                 <label for="cal-semana">Semana</label>
                 <input id="cal-semana" type="date" name="semana" value="{{ calendario_inicio|date:'Y-m-d' }}">
             </div>
-            <div class="field">
+            <div class="filtros-campo filtros-campo-escolha">
                 <label for="cal-polo">Polo</label>
                 <select id="cal-polo" name="cal_polo">
                     <option value="">Todos</option>
@@ -29,7 +29,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="field">
+            <div class="filtros-campo filtros-campo-escolha">
                 <label for="cal-sala">Sala</label>
                 <select id="cal-sala" name="cal_sala">
                     <option value="">Todas</option>
@@ -38,9 +38,9 @@
                     {% endfor %}
                 </select>
             </div>
-        </div>
-        <div class="form-actions">
-            <button class="btn" type="submit">Atualizar calendário</button>
+            <div class="filtros-acoes">
+                <button class="btn btn-secondary" type="submit">Atualizar</button>
+            </div>
         </div>
     </form>
 

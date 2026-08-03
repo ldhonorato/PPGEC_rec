@@ -32,20 +32,22 @@ tinha um unico filho e os cartoes encostavam um no outro.
             <button class="btn" type="button" data-open-dialog="nova-oferta">Nova oferta</button>
         </div>
     </div>
-    <form method="get" class="grid-two form-filtros" data-periodo-filter>
-        <div class="field">
-            <label for="periodo">Período letivo</label>
-            <select id="periodo" name="periodo">
-                {% for periodo in periodos %}
-                    <option value="{{ periodo.pk }}" {% if periodo_selecionado.pk == periodo.pk %}selected{% endif %}>
-                        {{ periodo.nome }} - {{ periodo.status_atual_display }}
-                    </option>
-                {% endfor %}
-            </select>
+    <form method="get" class="filtros" data-periodo-filter>
+        <div class="filtros-linha">
+            <div class="filtros-campo filtros-campo-escolha">
+                <label for="periodo">Período letivo</label>
+                <select id="periodo" name="periodo">
+                    {% for periodo in periodos %}
+                        <option value="{{ periodo.pk }}" {% if periodo_selecionado.pk == periodo.pk %}selected{% endif %}>
+                            {{ periodo.nome }} - {{ periodo.status_atual_display }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if filtro_nao_conformes %}
+                <input type="hidden" name="nao_conformes" value="1">
+            {% endif %}
         </div>
-        {% if filtro_nao_conformes %}
-            <input type="hidden" name="nao_conformes" value="1">
-        {% endif %}
     </form>
 </section>
 
