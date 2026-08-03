@@ -4533,6 +4533,57 @@ class TodasAsTelasRenderizamTests(TestCase):
         ("matriculas_ofertas", {"docente", "servidor"}),
     ]
 
+    def test_toda_tela_de_detalhe_responde_para_todo_perfil(self):
+        """As telas que precisam de um id, que a lista acima nao alcanca.
+
+        Existe pelo mesmo motivo da lista, e por uma falha concreta: o filtro
+        url_protegida foi acrescentado a processo_detalhe.html e a
+        solicitacao_assinatura_detalhe.html, e nenhum teste abria essas duas
+        telas -- elas exigem um objeto, entao ficaram de fora da lista de rotas
+        sem argumento. Um {% templatetag openblock %} load {% templatetag closeblock %} esquecido teria passado pela suite
+        inteira.
+
+        Filtro invalido estoura na compilacao do template, mesmo em ramo que nao
+        seja tomado; abrir a tela ja e suficiente para pegar esse caso.
+        """
+        setor = Setor.objects.create(nome="Setor das Telas", descricao="Teste")
+        processo = Processo.objects.create(
+            tipo=Processo.TipoProcesso.OUTRO, assunto="Processo das telas",
+            descricao="Teste de renderizacao", usuario_criado_por=self.aluno,
+            setor_atual=setor,
+        )
+        # Com arquivo: e o documento com arquivo que exercita o link protegido.
+        Documento.objects.create(
+            processo=processo, titulo="Anexo das telas", enviado_por=self.servidor,
+            restricao_tipo=Documento.RestricaoAcesso.NAO,
+            arquivo=SimpleUploadedFile("anexo-telas.txt", b"conteudo"),
+        )
+        assinatura = SolicitacaoAssinatura.objects.create(
+            criado_por=self.servidor,
+            destinatario_tipo=SolicitacaoAssinatura.DestinatarioTipo.DOCENTE,
+            docente=self.docente,
+            tipo_documento=SolicitacaoAssinatura.TipoDocumento.DOCUMENTO_SEI,
+            numero_documento_sei="SEI-0001",
+        )
+
+        telas = [
+            ("processo_detalhe", [processo.id], {"aluno", "docente", "servidor"}),
+            ("aluno_detalhe", [self.aluno.id], {"aluno", "docente", "servidor"}),
+            ("solicitacao_assinatura_detalhe", [assinatura.id], {"docente", "servidor"}),
+        ]
+        usuarios = {"aluno": self.aluno, "docente": self.docente, "servidor": self.servidor}
+
+        for nome_rota, argumentos, perfis_com_acesso in telas:
+            for perfil, usuario in usuarios.items():
+                with self.subTest(tela=nome_rota, perfil=perfil):
+                    self.client.force_login(usuario)
+                    resposta = self.client.get(reverse(nome_rota, args=argumentos))
+                    esperado = 200 if perfil in perfis_com_acesso else 403
+                    self.assertEqual(
+                        resposta.status_code, esperado,
+                        f"{nome_rota} devolveu {resposta.status_code} para {perfil}",
+                    )
+
     def test_toda_tela_responde_para_todo_perfil(self):
         usuarios = {"aluno": self.aluno, "docente": self.docente, "servidor": self.servidor}
 
