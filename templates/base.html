@@ -11,9 +11,19 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_classe %}{% endblock %}">
+{% comment %}
+"mostra_moldura" decide se a casca da aplicacao -- barra lateral, barra superior
+e o script da gaveta -- entra na pagina. Vale por padrao para quem tem sessao, e
+as telas de acesso a desligam.
+
+Existe porque essas telas tem layout proprio, de duas colunas ocupando a janela
+inteira, e nao foram feitas para conviver com a moldura. Quem abria /login/ ou
+/senha/esqueci/ ja logado via o formulario de entrada com a barra superior da
+propria sessao por cima -- nome, avisos e menu da conta.
+{% endcomment %}
 {% include "includes/icons.html" %}
 <div class="app-shell">
-    {% if user.is_authenticated %}
+    {% if user.is_authenticated and mostra_moldura %}
         {% comment %}
         Casca da aplicacao: barra lateral em altura total a esquerda, barra
         superior apenas sobre a coluna de conteudo.
@@ -168,7 +178,7 @@
     {% endif %}
 
     <main class="main-area">
-        <div class="container{% if user.is_authenticated %} content-area{% endif %}">
+        <div class="container{% if user.is_authenticated and mostra_moldura %} content-area{% endif %}">
             {% if messages %}
                 <ul class="messages">
                     {% for message in messages %}
@@ -180,11 +190,11 @@
         </div>
     </main>
 
-    {% if user.is_authenticated %}
+    {% if user.is_authenticated and mostra_moldura %}
         </div>{# .app-main -- aberta antes da barra superior #}
     {% endif %}
 </div>
-{% if user.is_authenticated %}
+{% if user.is_authenticated and mostra_moldura %}
 <script>
     // Menu lateral como gaveta no mobile. Em telas largas o CSS mantem a barra
     // sempre visivel e nada aqui tem efeito.

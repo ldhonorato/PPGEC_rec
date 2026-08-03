@@ -437,6 +437,9 @@ def navegacao_lateral(request):
         "nav_can_view_dashboard": has_gestao_access,
         "nav_can_view_processos": can_view_processos,
         "nav_can_view_caixa": _can_view_caixa(request.user),
+        # A casca da aplicacao entra por padrao; as telas de acesso desligam
+        # com extra_context, porque tem layout proprio de janela inteira.
+        "mostra_moldura": True,
         "nav_menu_sections": _menu_lateral_sections(request.user),
         "nav_side_menu_items": _menu_lateral_items(request.user),
         "solicitar_cpf_aluno": solicitar_cpf_aluno,

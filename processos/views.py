@@ -2157,14 +2157,14 @@ def cadastro_aluno_view(request):
     return render(
         request,
         "registration/cadastro_aluno.html",
-        {"form": form},
+        {"form": form, "mostra_moldura": False},
     )
 
 
 def cadastro_aluno_sucesso_view(request):
     if request.user.is_authenticated:
         return redirect("home")
-    return render(request, "registration/cadastro_aluno_sucesso.html")
+    return render(request, "registration/cadastro_aluno_sucesso.html", {"mostra_moldura": False})
 
 
 def _aprovar_cadastro_aluno(*, aluno, usuario):

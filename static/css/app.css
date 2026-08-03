@@ -1473,12 +1473,14 @@ dialog::backdrop {
     background: rgba(8, 20, 38, 0.48);
 }
 
+/* Largura unica. Havia 900px aqui e 720px na implementacao propria, entao a
+   mesma acao abria em tamanhos diferentes conforme a tela de origem. */
 .modal-dialog {
-    width: min(900px, 92vw);
+    width: min(760px, 92vw);
 }
 
 .modal-body {
-    padding: 1rem;
+    padding: var(--espaco-5);
 }
 
 .cpf-pendente-modal {
@@ -3569,42 +3571,15 @@ dialog::backdrop {
     }
 }
 
-/* ==========================================================================
-   Modal
+/* Cabecalho de um modal: titulo a esquerda, fechar a direita.
 
-   Vivia num bloco <style> dentro de aluno_detalhe.html, servindo as 19 caixas
-   de edicao daquela ficha. Enquanto o unico consumidor fosse aquele template
-   isso passava, mas e um componente -- e um <style> solto no meio do content
-   nao e revisavel nem reaproveitavel. A regra que importa e o display:none do
-   backdrop: sem ela, todos os formularios de edicao aparecem empilhados na
-   pagina de uma vez.
+   O restante do que existia aqui -- .modal-backdrop, .modal-card, o fundo
+   escurecido e o display:none que escondia -- era uma implementacao propria de
+   modal, usada so pela ficha do aluno. Saiu junto com a conversao daquelas 19
+   caixas para o <dialog> nativo: o elemento ja traz o fundo (::backdrop), o
+   fechar com Esc, o foco preso dentro e o conteudo de tras isolado do leitor
+   de tela, que a implementacao propria nao tinha.
    ========================================================================== */
-.modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(8, 20, 38, 0.48);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 50;
-    padding: var(--espaco-4);
-}
-
-.modal-backdrop.open {
-    display: flex;
-}
-
-.modal-card {
-    width: min(720px, 96vw);
-    max-height: 92vh;
-    overflow: auto;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    padding: var(--espaco-5);
-    box-shadow: var(--shadow-card);
-}
-
 .modal-head {
     display: flex;
     align-items: center;
@@ -3631,27 +3606,7 @@ dialog::backdrop {
 
 .modal-close:hover {
     color: var(--color-text);
-    border-color: var(--color-text-soft, var(--color-muted));
-}
-
-/* ==========================================================================
-   Grade de horario semanal
-
-   Estava num bloco <style> de matriculas_ofertas.html, com todos os seletores
-   presos a .matriculas-ofertas-page e as cores em hexadecimal solto
-   (#f7fbff, #fbfdff, #bdd4f3, #174d90). Como componente ela serve tambem a
-   tela de matricula do aluno, entao vem para ca sem prefixo de pagina e com os
-   tokens do tema.
-
-   Geometria: as marcas de hora e os eventos vem da view em porcentagem da
-   altura total; --altura-hora, tambem calculado la, diz de quanto em quanto
-   repetir a linha divisoria.
-   ========================================================================== */
-.grade-horario-envolvido {
-    margin-top: var(--espaco-5);
-    max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
+    border-color: var(--color-muted);
 }
 
 .grade-horario {

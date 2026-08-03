@@ -441,8 +441,8 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
     </section>
 
 {% if can_manage_aluno %}
-<div id="modal-dados" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-dados" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar dados do aluno</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -463,7 +463,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% endif %}
 
 {% comment %}
@@ -479,8 +479,8 @@ Publicacoes e disciplinas ja tinham a guarda ({% templatetag openblock %} if can
 faltava a da coordenacao.
 {% endcomment %}
 {% if can_manage_aluno %}
-<div id="modal-nova-trajetoria" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-nova-trajetoria" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Nova trajetória acadêmica</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -530,15 +530,15 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% endif %}
 
 {% for card in trajetoria_cards %}
 {% with trajetoria=card.obj form=card.form horas_form=card.horas_form %}
 {% if can_manage_aluno %}
 {% if trajetoria.nivel_curso != "POSDOUTORADO" %}
-<div id="modal-horas-complementares-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-horas-complementares-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Adicionar horas complementares</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -561,11 +561,11 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% endif %}
 
-<div id="modal-trajetoria-status-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-status-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar status da trajetória</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -585,10 +585,10 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-nivel-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-nivel-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar nível</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -604,10 +604,10 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar prazo {{ trajetoria.qualificacao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -623,10 +623,10 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar prazo defesa</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -642,10 +642,10 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-reingressante-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-reingressante-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar reingressante</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -660,9 +660,9 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
-<div id="modal-estagio-create-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+</dialog>
+<dialog id="modal-estagio-create-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head">
             <h3 class="section-title">Novo estágio de docência</h3>
             <button type="button" class="modal-close" data-modal-close>Fechar</button>
@@ -710,10 +710,10 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% for estagio in trajetoria.estagios_docencia.all %}
-<div id="modal-estagio-editar-{{ estagio.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-estagio-editar-{{ estagio.id }}" class="modal-dialog">
+    <div class="modal-body">
 
         <div class="modal-head">
             <h3 class="section-title">
@@ -782,11 +782,11 @@ faltava a da coordenacao.
         </form>
 
     </div>
-</div>
+</dialog>
 {% endfor %}
 
-<div id="modal-trajetoria-qualificacao-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-qualificacao-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar {{ trajetoria.qualificacao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -801,10 +801,10 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-orientador-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-orientador-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar {% if trajetoria.nivel_curso == "POSDOUTORADO" %}supervisor{% else %}orientador{% endif %}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -820,10 +820,10 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-coorientador-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-coorientador-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar coorientador</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -851,10 +851,10 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-defesa-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-defesa-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar {{ trajetoria.conclusao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -872,10 +872,10 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-deposito-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-deposito-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar depósito final</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -890,12 +890,12 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% endif %}
 
 {% if can_edit_publicacoes %}
-<div id="modal-publicacao-nova-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-publicacao-nova-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Adicionar publicação</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -915,11 +915,11 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 {% for publicacao in trajetoria.publicacoes.all %}
-<div id="modal-publicacao-{{ publicacao.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-publicacao-{{ publicacao.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Editar publicação</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -948,13 +948,13 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% endfor %}
 {% endif %}
 
 {% if can_edit_disciplinas %}
-<div id="modal-disciplina-nova-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-disciplina-nova-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Adicionar disciplina</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -974,11 +974,11 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 {% for disciplina in trajetoria.disciplinas.all %}
-<div id="modal-disciplina-{{ disciplina.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-disciplina-{{ disciplina.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Editar disciplina</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -1007,7 +1007,7 @@ faltava a da coordenacao.
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% endfor %}
 {% endif %}
 {% endwith %}
@@ -1018,33 +1018,32 @@ faltava a da coordenacao.
         const openButtons = document.querySelectorAll("[data-modal-open]");
         const closeButtons = document.querySelectorAll("[data-modal-close]");
 
-        function closeModal(modal) {
-            modal.classList.remove("open");
-        }
-
+        // Estes modais eram divs com uma classe "open", como a plataforma fazia
+        // antes de padronizar no <dialog> nativo. A diferenca nao era so visual:
+        // sem o elemento nativo nao havia fechar com Esc, o foco do teclado
+        // passeava pela pagina atras do modal e o leitor de tela lia o conteudo
+        // de tras. O <dialog> aberto com showModal() da os tres.
         openButtons.forEach((btn) => {
             btn.addEventListener("click", () => {
-                const modal = document.getElementById(btn.getAttribute("data-modal-open"));
-                if (modal) modal.classList.add("open");
+                document.getElementById(btn.getAttribute("data-modal-open"))?.showModal();
             });
         });
 
         closeButtons.forEach((btn) => {
-            btn.addEventListener("click", () => {
-                const modal = btn.closest(".modal-backdrop");
-                if (modal) closeModal(modal);
-            });
+            btn.addEventListener("click", () => btn.closest("dialog")?.close());
         });
 
-        document.querySelectorAll(".modal-backdrop").forEach((modal) => {
+        // Clicar fora fecha. O <dialog> nao faz isso sozinho, e o alvo do clique
+        // no vazio e o proprio dialog -- o conteudo fica no .modal-body dentro.
+        document.querySelectorAll("dialog.modal-dialog").forEach((modal) => {
             modal.addEventListener("click", (event) => {
-                if (event.target === modal) closeModal(modal);
+                if (event.target === modal) modal.close();
             });
         });
 
         document.querySelectorAll("select[name='tipo_coorientador']").forEach((select) => {
             function atualizar() {
-                const modal = select.closest(".modal-backdrop");
+                const modal = select.closest("dialog");
                 modal.querySelectorAll("[data-coorientador-section]").forEach((section) => {
                     section.style.display = section.dataset.coorientadorSection === select.value ? "block" : "none";
                 });
@@ -1055,7 +1054,7 @@ faltava a da coordenacao.
 
         document.querySelectorAll("select[name='nivel_curso']").forEach((select) => {
             function atualizarNivel() {
-                const modal = select.closest(".modal-backdrop");
+                const modal = select.closest("dialog");
                 if (!modal) return;
                 const nivel = select.value;
                 const usaAcademico = nivel === "MESTRADO" || nivel === "DOUTORADO";
