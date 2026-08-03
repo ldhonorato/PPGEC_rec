@@ -33,6 +33,7 @@ from .models import (
     EncontroOferta,
     ItemSolicitacaoMatricula,
     LancamentoHorasComplementares,
+    LoginThrottle,
     ManifestacaoProcesso,
     MembroBanca,
     OfertaDisciplina,
@@ -84,6 +85,71 @@ class SessionExpirationSettingsTests(SimpleTestCase):
     def test_login_expira_apos_vinte_minutos_sem_atividade(self):
         self.assertEqual(settings.SESSION_COOKIE_AGE, 20 * 60)
         self.assertTrue(settings.SESSION_SAVE_EVERY_REQUEST)
+
+
+@override_settings(
+    SECURE_SSL_REDIRECT=False,
+    LOGIN_MAX_FAILURES=5,
+    LOGIN_FAILURE_WINDOW_SECONDS=900,
+    LOGIN_LOCKOUT_SECONDS=900,
+)
+class LoginSecurityTests(TestCase):
+    def setUp(self):
+        self.password = "senha-segura-123"
+        self.user = User.objects.create_user(
+            email="login.security@example.com",
+            password=self.password,
+            nome="Login Security",
+        )
+        self.url = reverse("login")
+
+    def _post(self, password="incorreta", ip="192.0.2.10"):
+        return self.client.post(
+            self.url,
+            {"username": self.user.email, "password": password},
+            REMOTE_ADDR=ip,
+        )
+
+    def test_quinta_falha_bloqueia_e_informa_retry_after(self):
+        for _ in range(4):
+            self.assertEqual(self._post().status_code, 200)
+
+        response = self._post()
+
+        self.assertEqual(response.status_code, 429)
+        self.assertIn("Retry-After", response)
+        self.assertContains(response, "Muitas tentativas", status_code=429)
+        self.assertEqual(LoginThrottle.objects.count(), 2)
+
+    def test_bloqueio_por_conta_vale_para_outro_ip(self):
+        for _ in range(5):
+            self._post()
+
+        response = self._post(password=self.password, ip="198.51.100.25")
+
+        self.assertEqual(response.status_code, 429)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_login_valido_limpa_falhas_anteriores(self):
+        for _ in range(4):
+            self._post()
+
+        response = self._post(password=self.password)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(LoginThrottle.objects.exists())
+
+    @override_settings(SECURE_SSL_REDIRECT=True)
+    def test_post_de_login_em_http_e_redirecionado_sem_validar_credenciais(self):
+        response = self.client.post(
+            self.url,
+            {"username": self.user.email, "password": self.password},
+            secure=False,
+        )
+
+        self.assertEqual(response.status_code, 301)
+        self.assertTrue(response["Location"].startswith("https://"))
+        self.assertFalse(LoginThrottle.objects.exists())
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, DEBUG=False)

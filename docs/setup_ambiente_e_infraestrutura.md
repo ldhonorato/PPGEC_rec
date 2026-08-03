@@ -42,6 +42,18 @@ A aplicação é totalmente orquestrada através do **Docker Compose**, onde cad
 
 > **Nginx:** Em produção, o DTI (Departamento de Tecnologia da Informação) gerencia um **Nginx Proxy Manager** externo à stack Docker, que faz o proxy reverso para a aplicação. Os contêineres da aplicação **não incluem Nginx** — ele é infraestrutura da universidade, não da equipe.
 
+### Requisitos de HTTPS em produção
+
+O endpoint público deve aceitar exclusivamente HTTPS. O `docker-compose-prod.yml`
+publica o HTTP do Gunicorn apenas em `127.0.0.1`; não remova esse vínculo nem
+exponha diretamente a porta 8001 na rede. O proxy reverso deve terminar TLS,
+redirecionar HTTP para HTTPS e enviar `X-Forwarded-Proto: https`. No ambiente da
+aplicação, mantenha `DEBUG=False`, `SECURE_SSL_REDIRECT=True`,
+`USE_X_FORWARDED_PROTO=True`, `SESSION_COOKIE_SECURE=True` e
+`CSRF_COOKIE_SECURE=True`. Depois da implantação, confirme que um acesso a
+`http://<domínio>/login/` redireciona antes de exibir o formulário e que não há
+rota de rede externa direta para a porta do Gunicorn.
+
 Existem dois arquivos de orquestração:
 
 | Arquivo | Contexto | Diferença principal |
