@@ -62,29 +62,29 @@ tinha um unico filho e os cartoes encostavam um no outro.
             <input type="hidden" name="acao" value="criar_oferta">
             {{ oferta_form.non_field_errors }}
             <div class="grid-two">
-                <div class="field"><label for="{{ oferta_form.periodo.id_for_label }}">{{ oferta_form.periodo.label }}</label>{{ oferta_form.periodo }}{{ oferta_form.periodo.errors }}</div>
-                <div class="field"><label for="{{ oferta_form.disciplina.id_for_label }}">{{ oferta_form.disciplina.label }}</label>{{ oferta_form.disciplina }}{{ oferta_form.disciplina.errors }}</div>
-                <div class="field"><label for="{{ oferta_form.docente_responsavel.id_for_label }}">{{ oferta_form.docente_responsavel.label }}</label>{{ oferta_form.docente_responsavel }}{{ oferta_form.docente_responsavel.errors }}</div>
+                {% include "includes/campo_formulario.html" with campo=oferta_form.periodo %}
+                {% include "includes/campo_formulario.html" with campo=oferta_form.disciplina %}
+                {% include "includes/campo_formulario.html" with campo=oferta_form.docente_responsavel %}
                 <div class="field"><label for="{{ oferta_form.docente_colaborador.id_for_label }}">Segundo docente</label>{{ oferta_form.docente_colaborador }}{{ oferta_form.docente_colaborador.errors }}</div>
-                <div class="field"><label for="{{ oferta_form.modalidade.id_for_label }}">{{ oferta_form.modalidade.label }}</label>{{ oferta_form.modalidade }}{{ oferta_form.modalidade.errors }}</div>
-                <div class="field"><label for="{{ oferta_form.vagas_regulares.id_for_label }}">{{ oferta_form.vagas_regulares.label }}</label>{{ oferta_form.vagas_regulares }}{{ oferta_form.vagas_regulares.errors }}</div>
-                <div class="field"><label for="{{ oferta_form.vagas_especiais.id_for_label }}">{{ oferta_form.vagas_especiais.label }}</label>{{ oferta_form.vagas_especiais }}{{ oferta_form.vagas_especiais.errors }}</div>
+                {% include "includes/campo_formulario.html" with campo=oferta_form.modalidade %}
+                {% include "includes/campo_formulario.html" with campo=oferta_form.vagas_regulares %}
+                {% include "includes/campo_formulario.html" with campo=oferta_form.vagas_especiais %}
             </div>
             <div class="card room-modal-card panel">
                 <h3 class="section-title">Horário principal</h3>
                 <div class="grid-two">
-                    <div class="field"><label for="{{ oferta_form.dia_semana_1.id_for_label }}">{{ oferta_form.dia_semana_1.label }}</label>{{ oferta_form.dia_semana_1 }}{{ oferta_form.dia_semana_1.errors }}</div>
-                    <div class="field"><label for="{{ oferta_form.hora_inicio_1.id_for_label }}">{{ oferta_form.hora_inicio_1.label }}</label>{{ oferta_form.hora_inicio_1 }}{{ oferta_form.hora_inicio_1.errors }}</div>
-                    <div class="field"><label for="{{ oferta_form.hora_fim_1.id_for_label }}">{{ oferta_form.hora_fim_1.label }}</label>{{ oferta_form.hora_fim_1 }}{{ oferta_form.hora_fim_1.errors }}</div>
+                    {% include "includes/campo_formulario.html" with campo=oferta_form.dia_semana_1 %}
+                    {% include "includes/campo_formulario.html" with campo=oferta_form.hora_inicio_1 %}
+                    {% include "includes/campo_formulario.html" with campo=oferta_form.hora_fim_1 %}
                 </div>
             </div>
             <button class="btn btn-secondary panel" type="button" data-show-optional="segundo-horario-novo">Adicionar segundo dia</button>
             <div id="segundo-horario-novo" class="card room-modal-card optional-schedule" {% if not oferta_form.dia_semana_2.value and not oferta_form.hora_inicio_2.value and not oferta_form.hora_fim_2.value %}hidden{% endif %}>
                 <h3 class="section-title">Segundo dia</h3>
                 <div class="grid-two">
-                    <div class="field"><label for="{{ oferta_form.dia_semana_2.id_for_label }}">{{ oferta_form.dia_semana_2.label }}</label>{{ oferta_form.dia_semana_2 }}{{ oferta_form.dia_semana_2.errors }}</div>
-                    <div class="field"><label for="{{ oferta_form.hora_inicio_2.id_for_label }}">{{ oferta_form.hora_inicio_2.label }}</label>{{ oferta_form.hora_inicio_2 }}{{ oferta_form.hora_inicio_2.errors }}</div>
-                    <div class="field"><label for="{{ oferta_form.hora_fim_2.id_for_label }}">{{ oferta_form.hora_fim_2.label }}</label>{{ oferta_form.hora_fim_2 }}{{ oferta_form.hora_fim_2.errors }}</div>
+                    {% include "includes/campo_formulario.html" with campo=oferta_form.dia_semana_2 %}
+                    {% include "includes/campo_formulario.html" with campo=oferta_form.hora_inicio_2 %}
+                    {% include "includes/campo_formulario.html" with campo=oferta_form.hora_fim_2 %}
                 </div>
             </div>
             <div class="form-actions">

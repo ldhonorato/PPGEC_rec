@@ -23,57 +23,29 @@
                 <ul class="errorlist">{{ form.non_field_errors }}</ul>
             {% endif %}
             <div class="grid-two">
-                <div class="field">
-                    <label for="{{ form.sala.id_for_label }}">{{ form.sala.label }}</label>
-                    {{ form.sala }}
-                    {{ form.sala.errors }}
-                </div>
+                {% include "includes/campo_formulario.html" with campo=form.sala %}
                 {% if user.tipo_usuario == "SERVIDOR" %}
-                    <div class="field">
-                        <label for="{{ form.docente.id_for_label }}">{{ form.docente.label }}</label>
-                        {{ form.docente }}
-                        {{ form.docente.errors }}
-                    </div>
+                    {% include "includes/campo_formulario.html" with campo=form.docente %}
                 {% else %}
                     {{ form.docente }}
                 {% endif %}
-                <div class="field">
-                    <label for="{{ form.tipo.id_for_label }}">{{ form.tipo.label }}</label>
-                    {{ form.tipo }}
-                    {{ form.tipo.errors }}
-                </div>
-                <div class="field">
-                    <label for="{{ form.titulo.id_for_label }}">{{ form.titulo.label }}</label>
-                    {{ form.titulo }}
-                    {{ form.titulo.errors }}
-                </div>
-                <div class="field">
-                    <label for="{{ form.data_inicio.id_for_label }}">{{ form.data_inicio.label }}</label>
-                    {{ form.data_inicio }}
-                    {{ form.data_inicio.errors }}
-                </div>
-                <div class="field">
-                    <label for="{{ form.hora_inicio.id_for_label }}">{{ form.hora_inicio.label }}</label>
-                    {{ form.hora_inicio }}
-                    {{ form.hora_inicio.errors }}
-                </div>
-                <div class="field">
-                    <label for="{{ form.hora_fim.id_for_label }}">{{ form.hora_fim.label }}</label>
-                    {{ form.hora_fim }}
-                    {{ form.hora_fim.errors }}
-                    <small class="muted">A reserva deve começar e terminar no mesmo dia.</small>
-                </div>
-                <div class="field">
-                    <label for="{{ form.recorrencia.id_for_label }}">{{ form.recorrencia.label }}</label>
-                    {{ form.recorrencia }}
-                    {{ form.recorrencia.errors }}
-                </div>
-                <div class="field">
-                    <label for="{{ form.duracao_recorrencia_meses.id_for_label }}">{{ form.duracao_recorrencia_meses.label }}</label>
-                    {{ form.duracao_recorrencia_meses }}
-                    {{ form.duracao_recorrencia_meses.errors }}
-                    <small class="muted">Preencha apenas para recorrências diárias, semanais ou mensais. Limite de 6 meses.</small>
-                </div>
+                {% include "includes/campo_formulario.html" with campo=form.tipo %}
+                {% include "includes/campo_formulario.html" with campo=form.titulo %}
+                {% include "includes/campo_formulario.html" with campo=form.data_inicio %}
+                {% include "includes/campo_formulario.html" with campo=form.hora_inicio %}
+                <div class="formulario-campo">
+    <label for="{{ form.hora_fim.id_for_label }}">{{ form.hora_fim.label }}</label>
+    {{ form.hora_fim }}
+    <p class="formulario-ajuda">A reserva deve começar e terminar no mesmo dia.</p>
+    {{ form.hora_fim.errors }}
+</div>
+                {% include "includes/campo_formulario.html" with campo=form.recorrencia %}
+                <div class="formulario-campo">
+    <label for="{{ form.duracao_recorrencia_meses.id_for_label }}">{{ form.duracao_recorrencia_meses.label }}</label>
+    {{ form.duracao_recorrencia_meses }}
+    <p class="formulario-ajuda">Preencha apenas para recorrências diárias, semanais ou mensais. Limite de 6 meses.</p>
+    {{ form.duracao_recorrencia_meses.errors }}
+</div>
             </div>
             <div class="form-actions">
                 <button class="btn" type="submit">Reservar ambiente</button>

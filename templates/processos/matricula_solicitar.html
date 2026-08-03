@@ -138,11 +138,7 @@ nenhum para mostrar.
             {{ form.aceitar_lista_espera.errors }}
         </div>
 
-        <div class="field">
-            <label for="{{ form.observacao.id_for_label }}">{{ form.observacao.label }}</label>
-            {{ form.observacao }}
-            {{ form.observacao.errors }}
-        </div>
+        {% include "includes/campo_formulario.html" with campo=form.observacao %}
         <div class="form-actions">
             <button class="btn" type="button" data-open-confirmacao>Enviar solicitação</button>
         </div>

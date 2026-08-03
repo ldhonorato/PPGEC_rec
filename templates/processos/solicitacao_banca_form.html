@@ -17,11 +17,7 @@
 
     <section class="card">
         <h2 class="section-title">Discente e trajetória</h2>
-        <div class="field">
-            <label for="{{ form.aluno.id_for_label }}">{{ form.aluno.label }}</label>
-            {{ form.aluno }}
-            {{ form.aluno.errors }}
-        </div>
+        {% include "includes/campo_formulario.html" with campo=form.aluno %}
 
         <div class="field hidden-field">
             <label for="{{ form.trajetoria.id_for_label }}">{{ form.trajetoria.label }}</label>
@@ -96,43 +92,39 @@
     <section class="card">
         <h2 class="section-title">Dados gerais</h2>
         <div class="grid-two">
-            <div class="field">
-                <label for="{{ form.tipo_defesa.id_for_label }}">{{ form.tipo_defesa.label }}</label>
-                {{ form.tipo_defesa }}
-                {{ form.tipo_defesa.errors }}
-            </div>
-            <div class="field">
-                <label for="{{ form.titulo.id_for_label }}">Título da dissertação/tese/projeto</label>
-                {{ form.titulo }}
-                {{ form.titulo.errors }}
-            </div>
-            <div class="field">
-                <label for="{{ form.data_prevista.id_for_label }}">Data prevista</label>
-                {{ form.data_prevista }}
-                {{ form.data_prevista.errors }}
-            </div>
-            <div class="field">
-                <label for="{{ form.horario_previsto.id_for_label }}">Horário previsto</label>
-                {{ form.horario_previsto }}
-                {{ form.horario_previsto.errors }}
-            </div>
+            {% include "includes/campo_formulario.html" with campo=form.tipo_defesa %}
+            <div class="formulario-campo">
+    <label for="{{ form.titulo.id_for_label }}">Título da dissertação/tese/projeto</label>
+    {{ form.titulo }}
+    {{ form.titulo.errors }}
+</div>
+            <div class="formulario-campo">
+    <label for="{{ form.data_prevista.id_for_label }}">Data prevista</label>
+    {{ form.data_prevista }}
+    {{ form.data_prevista.errors }}
+</div>
+            <div class="formulario-campo">
+    <label for="{{ form.horario_previsto.id_for_label }}">Horário previsto</label>
+    {{ form.horario_previsto }}
+    {{ form.horario_previsto.errors }}
+</div>
         </div>
-        <div class="field">
-            <label for="{{ form.resumo.id_for_label }}">Resumo</label>
-            {{ form.resumo }}
-            {{ form.resumo.errors }}
-        </div>
+        <div class="formulario-campo">
+    <label for="{{ form.resumo.id_for_label }}">Resumo</label>
+    {{ form.resumo }}
+    {{ form.resumo.errors }}
+</div>
         <div class="grid-two">
-            <div class="field">
-                <label for="{{ form.palavras_chave.id_for_label }}">Palavras-chave</label>
-                {{ form.palavras_chave }}
-                {{ form.palavras_chave.errors }}
-            </div>
-            <div class="field">
-                <label for="{{ form.modalidade_local_link.id_for_label }}">Modalidade/local/link da defesa</label>
-                {{ form.modalidade_local_link }}
-                {{ form.modalidade_local_link.errors }}
-            </div>
+            <div class="formulario-campo">
+    <label for="{{ form.palavras_chave.id_for_label }}">Palavras-chave</label>
+    {{ form.palavras_chave }}
+    {{ form.palavras_chave.errors }}
+</div>
+            <div class="formulario-campo">
+    <label for="{{ form.modalidade_local_link.id_for_label }}">Modalidade/local/link da defesa</label>
+    {{ form.modalidade_local_link }}
+    {{ form.modalidade_local_link.errors }}
+</div>
         </div>
     </section>
 
@@ -144,11 +136,11 @@
         </label>
         {{ form.requisitos_cumpridos.errors }}
 
-        <div class="field">
-            <label for="{{ form.justificativa_excepcionalidade.id_for_label }}">Justificativa para excepcionalidades</label>
-            {{ form.justificativa_excepcionalidade }}
-            {{ form.justificativa_excepcionalidade.errors }}
-        </div>
+        <div class="formulario-campo">
+    <label for="{{ form.justificativa_excepcionalidade.id_for_label }}">Justificativa para excepcionalidades</label>
+    {{ form.justificativa_excepcionalidade }}
+    {{ form.justificativa_excepcionalidade.errors }}
+</div>
 
         <label class="checkbox-field banca-check">
             {{ form.ciencia_recomendacao_mpf }}
@@ -166,11 +158,11 @@
                     <article class="banca-member-card">
                         <h4>{{ papel.label }}{% if papel.opcional %} <span class="muted">(opcional)</span>{% endif %}</h4>
                         <div class="grid-two">
-                            <div class="field">
-                                <label for="{{ papel.nome_field.id_for_label }}">Nome</label>
-                                {{ papel.nome_field }}
-                                {{ papel.nome_field.errors }}
-                            </div>
+                            <div class="formulario-campo">
+    <label for="{{ papel.nome_field.id_for_label }}">Nome</label>
+    {{ papel.nome_field }}
+    {{ papel.nome_field.errors }}
+</div>
                             <div class="field {% if not papel.exige_instituicao %}optional-banca-field{% endif %}">
                                 <label for="{{ papel.instituicao_field.id_for_label }}">Instituição/IES</label>
                                 {{ papel.instituicao_field }}

@@ -14,9 +14,9 @@
         {% csrf_token %}
         {{ form.non_field_errors }}
         <div class="form-grid">
-            <div class="field"><label for="{{ form.arquivo.id_for_label }}">{{ form.arquivo.label }}</label>{{ form.arquivo }}{{ form.arquivo.errors }}<p class="dado-nota">{{ form.arquivo.help_text }}</p></div>
-            <div class="field"><label for="{{ form.nivel_curso.id_for_label }}">{{ form.nivel_curso.label }}</label>{{ form.nivel_curso }}{{ form.nivel_curso.errors }}</div>
-            <div class="field"><label for="{{ form.ingresso.id_for_label }}">{{ form.ingresso.label }}</label>{{ form.ingresso }}{{ form.ingresso.errors }}</div>
+            {% include "includes/campo_formulario.html" with campo=form.arquivo %}
+            {% include "includes/campo_formulario.html" with campo=form.nivel_curso %}
+            {% include "includes/campo_formulario.html" with campo=form.ingresso %}
         </div>
         <button class="btn" type="submit">Importar ingressantes</button>
     </form>
