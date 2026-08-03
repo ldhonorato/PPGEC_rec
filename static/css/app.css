@@ -316,6 +316,8 @@ input[type="checkbox"] {
     text-decoration: none;
     cursor: pointer;
     box-shadow: var(--shadow-control);
+    transition: background 0.14s ease, border-color 0.14s ease,
+                transform 0.14s ease, box-shadow 0.14s ease;
 }
 
 /* Icones do sprite SVG (templates/includes/icons.html). Herdam a cor do texto
@@ -461,16 +463,36 @@ input[type="checkbox"] {
     margin: 0;
 }
 
+/* Botao primario: a acao que a tela existe para oferecer.
+
+   Ganha resposta ao ponteiro e ao clique. Antes so mudava de cor no hover, o
+   que num botao azul sobre fundo claro quase nao se percebe; o leve
+   deslocamento e a sombra dizem que ele e pressionavel antes mesmo do toque.
+   No :active ele afunda -- o movimento contrario do hover --, que e o que se
+   espera de algo que responde. */
 .btn:hover,
 .nav-btn:hover,
 .btn:focus-visible,
 .nav-btn:focus-visible {
     background: var(--color-primary-strong);
     outline: none;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 72, 154, 0.18), 0 8px 18px rgba(0, 72, 154, 0.18);
 }
 
+.btn:active,
+.nav-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 72, 154, 0.2);
+}
+
+/* Botao secundario: acao de apoio, que nao deve disputar a atencao do primario.
+
+   Aqui o realce e o contorno, nao o preenchimento -- e a diferenca de peso
+   entre "Novo processo" e "Filtrar" na mesma tela. Ele nao se desloca: nao e
+   para se oferecer, e para estar disponivel. */
 .btn-secondary {
-    background: #ffffff;
+    background: var(--color-surface);
     color: var(--color-primary);
     border-color: var(--color-border);
     box-shadow: none;
@@ -480,6 +502,25 @@ input[type="checkbox"] {
 .btn-secondary:focus-visible {
     background: var(--color-primary-soft);
     color: var(--color-primary);
+    border-color: var(--color-primary);
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-secondary:active {
+    background: var(--color-primary-soft);
+    transform: none;
+}
+
+/* Nao ha o que animar para quem pede menos movimento; o realce de cor fica. */
+@media (prefers-reduced-motion: reduce) {
+    .btn,
+    .nav-btn,
+    .btn:hover,
+    .nav-btn:hover,
+    .btn:active {
+        transform: none !important;
+    }
 }
 
 .btn-full {
@@ -1018,11 +1059,42 @@ textarea {
     border-radius: var(--radius-sm);
 }
 
+/* Seta do select, desenhada por nos.
+
+   A seta nativa do navegador fica colada na borda direita: ela nao respeita o
+   padding do campo, entao o valor selecionado termina a 0.72rem da borda e a
+   seta a 0. Alem de encostar, ela e diferente em cada navegador -- no Chrome e
+   um triangulo cheio, no Firefox um chevron fino -- e nao acompanha nem a cor
+   nem a espessura do resto da interface.
+
+   Com appearance:none ela sai, e no lugar entra um chevron igual ao que a barra
+   lateral e os blocos que abrem ja usam. O padding a direita abre espaco para
+   ele, senao o texto de uma opcao longa passaria por baixo. */
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 2.3rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23637083' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 9.5l5.5 5.5 5.5-5.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.8rem center;
+    background-size: 0.8rem;
+}
+
+/* Sem isto, o Chrome no Windows desenha a seta nativa por cima da nossa quando
+   o campo esta desabilitado. */
+select::-ms-expand {
+    display: none;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
     border-color: var(--color-primary);
     outline: 3px solid rgba(0, 72, 154, 0.12);
+}
+
+select:focus {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300489a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 9.5l5.5 5.5 5.5-5.5'/%3E%3C/svg%3E");
 }
 
 label {
@@ -3866,4 +3938,231 @@ dialog::backdrop {
 
 .selected-list button:hover {
     color: var(--color-text);
+}
+
+/* ==========================================================================
+   Barra de filtros
+
+   Filtro nao e formulario de entrada, e ate aqui os dois eram desenhados
+   igual: mesma grade de duas colunas, mesmos rotulos em negrito, mesmo botao
+   azul cheio. Em "Meus Processos" isso dava 350px de filtro para 4 linhas de
+   resultado -- a ferramenta ocupando mais tela do que aquilo sobre o que ela
+   atua.
+
+   As diferencas que este bloco assume:
+
+   - O campo tem a largura do que ele guarda. Uma data pede 10rem, uma busca
+     cresce com o espaco que sobrar. A grade rigida dava 527px para "Data
+     inicial" e os mesmos 527px para "Busca".
+   - O rotulo e menor e mais leve que o de um formulario de entrada. Ali ele
+     nomeia o que se esta preenchendo; aqui, o que se esta refinando.
+   - O botao e secundario. O primario da tela e a acao principal ("Novo
+     processo"), e dois azuis cheios disputam a mesma atencao.
+   - O que e usado sempre fica a vista; o resto vai para um bloco que abre.
+   ========================================================================== */
+.filtros {
+    margin: var(--espaco-5) 0;
+}
+
+.filtros-linha {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--espaco-3) var(--espaco-4);
+}
+
+.filtros-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.filtros-campo > label {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+/* Larguras por natureza do campo, nao por posicao na grade. */
+.filtros-campo-busca {
+    flex: 1 1 18rem;
+}
+
+.filtros-campo-escolha {
+    flex: 0 1 12rem;
+}
+
+.filtros-campo-data {
+    flex: 0 1 10.5rem;
+}
+
+.filtros-campo input,
+.filtros-campo select {
+    width: 100%;
+}
+
+/* Filtro de liga-desliga, como marcador que acende.
+
+   Era uma caixa de marcar solta na grade: o quadradinho de 13px flutuava no
+   meio da altura da celula, sem alinhamento com os campos ao lado, e nada
+   distinguia ligado de desligado alem de um tique minusculo.
+
+   Como marcador, ele diz sozinho em que estado esta -- apagado e uma opcao
+   disponivel, aceso e um filtro em vigor. E a mesma linguagem dos marcadores de
+   filtro ativo logo abaixo, que e o que ele vira ao ser ligado.
+
+   O tom de alerta quando aceso nao e decoracao: "atrasado" ja e vermelho na
+   tabela e no aviso da barra superior, e repetir a cor liga as tres coisas.
+
+   A caixa de marcar continua ali, so que invisivel: o teclado alcanca, o leitor
+   de tela anuncia o estado, e o formulario envia o campo como sempre. */
+.filtros-opcao {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-end;
+    min-height: 2.75rem;
+    cursor: pointer;
+}
+
+.filtros-opcao input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.filtros-opcao > span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--espaco-2);
+    padding: 0.52rem 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-muted);
+    font-size: 0.875rem;
+    line-height: 1;
+    transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.filtros-opcao > span svg {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+}
+
+.filtros-opcao:hover > span {
+    border-color: var(--color-muted);
+    color: var(--color-text);
+}
+
+.filtros-opcao input:checked + span {
+    border-color: var(--color-danger);
+    background: #fff0f1;
+    color: var(--color-danger);
+    font-weight: 560;
+}
+
+/* O contorno de foco precisa aparecer no marcador, porque a caixa que recebe o
+   foco esta invisivel. */
+.filtros-opcao input:focus-visible + span {
+    outline: 3px solid rgba(0, 72, 154, 0.16);
+    outline-offset: 1px;
+    border-color: var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .filtros-opcao > span {
+        transition: none;
+    }
+}
+
+.filtros-acoes {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    margin-left: auto;
+}
+
+/* Filtros ativos, entre a barra e a lista.
+
+   Sem isto nao havia como saber que a lista esta filtrada: quem voltasse a tela
+   depois via menos resultados e nenhuma explicacao. Cada marcador diz o que
+   esta valendo e some ao ser clicado. */
+.filtros-ativos {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--espaco-3);
+    margin: var(--espaco-4) 0 0;
+    padding-top: var(--espaco-4);
+    border-top: 1px solid var(--color-border);
+}
+
+.filtros-ativos-rotulo {
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+}
+
+.filtro-marcador {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--espaco-2);
+    padding: 0.3rem 0.55rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface-soft);
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    text-decoration: none;
+    transition: border-color 0.14s ease, color 0.14s ease;
+}
+
+.filtro-marcador:hover,
+.filtro-marcador:focus-visible {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.filtro-marcador span {
+    color: var(--color-muted);
+}
+
+.filtro-marcador:hover span,
+.filtro-marcador:focus-visible span {
+    color: inherit;
+}
+
+/* O "x" e desenhado, para nao depender de fonte nem de icone extra. */
+.filtro-marcador::after {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    background:
+        linear-gradient(currentColor, currentColor) center/100% 1.2px no-repeat,
+        linear-gradient(currentColor, currentColor) center/1.2px 100% no-repeat;
+    transform: rotate(45deg);
+    opacity: 0.55;
+}
+
+.filtro-marcador:hover::after,
+.filtro-marcador:focus-visible::after {
+    opacity: 1;
+}
+
+@media (max-width: 640px) {
+    .filtros-campo-busca,
+    .filtros-campo-escolha,
+    .filtros-campo-data {
+        flex: 1 1 100%;
+    }
+
+    .filtros-acoes {
+        margin-left: 0;
+        width: 100%;
+    }
 }

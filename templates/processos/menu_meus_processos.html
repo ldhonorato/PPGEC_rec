@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Meus Processos | PPGEC{% endblock %}
+{% block title %}Meus processos{% endblock %}
 {% block content %}
 <section class="card">
     <div class="secao-cabecalho">
@@ -7,22 +7,27 @@
         <a class="btn" href="{% url 'novo_processo' %}">Novo processo</a>
     </div>
 
-    <form method="get" class="form-filtros">
-        <div class="grid-two">
-            <div class="field">
+    {% comment %}
+    Barra de filtros.
+
+    Antes eram seis campos numa grade de duas colunas, todos com a mesma
+    largura de 527px -- "Data inicial" recebia o mesmo espaco que "Busca" --,
+    rotulos em negrito e um botao azul cheio disputando atencao com "Novo
+    processo". Dava 350px de filtro para quatro linhas de resultado.
+
+    Agora: o campo tem a largura do que guarda, os dois filtros de uso diario
+    ficam a vista e os quatro restantes vao para um bloco que abre. O bloco
+    nasce aberto quando algum deles esta em uso, senao a lista viria filtrada
+    sem que o motivo estivesse na tela.
+    {% endcomment %}
+    <form method="get" class="filtros">
+        <div class="filtros-linha">
+            <div class="filtros-campo filtros-campo-busca">
                 <label for="id_my_q">Busca</label>
-                <input id="id_my_q" type="text" name="my_q" value="{{ my_filtro_q }}" placeholder="número, assunto ou descrição">
+                <input id="id_my_q" type="search" name="my_q" value="{{ my_filtro_q }}"
+                       placeholder="número, assunto ou descrição">
             </div>
-            <div class="field">
-                <label for="id_my_tipo">Tipo</label>
-                <select id="id_my_tipo" name="my_tipo">
-                    <option value="">Todos</option>
-                    {% for value, label in my_tipos %}
-                        <option value="{{ value }}" {% if my_filtro_tipo == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="field">
+            <div class="filtros-campo filtros-campo-escolha">
                 <label for="id_my_status">Status</label>
                 <select id="id_my_status" name="my_status">
                     <option value="">Todos</option>
@@ -31,23 +36,59 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="field">
-                <label for="id_my_data_inicio">Data inicial</label>
-                <input id="id_my_data_inicio" type="date" name="my_data_inicio" value="{{ my_filtro_data_inicio }}">
-            </div>
-            <div class="field">
-                <label for="id_my_data_fim">Data final</label>
-                <input id="id_my_data_fim" type="date" name="my_data_fim" value="{{ my_filtro_data_fim }}">
-            </div>
-            <div class="field">
-                <label>
-                    <input type="checkbox" name="my_atrasados" value="1" {% if my_filtro_atrasados %}checked{% endif %}>
-                    Apenas atrasados
-                </label>
+            <div class="filtros-acoes">
+                <button class="btn btn-secondary" type="submit">Filtrar</button>
             </div>
         </div>
-        <button class="btn" type="submit">Filtrar</button>
+
+        <details class="revelar" {% if my_filtro_tipo or my_filtro_data_inicio or my_filtro_data_fim or my_filtro_atrasados %}open{% endif %}>
+            <summary>Mais filtros</summary>
+            <div class="filtros-linha">
+                <div class="filtros-campo filtros-campo-escolha">
+                    <label for="id_my_tipo">Tipo</label>
+                    <select id="id_my_tipo" name="my_tipo">
+                        <option value="">Todos</option>
+                        {% for value, label in my_tipos %}
+                            <option value="{{ value }}" {% if my_filtro_tipo == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filtros-campo filtros-campo-data">
+                    <label for="id_my_data_inicio">A partir de</label>
+                    <input id="id_my_data_inicio" type="date" name="my_data_inicio" value="{{ my_filtro_data_inicio }}">
+                </div>
+                <div class="filtros-campo filtros-campo-data">
+                    <label for="id_my_data_fim">Até</label>
+                    <input id="id_my_data_fim" type="date" name="my_data_fim" value="{{ my_filtro_data_fim }}">
+                </div>
+                <label class="filtros-opcao">
+                    <input type="checkbox" name="my_atrasados" value="1" {% if my_filtro_atrasados %}checked{% endif %}>
+                    <span>
+                        <svg aria-hidden="true"><use href="#i-alerta"></use></svg>
+                        Somente atrasados
+                    </span>
+                </label>
+            </div>
+        </details>
     </form>
+
+    {% comment %}
+    Uma lista filtrada nao se anunciava: quem voltasse a tela depois via menos
+    resultados do que esperava, sem explicacao e sem como desfazer. Cada
+    marcador diz o que esta valendo e leva ao mesmo endereco sem aquele
+    parametro -- os demais filtros seguem de pe.
+    {% endcomment %}
+    {% if my_filtros_ativos %}
+        <div class="filtros-ativos">
+            <span class="filtros-ativos-rotulo">Filtrando por</span>
+            {% for filtro in my_filtros_ativos %}
+                <a class="filtro-marcador" href="{{ filtro.url_sem }}" title="Remover este filtro">
+                    {% if filtro.titulo %}<span>{{ filtro.titulo }}:</span> {% endif %}{{ filtro.valor }}
+                </a>
+            {% endfor %}
+            <a class="text-link" href="{% url 'menu_meus_processos' %}">Limpar tudo</a>
+        </div>
+    {% endif %}
 
     {% include "includes/tabela_processos.html" with processos=meus_processos mostrar_tipo=True mostrar_setor=True mostrar_prazo=True vazio_titulo="Nenhum processo encontrado" vazio_texto="Você ainda não abriu processos, ou nenhum corresponde aos filtros." %}
 </section>

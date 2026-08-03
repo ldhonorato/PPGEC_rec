@@ -4731,13 +4731,28 @@ class PadraoVisualDosTemplatesTests(SimpleTestCase):
             primeiro = abertura.match(conteudo)
             if not primeiro:
                 continue
+            dentro = self._conteudo_do_elemento(conteudo, primeiro)
             classes = set(re.findall(r"[a-z0-9-]+", re.search(r'class="([^"]*)"', primeiro.group(2)).group(1))) \
                 if 'class="' in primeiro.group(2) else set()
-            # Problema quando o envolvente guarda mais de um cartao e nao espaca
-            # nada: e ai que o ritmo entre blocos deixa de existir.
-            if conteudo.count('class="card') > 1 and not (classes & (com_gap | {"card"})):
+            # Conta os cartoes DENTRO do primeiro elemento, nao no conteudo
+            # inteiro: um cabecalho de pagina que abre a tela e irmao dos cartoes,
+            # nao envolvente deles, e nao tem nada a ver com o ritmo entre eles.
+            if dentro.count('class="card') > 1 and not (classes & (com_gap | {"card"})):
                 culpados.append(f"{caminho.name}: <{primeiro.group(1)}{primeiro.group(2)}>")
         self.assertEqual(culpados, [], f"cartoes fora do alcance do ritmo vertical: {culpados}")
+
+    @staticmethod
+    def _conteudo_do_elemento(html, abertura):
+        """O que esta entre a tag de abertura encontrada e o seu fechamento."""
+        tag = abertura.group(1)
+        profundidade = 0
+        for marca in re.finditer(rf"<(/?){tag}\b[^>]*>", html):
+            profundidade += -1 if marca.group(1) else 1
+            if profundidade == 0:
+                return html[abertura.end():marca.start()]
+        # Sem fechamento correspondente (o template pode fechar noutro bloco):
+        # considera tudo o que vem depois, que e a leitura conservadora.
+        return html[abertura.end():]
 
     def test_nenhum_template_carrega_anotacao_de_desenvolvimento(self):
         """TODO/FIXME nao sao conteudo de tela.

@@ -4779,6 +4779,41 @@ def aluno_documento_historico_view(request):
     )
 
 
+
+def _filtros_ativos(request, rotulos):
+    """Os filtros em vigor, cada um com o endereco que o remove.
+
+    Existe porque uma lista filtrada nao se anunciava: quem voltasse a tela
+    depois via menos resultados do que esperava e nenhuma explicacao do porque.
+    Cada marcador diz o que esta valendo e leva ao mesmo endereco sem aquele
+    parametro -- os demais filtros seguem de pe, que e o que se espera ao tirar
+    um de varios.
+
+    rotulos: {parametro: (titulo, funcao que transforma o valor em texto)}. A
+    funcao existe para o marcador mostrar "Trancamento de Matricula" e nao
+    "TRANCAMENTO_MATRICULA".
+
+    Titulo vazio serve aos filtros de liga-desliga: "Somente atrasados" e a
+    frase inteira, e escrever "Somente: atrasados" seria partir em par o que nao
+    e par de rotulo e valor.
+    """
+    ativos = []
+    for parametro, (titulo, formatar) in rotulos.items():
+        valor = request.GET.get(parametro, "").strip()
+        if not valor:
+            continue
+        restante = request.GET.copy()
+        restante.pop(parametro, None)
+        ativos.append(
+            {
+                "titulo": titulo,
+                "valor": formatar(valor) if formatar else valor,
+                "url_sem": f"{request.path}?{restante.urlencode()}" if restante else request.path,
+            }
+        )
+    return ativos
+
+
 @login_required
 def menu_meus_processos_view(request):
     if request.user.tipo_usuario == User.TipoUsuario.SERVIDOR:
@@ -4832,6 +4867,17 @@ def menu_meus_processos_view(request):
             "my_filtro_data_inicio": filtro_data_inicio,
             "my_filtro_data_fim": filtro_data_fim,
             "my_filtro_atrasados": filtro_atrasados,
+            "my_filtros_ativos": _filtros_ativos(
+                request,
+                {
+                    "my_q": ("Busca", None),
+                    "my_tipo": ("Tipo", dict(Processo.TipoProcesso.choices).get),
+                    "my_status": ("Status", dict(Processo.StatusProcesso.choices).get),
+                    "my_data_inicio": ("A partir de", None),
+                    "my_data_fim": ("Até", None),
+                    "my_atrasados": ("", lambda _: "Somente atrasados"),
+                },
+            ),
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
