@@ -48,7 +48,8 @@ services:
     command: gunicorn ppgec.wsgi:application --bind 0.0.0.0:8001 --workers 3
     labels: *watchtower-enabled
     ports:
-      - "${WEB_PORT:-8001}:8001"
+      # Gunicorn fala HTTP. Restrinja-o ao host e publique somente o proxy TLS.
+      - "127.0.0.1:${WEB_PORT:-8001}:8001"
     env_file:
       - .env
     volumes:
