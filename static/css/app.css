@@ -1,5 +1,9 @@
 :root {
     --color-bg: #f5f7fb;
+    /* Permite animar para "auto" (altura de conteudo). Sem isto, o navegador
+       trata auto como valor nao interpolavel e a transicao vira um salto. */
+    interpolate-size: allow-keywords;
+
     --color-surface: #ffffff;
     --color-surface-soft: #f8fbff;
     --color-text: #18233a;
@@ -4164,5 +4168,38 @@ dialog::backdrop {
     .filtros-acoes {
         margin-left: 0;
         width: 100%;
+    }
+}
+
+/* ==========================================================================
+   Abertura dos blocos que revelam conteudo
+
+   <details> abre e fecha de uma vez: o conteudo aparece inteiro no mesmo
+   quadro, e o que estava abaixo salta para baixo sem aviso. Em "Mais filtros"
+   isso desloca a tabela de resultados em ~95px de uma vez, e o olho perde a
+   linha que estava lendo.
+
+   ::details-content e o conteudo do bloco. Animar a altura dele exige que
+   "auto" seja interpolavel -- e o interpolate-size no :root. content-visibility
+   entra com allow-discrete para o conteudo nao sumir antes de a altura chegar a
+   zero ao fechar.
+
+   Onde nao houver suporte, nada disso se aplica e o bloco continua abrindo de
+   uma vez, que e o comportamento de hoje: a animacao e um acrescimo, nao um
+   requisito.
+   ========================================================================== */
+@media (prefers-reduced-motion: no-preference) {
+    .revelar::details-content,
+    .trajetoria::details-content {
+        block-size: 0;
+        overflow: hidden;
+        transition:
+            block-size 0.22s ease,
+            content-visibility 0.22s allow-discrete;
+    }
+
+    .revelar[open]::details-content,
+    .trajetoria[open]::details-content {
+        block-size: auto;
     }
 }
