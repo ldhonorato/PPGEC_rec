@@ -799,16 +799,40 @@ class EncaminhamentoForm(forms.Form):
 
 
 class ProcessoAberturaForm(forms.ModelForm):
+    """Abertura de processo pelo requerente.
+
+    Os textos de ajuda existem porque "Assunto" e "Descricao", lado a lado e sem
+    explicacao, nao dizem o que muda de um para o outro -- e o assunto e o que a
+    secretaria le primeiro na caixa, entao um assunto vago custa uma ida e volta.
+    """
+
     class Meta:
         model = Processo
         fields = ["tipo", "assunto", "descricao"]
         widgets = {
-            "descricao": forms.Textarea(attrs={"rows": 5}),
+            "descricao": forms.Textarea(attrs={"rows": 6}),
+        }
+        help_texts = {
+            "tipo": "Define para onde o processo vai e que documentos serão exigidos.",
+            "assunto": "Uma linha que identifique o pedido. É o que aparece na listagem.",
+            "descricao": "Explique o que está pedindo e por quê. Inclua datas, disciplinas "
+                         "ou prazos envolvidos.",
         }
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
+        # O padrao do Django e "---------", que ocupa a primeira posicao da lista
+        # sem dizer o que fazer com ela. Como "tipo" tem choices e nao e chave
+        # estrangeira, o campo e um TypedChoiceField -- que nao tem empty_label;
+        # a opcao vazia vem dentro de choices e e la que se troca.
+        escolhas = list(self.fields["tipo"].choices)
+        if escolhas and escolhas[0][0] == "":
+            escolhas[0] = ("", "Selecione o tipo de requerimento")
+            self.fields["tipo"].choices = escolhas
+        self.fields["assunto"].widget.attrs.setdefault(
+            "placeholder", "Ex.: Prorrogação de prazo para defesa"
+        )
 
 
 class SolicitarCienteOrientadorForm(forms.Form):

@@ -4203,3 +4203,150 @@ dialog::backdrop {
         block-size: auto;
     }
 }
+
+/* ==========================================================================
+   Formulario de entrada
+
+   O outro padrao de formulario do sistema. Filtro refina uma lista e e sempre
+   opcional; este cria dados, tem campo obrigatorio e uma acao que confirma.
+   As diferencas seguem dessa distincao:
+
+   - O rotulo tem peso: aqui ele nomeia o que se preenche, e nao o que se
+     refina.
+   - Obrigatorio e dito na tela. Antes os tres campos eram required e nada
+     indicava isso -- o usuario descobria ao tentar enviar.
+   - Cada campo pode trazer uma linha de orientacao. "Assunto" e "Descricao",
+     lado a lado e sem explicacao, nao dizem o que muda de um para o outro.
+   - As acoes ficam separadas do conteudo por uma divisoria, e a que confirma
+     vem por ultimo.
+   ========================================================================== */
+.formulario {
+    display: grid;
+    gap: var(--espaco-5);
+    max-width: 42rem;
+}
+
+.formulario-campo {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.formulario-campo > label {
+    margin: 0;
+    color: var(--color-text);
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
+/* A marca de obrigatorio acompanha o rotulo, nao o campo: e uma informacao
+   sobre o que se pede, e quem usa leitor de tela ja recebe isso pelo atributo
+   required do proprio controle -- dai o aria-hidden na marca. */
+.formulario-campo > label .obrigatorio {
+    margin-left: 0.15rem;
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
+.formulario-campo input,
+.formulario-campo select,
+.formulario-campo textarea {
+    margin-top: 0;
+}
+
+.formulario-campo textarea {
+    min-height: 8rem;
+    resize: vertical;
+}
+
+/* Orientacao abaixo do campo, nao acima: quem sabe o que preencher nem chega a
+   ler, e quem nao sabe procura depois de ver o campo. */
+.formulario-ajuda {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}
+
+.formulario-campo .errorlist {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--color-danger);
+    font-size: 0.8125rem;
+}
+
+.formulario-campo:has(.errorlist) input,
+.formulario-campo:has(.errorlist) select,
+.formulario-campo:has(.errorlist) textarea {
+    border-color: var(--color-danger);
+}
+
+/* Bloco dentro do formulario que nao e um campo -- anexos, por exemplo. Tem
+   titulo proprio para nao se confundir com os campos acima dele. */
+.formulario-secao {
+    display: grid;
+    gap: var(--espaco-4);
+    padding-top: var(--espaco-5);
+    border-top: 1px solid var(--color-border);
+}
+
+.formulario-secao-cabecalho {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--espaco-4);
+    flex-wrap: wrap;
+}
+
+.formulario-secao-titulo {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
+/* Rodape de acoes: separado do conteudo, e a acao que confirma por ultimo --
+   e a ordem em que o olho chega nela depois de percorrer o formulario. */
+.formulario-acoes {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--espaco-3);
+    flex-wrap: wrap;
+    padding-top: var(--espaco-5);
+    border-top: 1px solid var(--color-border);
+}
+
+/* Aviso de contexto no topo do formulario: diz o que vai acontecer com o que
+   esta sendo preenchido. Era um paragrafo cinza solto sob o titulo. */
+.formulario-aviso {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--espaco-3);
+    margin: 0 0 var(--espaco-5);
+    padding: var(--espaco-4);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-soft);
+    color: var(--color-text);
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.formulario-aviso svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    flex: 0 0 auto;
+    margin-top: 0.1rem;
+    color: var(--color-primary);
+}
+
+@media (max-width: 640px) {
+    .formulario-acoes {
+        justify-content: stretch;
+    }
+
+    .formulario-acoes .btn {
+        flex: 1 1 auto;
+    }
+}
