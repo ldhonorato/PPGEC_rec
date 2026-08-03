@@ -267,6 +267,38 @@ STORAGES = {
 MEDIA_URL = '/media/'
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", BASE_DIR / "media"))
 
+# --------------------------------------------------------------------------
+# Armazenamento dos documentos enviados
+#
+# Sem AWS_STORAGE_BUCKET_NAME, os arquivos ficam em disco (MEDIA_ROOT) -- e o
+# modo de desenvolvimento. Com o nome do bucket definido, passam para o S3.
+#
+# A escolha e pela presenca do bucket, e nao por um booleano separado, para nao
+# existir o estado "S3 ligado, bucket nao informado": ou ha destino, ou nao ha.
+# --------------------------------------------------------------------------
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "").strip()
+USA_S3 = bool(AWS_STORAGE_BUCKET_NAME)
+
+if USA_S3:
+    from ppgec.storage import configuracao_s3
+
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
+    AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1").strip()
+
+    # Vida da URL assinada, em segundos. Curta de proposito: a URL e entregue
+    # depois da verificacao de permissao e, a partir dai, vale por si -- quanto
+    # menos durar, menor a janela em que um link repassado ainda abre.
+    AWS_QUERYSTRING_EXPIRE = int(os.getenv("AWS_QUERYSTRING_EXPIRE", "300"))
+
+    STORAGES["default"] = configuracao_s3(
+        bucket=AWS_STORAGE_BUCKET_NAME,
+        regiao=AWS_S3_REGION_NAME,
+        chave=AWS_ACCESS_KEY_ID,
+        segredo=AWS_SECRET_ACCESS_KEY,
+        expiracao_da_url=AWS_QUERYSTRING_EXPIRE,
+    )
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

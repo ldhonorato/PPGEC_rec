@@ -15,10 +15,11 @@ from django.templatetags.static import static
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.utils import timezone
 
 
+from .templatetags.acadflow import url_protegida
 from .views import _linhas_trajetoria
 from .models import (
     AlteracaoAluno,
@@ -184,6 +185,26 @@ class ArquivoEnviadoTests(TestCase):
 
         self.assertRedirects(self.client.get(url), f"{reverse('login')}?next={url}")
 
+    def test_o_link_da_tela_aponta_para_a_rota_com_verificacao(self):
+        """O template nao pode linkar o arquivo direto.
+
+        Enquanto o armazenamento e disco, ``arquivo.url`` produz "/media/..." --
+        que por acaso e a rota verificada. Com o S3, o mesmo ``.url`` passa a
+        devolver o endereco assinado do bucket, que abre sem passar por lugar
+        nenhum do sistema. O filtro url_protegida devolve sempre a rota interna.
+        """
+        from processos.templatetags.acadflow import url_protegida
+
+        documento = self._documento(restricao=Documento.RestricaoAcesso.NAO)
+
+        self.assertEqual(
+            url_protegida(documento.arquivo),
+            reverse("media_file", kwargs={"path": documento.arquivo.name}),
+        )
+
+    def test_sem_arquivo_o_filtro_nao_inventa_endereco(self):
+        self.assertEqual(url_protegida(None), "")
+
     def test_todo_campo_de_arquivo_do_sistema_tem_regra_declarada(self):
         """Campo novo nasce protegido, ou nao e servido.
 
@@ -205,6 +226,72 @@ class ArquivoEnviadoTests(TestCase):
 
         faltando = sorted(f"{m.__name__}.{c}" for m, c in no_sistema - declarados)
         self.assertEqual(faltando, [], f"campos de arquivo sem regra de acesso: {faltando}")
+
+
+class ArmazenamentoS3Tests(SimpleTestCase):
+    """Configuracao do bucket e entrega por URL assinada.
+
+    O bucket e privado: quem tem a chave e a aplicacao. A URL de leitura e
+    assinada e de vida curta, emitida so depois de a view conferir quem esta
+    pedindo -- e o que mantem a regra de sigilo valendo tambem do lado do S3.
+    """
+
+    PADRAO = dict(bucket="ppgec-documentos", regiao="us-east-1",
+                  chave="AKIAEXEMPLO", segredo="segredo", expiracao_da_url=300)
+
+    def _config(self, **ajustes):
+        from ppgec.storage import configuracao_s3
+
+        return configuracao_s3(**{**self.PADRAO, **ajustes})
+
+    def test_sem_credencial_a_aplicacao_nao_sobe(self):
+        """Falhar na subida, e nao no primeiro upload com o usuario esperando."""
+        for faltando in ("chave", "segredo"):
+            with self.subTest(vazio=faltando):
+                with self.assertRaises(ImproperlyConfigured):
+                    self._config(**{faltando: ""})
+
+    def test_toda_url_sai_assinada_e_expira(self):
+        """Sem assinatura nao ha leitura: e o que sustenta o bucket privado."""
+        opcoes = self._config()["OPTIONS"]
+
+        self.assertTrue(opcoes["querystring_auth"])
+        self.assertEqual(opcoes["querystring_expire"], 300)
+
+    def test_arquivo_de_mesmo_nome_nao_sobrescreve_o_anterior(self):
+        """"declaracao.pdf" enviado duas vezes sao dois documentos.
+
+        Com file_overwrite ligado -- o padrao da biblioteca -- o segundo envio
+        apagaria o primeiro em silencio, e o registro antigo passaria a apontar
+        para o arquivo novo.
+        """
+        self.assertFalse(self._config()["OPTIONS"]["file_overwrite"])
+
+    def test_nao_manda_acl_no_upload(self):
+        """Bucket novo vem com ACL desabilitada e recusa a chamada com ACL."""
+        self.assertIsNone(self._config()["OPTIONS"]["default_acl"])
+
+    def test_regiao_vem_de_fora(self):
+        self.assertEqual(self._config(regiao="sa-east-1")["OPTIONS"]["region_name"], "sa-east-1")
+
+    def test_a_view_redireciona_para_a_url_assinada(self):
+        """No S3 a view nao transmite o arquivo: assina e redireciona.
+
+        Baixar do bucket para reenviar faria todo o trafego passar pela
+        aplicacao. O redirecionamento so acontece depois da verificacao, entao
+        nao afrouxa a regra: sem passar pela view, nao ha endereco valido.
+        """
+        from processos.views import _entregar_arquivo
+
+        assinada = "https://ppgec-documentos.s3.amazonaws.com/doc.pdf?X-Amz-Signature=abc"
+        with override_settings(USA_S3=True):
+            with patch("processos.views.default_storage") as armazenamento:
+                armazenamento.url.return_value = assinada
+                resposta = _entregar_arquivo(None, "documentos/processos/doc.pdf")
+
+        self.assertEqual(resposta.status_code, 302)
+        self.assertEqual(resposta["Location"], assinada)
+        armazenamento.url.assert_called_once_with("documentos/processos/doc.pdf")
 
 
 def criar_trajetoria(aluno, **kwargs):

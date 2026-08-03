@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load acadflow %}
 {% block title %}Solicitação de Assinatura | AcadFlow{% endblock %}
 {% block content %}
 <section class="card panel">
@@ -31,12 +32,12 @@
 
     {% if solicitacao.documento_pdf %}
         <p class="nota-espacada">
-            <a class="btn btn-secondary" href="{{ solicitacao.documento_pdf.url }}">Baixar PDF original</a>
+            <a class="btn btn-secondary" href="{{ solicitacao.documento_pdf|url_protegida }}">Baixar PDF original</a>
         </p>
     {% endif %}
     {% if solicitacao.documento_assinado_pdf %}
         <p>
-            <a class="btn" href="{{ solicitacao.documento_assinado_pdf.url }}">Baixar PDF assinado</a>
+            <a class="btn" href="{{ solicitacao.documento_assinado_pdf|url_protegida }}">Baixar PDF assinado</a>
         </p>
     {% endif %}
 </section>

@@ -529,7 +529,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                         {% endif %}
                     {% elif documento.arquivo and item.can_view_file %}
                         <p class="item-observacao">
-                            <a href="{{ documento.arquivo.url }}" target="_blank" rel="noopener">Abrir arquivo</a>
+                            <a href="{{ documento.arquivo|url_protegida }}" target="_blank" rel="noopener">Abrir arquivo</a>
                         </p>
                     {% elif documento.arquivo and not item.can_view_file %}
                         <p class="item-observacao">

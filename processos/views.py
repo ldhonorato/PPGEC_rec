@@ -9,6 +9,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q, Sum
 from django.conf import settings
+from django.core.files.storage import default_storage
 from django.http import Http404, HttpResponse, JsonResponse
 from django.views.static import serve
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
@@ -5045,8 +5046,25 @@ def arquivo_enviado_view(request, path):
             continue
         if not pode_ver(dono, request.user):
             raise Http404("Arquivo não encontrado.")
-        return serve(request, path, document_root=settings.MEDIA_ROOT)
+        return _entregar_arquivo(request, path)
 
     # Nenhum registro reivindica este caminho: arquivo orfao, sobra de um
     # registro apagado ou tentativa de adivinhar caminho.
     raise Http404("Arquivo não encontrado.")
+
+
+def _entregar_arquivo(request, path):
+    """Entrega o arquivo pelo meio do armazenamento em uso.
+
+    Em disco, a propria view transmite o conteudo. No S3, o bucket e privado e
+    quem tem a chave e a aplicacao: em vez de baixar o arquivo para reenvia-lo,
+    a view assina um endereco de vida curta e redireciona para ele. O trafego
+    vai direto do S3 para o navegador, e a aplicacao continua sendo o unico
+    lugar onde a permissao e decidida.
+
+    A assinatura so e emitida depois da verificacao, e por isso ela nao afrouxa
+    a regra: sem passar por aqui, nao ha endereco valido.
+    """
+    if settings.USA_S3:
+        return redirect(default_storage.url(path))
+    return serve(request, path, document_root=settings.MEDIA_ROOT)
