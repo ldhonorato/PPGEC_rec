@@ -22,14 +22,14 @@
             <input type="hidden" name="acao" value="criar_periodo">
             <div class="grid-two">
                 {% for field in form %}
-                    <div class="field">
+                    <div class="formulario-campo">
                         <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {{ field }}
                         {{ field.errors }}
                     </div>
                 {% endfor %}
             </div>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Criar período</button>
             </div>
         </form>
@@ -184,7 +184,7 @@
             {% if periodo_editando.pk == periodo.pk and edit_form %}
                 <div class="grid-two">
                     {% for field in edit_form %}
-                        <div class="field">
+                        <div class="formulario-campo">
                             <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                             {{ field }}
                             {{ field.errors }}
@@ -193,18 +193,18 @@
                 </div>
             {% else %}
                 <div class="grid-two">
-                    <div class="field"><label>Nome</label><input name="nome" value="{{ periodo.nome }}" required maxlength="20"></div>
-                    <div class="field"><label>Início do período letivo</label><input type="date" name="data_inicio" value="{{ periodo.data_inicio|date:'Y-m-d' }}"></div>
-                    <div class="field"><label>Fim do período letivo</label><input type="date" name="data_fim" value="{{ periodo.data_fim|date:'Y-m-d' }}"></div>
-                    <div class="field"><label>Prazo para cadastro de disciplinas</label><input type="date" name="prazo_cadastro_disciplinas" value="{{ periodo.prazo_cadastro_disciplinas|date:'Y-m-d' }}" required></div>
-                    <div class="field"><label>Prazo para aulas presenciais</label><input type="date" name="prazo_agendamento_aulas_presenciais" value="{{ periodo.prazo_agendamento_aulas_presenciais|date:'Y-m-d' }}"></div>
-                    <div class="field"><label>Início da matrícula</label><input type="date" name="matricula_inicio" value="{{ periodo.matricula_inicio|date:'Y-m-d' }}" required></div>
-                    <div class="field"><label>Fim da matrícula</label><input type="date" name="matricula_fim" value="{{ periodo.matricula_fim|date:'Y-m-d' }}" required></div>
-                    <div class="field"><label>Início da modificação</label><input type="date" name="modificacao_inicio" value="{{ periodo.modificacao_inicio|date:'Y-m-d' }}" required></div>
-                    <div class="field"><label>Fim da modificação</label><input type="date" name="modificacao_fim" value="{{ periodo.modificacao_fim|date:'Y-m-d' }}" required></div>
+                    <div class="formulario-campo"><label>Nome</label><input name="nome" value="{{ periodo.nome }}" required maxlength="20"></div>
+                    <div class="formulario-campo"><label>Início do período letivo</label><input type="date" name="data_inicio" value="{{ periodo.data_inicio|date:'Y-m-d' }}"></div>
+                    <div class="formulario-campo"><label>Fim do período letivo</label><input type="date" name="data_fim" value="{{ periodo.data_fim|date:'Y-m-d' }}"></div>
+                    <div class="formulario-campo"><label>Prazo para cadastro de disciplinas</label><input type="date" name="prazo_cadastro_disciplinas" value="{{ periodo.prazo_cadastro_disciplinas|date:'Y-m-d' }}" required></div>
+                    <div class="formulario-campo"><label>Prazo para aulas presenciais</label><input type="date" name="prazo_agendamento_aulas_presenciais" value="{{ periodo.prazo_agendamento_aulas_presenciais|date:'Y-m-d' }}"></div>
+                    <div class="formulario-campo"><label>Início da matrícula</label><input type="date" name="matricula_inicio" value="{{ periodo.matricula_inicio|date:'Y-m-d' }}" required></div>
+                    <div class="formulario-campo"><label>Fim da matrícula</label><input type="date" name="matricula_fim" value="{{ periodo.matricula_fim|date:'Y-m-d' }}" required></div>
+                    <div class="formulario-campo"><label>Início da modificação</label><input type="date" name="modificacao_inicio" value="{{ periodo.modificacao_inicio|date:'Y-m-d' }}" required></div>
+                    <div class="formulario-campo"><label>Fim da modificação</label><input type="date" name="modificacao_fim" value="{{ periodo.modificacao_fim|date:'Y-m-d' }}" required></div>
                 </div>
             {% endif %}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar período</button>
             </div>
         </form>

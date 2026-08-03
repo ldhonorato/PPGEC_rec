@@ -1,5 +1,9 @@
 :root {
     --color-bg: #f5f7fb;
+    /* Permite animar para "auto" (altura de conteudo). Sem isto, o navegador
+       trata auto como valor nao interpolavel e a transicao vira um salto. */
+    interpolate-size: allow-keywords;
+
     --color-surface: #ffffff;
     --color-surface-soft: #f8fbff;
     --color-text: #18233a;
@@ -316,6 +320,8 @@ input[type="checkbox"] {
     text-decoration: none;
     cursor: pointer;
     box-shadow: var(--shadow-control);
+    transition: background 0.14s ease, border-color 0.14s ease,
+                transform 0.14s ease, box-shadow 0.14s ease;
 }
 
 /* Icones do sprite SVG (templates/includes/icons.html). Herdam a cor do texto
@@ -414,63 +420,203 @@ input[type="checkbox"] {
     color: var(--color-muted);
 }
 
+/* Painel da conta.
+
+   Era uma caixa de 190px com dois itens em negrito e nada mais: nao dizia de
+   quem e a conta -- o nome vive no chip, que some abaixo de 640px -- nem o que
+   cada destino faz. Agora abre com a identidade no topo e cada item leva uma
+   linha de apoio, como os itens da barra lateral ja fazem.
+
+   O painel entra com um leve deslocamento e some no caminho inverso. Sem isso
+   ele aparecia e sumia de um quadro para o outro, o que num elemento que se
+   sobrepoe ao conteudo se le como salto. */
 .user-menu-panel {
     position: absolute;
     right: 0;
     top: calc(100% + 10px);
     z-index: 30;
-    width: 190px;
-    padding: 0.4rem;
+    width: min(19rem, calc(100vw - 2rem));
+    padding: var(--espaco-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: #ffffff;
-    box-shadow: var(--shadow-card);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    box-shadow:
+        0 1px 2px rgba(8, 20, 38, 0.06),
+        0 12px 32px rgba(8, 20, 38, 0.14);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .user-menu[open] .user-menu-panel {
+        animation: painel-conta-entra 0.16s ease-out;
+    }
+}
+
+@keyframes painel-conta-entra {
+    from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.user-menu-cabecalho {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    padding: var(--espaco-3);
+}
+
+.avatar-grande {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    font-size: 0.9rem;
+}
+
+.user-menu-identidade {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.user-menu-identidade strong {
+    font-size: 0.9375rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.user-menu-email {
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+}
+
+/* O papel vem de uma etiqueta, e nao de mais uma linha de texto: e o que
+   distingue duas contas com o mesmo nome, e merece ser visto de relance. */
+.user-menu-papel {
+    justify-self: start;
+    margin-top: 0.2rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.user-menu-itens {
+    display: grid;
+    gap: 0.1rem;
+    padding-top: var(--espaco-2);
+    border-top: 1px solid var(--color-border);
 }
 
 .user-menu-panel a,
 .user-menu-panel button {
     display: flex;
-    width: 100%;
-    min-height: 42px;
     align-items: center;
-    padding: 0.55rem 0.7rem;
+    gap: var(--espaco-3);
+    width: 100%;
+    min-height: 44px;
+    padding: var(--espaco-3);
     border: 0;
     border-radius: var(--radius-sm);
     color: var(--color-text);
     background: transparent;
-    font-weight: 600;
     text-align: left;
     text-decoration: none;
     cursor: pointer;
+    transition: background 0.14s ease, color 0.14s ease;
+}
+
+.user-menu-panel a span,
+.user-menu-panel button span {
+    display: grid;
+    gap: 0.05rem;
+    min-width: 0;
+}
+
+.user-menu-panel strong {
+    font-size: 0.875rem;
+    font-weight: 560;
+}
+
+.user-menu-panel small {
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    line-height: 1.35;
 }
 
 .user-menu-panel a:hover,
-.user-menu-panel button:hover,
-.user-menu-panel a:focus-visible,
-.user-menu-panel button:focus-visible {
+.user-menu-panel a:focus-visible {
     color: var(--color-primary);
     background: var(--color-primary-soft);
     outline: none;
 }
 
-.user-menu-panel form {
-    margin: 0;
+.user-menu-panel a:hover .nav-icon,
+.user-menu-panel a:focus-visible .nav-icon {
+    color: var(--color-primary);
 }
+
+/* Sair e a unica acao destrutiva do painel, e fica separada das demais: um
+   clique errado aqui custa a sessao. */
+.user-menu-sair {
+    margin: var(--espaco-2) 0 0;
+    padding-top: var(--espaco-2);
+    border-top: 1px solid var(--color-border);
+}
+
+.user-menu-sair button {
+    font-size: 0.875rem;
+    font-weight: 560;
+}
+
+.user-menu-sair button:hover,
+.user-menu-sair button:focus-visible {
+    color: var(--color-danger);
+    background: #fff0f1;
+    outline: none;
+}
+
+.user-menu-sair button:hover .nav-icon,
+.user-menu-sair button:focus-visible .nav-icon {
+    color: var(--color-danger);
+}
+
 
 .inline-form {
     margin: 0;
 }
 
+/* Botao primario: a acao que a tela existe para oferecer.
+
+   Ganha resposta ao ponteiro e ao clique. Antes so mudava de cor no hover, o
+   que num botao azul sobre fundo claro quase nao se percebe; o leve
+   deslocamento e a sombra dizem que ele e pressionavel antes mesmo do toque.
+   No :active ele afunda -- o movimento contrario do hover --, que e o que se
+   espera de algo que responde. */
 .btn:hover,
 .nav-btn:hover,
 .btn:focus-visible,
 .nav-btn:focus-visible {
     background: var(--color-primary-strong);
     outline: none;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 72, 154, 0.18), 0 8px 18px rgba(0, 72, 154, 0.18);
 }
 
+.btn:active,
+.nav-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 72, 154, 0.2);
+}
+
+/* Botao secundario: acao de apoio, que nao deve disputar a atencao do primario.
+
+   Aqui o realce e o contorno, nao o preenchimento -- e a diferenca de peso
+   entre "Novo processo" e "Filtrar" na mesma tela. Ele nao se desloca: nao e
+   para se oferecer, e para estar disponivel. */
 .btn-secondary {
-    background: #ffffff;
+    background: var(--color-surface);
     color: var(--color-primary);
     border-color: var(--color-border);
     box-shadow: none;
@@ -480,6 +626,25 @@ input[type="checkbox"] {
 .btn-secondary:focus-visible {
     background: var(--color-primary-soft);
     color: var(--color-primary);
+    border-color: var(--color-primary);
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-secondary:active {
+    background: var(--color-primary-soft);
+    transform: none;
+}
+
+/* Nao ha o que animar para quem pede menos movimento; o realce de cor fica. */
+@media (prefers-reduced-motion: reduce) {
+    .btn,
+    .nav-btn,
+    .btn:hover,
+    .nav-btn:hover,
+    .btn:active {
+        transform: none !important;
+    }
 }
 
 .btn-full {
@@ -795,39 +960,6 @@ input[type="checkbox"] {
 
 
 
-/* --- Gaveta no mobile --- */
-
-.menu-toggle,
-.menu-fechar {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    width: 42px;
-    height: 42px;
-    padding: 0;
-    color: var(--color-primary);
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-}
-
-.menu-toggle:focus-visible,
-.menu-fechar:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
-}
-
-.menu-fechar {
-    margin-left: auto;
-    color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.28);
-}
-
-.sidebar-overlay {
-    display: none;
-}
-
 /* Ritmo vertical da coluna de conteudo.
 
    Cada bloco irmao se afasta do anterior sozinho. Antes o respiro dependia de
@@ -1002,6 +1134,13 @@ input[type="checkbox"] {
     gap: 1rem;
 }
 
+/* Vale o mesmo que em .pilha-trajetorias: item de grade nao encolhe abaixo do
+   proprio conteudo enquanto tiver min-width: auto, e o que nao coube vira
+   largura de pagina em vez de rolagem interna. */
+.stack > * {
+    min-width: 0;
+}
+
 .panel {
     margin-bottom: 1rem;
 }
@@ -1018,6 +1157,33 @@ textarea {
     border-radius: var(--radius-sm);
 }
 
+/* Seta do select, desenhada por nos.
+
+   A seta nativa do navegador fica colada na borda direita: ela nao respeita o
+   padding do campo, entao o valor selecionado termina a 0.72rem da borda e a
+   seta a 0. Alem de encostar, ela e diferente em cada navegador -- no Chrome e
+   um triangulo cheio, no Firefox um chevron fino -- e nao acompanha nem a cor
+   nem a espessura do resto da interface.
+
+   Com appearance:none ela sai, e no lugar entra um chevron igual ao que a barra
+   lateral e os blocos que abrem ja usam. O padding a direita abre espaco para
+   ele, senao o texto de uma opcao longa passaria por baixo. */
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 2.3rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23637083' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 9.5l5.5 5.5 5.5-5.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.8rem center;
+    background-size: 0.8rem;
+}
+
+/* Sem isto, o Chrome no Windows desenha a seta nativa por cima da nossa quando
+   o campo esta desabilitado. */
+select::-ms-expand {
+    display: none;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -1025,14 +1191,14 @@ textarea:focus {
     outline: 3px solid rgba(0, 72, 154, 0.12);
 }
 
+select:focus {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300489a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 9.5l5.5 5.5 5.5-5.5'/%3E%3C/svg%3E");
+}
+
 label {
     color: var(--color-text);
     font-size: 0.92rem;
     font-weight: 600;
-}
-
-.field {
-    margin-bottom: 0.9rem;
 }
 
 .checkbox-field {
@@ -1080,10 +1246,6 @@ label {
 
 .time-grid {
     gap: 0.75rem;
-}
-
-.hidden-field {
-    display: none;
 }
 
 .trajectory-panel {
@@ -1277,12 +1439,22 @@ dialog::backdrop {
     background: rgba(8, 20, 38, 0.48);
 }
 
+/* Largura unica. Havia 900px aqui e 720px na implementacao propria, entao a
+   mesma acao abria em tamanhos diferentes conforme a tela de origem. */
 .modal-dialog {
-    width: min(900px, 92vw);
+    width: min(760px, 92vw);
 }
 
 .modal-body {
-    padding: 1rem;
+    padding: var(--espaco-5);
+}
+
+/* Fora do modal, o limite de 42rem existe para a linha do campo nao ficar
+   larga demais para o olho percorrer. Dentro, quem ja limita e o proprio
+   dialogo -- manter os dois faz o formulario parar antes da borda e deixar
+   uma faixa vazia a direita, como se algo tivesse ficado de fora. */
+.modal-dialog .formulario {
+    max-width: none;
 }
 
 .cpf-pendente-modal {
@@ -1297,7 +1469,7 @@ dialog::backdrop {
     backdrop-filter: blur(2px);
 }
 
-.cpf-pendente-modal .field {
+.cpf-pendente-modal .formulario-campo {
     text-align: left;
 }
 
@@ -1317,13 +1489,6 @@ dialog::backdrop {
 .field-tooltip {
     cursor: help;
     color: var(--color-primary);
-}
-
-.form-actions {
-    display: flex;
-    gap: 0.7rem;
-    justify-content: flex-end;
-    flex-wrap: wrap;
 }
 
 /* Faixa de abertura. Substitui um bloco de 245px que repetia a marca da
@@ -1910,7 +2075,7 @@ dialog::backdrop {
 
 /* Botoes do formulario acompanham a largura dos campos, senao ficam soltos
    na outra ponta do cartao. */
-.form-coluna .form-actions,
+.form-coluna .formulario-acoes,
 .form-coluna .actions-row {
     max-width: 42rem;
 }
@@ -2245,63 +2410,15 @@ dialog::backdrop {
     /* Abaixo de 920px a barra vira gaveta. Antes ela ficava estatica no topo,
        empilhada acima do conteudo: em toda pagina o usuario rolava ~470px de
        menu antes de ver qualquer coisa. */
-    .menu-toggle,
-    .menu-fechar {
-        display: inline-flex;
-    }
-
     .brand-mobile {
         display: flex;
     }
 
-    /* A gaveta desliza nos dois sentidos.
-
-       O deslize de saida sempre existiu, mas ninguem o via: "visibility:
-       hidden" nao e animavel e valia no mesmo instante em que a classe saia do
-       body, entao a barra ficava invisivel enquanto percorria os 320px. Na tela
-       ela sumia de uma vez.
-
-       A visibilidade passa a esperar o fim do deslize para virar "hidden"
-       (delay de 0.24s ao fechar) e a mudar na hora ao abrir (delay 0), senao a
-       barra so apareceria depois de ja ter entrado. O elemento continua fora da
-       arvore de acessibilidade e do foco quando fechado, que e o motivo de o
-       visibility existir aqui. */
+    /* A barra lateral sai de cena: quem navega aqui e a barra flutuante, e a
+       folha que ela abre. A gaveta que existia neste lugar entrava pela
+       esquerda, puxada por um botao no canto oposto ao polegar. */
     .sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        z-index: 60;
-        flex-basis: auto;
-        width: min(86vw, 320px);
-        transform: translateX(-100%);
-        visibility: hidden;
-        transition: transform 0.24s ease, visibility 0s linear 0.24s;
-    }
-
-    .menu-aberto .sidebar {
-        transform: translateX(0);
-        visibility: visible;
-        transition: transform 0.24s ease, visibility 0s linear 0s;
-    }
-
-    .sidebar-overlay {
-        display: block;
-        position: fixed;
-        inset: 0;
-        z-index: 50;
-        background: rgba(4, 22, 48, 0.5);
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.24s ease;
-    }
-
-    .menu-aberto .sidebar-overlay {
-        opacity: 1;
-        pointer-events: auto;
-    }
-
-    .menu-aberto {
-        overflow: hidden;
+        display: none;
     }
 
     /* .dashboard-grid estava, por engano, na lista da regra de display acima --
@@ -2556,6 +2673,15 @@ dialog::backdrop {
 
 .tabela-envolvido {
     overflow-x: auto;
+    /* O envolvente precisa ser bloco de contencao dos descendentes absolutos,
+       senao eles nao sao recortados junto com a rolagem: sobem para o bloco
+       inicial e passam a contar na largura da pagina.
+
+       Era o caso do rotulo "Acoes", escondido com .apenas-leitor -- 1px de
+       largura, invisivel, e mesmo assim ancorado na coluna onde o cabecalho
+       cai, a 714px do inicio. A tabela rolava certinho dentro do cartao e a
+       pagina, mesmo assim, media 714px numa tela de 390. */
+    position: relative;
     margin: 0 -0.35rem;
     padding: 0 0.35rem;
 }
@@ -3363,52 +3489,23 @@ dialog::backdrop {
         animation: none !important;
     }
 
-    /* A gaveta aparece e some sem deslizar. O delay da visibilidade cai junto:
-       mantido, ela continuaria visivel por 0.24s depois de fechada, sem
-       movimento nenhum -- o pior dos dois mundos. */
-    .sidebar,
-    .menu-aberto .sidebar,
-    .sidebar-overlay {
+    /* A folha aparece e some sem subir. Sem transicao, o display discreto
+       troca no mesmo quadro, que e o comportamento desejado aqui. */
+    .folha-navegacao,
+    .folha-navegacao::backdrop {
         transition: none !important;
     }
 }
 
-/* ==========================================================================
-   Modal
+/* Cabecalho de um modal: titulo a esquerda, fechar a direita.
 
-   Vivia num bloco <style> dentro de aluno_detalhe.html, servindo as 19 caixas
-   de edicao daquela ficha. Enquanto o unico consumidor fosse aquele template
-   isso passava, mas e um componente -- e um <style> solto no meio do content
-   nao e revisavel nem reaproveitavel. A regra que importa e o display:none do
-   backdrop: sem ela, todos os formularios de edicao aparecem empilhados na
-   pagina de uma vez.
+   O restante do que existia aqui -- .modal-backdrop, .modal-card, o fundo
+   escurecido e o display:none que escondia -- era uma implementacao propria de
+   modal, usada so pela ficha do aluno. Saiu junto com a conversao daquelas 19
+   caixas para o <dialog> nativo: o elemento ja traz o fundo (::backdrop), o
+   fechar com Esc, o foco preso dentro e o conteudo de tras isolado do leitor
+   de tela, que a implementacao propria nao tinha.
    ========================================================================== */
-.modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(8, 20, 38, 0.48);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 50;
-    padding: var(--espaco-4);
-}
-
-.modal-backdrop.open {
-    display: flex;
-}
-
-.modal-card {
-    width: min(720px, 96vw);
-    max-height: 92vh;
-    overflow: auto;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    padding: var(--espaco-5);
-    box-shadow: var(--shadow-card);
-}
-
 .modal-head {
     display: flex;
     align-items: center;
@@ -3435,27 +3532,15 @@ dialog::backdrop {
 
 .modal-close:hover {
     color: var(--color-text);
-    border-color: var(--color-text-soft, var(--color-muted));
+    border-color: var(--color-muted);
 }
 
-/* ==========================================================================
-   Grade de horario semanal
-
-   Estava num bloco <style> de matriculas_ofertas.html, com todos os seletores
-   presos a .matriculas-ofertas-page e as cores em hexadecimal solto
-   (#f7fbff, #fbfdff, #bdd4f3, #174d90). Como componente ela serve tambem a
-   tela de matricula do aluno, entao vem para ca sem prefixo de pagina e com os
-   tokens do tema.
-
-   Geometria: as marcas de hora e os eventos vem da view em porcentagem da
-   altura total; --altura-hora, tambem calculado la, diz de quanto em quanto
-   repetir a linha divisoria.
-   ========================================================================== */
+/* A grade tem seis dias de no minimo 6rem mais a coluna das horas: 530px, que
+   nao cabem num celular e nao devem encolher -- um dia de 40px nao mostra o
+   nome da disciplina. Entao ela rola dentro do proprio bloco, como as tabelas
+   largas ja faziam, em vez de empurrar a pagina. */
 .grade-horario-envolvido {
-    margin-top: var(--espaco-5);
-    max-width: 100%;
     overflow-x: auto;
-    overflow-y: hidden;
 }
 
 .grade-horario {
@@ -3766,6 +3851,19 @@ dialog::backdrop {
     gap: var(--espaco-4);
 }
 
+/* Item de grade nasce com min-width: auto, ou seja, nao encolhe abaixo do que
+   o conteudo dele pede. Numa trajetoria isso ia longe: o resumo tem titulo,
+   etiqueta de status e a linha de metadados -- "Ingresso 2024-0 · Docente
+   Mock" --, e o conjunto pedia 429px numa faixa de 309.
+
+   O excedente nao ficava dentro do cartao: empurrava a pagina para 470px numa
+   tela de 390, e em celular isso tira a barra flutuante de vista, porque
+   position: fixed se ancora na pagina, e nao no pedaco visivel dela. Um
+   defeito de largura virava um sumico de navegacao. */
+.pilha-trajetorias > * {
+    min-width: 0;
+}
+
 .trajetoria {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
@@ -4062,4 +4160,1015 @@ dialog::backdrop {
 
 .selected-list button:hover {
     color: var(--color-text);
+}
+
+/* ==========================================================================
+   Barra de filtros
+
+   Filtro nao e formulario de entrada, e ate aqui os dois eram desenhados
+   igual: mesma grade de duas colunas, mesmos rotulos em negrito, mesmo botao
+   azul cheio. Em "Meus Processos" isso dava 350px de filtro para 4 linhas de
+   resultado -- a ferramenta ocupando mais tela do que aquilo sobre o que ela
+   atua.
+
+   As diferencas que este bloco assume:
+
+   - O campo tem a largura do que ele guarda. Uma data pede 10rem, uma busca
+     cresce com o espaco que sobrar. A grade rigida dava 527px para "Data
+     inicial" e os mesmos 527px para "Busca".
+   - O rotulo e menor e mais leve que o de um formulario de entrada. Ali ele
+     nomeia o que se esta preenchendo; aqui, o que se esta refinando.
+   - O botao e secundario. O primario da tela e a acao principal ("Novo
+     processo"), e dois azuis cheios disputam a mesma atencao.
+   - O que e usado sempre fica a vista; o resto vai para um bloco que abre.
+   ========================================================================== */
+.filtros {
+    margin: var(--espaco-5) 0;
+}
+
+.filtros-linha {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--espaco-3) var(--espaco-4);
+}
+
+.filtros-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.filtros-campo > label {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+/* Larguras por natureza do campo, nao por posicao na grade. */
+.filtros-campo-busca {
+    flex: 1 1 18rem;
+}
+
+.filtros-campo-escolha {
+    flex: 0 1 12rem;
+}
+
+.filtros-campo-data {
+    flex: 0 1 10.5rem;
+}
+
+.filtros-campo input,
+.filtros-campo select {
+    width: 100%;
+}
+
+/* Filtro de liga-desliga, como marcador que acende.
+
+   Era uma caixa de marcar solta na grade: o quadradinho de 13px flutuava no
+   meio da altura da celula, sem alinhamento com os campos ao lado, e nada
+   distinguia ligado de desligado alem de um tique minusculo.
+
+   Como marcador, ele diz sozinho em que estado esta -- apagado e uma opcao
+   disponivel, aceso e um filtro em vigor. E a mesma linguagem dos marcadores de
+   filtro ativo logo abaixo, que e o que ele vira ao ser ligado.
+
+   O tom de alerta quando aceso nao e decoracao: "atrasado" ja e vermelho na
+   tabela e no aviso da barra superior, e repetir a cor liga as tres coisas.
+
+   A caixa de marcar continua ali, so que invisivel: o teclado alcanca, o leitor
+   de tela anuncia o estado, e o formulario envia o campo como sempre. */
+.filtros-opcao {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-end;
+    min-height: 2.75rem;
+    cursor: pointer;
+}
+
+.filtros-opcao input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.filtros-opcao > span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--espaco-2);
+    padding: 0.52rem 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-muted);
+    font-size: 0.875rem;
+    line-height: 1;
+    transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.filtros-opcao > span svg {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+}
+
+.filtros-opcao:hover > span {
+    border-color: var(--color-muted);
+    color: var(--color-text);
+}
+
+.filtros-opcao input:checked + span {
+    border-color: var(--color-danger);
+    background: #fff0f1;
+    color: var(--color-danger);
+    font-weight: 560;
+}
+
+/* O contorno de foco precisa aparecer no marcador, porque a caixa que recebe o
+   foco esta invisivel. */
+.filtros-opcao input:focus-visible + span {
+    outline: 3px solid rgba(0, 72, 154, 0.16);
+    outline-offset: 1px;
+    border-color: var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .filtros-opcao > span {
+        transition: none;
+    }
+}
+
+.filtros-acoes {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    margin-left: auto;
+}
+
+/* Filtros ativos, entre a barra e a lista.
+
+   Sem isto nao havia como saber que a lista esta filtrada: quem voltasse a tela
+   depois via menos resultados e nenhuma explicacao. Cada marcador diz o que
+   esta valendo e some ao ser clicado. */
+.filtros-ativos {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--espaco-3);
+    margin: var(--espaco-4) 0 0;
+    padding-top: var(--espaco-4);
+    border-top: 1px solid var(--color-border);
+}
+
+.filtros-ativos-rotulo {
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+}
+
+.filtro-marcador {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--espaco-2);
+    padding: 0.3rem 0.55rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface-soft);
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    text-decoration: none;
+    transition: border-color 0.14s ease, color 0.14s ease;
+}
+
+.filtro-marcador:hover,
+.filtro-marcador:focus-visible {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.filtro-marcador span {
+    color: var(--color-muted);
+}
+
+.filtro-marcador:hover span,
+.filtro-marcador:focus-visible span {
+    color: inherit;
+}
+
+/* O "x" e desenhado, para nao depender de fonte nem de icone extra. */
+.filtro-marcador::after {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    background:
+        linear-gradient(currentColor, currentColor) center/100% 1.2px no-repeat,
+        linear-gradient(currentColor, currentColor) center/1.2px 100% no-repeat;
+    transform: rotate(45deg);
+    opacity: 0.55;
+}
+
+.filtro-marcador:hover::after,
+.filtro-marcador:focus-visible::after {
+    opacity: 1;
+}
+
+@media (max-width: 640px) {
+    .filtros-campo-busca,
+    .filtros-campo-escolha,
+    .filtros-campo-data {
+        flex: 1 1 100%;
+    }
+
+    .filtros-acoes {
+        margin-left: 0;
+        width: 100%;
+    }
+}
+
+/* ==========================================================================
+   Abertura dos blocos que revelam conteudo
+
+   <details> abre e fecha de uma vez: o conteudo aparece inteiro no mesmo
+   quadro, e o que estava abaixo salta para baixo sem aviso. Em "Mais filtros"
+   isso desloca a tabela de resultados em ~95px de uma vez, e o olho perde a
+   linha que estava lendo.
+
+   ::details-content e o conteudo do bloco. Animar a altura dele exige que
+   "auto" seja interpolavel -- e o interpolate-size no :root. content-visibility
+   entra com allow-discrete para o conteudo nao sumir antes de a altura chegar a
+   zero ao fechar.
+
+   Onde nao houver suporte, nada disso se aplica e o bloco continua abrindo de
+   uma vez, que e o comportamento de hoje: a animacao e um acrescimo, nao um
+   requisito.
+   ========================================================================== */
+@media (prefers-reduced-motion: no-preference) {
+    .revelar::details-content,
+    .trajetoria::details-content {
+        block-size: 0;
+        overflow: hidden;
+        transition:
+            block-size 0.22s ease,
+            content-visibility 0.22s allow-discrete;
+    }
+
+    .revelar[open]::details-content,
+    .trajetoria[open]::details-content {
+        block-size: auto;
+    }
+}
+
+/* ==========================================================================
+   Formulario de entrada
+
+   O outro padrao de formulario do sistema. Filtro refina uma lista e e sempre
+   opcional; este cria dados, tem campo obrigatorio e uma acao que confirma.
+   As diferencas seguem dessa distincao:
+
+   - O rotulo tem peso: aqui ele nomeia o que se preenche, e nao o que se
+     refina.
+   - Obrigatorio e dito na tela. Antes os tres campos eram required e nada
+     indicava isso -- o usuario descobria ao tentar enviar.
+   - Cada campo pode trazer uma linha de orientacao. "Assunto" e "Descricao",
+     lado a lado e sem explicacao, nao dizem o que muda de um para o outro.
+   - As acoes ficam separadas do conteudo por uma divisoria, e a que confirma
+     vem por ultimo.
+   ========================================================================== */
+.formulario {
+    display: grid;
+    gap: var(--espaco-5);
+    max-width: 42rem;
+}
+
+.formulario-campo {
+    display: grid;
+    gap: 0.35rem;
+    /* As linhas empacotam em cima em vez de esticar. Num formulario de duas
+       colunas, a altura da linha e a do campo mais alto -- uma ementa de seis
+       linhas ao lado de "Carga horaria" fazia a caixa de uma linha so crescer
+       ate o rodape da outra, com o rotulo la em cima e o campo la embaixo,
+       parecendo dois campos diferentes. */
+    align-content: start;
+    margin-bottom: var(--espaco-4);
+}
+
+/* Dentro dos envolventes que ja distribuem o espaco -- .formulario com o seu
+   gap, .filtros com o dele --, a margem viraria soma: um campo afastado do
+   proximo por gap + margem, e o ultimo empurrando os botoes para longe. Fora
+   deles, e a margem que separa um campo do outro; nem todo formulario da casa
+   e uma pilha de campos, e os que misturam campo e conteudo continuam
+   dependendo dela. */
+.formulario .formulario-campo,
+.filtros .formulario-campo {
+    margin-bottom: 0;
+}
+
+.formulario-campo > label {
+    margin: 0;
+    color: var(--color-text);
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
+/* A marca de obrigatorio acompanha o rotulo, nao o campo: e uma informacao
+   sobre o que se pede, e quem usa leitor de tela ja recebe isso pelo atributo
+   required do proprio controle -- dai o aria-hidden na marca. */
+.formulario-campo > label .obrigatorio {
+    margin-left: 0.15rem;
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
+/* O display:grid acima venceria o display:none que o atributo hidden aplica
+   pela folha do navegador -- classe ganha de seletor de elemento. Sem esta
+   regra, esconder um campo pelo atributo nao esconde nada. */
+.formulario-campo[hidden] {
+    display: none;
+}
+
+/* Caixa de marcar: o controle vem antes do rotulo, os dois na mesma linha. A
+   pergunta e a resposta sao a mesma coisa aqui -- empilhar rotulo e caixa,
+   como nos outros campos, separaria o que se le do que se clica. */
+.formulario-campo-marcavel {
+    grid-auto-flow: column;
+    justify-content: start;
+    align-items: center;
+    gap: var(--espaco-3);
+}
+
+.formulario-campo-marcavel input {
+    width: auto;
+    margin: 0;
+}
+
+.formulario-campo-marcavel > label {
+    font-weight: 500;
+}
+
+.formulario-campo input,
+.formulario-campo select,
+.formulario-campo textarea {
+    margin-top: 0;
+}
+
+.formulario-campo textarea {
+    min-height: 8rem;
+    resize: vertical;
+}
+
+/* Orientacao abaixo do campo, nao acima: quem sabe o que preencher nem chega a
+   ler, e quem nao sabe procura depois de ver o campo. */
+.formulario-ajuda {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}
+
+.formulario-campo .errorlist {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--color-danger);
+    font-size: 0.8125rem;
+}
+
+.formulario-campo:has(.errorlist) input,
+.formulario-campo:has(.errorlist) select,
+.formulario-campo:has(.errorlist) textarea {
+    border-color: var(--color-danger);
+}
+
+/* Bloco dentro do formulario que nao e um campo -- anexos, por exemplo. Tem
+   titulo proprio para nao se confundir com os campos acima dele. */
+.formulario-secao {
+    display: grid;
+    gap: var(--espaco-4);
+    padding-top: var(--espaco-5);
+    border-top: 1px solid var(--color-border);
+}
+
+.formulario-secao-cabecalho {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--espaco-4);
+    flex-wrap: wrap;
+}
+
+.formulario-secao-titulo {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
+/* Rodape de acoes: separado do conteudo, e a acao que confirma por ultimo --
+   e a ordem em que o olho chega nela depois de percorrer o formulario. */
+.formulario-acoes {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--espaco-3);
+    flex-wrap: wrap;
+    padding-top: var(--espaco-5);
+    border-top: 1px solid var(--color-border);
+}
+
+/* Aviso de contexto no topo do formulario: diz o que vai acontecer com o que
+   esta sendo preenchido. Era um paragrafo cinza solto sob o titulo. */
+.formulario-aviso {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--espaco-3);
+    margin: 0 0 var(--espaco-5);
+    padding: var(--espaco-4);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-soft);
+    color: var(--color-text);
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.formulario-aviso svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    flex: 0 0 auto;
+    margin-top: 0.1rem;
+    color: var(--color-primary);
+}
+
+@media (max-width: 640px) {
+    .formulario-acoes {
+        justify-content: stretch;
+    }
+
+    .formulario-acoes .btn {
+        flex: 1 1 auto;
+    }
+}
+
+/* Campo de data ou hora em formato brasileiro.
+
+   O controle nativo e desenhado pelo navegador e segue o idioma da interface
+   dele: num Chrome em ingles, "03/15/2026" e "02:30 PM" num sistema em
+   portugues. O campo visivel e nosso; o nativo fica ao lado, invisivel, so para
+   enviar o valor em ISO e abrir o seletor pelo botao. */
+.campo-datahora {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.campo-datahora > input[type="text"] {
+    padding-right: 2.6rem;
+}
+
+.campo-datahora-nativo {
+    position: absolute;
+    right: 0.5rem;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.campo-datahora-seletor {
+    position: absolute;
+    right: 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-muted);
+    cursor: pointer;
+}
+
+.campo-datahora-seletor svg {
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+.campo-datahora-seletor:hover,
+.campo-datahora-seletor:focus-visible {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+}
+
+/* Cabecalho do perfil: quem e a pessoa, antes do que ela pode alterar. */
+.perfil-cabecalho {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--espaco-3) var(--espaco-4);
+    align-items: center;
+}
+
+.avatar-perfil {
+    width: 56px;
+    height: 56px;
+    font-size: 1.05rem;
+}
+
+.perfil-identidade {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.perfil-identidade > .section-title {
+    margin: 0;
+}
+
+/* O papel e etiqueta, nao mais uma linha de texto: e o que distingue duas
+   contas de mesmo nome, e vale ser visto de relance. */
+.perfil-papel {
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* A grade de dados ocupa a largura toda, abaixo do avatar e do nome. */
+.perfil-cabecalho > .dados-grid {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding-top: var(--espaco-4);
+    border-top: 1px solid var(--color-border);
+    border-bottom: 0;
+}
+
+@media (max-width: 640px) {
+    .perfil-cabecalho {
+        grid-template-columns: 1fr;
+        justify-items: start;
+    }
+}
+
+/* ==========================================================================
+   Barra flutuante de navegacao (somente em tela estreita)
+   ========================================================================== */
+
+/* Abaixo de 920px a barra lateral vira gaveta, e a navegacao inteira passava a
+   viver atras do botao de tres tracos -- no canto superior esquerdo, o ponto
+   mais distante do polegar de quem segura o aparelho com uma mao so. O que se
+   encontrava depois de tocar era uma lista de oito a vinte e um destinos.
+   Trocar de tela custava dois toques e uma leitura.
+
+   A barra traz os tres destinos de uso diario para a faixa que o polegar
+   alcanca, deixa a gaveta no quarto lugar -- ela continua tendo tudo -- e
+   separa a acao de criar num circulo proprio, porque criar nao e ir a lugar
+   nenhum. A forma vem da barra lateral, e nao de um preto generico: e o mesmo
+   azul, com o mesmo verde marcando o item ativo. */
+.barra-flutuante {
+    display: none;
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--espaco-4) + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 60;
+    align-items: center;
+    gap: var(--espaco-3);
+    max-width: calc(100vw - 2 * var(--espaco-4));
+    transition: opacity 160ms ease;
+}
+
+.barra-flutuante-itens {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    border-radius: 999px;
+    background:
+        radial-gradient(circle at 18% 0%, rgba(88, 201, 141, 0.18), transparent 55%),
+        linear-gradient(180deg, #063a78 0%, #002b63 100%);
+    box-shadow: 0 2px 6px rgba(0, 20, 50, 0.24), 0 14px 32px rgba(0, 20, 50, 0.28);
+}
+
+.barra-flutuante-item {
+    display: grid;
+    place-items: center;
+    -webkit-tap-highlight-color: transparent;
+    width: 54px;
+    height: 50px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    /* Branco a 62% no repouso: os quatro icones precisam se ler como um
+       conjunto, e o que estiver ativo se destaca por contraste dentro dele. */
+    color: rgba(255, 255, 255, 0.62);
+    cursor: pointer;
+    transition: color 140ms ease, background-color 140ms ease, scale 120ms ease;
+}
+
+.barra-flutuante-item svg {
+    width: 22px;
+    height: 22px;
+}
+
+.barra-flutuante-item:focus-visible {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+@media (hover: hover) {
+    .barra-flutuante-item:hover {
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* Retorno ao toque.
+
+   O hover ficou atras de (hover: hover) para nao grudar no ultimo item tocado,
+   e isso deixou o toque sem sinal nenhum: entre o dedo e a tela seguinte havia
+   so espera. :active dura o tempo do dedo encostado, entao nao gruda, e vale
+   para ponteiro e para toque. */
+.barra-flutuante-item:active {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.16);
+    scale: 0.94;
+}
+
+/* O ponto abaixo do icone e o que diz onde a pessoa esta. So a cor nao bastaria
+   -- num icone de 22px a diferenca entre branco e branco-62% e sutil, e quem
+   nao distingue matiz nao teria pista nenhuma. */
+.barra-flutuante-item.is-active {
+    color: #ffffff;
+}
+
+.barra-flutuante-item.is-active::after {
+    content: "";
+    width: 5px;
+    height: 5px;
+    margin-top: 3px;
+    border-radius: 50%;
+    background: var(--color-accent);
+}
+
+.barra-flutuante-item.is-active svg {
+    margin-top: 3px;
+}
+
+/* Fora da pilula, e nao dentro: e a unica coisa aqui que nao leva a outra tela,
+   e sim cria alguma coisa. A separacao fisica e o que diz isso antes da leitura
+   do icone. */
+.barra-flutuante-acao {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    -webkit-tap-highlight-color: transparent;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: var(--color-accent-strong);
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 20, 50, 0.2), 0 12px 26px rgba(47, 169, 107, 0.34);
+    transition: transform 140ms ease, background-color 140ms ease, scale 120ms ease;
+}
+
+.barra-flutuante-acao svg {
+    width: 24px;
+    height: 24px;
+}
+
+.barra-flutuante-acao:focus-visible {
+    background: #268a58;
+}
+
+@media (hover: hover) {
+    .barra-flutuante-acao:hover {
+        background: #268a58;
+        transform: translateY(-1px);
+    }
+}
+
+.barra-flutuante-acao:active {
+    background: #268a58;
+    scale: 0.94;
+}
+
+@media (max-width: 920px) {
+    .barra-flutuante {
+        display: flex;
+    }
+
+    /* O ultimo cartao terminava embaixo da barra. A folga e a altura dela mais
+       o respiro que separa os cartoes entre si. */
+    .main-area {
+        padding-bottom: calc(72px + var(--espaco-5) + env(safe-area-inset-bottom, 0px));
+    }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .barra-flutuante-item,
+    .barra-flutuante-acao,
+    .folha-item {
+        transition: none;
+    }
+
+    .barra-flutuante-acao:hover {
+        transform: none;
+    }
+
+    /* A mudanca de cor do :active permanece -- e ela que diz "recebi o toque".
+       O que sai e o encolhimento, que e movimento. */
+    .barra-flutuante-item:active,
+    .barra-flutuante-acao:active {
+        scale: 1;
+    }
+}
+
+/* ==========================================================================
+   Folha de navegacao (somente em tela estreita)
+   ========================================================================== */
+
+/* Substitui a gaveta lateral. A gaveta entrava pela esquerda, puxada por um
+   botao no canto superior esquerdo -- o ponto mais distante do polegar. A folha
+   sobe do lado de onde o dedo tocou, que e a barra flutuante.
+
+   Sendo <dialog>, ela ja nasce com Esc, prisao de foco e o conteudo de tras
+   inerte; o que se escreve aqui e so a forma. */
+.folha-navegacao {
+    width: 100%;
+    max-width: none;
+    max-height: 82dvh;
+    margin: 0;
+    margin-top: auto;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    background: var(--color-surface);
+    box-shadow: 0 -8px 40px rgba(4, 22, 48, 0.24);
+
+    /* Estado fechado -- e tambem o ponto de partida da entrada e o de chegada
+       da saida. Com @keyframes so havia entrada: fechar era um corte seco, o
+       oposto do que a abertura ensinava. Transicao serve aos dois sentidos.
+
+       display e overlay entram na lista com allow-discrete porque sao
+       propriedades discretas: sem isso o navegador aplica display:none e
+       remove da camada superior no primeiro quadro, e a saida nao chega a ser
+       vista. Com allow-discrete, a troca espera o fim do percurso. */
+    translate: 0 100%;
+    opacity: 0;
+    transition:
+        translate 240ms ease,
+        opacity 200ms ease,
+        display 240ms allow-discrete,
+        overlay 240ms allow-discrete;
+}
+
+/* O display vive aqui, e nao na regra acima, por causa de como <dialog> se
+   esconde: a folha do navegador diz dialog:not([open]) { display: none }, e
+   qualquer display escrito por nos vence essa regra -- folha de autor ganha da
+   folha do navegador, independentemente de especificidade.
+
+   Com display:flex fixo, fechar a folha tirava o modo modal sem tirar a folha
+   da tela: ela continuava pintada, agora fora da camada superior, e a barra
+   flutuante passava por cima dela. Quem fechasse pelo X ficava com a folha
+   presa no rodape. Pelo clique fora o efeito era outro so por acaso. */
+.folha-navegacao[open] {
+    display: flex;
+    flex-direction: column;
+    translate: 0 0;
+    opacity: 1;
+}
+
+/* Sem isto a entrada nao acontece: o elemento nasce ja com o estado aberto, e
+   nao ha de onde transicionar. @starting-style diz de onde comecar no primeiro
+   quadro depois de o display virar flex. */
+@starting-style {
+    .folha-navegacao[open] {
+        translate: 0 100%;
+        opacity: 0;
+    }
+}
+
+/* Saida instantanea, para o caso em que a folha sai porque a pagina vai mudar:
+   nao ha 240ms disponiveis, e a alternativa e aparecer congelada no meio do
+   percurso na foto que a transicao de pagina tira. */
+.folha-navegacao.folha-sem-saida {
+    transition: none;
+}
+
+.folha-navegacao::backdrop {
+    background: rgba(4, 22, 48, 0);
+    transition:
+        background-color 240ms ease,
+        display 240ms allow-discrete,
+        overlay 240ms allow-discrete;
+}
+
+.folha-navegacao[open]::backdrop {
+    background: rgba(4, 22, 48, 0.5);
+}
+
+@starting-style {
+    .folha-navegacao[open]::backdrop {
+        background: rgba(4, 22, 48, 0);
+    }
+}
+
+.folha-cabecalho {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    flex: 0 0 auto;
+    padding: var(--espaco-5) var(--espaco-5) var(--espaco-4);
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* A pega no topo diz que a folha vem de baixo e pode voltar para la. Nao e
+   controle -- nao ha arrasto --, e sinal de origem. */
+.folha-alca {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--color-border);
+}
+
+.folha-titulo {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.folha-fechar {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-left: auto;
+    padding: 0;
+    color: var(--color-muted);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.folha-fechar svg {
+    width: 18px;
+    height: 18px;
+}
+
+.folha-rolagem {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--espaco-4) var(--espaco-4) var(--espaco-5);
+}
+
+.folha-secao {
+    margin: var(--espaco-4) 0 var(--espaco-2);
+    padding: 0 var(--espaco-2);
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.folha-rolagem > .folha-secao:first-child {
+    margin-top: 0;
+}
+
+.folha-lista {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* O grupo tem titulo e um filete a esquerda, e nao uma sanfona: numa lista de
+   vinte e um destinos, cada sanfona fechada e mais um toque entre a pessoa e o
+   lugar aonde ela vai. */
+.folha-grupo {
+    margin: var(--espaco-2) 0;
+    padding-left: var(--espaco-3);
+    border-left: 2px solid var(--color-border);
+}
+
+.folha-grupo-titulo {
+    margin: 0 0 var(--espaco-1);
+    padding: 0 var(--espaco-2);
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.folha-item {
+    display: flex;
+    align-items: center;
+    -webkit-tap-highlight-color: transparent;
+    gap: var(--espaco-3);
+    /* 52px de altura util: o alvo de toque nao depende do tamanho do rotulo. */
+    min-height: 52px;
+    padding: var(--espaco-2) var(--espaco-3);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    text-decoration: none;
+    transition: background-color 120ms ease;
+}
+
+/* O hover fica atras de (hover: hover) porque em tela de toque ele nao existe
+   de verdade: o navegador o aplica no ultimo item tocado e nao o retira, entao
+   um destino qualquer ficava com a marca de destino atual depois de a folha
+   abrir. O foco continua valendo sempre -- e por ele que se navega no teclado. */
+.folha-item:focus-visible {
+    background: var(--color-primary-soft);
+}
+
+@media (hover: hover) {
+    .folha-item:hover {
+        background: var(--color-primary-soft);
+    }
+}
+
+.folha-item:active {
+    background: var(--color-primary-soft);
+}
+
+.folha-icone {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    color: var(--color-muted);
+}
+
+.folha-texto {
+    display: grid;
+    min-width: 0;
+}
+
+.folha-rotulo {
+    font-weight: 600;
+    font-size: 0.94rem;
+}
+
+.folha-descricao {
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+/* Mesma marcacao da barra lateral: fundo claro, rotulo no azul da marca e o
+   icone no verde. Quem passa do desktop para o celular reconhece o estado. */
+.folha-item.is-active {
+    background: var(--color-primary-soft);
+}
+
+.folha-item.is-active .folha-rotulo {
+    color: var(--color-primary);
+}
+
+.folha-item.is-active .folha-icone {
+    color: var(--color-accent-strong);
+}
+
+.folha-rodape {
+    display: grid;
+    gap: 2px;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: var(--espaco-4) var(--espaco-5) calc(var(--espaco-4) + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.78rem;
+}
+
+/* Acima de 920px a barra lateral esta na tela inteira o tempo todo, e nao ha
+   gatilho que alcance a folha. A regra existe para o caso de o dialogo ser
+   aberto por outro caminho -- teclado, script -- numa largura em que ele nao
+   faz sentido. */
+@media (min-width: 921px) {
+    .folha-navegacao {
+        display: none;
+    }
 }

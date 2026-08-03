@@ -84,11 +84,11 @@
             {% csrf_token %}
             <input type="hidden" name="acao" value="indeferir">
             <input type="hidden" name="item_id" value="{{ item.pk }}">
-            <div class="field">
+            <div class="formulario-campo">
                 <label for="motivo-{{ item.pk }}">Motivo</label>
                 <textarea id="motivo-{{ item.pk }}" name="motivo" rows="4"></textarea>
             </div>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Confirmar indeferimento</button>
             </div>
         </form>

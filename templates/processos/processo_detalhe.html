@@ -362,7 +362,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         <input type="hidden" name="registrar_horas_complementares" value="1">
         <div class="grid-two">
             {% for field in horas_complementares_form %}
-                <div class="field">
+                <div class="formulario-campo">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
                     {{ field.errors }}
@@ -376,7 +376,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         <p class="muted nota-espacada">
             A carga calculada segue a norma vigente do discente. Caso as horas aprovadas sejam diferentes ou excedam o saldo normativo, registre a justificativa.
         </p>
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button type="button" class="btn btn-secondary" id="btn-fechar-modal-horas">Cancelar</button>
             <button type="submit" class="btn">Registrar lançamento</button>
         </div>
@@ -392,13 +392,13 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% csrf_token %}
         <input type="hidden" name="adicionar_documento" value="1">
         {% for field in documento_form %}
-            <div class="field">
+            <div class="formulario-campo">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {{ field.errors }}
             </div>
         {% endfor %}
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button type="button" class="btn btn-secondary" id="btn-fechar-modal-documento">Cancelar</button>
             <button type="submit" class="btn">Salvar documento</button>
         </div>
@@ -420,13 +420,13 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% csrf_token %}
         <input type="hidden" name="encaminhar_processo" value="1">
         {% for field in encaminhamento_form %}
-            <div class="field" {% if field.html_name == "prazo_limite" %}id="campo-prazo-pleno" hidden{% endif %}>
+            <div class="formulario-campo" {% if field.html_name == "prazo_limite" %}id="campo-prazo-pleno" hidden{% endif %}>
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {{ field.errors }}
             </div>
         {% endfor %}
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button type="button" class="btn btn-secondary" id="btn-fechar-modal-encaminhamento">Cancelar</button>
             {% if can_manage_requerente %}
                 <button type="submit" class="btn">Devolver</button>
@@ -450,13 +450,13 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% if can_manifestar_ciente %}
             <input type="hidden" name="manifestar_ciente_orientador" value="1">
             {% for field in manifestar_ciente_form %}
-                <div class="field">
+                <div class="formulario-campo">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
                     {{ field.errors }}
                 </div>
             {% endfor %}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button type="button" class="btn btn-secondary" id="btn-fechar-modal-ciente">Cancelar</button>
                 <button type="submit" class="btn btn-secondary" name="acao_ciente" value="recusar">Recusar</button>
                 <button type="submit" class="btn" name="acao_ciente" value="ciente">Dar ciente</button>
@@ -464,13 +464,13 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% else %}
             <input type="hidden" name="solicitar_ciente_orientador" value="1">
             {% for field in solicitar_ciente_form %}
-                <div class="field">
+                <div class="formulario-campo">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
                     {{ field.errors }}
                 </div>
             {% endfor %}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button type="button" class="btn btn-secondary" id="btn-fechar-modal-ciente">Cancelar</button>
                 <button type="submit" class="btn">Solicitar</button>
             </div>
@@ -486,13 +486,13 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% csrf_token %}
         <input type="hidden" name="finalizar_processo" value="1">
         {% for field in finalizar_form %}
-            <div class="field">
+            <div class="formulario-campo">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {{ field.errors }}
             </div>
         {% endfor %}
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button type="button" class="btn btn-secondary" id="btn-fechar-modal-finalizar">Cancelar</button>
             <button type="submit" class="btn">Confirmar finalização</button>
         </div>
@@ -567,7 +567,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% csrf_token %}
         <input type="hidden" name="adicionar_comentario" value="1">
         {% for field in comentario_form %}
-            <div class="field">
+            <div class="formulario-campo">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {{ field.errors }}
@@ -651,11 +651,11 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% csrf_token %}
         <input type="hidden" name="remover_arquivo_documento" value="1">
         <input type="hidden" name="documento_id" id="input-documento-id-remocao">
-        <div class="field">
+        <div class="formulario-campo">
             <label for="id_motivo_remocao">Motivo da remoção</label>
             <textarea id="id_motivo_remocao" name="motivo_remocao" rows="4" required></textarea>
         </div>
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button type="button" class="btn btn-secondary" id="btn-cancelar-remocao">Cancelar</button>
             <button type="submit" class="btn">Confirmar remoção</button>
         </div>

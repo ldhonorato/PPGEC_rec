@@ -3,13 +3,13 @@
 {% block content %}
 <section class="card">
     <h1 class="section-title">Alunos</h1>
-    <form method="get">
-        <div class="grid-two">
-            <div class="field">
+    <form method="get" class="filtros">
+        <div class="filtros-linha">
+            <div class="filtros-campo filtros-campo-busca">
                 <label for="id_nome">Nome</label>
-                <input id="id_nome" type="text" name="nome" value="{{ filtro_nome }}" placeholder="nome do aluno">
+                <input id="id_nome" type="search" name="nome" value="{{ filtro_nome }}" placeholder="nome do aluno">
             </div>
-            <div class="field">
+            <div class="filtros-campo filtros-campo-escolha">
                 <label for="id_status">Status</label>
                 <select id="id_status" name="status">
                     <option value="">Todos</option>
@@ -18,44 +18,65 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="field">
-                <label for="id_nivel">Nível</label>
-                <select id="id_nivel" name="nivel">
-                    <option value="">Todos</option>
-                    {% for value, label in nivel_list %}
-                        <option value="{{ value }}" {% if filtro_nivel == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="field">
-                <label for="id_reingressante">Reingressante</label>
-                <select id="id_reingressante" name="reingressante">
-                    <option value="" {% if filtro_reingressante == "" %}selected{% endif %}>Todos</option>
-                    <option value="1" {% if filtro_reingressante == "1" %}selected{% endif %}>Sim</option>
-                    <option value="0" {% if filtro_reingressante == "0" %}selected{% endif %}>Não</option>
-                </select>
-            </div>
-            <div class="field">
-                <label for="id_ingresso_inicio">Ingresso de</label>
-                <input id="id_ingresso_inicio" type="text" name="ingresso_inicio" value="{{ filtro_ingresso_inicio }}" placeholder="YYYY.1 ou YYYY.2">
-            </div>
-            <div class="field">
-                <label for="id_ingresso_fim">Ingresso até</label>
-                <input id="id_ingresso_fim" type="text" name="ingresso_fim" value="{{ filtro_ingresso_fim }}" placeholder="YYYY.1 ou YYYY.2">
-            </div>
-            <div class="field">
-                <label for="id_sem_matricula_periodo">Sem matrícula no período</label>
-                <select id="id_sem_matricula_periodo" name="sem_matricula_periodo">
-                    <option value="">Não filtrar</option>
-                    {% for periodo in periodos_letivos %}
-                        <option value="{{ periodo.pk }}" {% if filtro_sem_matricula_periodo == periodo.pk|stringformat:"s" %}selected{% endif %}>{{ periodo.nome }}</option>
-                    {% endfor %}
-                </select>
+            <div class="filtros-acoes">
+                <button class="btn btn-secondary" type="submit">Filtrar</button>
             </div>
         </div>
-        <small class="muted">Formato de semestre: YYYY.1 ou YYYY.2 (ex.: 2025.1).</small><br>
-        <button class="btn" type="submit">Filtrar</button>
+
+        <details class="revelar" {% if filtro_nivel or filtro_reingressante or filtro_ingresso_inicio or filtro_ingresso_fim or filtro_sem_matricula_periodo %}open{% endif %}>
+            <summary>Mais filtros</summary>
+            <div class="filtros-linha">
+                <div class="filtros-campo filtros-campo-escolha">
+                    <label for="id_nivel">Nível</label>
+                    <select id="id_nivel" name="nivel">
+                        <option value="">Todos</option>
+                        {% for value, label in nivel_list %}
+                            <option value="{{ value }}" {% if filtro_nivel == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filtros-campo filtros-campo-escolha">
+                    <label for="id_reingressante">Reingressante</label>
+                    <select id="id_reingressante" name="reingressante">
+                        <option value="" {% if filtro_reingressante == "" %}selected{% endif %}>Todos</option>
+                        <option value="1" {% if filtro_reingressante == "1" %}selected{% endif %}>Sim</option>
+                        <option value="0" {% if filtro_reingressante == "0" %}selected{% endif %}>Não</option>
+                    </select>
+                </div>
+                <div class="filtros-campo filtros-campo-data">
+                    <label for="id_ingresso_inicio">Ingresso de</label>
+                    <input id="id_ingresso_inicio" type="text" name="ingresso_inicio"
+                           value="{{ filtro_ingresso_inicio }}" placeholder="2025.1" inputmode="numeric">
+                </div>
+                <div class="filtros-campo filtros-campo-data">
+                    <label for="id_ingresso_fim">Ingresso até</label>
+                    <input id="id_ingresso_fim" type="text" name="ingresso_fim"
+                           value="{{ filtro_ingresso_fim }}" placeholder="2025.2" inputmode="numeric">
+                </div>
+                <div class="filtros-campo filtros-campo-escolha">
+                    <label for="id_sem_matricula_periodo">Sem matrícula em</label>
+                    <select id="id_sem_matricula_periodo" name="sem_matricula_periodo">
+                        <option value="">Não filtrar</option>
+                        {% for periodo in periodos_letivos %}
+                            <option value="{{ periodo.pk }}" {% if filtro_sem_matricula_periodo == periodo.pk|stringformat:"s" %}selected{% endif %}>{{ periodo.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </details>
     </form>
+
+    {% if filtros_ativos %}
+        <div class="filtros-ativos">
+            <span class="filtros-ativos-rotulo">Filtrando por</span>
+            {% for filtro in filtros_ativos %}
+                <a class="filtro-marcador" href="{{ filtro.url_sem }}" title="Remover este filtro">
+                    {% if filtro.titulo %}<span>{{ filtro.titulo }}:</span> {% endif %}{{ filtro.valor }}
+                </a>
+            {% endfor %}
+            <a class="text-link" href="{% url 'coordenacao_alunos' %}">Limpar tudo</a>
+        </div>
+    {% endif %}
 </section>
 
 <section class="card">

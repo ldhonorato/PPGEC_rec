@@ -22,7 +22,7 @@
             <input type="hidden" name="acao" value="criar_disciplina">
             <div class="grid-two">
                 {% for field in disciplina_form %}
-                    <div class="field{% if field.field.widget.input_type == 'checkbox' %} checkbox-field{% endif %}">
+                    <div class="formulario-campo{% if field.field.widget.input_type == 'checkbox' %} formulario-campo-marcavel{% endif %}">
                         {% if field.field.widget.input_type == 'checkbox' %}
                             {{ field }} <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {% else %}
@@ -33,7 +33,7 @@
                     </div>
                 {% endfor %}
             </div>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Cadastrar disciplina</button>
             </div>
         </form>
@@ -121,7 +121,7 @@
             {% if disciplina_editando.pk == disciplina.pk and disciplina_edit_form %}
                 <div class="grid-two">
                     {% for field in disciplina_edit_form %}
-                        <div class="field{% if field.field.widget.input_type == 'checkbox' %} checkbox-field{% endif %}">
+                        <div class="formulario-campo{% if field.field.widget.input_type == 'checkbox' %} formulario-campo-marcavel{% endif %}">
                             {% if field.field.widget.input_type == 'checkbox' %}
                                 {{ field }} <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                             {% else %}
@@ -134,14 +134,14 @@
                 </div>
             {% else %}
                 <div class="grid-two">
-                    <div class="field"><label>Código</label><input name="codigo" value="{{ disciplina.codigo }}" maxlength="40" required></div>
-                    <div class="field"><label>Nome</label><input name="nome" value="{{ disciplina.nome }}" maxlength="255" required></div>
+                    <div class="formulario-campo"><label>Código</label><input name="codigo" value="{{ disciplina.codigo }}" maxlength="40" required></div>
+                    <div class="formulario-campo"><label>Nome</label><input name="nome" value="{{ disciplina.nome }}" maxlength="255" required></div>
                     {% comment %}
                     Era <input> de texto livre -- a origem das cinco grafias para tres
                     categorias que a migracao 0062 teve de unificar. Digitar a
                     categoria a mao garante que ela divirja.
                     {% endcomment %}
-                    <div class="field">
+                    <div class="formulario-campo">
                         <label for="tipo-{{ disciplina.pk }}">Tipo</label>
                         <select id="tipo-{{ disciplina.pk }}" name="tipo">
                             <option value="">Não classificada</option>
@@ -150,15 +150,15 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="field"><label>Créditos</label><input type="number" name="creditos" min="0" value="{{ disciplina.creditos|default_if_none:'' }}"></div>
-                    <div class="field"><label>Carga horária</label><input type="number" name="carga_horaria" min="0" value="{{ disciplina.carga_horaria|default_if_none:'' }}"></div>
-                    <div class="field"><label>Pré-requisitos</label><textarea name="pre_requisitos" rows="3">{{ disciplina.pre_requisitos }}</textarea></div>
-                    <div class="field"><label>Ementa</label><textarea name="ementa" rows="5">{{ disciplina.ementa }}</textarea></div>
-                    <div class="field"><label>Bibliografia</label><textarea name="bibliografia" rows="5">{{ disciplina.bibliografia }}</textarea></div>
-                    <div class="field checkbox-field"><input type="checkbox" name="ativa" {% if disciplina.ativa %}checked{% endif %}> <label>Ativa</label></div>
+                    <div class="formulario-campo"><label>Créditos</label><input type="number" name="creditos" min="0" value="{{ disciplina.creditos|default_if_none:'' }}"></div>
+                    <div class="formulario-campo"><label>Carga horária</label><input type="number" name="carga_horaria" min="0" value="{{ disciplina.carga_horaria|default_if_none:'' }}"></div>
+                    <div class="formulario-campo"><label>Pré-requisitos</label><textarea name="pre_requisitos" rows="3">{{ disciplina.pre_requisitos }}</textarea></div>
+                    <div class="formulario-campo"><label>Ementa</label><textarea name="ementa" rows="5">{{ disciplina.ementa }}</textarea></div>
+                    <div class="formulario-campo"><label>Bibliografia</label><textarea name="bibliografia" rows="5">{{ disciplina.bibliografia }}</textarea></div>
+                    <div class="formulario-campo formulario-campo-marcavel"><input type="checkbox" name="ativa" {% if disciplina.ativa %}checked{% endif %}> <label>Ativa</label></div>
                 </div>
             {% endif %}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar disciplina</button>
             </div>
         </form>

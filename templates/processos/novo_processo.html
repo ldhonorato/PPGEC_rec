@@ -3,33 +3,59 @@
 {% block content %}
 <section class="card">
     <h1 class="section-title">Abrir novo processo</h1>
-    <p class="muted">
-        Todo processo aberto é direcionado inicialmente para o setor <strong>Secretaria PPGEC</strong>.
+
+    {% comment %}
+    O destino do processo era um paragrafo cinza solto sob o titulo, com o mesmo
+    peso de qualquer texto de apoio. E a unica informacao da tela sobre o que
+    acontece depois de enviar, entao ganha a forma de aviso.
+    {% endcomment %}
+    <p class="formulario-aviso">
+        <svg aria-hidden="true"><use href="#i-caixa"></use></svg>
+        <span>Ao enviar, o processo segue para a <strong>Secretaria PPGEC</strong>,
+        que faz a triagem e o encaminha ao setor responsável.</span>
     </p>
 
-   <form class="form-coluna" method="post" enctype="multipart/form-data">
+    {% comment %}
+    Formulario de entrada, nao de filtro.
+
+    Antes os campos eram renderizados em bloco, sem indicar quais sao
+    obrigatorios -- os tres sao -- e sem nenhuma orientacao: "Assunto" e
+    "Descricao" lado a lado nao dizem o que muda de um para o outro. Os textos
+    de ajuda vem do proprio formulario (ProcessoAberturaForm), para valerem em
+    qualquer tela que o use.
+
+    "Documentos" estava dentro de um .field, com rotulo do mesmo peso dos
+    campos, mas nao e campo: e uma secao com acao propria.
+    {% endcomment %}
+    <form class="formulario" method="post" enctype="multipart/form-data">
         {% csrf_token %}
+        {{ form.non_field_errors }}
+
         {% for field in form %}
-            <div class="field">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <div class="formulario-campo">
+                <label for="{{ field.id_for_label }}">
+                    {{ field.label }}{% if field.field.required %}<span class="obrigatorio" aria-hidden="true">*</span>{% endif %}
+                </label>
                 {{ field }}
+                {% if field.help_text %}<p class="formulario-ajuda">{{ field.help_text }}</p>{% endif %}
                 {{ field.errors }}
             </div>
         {% endfor %}
 
-
-        <div class="field">
-            <label>Documentos</label>
-            <div class="secao-cabecalho">
-                <span class="muted">Adicione um ou mais documentos para abrir o processo.</span>
-                <button type="button" class="btn" id="btn-abrir-modal-doc">Adicionar documento</button>
+        <div class="formulario-secao">
+            <div class="formulario-secao-cabecalho">
+                <div>
+                    <h2 class="formulario-secao-titulo">Documentos</h2>
+                    <p class="formulario-ajuda">Anexe comprovantes e formulários que sustentem o pedido.</p>
+                </div>
+                <button type="button" class="btn btn-secondary" id="btn-abrir-modal-doc">Adicionar documento</button>
             </div>
+
+            <div id="documentos-lista" class="pilha-documentos"></div>
+            <p class="estado-vazio-inline" id="documentos-vazio">Nenhum documento adicionado.</p>
         </div>
 
-        <div id="documentos-lista" class="pilha-documentos"></div>
-        <p class="estado-vazio-inline" id="documentos-vazio">Nenhum documento adicionado.</p>
-
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <a class="btn btn-secondary" href="{% url 'home' %}">Cancelar</a>
             <button type="submit" class="btn">Abrir processo</button>
         </div>
@@ -37,30 +63,39 @@
 </section>
 
 <dialog id="modal-doc" class="modal-dialog">
-    <form method="dialog" id="form-modal-doc" class="modal-body">
+    {% comment %}
+    O modal seguia o padrao antigo enquanto o formulario logo atras dele ja
+    estava no novo: mesma tela, dois jeitos de pedir a mesma coisa -- rotulo em
+    peso diferente, campo sem a marca de obrigatorio, botoes sem a linha que os
+    separa do que se preenche.
+
+    Os campos aqui sao escritos a mao, e nao BoundFields, entao o include nao
+    serve; o que da para compartilhar e a classe.
+    {% endcomment %}
+    <form method="dialog" id="form-modal-doc" class="modal-body formulario">
         <h2 class="section-title">Adicionar documento</h2>
-        <div class="field">
-            <label for="md_titulo">Título</label>
+        <div class="formulario-campo">
+            <label for="md_titulo">Título<span class="obrigatorio" aria-hidden="true">*</span></label>
             <input id="md_titulo" type="text" required>
         </div>
-        <div class="field">
-            <label for="md_tipo">Tipo do documento</label>
+        <div class="formulario-campo">
+            <label for="md_tipo">Tipo do documento<span class="obrigatorio" aria-hidden="true">*</span></label>
             <select id="md_tipo" required>
                 <option value="">Selecione</option>
             </select>
         </div>
-        <div class="field">
-            <label for="md_restricao">Documento restrito</label>
+        <div class="formulario-campo">
+            <label for="md_restricao">Documento restrito<span class="obrigatorio" aria-hidden="true">*</span></label>
             <select id="md_restricao" required>
                 <option value="">Selecione</option>
             </select>
         </div>
-        <div class="field">
-            <label for="md_arquivo">Arquivo</label>
+        <div class="formulario-campo">
+            <label for="md_arquivo">Arquivo<span class="obrigatorio" aria-hidden="true">*</span></label>
             <input id="md_arquivo" type="file" accept=".bmp,.doc,.docx,.gif,.jpeg,.jpg,.pdf,.png,.ppt,.pptx,.tif,.tiff,.webp,.xls,.xlsx" required>
-            <small class="muted">PDF, Office ou imagem. Tamanho máximo: 5 MB.</small>
+            <p class="formulario-ajuda">PDF, Office ou imagem. Tamanho máximo: 5 MB.</p>
         </div>
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-doc">Cancelar</button>
             <button type="submit" class="btn">Adicionar</button>
         </div>

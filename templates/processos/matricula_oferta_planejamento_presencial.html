@@ -44,7 +44,7 @@
             {% endfor %}
         </datalist>
 
-        <div class="actions-row" class="secao-cabecalho">
+        <div class="actions-row secao-cabecalho">
             <div>
                 <h2 class="section-title">Aulas presenciais</h2>
                 <p class="item-observacao">Adicione uma linha para cada aula presencial planejada.</p>
@@ -56,12 +56,12 @@
             {% for aula in aulas_form_rows %}
                 <div class="card room-modal-card panel" data-aula-row>
                     <div class="grid-two">
-                        <div class="field">
+                        <div class="formulario-campo">
                             <label>Data</label>
                             <input name="aula_data" list="datas-aulas" value="{{ aula.data }}" placeholder="dd/mm/aaaa" data-aula-data required>
                             <input type="hidden" name="aula_encontro" value="{{ aula.encontro_id }}" data-aula-encontro>
                         </div>
-                        <div class="field">
+                        <div class="formulario-campo">
                             <label>Ambiente</label>
                             <select name="aula_sala" required>
                                 <option value="">Selecione</option>
@@ -70,23 +70,23 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="field">
+                        <div class="formulario-campo">
                             <label>Horário inicial</label>
                             <input type="time" name="aula_hora_inicio" value="{{ aula.hora_inicio }}" data-aula-inicio required>
                         </div>
-                        <div class="field">
+                        <div class="formulario-campo">
                             <label>Horário final</label>
                             <input type="time" name="aula_hora_fim" value="{{ aula.hora_fim }}" data-aula-fim required>
                         </div>
                     </div>
-                    <div class="form-actions">
+                    <div class="formulario-acoes">
                         <button class="btn btn-secondary" type="button" data-remove-aula>Remover</button>
                     </div>
                 </div>
             {% endfor %}
         </div>
 
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button class="btn" type="button" data-open-norma>Salvar planejamento</button>
         </div>
     </form>
@@ -106,7 +106,7 @@
         <p class="muted">
             Ao confirmar, serão criadas ou atualizadas reservas de ambiente para as aulas presenciais selecionadas.
         </p>
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button class="btn btn-secondary" type="button" data-close-norma>Voltar</button>
             <button class="btn" type="button" data-confirmar-planejamento>Confirmar e salvar</button>
         </div>
@@ -118,12 +118,12 @@
 <template id="aula-row-template">
     <div class="card room-modal-card panel" data-aula-row>
         <div class="grid-two">
-            <div class="field">
+            <div class="formulario-campo">
                 <label>Data</label>
                 <input name="aula_data" list="datas-aulas" placeholder="dd/mm/aaaa" data-aula-data required>
                 <input type="hidden" name="aula_encontro" data-aula-encontro>
             </div>
-            <div class="field">
+            <div class="formulario-campo">
                 <label>Ambiente</label>
                 <select name="aula_sala" required>
                     <option value="">Selecione</option>
@@ -132,16 +132,16 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="field">
+            <div class="formulario-campo">
                 <label>Horário inicial</label>
                 <input type="time" name="aula_hora_inicio" data-aula-inicio required>
             </div>
-            <div class="field">
+            <div class="formulario-campo">
                 <label>Horário final</label>
                 <input type="time" name="aula_hora_fim" data-aula-fim required>
             </div>
         </div>
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button class="btn btn-secondary" type="button" data-remove-aula>Remover</button>
         </div>
     </div>

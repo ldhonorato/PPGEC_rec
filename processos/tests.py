@@ -152,6 +152,59 @@ class LoginSecurityTests(TestCase):
         self.assertFalse(LoginThrottle.objects.exists())
 
 
+class TelaDeLoginTests(TestCase):
+    """A rota /login/ acumula duas responsabilidades que chegaram separadas.
+
+    A limitacao de tentativas mora na RateLimitedLoginView; o desvio de quem ja
+    tem sessao e o sumico da moldura moram nos argumentos do as_view(). As duas
+    coisas ocupam a mesma linha do urls.py, e ja se perderam uma vez num merge:
+    trocar a classe da view derruba silenciosamente os argumentos, e acrescentar
+    argumentos derruba silenciosamente a classe. Nenhuma das duas quedas aparece
+    em teste de tela.
+    """
+
+    def setUp(self):
+        self.url = reverse("login")
+
+    def test_quem_ja_tem_sessao_vai_para_o_inicio(self):
+        """Sem isto, /login/ logado mostrava o formulario de entrada com a barra
+        da sessao ativa por cima -- nome, avisos e tudo."""
+        user = User.objects.create_user(
+            email="ja.logado@example.com",
+            password="senha-segura-123",
+            nome="Ja Logado",
+        )
+        self.client.force_login(user)
+
+        resposta = self.client.get(self.url)
+
+        self.assertRedirects(resposta, reverse(settings.LOGIN_REDIRECT_URL))
+
+    def test_anonimo_recebe_o_formulario_sem_a_moldura_da_sessao(self):
+        resposta = self.client.get(self.url)
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertFalse(resposta.context["mostra_moldura"])
+        self.assertNotContains(resposta, 'class="user-menu"')
+
+    def test_o_limite_de_tentativas_continua_valendo_nesta_rota(self):
+        """Guarda a convivencia: os argumentos do as_view() nao substituiram a
+        view que conta as falhas."""
+        User.objects.create_user(
+            email="tentativas@example.com",
+            password="senha-segura-123",
+            nome="Tentativas",
+        )
+        for _ in range(settings.LOGIN_MAX_FAILURES):
+            self.client.post(self.url, {"username": "tentativas@example.com", "password": "errada"})
+
+        resposta = self.client.post(
+            self.url, {"username": "tentativas@example.com", "password": "senha-segura-123"}
+        )
+
+        self.assertEqual(resposta.status_code, 429)
+
+
 @override_settings(SECURE_SSL_REDIRECT=False, DEBUG=False)
 class ArquivoEnviadoTests(TestCase):
     """Um arquivo de /media/ so e entregue a quem pode ver o registro dono dele.
@@ -1911,7 +1964,10 @@ class AlunosViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Sem matrícula no período")
+        # O rotulo encurtou junto com a barra de filtros: acima de um select que
+        # lista periodos, "Sem matrícula em" + "2026.2" diz o mesmo que "Sem
+        # matrícula no período" + "2026.2" sem repetir a palavra periodo.
+        self.assertContains(response, "Sem matrícula em")
         self.assertContains(response, "trajetória ativa e sem matrícula registrada em")
         self.assertContains(response, "Ativo Sem Matrícula 2026.2")
         self.assertNotContains(response, "Ativo Com Matrícula 2026.2")
@@ -2838,8 +2894,12 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "Meus Processos")
         self.assertNotContains(response, "Processos no Pleno")
         self.assertNotContains(response, 'class="nav"')
-        self.assertContains(response, "Perfil")
-        self.assertContains(response, "Sair")
+        # O painel da conta ganhou identidade e descricoes: os rotulos passaram
+        # de "Perfil" e "Sair" para "Meu perfil" e "Sair da conta". O que este
+        # teste verifica -- que os dois destinos existem no painel -- continua.
+        self.assertContains(response, "Meu perfil")
+        self.assertContains(response, "Sair da conta")
+        self.assertContains(response, self.docente.email)
 
     def test_membro_do_pleno_ve_menu_e_rota_de_processos_do_pleno(self):
         pleno = Setor.objects.get(nome=Setor.NOME_PLENO)
@@ -4911,6 +4971,44 @@ class NomeDoColegiadoTests(TestCase):
         self.assertIn("Processos no Pleno", rotulos)
 
 
+class CampoDeDataEHoraTests(SimpleTestCase):
+    """Data e hora sao escritas em formato brasileiro, seja qual for o navegador.
+
+    <input type="date"> e <input type="time"> sao desenhados pelo navegador, e o
+    formato segue o idioma da interface dele -- nao o lang da pagina, nao o
+    Accept-Language. Num Chrome em ingles, uma data aparece "03/15/2026" e uma
+    hora "02:30 PM" num sistema em portugues. Testei lang no input, lang no
+    elemento pai e locale do contexto: nenhum dos tres muda o formato.
+
+    A solucao mostra um campo de texto sob nosso controle e mantem o nativo ao
+    lado, invisivel, para enviar o valor em ISO e abrir o seletor pelo
+    showPicker(). Estes testes protegem as duas pontas disso.
+    """
+
+    DIRETORIO = Path(settings.BASE_DIR) / "templates"
+
+    def test_o_script_de_formatacao_esta_na_base(self):
+        base = (self.DIRETORIO / "base.html").read_text(encoding="utf-8")
+        self.assertIn("campo-datahora", base)
+        self.assertIn("showPicker", base)
+
+    def test_os_templates_mantem_o_campo_nativo(self):
+        """A troca e progressiva: sem JavaScript, o campo nativo continua valendo.
+
+        Se alguem "resolver" o formato trocando type="date" por type="text" no
+        template, perde-se o seletor de calendario, o teclado numerico do
+        celular e o envio em ISO -- e o campo passa a depender do script para
+        funcionar, em vez de ser melhorado por ele.
+        """
+        suspeitos = []
+        for caminho in sorted(self.DIRETORIO.rglob("*.html")):
+            if "emails" in caminho.parts:
+                continue
+            texto = caminho.read_text(encoding="utf-8")
+            for campo in re.findall(r'<input[^>]*name="[^"]*(?:data|hora)[^"]*"[^>]*>', texto):
+                if 'type="text"' in campo and "dd/mm" not in campo:
+                    suspeitos.append(f"{caminho.name}: {campo[:70]}")
+        self.assertEqual(suspeitos, [], f"campo de data/hora como texto no template: {suspeitos}")
 class LayoutResponsivoTests(SimpleTestCase):
     """As grades de cartoes colapsam para uma coluna em tela estreita.
 
@@ -4979,6 +5077,100 @@ class LayoutResponsivoTests(SimpleTestCase):
             faltando, [],
             f"grades sem colapso para uma coluna ate {self.LARGURA_DE_CELULAR}px: {faltando}",
         )
+
+    # Blocos que nao cabem num celular e nao devem encolher: uma tabela de sete
+    # colunas e a grade da semana, onde um dia de 40px nao mostra nome nenhum.
+    # A saida e rolarem dentro de si, e nao alargarem a pagina.
+    ENVOLVENTES_QUE_ROLAM = (".tabela-envolvido", ".grade-horario-envolvido")
+
+    # Grades cujos itens tem largura imprevisivel. Item de grade nasce com
+    # min-width: auto e nao encolhe abaixo do proprio conteudo -- o que sobra
+    # vira largura de pagina.
+    GRADES_QUE_ENCOLHEM = (".pilha-trajetorias > *", ".stack > *")
+
+    def _declaracoes_de(self, seletor):
+        for seletores, declaracoes in self._regras():
+            if seletor in seletores:
+                yield declaracoes
+
+    def test_o_que_e_largo_demais_rola_dentro_de_si(self):
+        """Pagina mais larga que a tela agora custa a navegacao.
+
+        Ate a barra flutuante existir, transbordar na horizontal custava uma
+        rolagem lateral. Com ela, custa a propria barra: em celular o
+        position: fixed se ancora na pagina, e nao no pedaco visivel dela, entao
+        uma pagina de 714px numa tela de 390 leva a barra para fora do campo de
+        visao. Foi assim que o defeito apareceu -- como sumico de navegacao.
+        """
+        for seletor in self.ENVOLVENTES_QUE_ROLAM:
+            with self.subTest(envolvente=seletor):
+                rola = any(
+                    re.search(r"overflow(-x)?\s*:\s*(auto|scroll)", d)
+                    for d in self._declaracoes_de(seletor)
+                )
+                self.assertTrue(rola, f"{seletor} nao rola: o excedente vira largura de pagina")
+
+    def test_o_envolvente_da_tabela_contem_os_absolutos(self):
+        """Descendente absoluto so e recortado por quem for bloco de contencao.
+
+        O rotulo "Acoes" da coluna de botoes e escondido com .apenas-leitor, que
+        e position: absolute. Sem position no envolvente, ele subia para o bloco
+        inicial: 1px de largura, invisivel, ancorado a 714px do inicio -- e a
+        pagina media 714px com a tabela rolando certinho dentro do cartao.
+        """
+        posicionado = any(
+            re.search(r"position\s*:\s*(relative|sticky)", d)
+            for d in self._declaracoes_de(".tabela-envolvido")
+        )
+        self.assertTrue(posicionado, ".tabela-envolvido sem position: os absolutos escapam da rolagem")
+
+    def test_a_folha_entra_e_sai_pelo_mesmo_caminho(self):
+        """Fechar era um corte seco, o oposto do que a abertura ensinava.
+
+        Com @keyframes so havia entrada. Transicao serve aos dois sentidos, mas
+        num <dialog> ela sozinha nao basta: display e overlay sao discretos, e
+        sem allow-discrete o navegador aplica display:none no primeiro quadro --
+        a saida existe no papel e nao chega a ser vista. @starting-style e o
+        outro lado: sem ele o elemento nasce ja no estado final e a entrada nao
+        tem de onde partir.
+        """
+        declaracoes = list(self._declaracoes_de(".folha-navegacao"))
+        transicao = " ".join(declaracoes)
+        self.assertRegex(transicao, r"transition\s*:", "a folha nao declara transicao")
+        for discreta in ("display", "overlay"):
+            with self.subTest(propriedade=discreta):
+                self.assertRegex(
+                    transicao, rf"{discreta}\s+[^;,]*allow-discrete",
+                    f"{discreta} sem allow-discrete: a saida nao aparece",
+                )
+        self.assertIn("@starting-style", self.css, "sem @starting-style a folha nao tem entrada")
+
+    def test_os_itens_de_toque_respondem_ao_dedo(self):
+        """O hover ficou atras de (hover: hover) para nao grudar no ultimo item
+        tocado, e isso deixou o toque sem sinal nenhum ate a tela seguinte
+        chegar. :active dura o tempo do dedo encostado."""
+        alvos = (".barra-flutuante-item", ".barra-flutuante-acao", ".folha-item")
+        # Exige a mudanca de fundo, e nao so a existencia do seletor: o bloco de
+        # movimento reduzido tambem casa ":active", e la a declaracao e
+        # scale: 1 -- ou seja, a retirada do movimento, nao o retorno. Sem esta
+        # condicao o teste passava com o retorno apagado.
+        com_retorno = set()
+        for seletores, declaracoes in self._regras():
+            if not re.search(r"(?:^|;)\s*background(-color)?\s*:", declaracoes):
+                continue
+            for seletor in seletores:
+                if seletor.endswith(":active"):
+                    com_retorno.add(seletor[: -len(":active")])
+        faltando = [a for a in alvos if a not in com_retorno]
+        self.assertEqual(faltando, [], f"itens sem retorno ao toque: {faltando}")
+
+    def test_as_grades_de_item_largo_deixam_o_item_encolher(self):
+        for seletor in self.GRADES_QUE_ENCOLHEM:
+            with self.subTest(grade=seletor):
+                encolhe = any(
+                    re.search(r"min-width\s*:\s*0", d) for d in self._declaracoes_de(seletor)
+                )
+                self.assertTrue(encolhe, f"{seletor} sem min-width: 0")
 
 
 class VersaoExibidaTests(SimpleTestCase):
@@ -5122,6 +5314,27 @@ class PadraoVisualDosTemplatesTests(SimpleTestCase):
         ]
         self.assertEqual(culpados, [], f"templates com <style> proprio: {culpados}")
 
+    def test_nenhum_template_usa_o_padrao_antigo_de_formulario(self):
+        """Campo e faixa de botoes tem uma classe so em todo o projeto.
+
+        As duas conviveram: .field/.form-actions, que so davam margem e
+        alinhamento, e .formulario-campo/.formulario-acoes, que trazem o rotulo
+        em peso, a marca de obrigatorio, o erro em vermelho e a linha acima dos
+        botoes. Na tela de novo processo as duas apareciam juntas -- o
+        formulario no padrao novo e o modal dele no antigo.
+
+        As regras antigas foram removidas do app.css; escrever a classe antiga
+        hoje nao produz nem o estilo antigo, apenas um campo sem estilo nenhum.
+        """
+        antigas = ('class="field"', 'class="field ', 'class="form-actions"', "hidden-field")
+        culpados = []
+        for caminho, texto in self._templates():
+            limpo = self._sem_comentarios(texto)
+            for antiga in antigas:
+                if antiga in limpo:
+                    culpados.append(f"{caminho.name}: {antiga}")
+        self.assertEqual(culpados, [], f"padrao antigo de formulario: {culpados}")
+
     def test_nenhum_template_separa_dados_com_pipe(self):
         """Metadados usam .meta-linha, nao "a | b | c".
 
@@ -5197,6 +5410,23 @@ class PadraoVisualDosTemplatesTests(SimpleTestCase):
         # considera tudo o que vem depois, que e a leitura conservadora.
         return html[abertura.end():]
 
+    def test_nenhum_elemento_tem_class_duplicado(self):
+        """Dois atributos class no mesmo elemento: o navegador ignora o segundo.
+
+        E um defeito silencioso -- o HTML e valido o bastante para renderizar, a
+        pagina nao quebra, e a classe simplesmente nao se aplica. Aconteceu ao
+        acrescentar uma classe a elementos que ja tinham uma: sairam tres
+        <h2 class="section-title" class="titulo-interno"> e um
+        <div class="actions-row" class="secao-cabecalho">, todos sem o efeito
+        pretendido.
+        """
+        culpados = []
+        for caminho, texto in self._templates():
+            for numero, linha in enumerate(texto.splitlines(), 1):
+                if re.search(r'class="[^"]*"\s+class="', linha):
+                    culpados.append(f"{caminho.name}:{numero}")
+        self.assertEqual(culpados, [], f"elementos com class duplicado: {culpados}")
+
     def test_nenhum_template_carrega_anotacao_de_desenvolvimento(self):
         """TODO/FIXME nao sao conteudo de tela.
 
@@ -5209,6 +5439,178 @@ class PadraoVisualDosTemplatesTests(SimpleTestCase):
             if re.search(r"\b(TODO|FIXME|XXX)\b", self._sem_comentarios(texto))
         ]
         self.assertEqual(culpados, [], f"templates com anotacao de desenvolvimento: {culpados}")
+
+
+class BarraFlutuanteTests(TestCase):
+    """A barra de navegacao que aparece em tela estreita.
+
+    Abaixo de 920px a barra lateral vira gaveta, e a navegacao inteira passava a
+    viver atras do botao no canto superior esquerdo -- o ponto mais distante do
+    polegar --, com uma lista de oito a vinte e um destinos do outro lado do
+    toque.
+
+    A barra monta a partir dos itens do proprio menu, e nao de uma segunda lista
+    de rotas: e o que impede que as duas discordem sobre onde um destino fica ou
+    quando ele esta ativo. O preco dessa escolha e que um rotulo que nao case com
+    nada some da barra em silencio -- foi o que aconteceu com "Alunos", que mora
+    dentro de um grupo do menu do servidor, enquanto a busca so olhava o primeiro
+    nivel. Dai a asercao ser sobre os rotulos exatos, e nao "pelo menos um".
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        senha = "senha-segura-123"
+        cls.aluno = Aluno.objects.create_user(
+            email="aluno.barra@example.com", password=senha, nome="Aluno Barra",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026M0009",
+        )
+        cls.docente = Docente.objects.create_user(
+            email="docente.barra@example.com", password=senha, nome="Docente Barra",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        cls.servidor = User.objects.create_user(
+            email="servidor.barra@example.com", password=senha, nome="Servidor Barra",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+
+    def _menu_e_barra(self, usuario):
+        """O menu e a barra da mesma construcao.
+
+        Cada chamada a _menu_lateral_items monta itens novos, entao comparar
+        objetos entre duas construcoes nunca daria identidade -- o que se quer
+        garantir e que a barra devolve os itens que recebeu, sem copiar.
+        """
+        from processos.context_processors import _barra_flutuante, _menu_lateral_items
+
+        itens = _menu_lateral_items(usuario)
+        return itens, _barra_flutuante(usuario, itens)
+
+    def _barra(self, usuario):
+        return self._menu_e_barra(usuario)[1]
+
+    def test_cada_perfil_recebe_os_tres_destinos_declarados(self):
+        esperado = {
+            "aluno": (self.aluno, ["Início", "Meus Processos", "Matrícula"]),
+            "docente": (self.docente, ["Início", "Meus Processos", "Meus Orientandos"]),
+            "servidor": (self.servidor, ["Início", "Caixa de Processos", "Alunos"]),
+        }
+        for perfil, (usuario, rotulos) in esperado.items():
+            with self.subTest(perfil=perfil):
+                self.assertEqual([item["label"] for item in self._barra(usuario)], rotulos)
+
+    def test_o_destino_da_barra_e_o_mesmo_do_menu(self):
+        """Endereco, icone e url_names vem do item do menu, nao de uma copia."""
+        for perfil, usuario in (("aluno", self.aluno), ("docente", self.docente), ("servidor", self.servidor)):
+            itens, barra = self._menu_e_barra(usuario)
+            do_menu = {}
+            pendentes = list(itens)
+            while pendentes:
+                item = pendentes.pop(0)
+                do_menu.setdefault(item["label"], item)
+                pendentes.extend(item["children"])
+            for item in barra:
+                with self.subTest(perfil=perfil, destino=item["label"]):
+                    self.assertIs(item, do_menu[item["label"]])
+
+    def test_o_circulo_de_acao_segue_a_permissao_de_abrir_processo(self):
+        """Servidor nao abre processo -- a barra dele nao oferece o atalho."""
+        for perfil, usuario, tem_acao in (
+            ("aluno", self.aluno, True),
+            ("docente", self.docente, True),
+            ("servidor", self.servidor, False),
+        ):
+            with self.subTest(perfil=perfil):
+                self.client.force_login(usuario)
+                resposta = self.client.get(reverse("home"))
+                self.assertEqual(bool(resposta.context["barra_flutuante_acao"]), tem_acao)
+                self.assertEqual("barra-flutuante-acao" in resposta.content.decode(), tem_acao)
+
+    def test_a_tela_atual_acende_exatamente_um_destino(self):
+        """Zero destinos acesos e o defeito que a busca rasa produzia."""
+        telas = {
+            "aluno": (self.aluno, ["home", "menu_meus_processos", "matriculas_minhas"]),
+            "docente": (self.docente, ["home", "menu_meus_processos", "menu_meus_orientandos"]),
+            "servidor": (self.servidor, ["home", "coordenacao_caixa_processos", "coordenacao_alunos"]),
+        }
+        for perfil, (usuario, url_names) in telas.items():
+            barra = self._barra(usuario)
+            for url_name in url_names:
+                with self.subTest(perfil=perfil, tela=url_name):
+                    acesos = [item["label"] for item in barra if url_name in item["url_names"]]
+                    self.assertEqual(len(acesos), 1, f"{url_name} acendeu {acesos or 'nada'} para {perfil}")
+
+    def test_a_navegacao_completa_tem_um_gatilho_so(self):
+        """A barra e atalho, nao substituicao -- mas o caminho para o resto e um.
+
+        Quando a barra flutuante nasceu, o botao de tres tracos continuou na
+        barra superior: dois gatilhos para a mesma gaveta, um deles no canto
+        oposto ao polegar. Ficou o de baixo, e o que ele abre e a folha.
+        """
+        self.client.force_login(self.servidor)
+        corpo = self.client.get(reverse("home")).content.decode()
+        # aria-controls, e nao o data-: o proprio script cita o atributo ao
+        # procurar o gatilho, e contar o data- somaria o botao com o codigo.
+        self.assertEqual(corpo.count('aria-controls="folha-navegacao"'), 1)
+        self.assertNotIn('class="menu-toggle"', corpo)
+        self.assertIn('id="folha-navegacao"', corpo)
+
+    @staticmethod
+    def _marcacao_da_folha(corpo):
+        """So o trecho do dialogo.
+
+        A pagina inteira nao serve: a barra lateral continua no HTML -- oculta
+        por CSS em tela estreita, mas presente -- e carrega os mesmos enderecos.
+        Procurar no corpo todo dava um teste que passava com a folha vazia.
+        """
+        inicio = corpo.index('<dialog id="folha-navegacao"')
+        return corpo[inicio:corpo.index("</dialog>", inicio)]
+
+    def test_a_folha_leva_a_todo_destino_do_menu(self):
+        """O que sai da barra tem de estar na folha, senao fica inalcancavel.
+
+        A folha achata os grupos -- um grupo nao vira link, porque o endereco
+        dele repete o do primeiro filho --, entao a conta e sobre as folhas da
+        arvore, e nao sobre o primeiro nivel.
+        """
+        from processos.context_processors import _menu_lateral_items
+
+        for perfil, usuario in (("aluno", self.aluno), ("docente", self.docente), ("servidor", self.servidor)):
+            with self.subTest(perfil=perfil):
+                self.client.force_login(usuario)
+                folha = self._marcacao_da_folha(self.client.get(reverse("home")).content.decode())
+                pendentes = list(_menu_lateral_items(usuario))
+                while pendentes:
+                    item = pendentes.pop(0)
+                    if item["children"]:
+                        pendentes.extend(item["children"])
+                        continue
+                    self.assertIn(f'href="{item["href"]}"', folha, f'{item["label"]} sumiu da folha')
+
+
+class MenuDaContaFechaTests(SimpleTestCase):
+    """O painel da conta fecha por fora, nao so pelo chip que o abriu.
+
+    Ele e um <details>, e <details> abre e fecha pelo proprio resumo -- nada
+    mais o alcanca. Clicar em qualquer outro ponto da tela, ou apertar Esc,
+    deixava o painel aberto por cima do conteudo, e a unica saida era voltar ao
+    nome no canto e clicar de novo. E a excecao entre os menus da plataforma: a
+    gaveta lateral, os modais e os blocos que abrem ja fechavam assim.
+
+    O comportamento vive em JavaScript, sem executor de JS na suite; o que da
+    para garantir aqui e que os dois tratadores continuam registrados. A
+    verificacao de que fecham mesmo foi feita no navegador, nos tres perfis.
+    """
+
+    def setUp(self):
+        self.base = (Path(settings.BASE_DIR) / "templates" / "base.html").read_text(encoding="utf-8")
+
+    def test_fecha_com_clique_fora(self):
+        self.assertIn("details.user-menu", self.base)
+        self.assertIn("!conta.contains(e.target)", self.base)
+
+    def test_fecha_com_esc_e_devolve_o_foco(self):
+        self.assertIn('e.key === "Escape" && conta.open', self.base)
+        self.assertIn("resumo.focus()", self.base)
 
 
 class MenuMarcaItemAtivoTests(TestCase):

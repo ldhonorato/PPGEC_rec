@@ -1852,6 +1852,14 @@ def me_view(request):
             "password_form": password_form,
             "participacoes_ativas": participacoes_ativas,
             "historico_participacoes": historico_participacoes,
+            # Aluno nao entra em setor nem em comissao -- e a secretaria que
+            # vincula servidores e docentes. Sem esta condicao ele via dois
+            # blocos que nunca teriam conteudo, e um estado vazio permanente
+            # ensina a ignorar os estados vazios que significam algo.
+            #
+            # A condicao e pelo tipo, e nao por "tem participacoes": um docente
+            # recem-cadastrado tambem tem zero, e para ele o bloco vazio informa.
+            "mostra_setores": request.user.tipo_usuario != User.TipoUsuario.ALUNO,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -2115,6 +2123,16 @@ def processos_view(request):
             "filtro_setor": setor_id,
             "filtro_q": termo,
             "filtro_atrasados": somente_atrasados,
+            "filtros_ativos": _filtros_ativos(
+                request,
+                {
+                    "q": ("Busca", None),
+                    "status": ("Status", dict(Processo.StatusProcesso.choices).get),
+                    "setor": ("Setor", lambda v: _nome_do_setor(v)),
+                    "tipo": ("Tipo", dict(Processo.TipoProcesso.choices).get),
+                    "atrasados": ("", lambda _: "Somente atrasados"),
+                },
+            ),
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -2139,14 +2157,14 @@ def cadastro_aluno_view(request):
     return render(
         request,
         "registration/cadastro_aluno.html",
-        {"form": form},
+        {"form": form, "mostra_moldura": False},
     )
 
 
 def cadastro_aluno_sucesso_view(request):
     if request.user.is_authenticated:
         return redirect("home")
-    return render(request, "registration/cadastro_aluno_sucesso.html")
+    return render(request, "registration/cadastro_aluno_sucesso.html", {"mostra_moldura": False})
 
 
 def _aprovar_cadastro_aluno(*, aluno, usuario):
@@ -2353,6 +2371,18 @@ def alunos_view(request):
             "total_alunos_filtrados": pagina.paginator.count,
             "status_list": Aluno.StatusAluno.choices,
             "nivel_list": Aluno.NivelCurso.choices,
+            "filtros_ativos": _filtros_ativos(
+                request,
+                {
+                    "nome": ("Nome", None),
+                    "status": ("Status", dict(Aluno.StatusAluno.choices).get),
+                    "nivel": ("Nível", dict(Aluno.NivelCurso.choices).get),
+                    "reingressante": ("Reingressante", lambda v: "Sim" if v == "1" else "Não"),
+                    "ingresso_inicio": ("Ingresso de", None),
+                    "ingresso_fim": ("Ingresso até", None),
+                    "sem_matricula_periodo": ("Sem matrícula em", _nome_do_periodo),
+                },
+            ),
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -4782,6 +4812,57 @@ def aluno_documento_historico_view(request):
     )
 
 
+
+def _nome_do_setor(valor):
+    """Nome do setor a partir do id que veio no filtro.
+
+    O marcador precisa dizer "Secretaria PPGEC", nao "3": o numero e detalhe da
+    URL, e quem le a tela nao tem como saber a que setor ele corresponde.
+    """
+    setor = Setor.objects.filter(pk=valor).first()
+    return setor.nome if setor else valor
+
+
+def _nome_do_periodo(valor):
+    """Nome do periodo letivo a partir do id que veio no filtro."""
+    periodo = PeriodoLetivo.objects.filter(pk=valor).first()
+    return periodo.nome if periodo else valor
+
+
+def _filtros_ativos(request, rotulos):
+    """Os filtros em vigor, cada um com o endereco que o remove.
+
+    Existe porque uma lista filtrada nao se anunciava: quem voltasse a tela
+    depois via menos resultados do que esperava e nenhuma explicacao do porque.
+    Cada marcador diz o que esta valendo e leva ao mesmo endereco sem aquele
+    parametro -- os demais filtros seguem de pe, que e o que se espera ao tirar
+    um de varios.
+
+    rotulos: {parametro: (titulo, funcao que transforma o valor em texto)}. A
+    funcao existe para o marcador mostrar "Trancamento de Matricula" e nao
+    "TRANCAMENTO_MATRICULA".
+
+    Titulo vazio serve aos filtros de liga-desliga: "Somente atrasados" e a
+    frase inteira, e escrever "Somente: atrasados" seria partir em par o que nao
+    e par de rotulo e valor.
+    """
+    ativos = []
+    for parametro, (titulo, formatar) in rotulos.items():
+        valor = request.GET.get(parametro, "").strip()
+        if not valor:
+            continue
+        restante = request.GET.copy()
+        restante.pop(parametro, None)
+        ativos.append(
+            {
+                "titulo": titulo,
+                "valor": formatar(valor) if formatar else valor,
+                "url_sem": f"{request.path}?{restante.urlencode()}" if restante else request.path,
+            }
+        )
+    return ativos
+
+
 @login_required
 def menu_meus_processos_view(request):
     if request.user.tipo_usuario == User.TipoUsuario.SERVIDOR:
@@ -4835,6 +4916,17 @@ def menu_meus_processos_view(request):
             "my_filtro_data_inicio": filtro_data_inicio,
             "my_filtro_data_fim": filtro_data_fim,
             "my_filtro_atrasados": filtro_atrasados,
+            "my_filtros_ativos": _filtros_ativos(
+                request,
+                {
+                    "my_q": ("Busca", None),
+                    "my_tipo": ("Tipo", dict(Processo.TipoProcesso.choices).get),
+                    "my_status": ("Status", dict(Processo.StatusProcesso.choices).get),
+                    "my_data_inicio": ("A partir de", None),
+                    "my_data_fim": ("Até", None),
+                    "my_atrasados": ("", lambda _: "Somente atrasados"),
+                },
+            ),
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),

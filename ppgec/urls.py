@@ -81,7 +81,19 @@ urlpatterns = [
     path("", home_view, name="home"),
     path("version/", version_view, name="version"),
     path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}img/acadflow-logo.png", permanent=True)),
-    path("login/", RateLimitedLoginView.as_view(template_name="registration/login.html"), name="login"),
+    # redirect_authenticated_user manda quem ja tem sessao para LOGIN_REDIRECT_URL.
+    # Sem isso, abrir /login/ logado mostrava o formulario de entrada com a barra
+    # superior da sessao ativa por cima -- nome do usuario, avisos e tudo -- num
+    # layout que nao foi feito para conviver com ela.
+    path(
+        "login/",
+        RateLimitedLoginView.as_view(
+            template_name="registration/login.html",
+            redirect_authenticated_user=True,
+            extra_context={"mostra_moldura": False},
+        ),
+        name="login",
+    ),
     path("logout/", SafeLogoutView.as_view(), name="logout"),
     path("cadastro/aluno/", cadastro_aluno_view, name="cadastro_aluno"),
     path("cadastro/aluno/sucesso/", cadastro_aluno_sucesso_view, name="cadastro_aluno_sucesso"),
@@ -94,12 +106,16 @@ urlpatterns = [
             html_email_template_name="registration/password_reset_email.html",
             subject_template_name="registration/password_reset_subject.txt",
             success_url=reverse_lazy("password_reset_done"),
+            extra_context={"mostra_moldura": False},
         ),
         name="password_reset",
     ),
     path(
         "senha/esqueci/enviado/",
-        PasswordResetDoneView.as_view(template_name="registration/password_reset_done.html"),
+        PasswordResetDoneView.as_view(
+            template_name="registration/password_reset_done.html",
+            extra_context={"mostra_moldura": False},
+        ),
         name="password_reset_done",
     ),
     path(
@@ -107,12 +123,16 @@ urlpatterns = [
         PasswordResetConfirmView.as_view(
             template_name="registration/password_reset_confirm.html",
             success_url=reverse_lazy("password_reset_complete"),
+            extra_context={"mostra_moldura": False},
         ),
         name="password_reset_confirm",
     ),
     path(
         "senha/redefinir/concluido/",
-        PasswordResetCompleteView.as_view(template_name="registration/password_reset_complete.html"),
+        PasswordResetCompleteView.as_view(
+            template_name="registration/password_reset_complete.html",
+            extra_context={"mostra_moldura": False},
+        ),
         name="password_reset_complete",
     ),
     path("me/", me_view, name="me"),

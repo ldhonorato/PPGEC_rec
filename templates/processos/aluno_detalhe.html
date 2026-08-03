@@ -441,29 +441,29 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
     </section>
 
 {% if can_manage_aluno %}
-<div id="modal-dados" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-dados" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar dados do aluno</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_dados">
             <div class="grid-two">
-                <div class="field"><label>Nome</label>{{ dados_form.nome }}</div>
-                <div class="field"><label>Email</label>{{ dados_form.email }}</div>
-                <div class="field"><label>Matrícula</label>{{ dados_form.matricula }}</div>
-                <div class="field"><label>CPF</label>{{ dados_form.cpf }}{{ dados_form.cpf.errors }}</div>
-                <div class="field"><label>Gênero</label>{{ dados_form.genero }}{{ dados_form.genero.errors }}</div>
-                <div class="field"><label>Sexo atribuído ao nascer</label>{{ dados_form.sexo_atribuido_nascimento }}{{ dados_form.sexo_atribuido_nascimento.errors }}</div>
-                <div class="field"><label>Polo</label>{{ dados_form.polo_atuacao }}{{ dados_form.polo_atuacao.errors }}</div>
+                <div class="formulario-campo"><label>Nome</label>{{ dados_form.nome }}</div>
+                <div class="formulario-campo"><label>Email</label>{{ dados_form.email }}</div>
+                <div class="formulario-campo"><label>Matrícula</label>{{ dados_form.matricula }}</div>
+                <div class="formulario-campo"><label>CPF</label>{{ dados_form.cpf }}{{ dados_form.cpf.errors }}</div>
+                <div class="formulario-campo"><label>Gênero</label>{{ dados_form.genero }}{{ dados_form.genero.errors }}</div>
+                <div class="formulario-campo"><label>Sexo atribuído ao nascer</label>{{ dados_form.sexo_atribuido_nascimento }}{{ dados_form.sexo_atribuido_nascimento.errors }}</div>
+                <div class="formulario-campo"><label>Polo</label>{{ dados_form.polo_atuacao }}{{ dados_form.polo_atuacao.errors }}</div>
             </div>
             <label>Comentário</label>
             {{ dados_form.comentario }}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar dados</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% endif %}
 
 {% comment %}
@@ -479,19 +479,19 @@ Publicacoes e disciplinas ja tinham a guarda ({% templatetag openblock %} if can
 faltava a da coordenacao.
 {% endcomment %}
 {% if can_manage_aluno %}
-<div id="modal-nova-trajetoria" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-nova-trajetoria" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Nova trajetória acadêmica</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="nova_trajetoria">
             <div class="grid-two">
-                <div class="field"><label>Nível</label>{{ nova_trajetoria_form.nivel_curso }}</div>
-                <div class="field"><label>Status</label>{{ nova_trajetoria_form.status }}</div>
-                <div class="field"><label>Ingresso</label>{{ nova_trajetoria_form.ingresso }}</div>
-                <div class="field" data-nivel-section="PRAZOS"><label>Prazo de qualificação/projeto</label>{{ nova_trajetoria_form.prazo_qualificacao }}</div>
-                <div class="field" data-nivel-section="PRAZOS"><label>Prazo defesa</label>{{ nova_trajetoria_form.prazo_defesa }}</div>
-                <div class="field" data-nivel-section="VINCULO_DOCENTE"><label data-vinculo-docente-label>Orientador</label>{{ nova_trajetoria_form.orientador }}</div>
+                <div class="formulario-campo"><label>Nível</label>{{ nova_trajetoria_form.nivel_curso }}</div>
+                <div class="formulario-campo"><label>Status</label>{{ nova_trajetoria_form.status }}</div>
+                <div class="formulario-campo"><label>Ingresso</label>{{ nova_trajetoria_form.ingresso }}</div>
+                <div class="formulario-campo" data-nivel-section="PRAZOS"><label>Prazo de qualificação/projeto</label>{{ nova_trajetoria_form.prazo_qualificacao }}</div>
+                <div class="formulario-campo" data-nivel-section="PRAZOS"><label>Prazo defesa</label>{{ nova_trajetoria_form.prazo_defesa }}</div>
+                <div class="formulario-campo" data-nivel-section="VINCULO_DOCENTE"><label data-vinculo-docente-label>Orientador</label>{{ nova_trajetoria_form.orientador }}</div>
             </div>
             <div data-nivel-section="PRAZOS">
                 <label>{{ nova_trajetoria_form.reingressante }} Reingressante</label>
@@ -516,8 +516,8 @@ faltava a da coordenacao.
             </div>
 
             <div class="grid-two" data-nivel-section="CONCLUSAO">
-                <div class="field"><label data-conclusao-numero-label>Número da defesa</label>{{ nova_trajetoria_form.numero_defesa }}</div>
-                <div class="field"><label data-conclusao-data-label>Data da defesa</label>{{ nova_trajetoria_form.data_defesa }}</div>
+                <div class="formulario-campo"><label data-conclusao-numero-label>Número da defesa</label>{{ nova_trajetoria_form.numero_defesa }}</div>
+                <div class="formulario-campo"><label data-conclusao-data-label>Data da defesa</label>{{ nova_trajetoria_form.data_defesa }}</div>
             </div>
             <div data-nivel-section="DEPOSITO">
                 <label>{{ nova_trajetoria_form.deposito_versao_final }} Depósito da versão final</label>
@@ -525,20 +525,20 @@ faltava a da coordenacao.
 
             <label>Comentário</label>
             {{ nova_trajetoria_form.comentario }}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Cadastrar trajetória</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% endif %}
 
 {% for card in trajetoria_cards %}
 {% with trajetoria=card.obj form=card.form horas_form=card.horas_form %}
 {% if can_manage_aluno %}
 {% if trajetoria.nivel_curso != "POSDOUTORADO" %}
-<div id="modal-horas-complementares-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-horas-complementares-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Adicionar horas complementares</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -546,7 +546,7 @@ faltava a da coordenacao.
             <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
             <div class="grid-two">
                 {% for field in horas_form %}
-                    <div class="field">
+                    <div class="formulario-campo">
                         <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {{ field }}
                         {{ field.errors }}
@@ -556,16 +556,16 @@ faltava a da coordenacao.
             <p class="item-observacao">
                 O comentário será registrado como observação administrativa da secretaria.
             </p>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar lançamento</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% endif %}
 
-<div id="modal-trajetoria-status-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-status-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar status da trajetória</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -580,15 +580,15 @@ faltava a da coordenacao.
             </select>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar status</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-nivel-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-nivel-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar nível</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -599,15 +599,15 @@ faltava a da coordenacao.
             {{ form.nivel_curso }}
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar nível</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar prazo {{ trajetoria.qualificacao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -618,15 +618,15 @@ faltava a da coordenacao.
             <input name="prazo_qualificacao" value="{{ trajetoria.prazo_qualificacao }}" placeholder="YYYY.1 ou YYYY.2">
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar prazo</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-prazo-defesa-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar prazo defesa</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -637,15 +637,15 @@ faltava a da coordenacao.
             <input name="prazo_defesa" value="{{ trajetoria.prazo_defesa }}" placeholder="YYYY.1 ou YYYY.2">
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar prazo</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-reingressante-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-reingressante-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar reingressante</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -655,14 +655,14 @@ faltava a da coordenacao.
             <label><input type="checkbox" name="reingressante" {% if trajetoria.reingressante %}checked{% endif %}> Reingressante</label>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar reingressante</button>
             </div>
         </form>
     </div>
-</div>
-<div id="modal-estagio-create-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+</dialog>
+<dialog id="modal-estagio-create-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head">
             <h3 class="section-title">Novo estágio de docência</h3>
             <button type="button" class="modal-close" data-modal-close>Fechar</button>
@@ -673,19 +673,19 @@ faltava a da coordenacao.
             <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
 
             <div class="grid-two">
-                <div class="field">
+                <div class="formulario-campo">
                     <label>Supervisor</label>
                     <input name="supervisor" required>
                 </div>
-                <div class="field">
+                <div class="formulario-campo">
                     <label>Data início</label>
                     <input type="date" name="inicio" required>
                 </div>
-                <div class="field">
+                <div class="formulario-campo">
                     <label>Data término</label>
                     <input type="date" name="termino" required>
                 </div>
-                <div class="field">
+                <div class="formulario-campo">
                     <label>Status</label>
                     <select name="status">
                         <option value="NAO_INICIADO">Não Iniciado</option>
@@ -703,17 +703,17 @@ faltava a da coordenacao.
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
 
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">
                 Criar estágio
             </button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% for estagio in trajetoria.estagios_docencia.all %}
-<div id="modal-estagio-editar-{{ estagio.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-estagio-editar-{{ estagio.id }}" class="modal-dialog">
+    <div class="modal-body">
 
         <div class="modal-head">
             <h3 class="section-title">
@@ -735,27 +735,27 @@ faltava a da coordenacao.
 
             <div class="grid-two">
 
-                <div class="field">
+                <div class="formulario-campo">
                     <label>Supervisor</label>
                     <input name="supervisor"
                            value="{{ estagio.supervisor }}">
                 </div>
 
-                <div class="field">
+                <div class="formulario-campo">
                     <label>Data início</label>
                     <input type="date"
                            name="inicio"
                            value="{% if estagio.inicio %}{{ estagio.inicio|date:'Y-m-d' }}{% endif %}">
                 </div>
 
-                <div class="field">
+                <div class="formulario-campo">
                     <label>Data término</label>
                     <input type="date"
                            name="termino"
                            value="{% if estagio.termino %}{{ estagio.termino|date:'Y-m-d' }}{% endif %}">
                 </div>
 
-                <div class="field">
+                <div class="formulario-campo">
                     <label>Status</label>
 
                     <select name="status">
@@ -775,18 +775,18 @@ faltava a da coordenacao.
                       rows="3"
                       required></textarea>
 
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar alterações</button>
             </div>
 
         </form>
 
     </div>
-</div>
+</dialog>
 {% endfor %}
 
-<div id="modal-trajetoria-qualificacao-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-qualificacao-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar {{ trajetoria.qualificacao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -796,15 +796,15 @@ faltava a da coordenacao.
             <label><input type="checkbox" name="isQualificado" {% if trajetoria.isQualificado %}checked{% endif %}> {{ trajetoria.qualificacao_label }} concluído</label>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-orientador-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-orientador-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar {% if trajetoria.nivel_curso == "POSDOUTORADO" %}supervisor{% else %}orientador{% endif %}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -815,15 +815,15 @@ faltava a da coordenacao.
             {{ form.orientador }}
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar {% if trajetoria.nivel_curso == "POSDOUTORADO" %}supervisor{% else %}orientador{% endif %}</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-coorientador-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-coorientador-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar coorientador</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -846,15 +846,15 @@ faltava a da coordenacao.
             </div>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar coorientador</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-defesa-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-defesa-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar {{ trajetoria.conclusao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -862,20 +862,20 @@ faltava a da coordenacao.
             <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
             <input type="hidden" name="campo" value="defesa">
             <div class="grid-two">
-                <div class="field"><label>{{ trajetoria.numero_conclusao_label }}</label><input name="numero_defesa" value="{{ trajetoria.numero_defesa }}"></div>
-                <div class="field"><label>{{ trajetoria.data_conclusao_label }}</label><input type="date" name="data_defesa" value="{% if trajetoria.data_defesa %}{{ trajetoria.data_defesa|date:'Y-m-d' }}{% endif %}"></div>
+                <div class="formulario-campo"><label>{{ trajetoria.numero_conclusao_label }}</label><input name="numero_defesa" value="{{ trajetoria.numero_defesa }}"></div>
+                <div class="formulario-campo"><label>{{ trajetoria.data_conclusao_label }}</label><input type="date" name="data_defesa" value="{% if trajetoria.data_defesa %}{{ trajetoria.data_defesa|date:'Y-m-d' }}{% endif %}"></div>
             </div>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar {{ trajetoria.conclusao_label_lower }}</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="modal-trajetoria-deposito-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-trajetoria-deposito-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar depósito final</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -885,41 +885,41 @@ faltava a da coordenacao.
             <label><input type="checkbox" name="deposito_versao_final" {% if trajetoria.deposito_versao_final %}checked{% endif %}> Depósito da versão final</label>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar depósito</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% endif %}
 
 {% if can_edit_publicacoes %}
-<div id="modal-publicacao-nova-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-publicacao-nova-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Adicionar publicação</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="salvar_publicacao">
             <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
             <div class="grid-two">
-                <div class="field"><label>Título</label>{{ publicacao_form.titulo }}</div>
-                <div class="field"><label>Tipo</label>{{ publicacao_form.tipo }}</div>
-                <div class="field"><label>Veículo</label>{{ publicacao_form.veiculo }}</div>
-                <div class="field"><label>Ano</label>{{ publicacao_form.ano }}</div>
-                <div class="field"><label>DOI/URL</label>{{ publicacao_form.doi_url }}</div>
+                <div class="formulario-campo"><label>Título</label>{{ publicacao_form.titulo }}</div>
+                <div class="formulario-campo"><label>Tipo</label>{{ publicacao_form.tipo }}</div>
+                <div class="formulario-campo"><label>Veículo</label>{{ publicacao_form.veiculo }}</div>
+                <div class="formulario-campo"><label>Ano</label>{{ publicacao_form.ano }}</div>
+                <div class="formulario-campo"><label>DOI/URL</label>{{ publicacao_form.doi_url }}</div>
             </div>
             <label>Autores</label>
             {{ publicacao_form.autores }}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar publicação</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 {% for publicacao in trajetoria.publicacoes.all %}
-<div id="modal-publicacao-{{ publicacao.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-publicacao-{{ publicacao.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Editar publicação</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -927,8 +927,8 @@ faltava a da coordenacao.
             <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
             <input type="hidden" name="publicacao_id" value="{{ publicacao.id }}">
             <div class="grid-two">
-                <div class="field"><label>Título</label><input name="titulo" value="{{ publicacao.titulo }}" maxlength="255" required></div>
-                <div class="field">
+                <div class="formulario-campo"><label>Título</label><input name="titulo" value="{{ publicacao.titulo }}" maxlength="255" required></div>
+                <div class="formulario-campo">
                     <label>Tipo</label>
                     <select name="tipo" required>
                         <option value="ARTIGO_PERIODICO" {% if publicacao.tipo == "ARTIGO_PERIODICO" %}selected{% endif %}>Artigo em periodico</option>
@@ -937,48 +937,48 @@ faltava a da coordenacao.
                         <option value="OUTRO" {% if publicacao.tipo == "OUTRO" %}selected{% endif %}>Outro</option>
                     </select>
                 </div>
-                <div class="field"><label>Veículo</label><input name="veiculo" value="{{ publicacao.veiculo }}" maxlength="255"></div>
-                <div class="field"><label>Ano</label><input type="number" name="ano" value="{{ publicacao.ano|default_if_none:'' }}" min="1900" max="2100"></div>
-                <div class="field"><label>DOI/URL</label><input name="doi_url" value="{{ publicacao.doi_url }}" maxlength="255"></div>
+                <div class="formulario-campo"><label>Veículo</label><input name="veiculo" value="{{ publicacao.veiculo }}" maxlength="255"></div>
+                <div class="formulario-campo"><label>Ano</label><input type="number" name="ano" value="{{ publicacao.ano|default_if_none:'' }}" min="1900" max="2100"></div>
+                <div class="formulario-campo"><label>DOI/URL</label><input name="doi_url" value="{{ publicacao.doi_url }}" maxlength="255"></div>
             </div>
             <label>Autores</label>
             <textarea name="autores" rows="3">{{ publicacao.autores }}</textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar publicação</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% endfor %}
 {% endif %}
 
 {% if can_edit_disciplinas %}
-<div id="modal-disciplina-nova-{{ trajetoria.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-disciplina-nova-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Adicionar disciplina</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="salvar_disciplina">
             <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
             <div class="grid-two">
-                <div class="field"><label>Código</label>{{ disciplina_form.codigo }}</div>
-                <div class="field"><label>Nome</label>{{ disciplina_form.nome }}</div>
-                <div class="field"><label>Semestre</label>{{ disciplina_form.semestre }}</div>
-                <div class="field"><label>Conceito</label>{{ disciplina_form.conceito }}</div>
-                <div class="field"><label>Créditos</label>{{ disciplina_form.creditos }}</div>
-                <div class="field"><label>Carga horária</label>{{ disciplina_form.carga_horaria }}</div>
-                <div class="field"><label>Situação</label>{{ disciplina_form.situacao }}</div>
+                <div class="formulario-campo"><label>Código</label>{{ disciplina_form.codigo }}</div>
+                <div class="formulario-campo"><label>Nome</label>{{ disciplina_form.nome }}</div>
+                <div class="formulario-campo"><label>Semestre</label>{{ disciplina_form.semestre }}</div>
+                <div class="formulario-campo"><label>Conceito</label>{{ disciplina_form.conceito }}</div>
+                <div class="formulario-campo"><label>Créditos</label>{{ disciplina_form.creditos }}</div>
+                <div class="formulario-campo"><label>Carga horária</label>{{ disciplina_form.carga_horaria }}</div>
+                <div class="formulario-campo"><label>Situação</label>{{ disciplina_form.situacao }}</div>
             </div>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar disciplina</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 {% for disciplina in trajetoria.disciplinas.all %}
-<div id="modal-disciplina-{{ disciplina.id }}" class="modal-backdrop">
-    <div class="modal-card">
+<dialog id="modal-disciplina-{{ disciplina.id }}" class="modal-dialog">
+    <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Editar disciplina</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
@@ -986,13 +986,13 @@ faltava a da coordenacao.
             <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
             <input type="hidden" name="disciplina_id" value="{{ disciplina.id }}">
             <div class="grid-two">
-                <div class="field"><label>Código</label><input name="codigo" value="{{ disciplina.codigo }}" maxlength="40"></div>
-                <div class="field"><label>Nome</label><input name="nome" value="{{ disciplina.nome }}" maxlength="255" required></div>
-                <div class="field"><label>Semestre</label><input name="semestre" value="{{ disciplina.semestre }}" maxlength="6" placeholder="YYYY.1 ou YYYY.2"></div>
-                <div class="field"><label>Conceito</label><input name="conceito" value="{{ disciplina.conceito }}" maxlength="20"></div>
-                <div class="field"><label>Créditos</label><input type="number" name="creditos" value="{{ disciplina.creditos|default_if_none:'' }}" min="0"></div>
-                <div class="field"><label>Carga horária</label><input type="number" name="carga_horaria" value="{{ disciplina.carga_horaria|default_if_none:'' }}" min="0"></div>
-                <div class="field">
+                <div class="formulario-campo"><label>Código</label><input name="codigo" value="{{ disciplina.codigo }}" maxlength="40"></div>
+                <div class="formulario-campo"><label>Nome</label><input name="nome" value="{{ disciplina.nome }}" maxlength="255" required></div>
+                <div class="formulario-campo"><label>Semestre</label><input name="semestre" value="{{ disciplina.semestre }}" maxlength="6" placeholder="YYYY.1 ou YYYY.2"></div>
+                <div class="formulario-campo"><label>Conceito</label><input name="conceito" value="{{ disciplina.conceito }}" maxlength="20"></div>
+                <div class="formulario-campo"><label>Créditos</label><input type="number" name="creditos" value="{{ disciplina.creditos|default_if_none:'' }}" min="0"></div>
+                <div class="formulario-campo"><label>Carga horária</label><input type="number" name="carga_horaria" value="{{ disciplina.carga_horaria|default_if_none:'' }}" min="0"></div>
+                <div class="formulario-campo">
                     <label>Situação</label>
                     <select name="situacao" required>
                         <option value="CURSANDO" {% if disciplina.situacao == "CURSANDO" %}selected{% endif %}>Cursando</option>
@@ -1002,12 +1002,12 @@ faltava a da coordenacao.
                     </select>
                 </div>
             </div>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar disciplina</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 {% endfor %}
 {% endif %}
 {% endwith %}
@@ -1018,33 +1018,32 @@ faltava a da coordenacao.
         const openButtons = document.querySelectorAll("[data-modal-open]");
         const closeButtons = document.querySelectorAll("[data-modal-close]");
 
-        function closeModal(modal) {
-            modal.classList.remove("open");
-        }
-
+        // Estes modais eram divs com uma classe "open", como a plataforma fazia
+        // antes de padronizar no <dialog> nativo. A diferenca nao era so visual:
+        // sem o elemento nativo nao havia fechar com Esc, o foco do teclado
+        // passeava pela pagina atras do modal e o leitor de tela lia o conteudo
+        // de tras. O <dialog> aberto com showModal() da os tres.
         openButtons.forEach((btn) => {
             btn.addEventListener("click", () => {
-                const modal = document.getElementById(btn.getAttribute("data-modal-open"));
-                if (modal) modal.classList.add("open");
+                document.getElementById(btn.getAttribute("data-modal-open"))?.showModal();
             });
         });
 
         closeButtons.forEach((btn) => {
-            btn.addEventListener("click", () => {
-                const modal = btn.closest(".modal-backdrop");
-                if (modal) closeModal(modal);
-            });
+            btn.addEventListener("click", () => btn.closest("dialog")?.close());
         });
 
-        document.querySelectorAll(".modal-backdrop").forEach((modal) => {
+        // Clicar fora fecha. O <dialog> nao faz isso sozinho, e o alvo do clique
+        // no vazio e o proprio dialog -- o conteudo fica no .modal-body dentro.
+        document.querySelectorAll("dialog.modal-dialog").forEach((modal) => {
             modal.addEventListener("click", (event) => {
-                if (event.target === modal) closeModal(modal);
+                if (event.target === modal) modal.close();
             });
         });
 
         document.querySelectorAll("select[name='tipo_coorientador']").forEach((select) => {
             function atualizar() {
-                const modal = select.closest(".modal-backdrop");
+                const modal = select.closest("dialog");
                 modal.querySelectorAll("[data-coorientador-section]").forEach((section) => {
                     section.style.display = section.dataset.coorientadorSection === select.value ? "block" : "none";
                 });
@@ -1055,7 +1054,7 @@ faltava a da coordenacao.
 
         document.querySelectorAll("select[name='nivel_curso']").forEach((select) => {
             function atualizarNivel() {
-                const modal = select.closest(".modal-backdrop");
+                const modal = select.closest("dialog");
                 if (!modal) return;
                 const nivel = select.value;
                 const usaAcademico = nivel === "MESTRADO" || nivel === "DOUTORADO";

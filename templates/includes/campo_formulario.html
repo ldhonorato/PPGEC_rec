@@ -1,0 +1,26 @@
+{% comment %}
+Um campo de formulario de entrada, no padrao da plataforma.
+
+Vinte e tres telas repetiam as mesmas quatro linhas -- div, label, campo, erros
+-- e nenhuma delas dizia se o campo era obrigatorio nem trazia a orientacao que
+o formulario ja carregava em help_text. Com o include, acrescentar algo ao
+padrao passa a valer em todas de uma vez.
+
+Parametros:
+
+  campo     BoundField do Django (o {{ form.x }} de sempre)
+  extra     classes adicionais no envolvente, para quem precisa marcar o campo
+            (data-destinatario-field e afins continuam no template chamador)
+
+A marca de obrigatorio e aria-hidden porque o proprio controle ja carrega o
+atributo required, que e o que o leitor de tela anuncia; repetir o asterisco na
+leitura so faria ruido.
+{% endcomment %}
+<div class="formulario-campo {{ extra }}">
+    <label for="{{ campo.id_for_label }}">
+        {{ campo.label }}{% if campo.field.required %}<span class="obrigatorio" aria-hidden="true">*</span>{% endif %}
+    </label>
+    {{ campo }}
+    {% if campo.help_text %}<p class="formulario-ajuda">{{ campo.help_text }}</p>{% endif %}
+    {{ campo.errors }}
+</div>

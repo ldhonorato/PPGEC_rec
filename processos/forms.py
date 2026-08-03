@@ -63,6 +63,61 @@ DOCUMENTO_UPLOAD_ACCEPT = ",".join(sorted(ALLOWED_DOCUMENTO_EXTENSIONS))
 MAX_ASSINATURA_UPLOAD_SIZE = 10 * 1024 * 1024
 
 
+
+class OpcoesVaziasNomeadas:
+    """Troca o "---------" que o Django poe na primeira opcao dos selects.
+
+    Sao 36 campos no sistema, e o problema nao e so o traco ser feio: ele apaga
+    uma distincao que importa. A opcao vazia significa duas coisas diferentes
+    conforme o campo:
+
+      - num campo obrigatorio, e "voce ainda nao escolheu";
+      - num campo opcional, e "nenhum" -- uma resposta valida, nao uma pendencia.
+
+    Com "---------" nos dois casos, quem preenche nao sabe se pode seguir sem
+    tocar naquele campo. Com "Selecione" e "Nenhum", sabe.
+
+    O texto e generico de proposito. "Selecione a sala" exigiria acertar o
+    artigo de cada rotulo, e um formulario com "Selecione a docente" e pior do
+    que um sem artigo nenhum -- o rotulo logo acima ja diz do que se trata. Onde
+    um texto proprio ajudar, basta atribui-lo depois do super().__init__.
+
+    A troca acontece no acesso ao campo, e nao no __init__, porque varios
+    formularios ajustam "required" no proprio __init__ -- depois, portanto, da
+    chamada a super(). Feita no __init__, a escolha entre "Selecione" e "Nenhum"
+    usaria o valor de antes do ajuste: em ReservaAmbienteForm, "docente" saia
+    como "Nenhum" sendo obrigatorio. No acesso, o estado ja e o definitivo.
+    """
+
+    TEXTO_OBRIGATORIO = "Selecione"
+    TEXTO_OPCIONAL = "Nenhum"
+
+    def __getitem__(self, nome):
+        campo = self.fields.get(nome)
+        if campo is not None:
+            self._nomear_opcao_vazia(campo)
+        return super().__getitem__(nome)
+
+    def _nomear_opcao_vazia(self, campo):
+        escolhas = getattr(campo, "choices", None)
+        if not escolhas:
+            return
+        escolhas = list(escolhas)
+        if not escolhas or escolhas[0][0] != "" or "---" not in str(escolhas[0][1]):
+            return
+
+        texto = self.TEXTO_OBRIGATORIO if campo.required else self.TEXTO_OPCIONAL
+        # ModelChoiceField reconstroi as choices a partir do queryset a cada
+        # acesso, entao nele o texto tem de ir em empty_label; nos demais, a
+        # lista e estatica e se troca direto.
+        if hasattr(campo, "empty_label"):
+            campo.empty_label = texto
+        else:
+            escolhas[0] = ("", texto)
+            campo.choices = escolhas
+
+
+
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = User
@@ -89,7 +144,7 @@ class DisciplinaTrajetoriaForm(forms.ModelForm):
         }
 
 
-class DisciplinaForm(forms.ModelForm):
+class DisciplinaForm(OpcoesVaziasNomeadas, forms.ModelForm):
     class Meta:
         model = Disciplina
         fields = ["codigo", "nome", "tipo", "creditos", "carga_horaria", "pre_requisitos", "ementa", "bibliografia", "ativa"]
@@ -128,7 +183,7 @@ class PeriodoLetivoForm(forms.ModelForm):
         }
 
 
-class OfertaDisciplinaForm(forms.ModelForm):
+class OfertaDisciplinaForm(OpcoesVaziasNomeadas, forms.ModelForm):
     DIAS_OFERTA_CHOICES = [
         (EncontroOferta.DiaSemana.SEGUNDA, "Segunda-feira"),
         (EncontroOferta.DiaSemana.TERCA, "Terça-feira"),
@@ -325,7 +380,7 @@ def _validar_pdf_upload(arquivo):
         raise forms.ValidationError("O PDF deve ter no máximo 10 MB.")
 
 
-class SolicitacaoAssinaturaForm(forms.ModelForm):
+class SolicitacaoAssinaturaForm(OpcoesVaziasNomeadas, forms.ModelForm):
     class Meta:
         model = SolicitacaoAssinatura
         fields = [
@@ -403,7 +458,7 @@ class SalaForm(forms.ModelForm):
             self.fields.pop("ativa")
 
 
-class DisponibilidadeSalaForm(forms.ModelForm):
+class DisponibilidadeSalaForm(OpcoesVaziasNomeadas, forms.ModelForm):
     class Meta:
         model = DisponibilidadeSala
         fields = ["sala", "dia_semana", "hora_inicio", "hora_fim"]
@@ -457,7 +512,7 @@ class DisponibilidadeSalaLoteForm(forms.Form):
         return disponibilidades
 
 
-class SolicitacaoBancaForm(forms.ModelForm):
+class SolicitacaoBancaForm(OpcoesVaziasNomeadas, forms.ModelForm):
     aluno = forms.ModelChoiceField(queryset=Aluno.objects.none(), label="Aluno")
     trajetoria = forms.ModelChoiceField(queryset=TrajetoriaAcademica.objects.none(), label="Trajetória acadêmica")
 
@@ -631,7 +686,7 @@ class SolicitacaoBancaForm(forms.ModelForm):
                 )
 
 
-class ReservaAmbienteForm(forms.Form):
+class ReservaAmbienteForm(OpcoesVaziasNomeadas, forms.Form):
     RECORRENCIA_NENHUMA = "NENHUMA"
     RECORRENCIA_DIARIA = "DIARIA"
     RECORRENCIA_SEMANAL = "SEMANAL"
@@ -644,7 +699,7 @@ class ReservaAmbienteForm(forms.Form):
         label="Docente",
     )
     tipo = forms.ChoiceField(choices=ReservaAmbiente.TipoReserva.choices, label="Tipo de reserva")
-    titulo = forms.CharField(max_length=255, required=False, label="Titulo")
+    titulo = forms.CharField(max_length=255, required=False, label="Título")
     data_inicio = forms.DateField(
         label="Data de início",
         widget=forms.DateInput(attrs={"type": "date"}),
@@ -664,7 +719,7 @@ class ReservaAmbienteForm(forms.Form):
             (RECORRENCIA_SEMANAL, "Semanal"),
             (RECORRENCIA_MENSAL, "Mensal"),
         ),
-        label="Recorrencia",
+        label="Recorrência",
     )
     duracao_recorrencia_meses = forms.IntegerField(
         required=False,
@@ -726,7 +781,7 @@ class ReservaAmbienteExclusaoForm(forms.Form):
 
 
 class DocumentoCadastroForm(forms.Form):
-    titulo = forms.CharField(max_length=255, label="Titulo")
+    titulo = forms.CharField(max_length=255, label="Título")
     tipo_documento = forms.ChoiceField(
         choices=[("", "Selecione")] + list(Documento.TipoDocumento.choices),
         required=False,
@@ -758,7 +813,7 @@ class DocumentoCadastroForm(forms.Form):
         return arquivo
 
 
-class EncaminhamentoForm(forms.Form):
+class EncaminhamentoForm(OpcoesVaziasNomeadas, forms.Form):
     setor_destino = forms.ModelChoiceField(
         queryset=Setor.objects.none(),
         label="Setor de destino",
@@ -799,16 +854,40 @@ class EncaminhamentoForm(forms.Form):
 
 
 class ProcessoAberturaForm(forms.ModelForm):
+    """Abertura de processo pelo requerente.
+
+    Os textos de ajuda existem porque "Assunto" e "Descricao", lado a lado e sem
+    explicacao, nao dizem o que muda de um para o outro -- e o assunto e o que a
+    secretaria le primeiro na caixa, entao um assunto vago custa uma ida e volta.
+    """
+
     class Meta:
         model = Processo
         fields = ["tipo", "assunto", "descricao"]
         widgets = {
-            "descricao": forms.Textarea(attrs={"rows": 5}),
+            "descricao": forms.Textarea(attrs={"rows": 6}),
+        }
+        help_texts = {
+            "tipo": "Define para onde o processo vai e que documentos serão exigidos.",
+            "assunto": "Uma linha que identifique o pedido. É o que aparece na listagem.",
+            "descricao": "Explique o que está pedindo e por quê. Inclua datas, disciplinas "
+                         "ou prazos envolvidos.",
         }
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
+        # O padrao do Django e "---------", que ocupa a primeira posicao da lista
+        # sem dizer o que fazer com ela. Como "tipo" tem choices e nao e chave
+        # estrangeira, o campo e um TypedChoiceField -- que nao tem empty_label;
+        # a opcao vazia vem dentro de choices e e la que se troca.
+        escolhas = list(self.fields["tipo"].choices)
+        if escolhas and escolhas[0][0] == "":
+            escolhas[0] = ("", "Selecione o tipo de requerimento")
+            self.fields["tipo"].choices = escolhas
+        self.fields["assunto"].widget.attrs.setdefault(
+            "placeholder", "Ex.: Prorrogação de prazo para defesa"
+        )
 
 
 class SolicitarCienteOrientadorForm(forms.Form):
@@ -835,7 +914,7 @@ class ComentarioProcessoForm(forms.Form):
     )
 
 
-class LancamentoHorasComplementaresForm(forms.ModelForm):
+class LancamentoHorasComplementaresForm(OpcoesVaziasNomeadas, forms.ModelForm):
     trajetoria = forms.ModelChoiceField(
         queryset=TrajetoriaAcademica.objects.none(),
         label="Trajetória acadêmica",
@@ -1018,7 +1097,7 @@ class LancamentoHorasComplementaresForm(forms.ModelForm):
         return lancamento
 
 
-class HorasComplementaresAdministrativoForm(forms.Form):
+class HorasComplementaresAdministrativoForm(OpcoesVaziasNomeadas, forms.Form):
     tipo_atividade = forms.ModelChoiceField(
         queryset=TipoAtividadeHorasComplementares.objects.none(),
         label="Tipo da atividade",
@@ -1122,7 +1201,7 @@ class FinalizarProcessoForm(forms.Form):
     )
 
 
-class AlunoComentarioForm(forms.Form):
+class AlunoComentarioForm(OpcoesVaziasNomeadas, forms.Form):
     comentario = forms.CharField(
         label="Comentário da alteração",
         widget=forms.Textarea(attrs={"rows": 3}),
@@ -1136,7 +1215,7 @@ class AlunoStatusForm(AlunoComentarioForm):
 class AlunoDadosForm(AlunoComentarioForm):
     nome = forms.CharField(max_length=255, label="Nome")
     email = forms.EmailField(label="Email")
-    matricula = forms.CharField(max_length=50, required=False, label="Matricula")
+    matricula = forms.CharField(max_length=50, required=False, label="Matrícula")
     cpf = forms.CharField(max_length=14, required=False, label="CPF")
     genero = forms.ChoiceField(
         choices=(("", "---------"), *Aluno.Genero.choices),
@@ -1199,7 +1278,7 @@ class AlunoCpfForm(forms.Form):
         return cpf
 
 
-class AlunoCadastroForm(forms.Form):
+class AlunoCadastroForm(OpcoesVaziasNomeadas, forms.Form):
     POLOS_CADASTRO_ALUNO = ("POLI", "Caruaru", "Garanhuns", "Petrolina", "Fitec/SP")
 
     nome = forms.CharField(max_length=255, label="Nome completo")

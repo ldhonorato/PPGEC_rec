@@ -11,9 +11,19 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_classe %}{% endblock %}">
+{% comment %}
+"mostra_moldura" decide se a casca da aplicacao -- barra lateral, barra superior
+e o script da gaveta -- entra na pagina. Vale por padrao para quem tem sessao, e
+as telas de acesso a desligam.
+
+Existe porque essas telas tem layout proprio, de duas colunas ocupando a janela
+inteira, e nao foram feitas para conviver com a moldura. Quem abria /login/ ou
+/senha/esqueci/ ja logado via o formulario de entrada com a barra superior da
+propria sessao por cima -- nome, avisos e menu da conta.
+{% endcomment %}
 {% include "includes/icons.html" %}
 <div class="app-shell">
-    {% if user.is_authenticated %}
+    {% if user.is_authenticated and mostra_moldura %}
         {% comment %}
         Casca da aplicacao: barra lateral em altura total a esquerda, barra
         superior apenas sobre a coluna de conteudo.
@@ -22,16 +32,12 @@
         navegacao, a superior cuida de alertas e conta. Perfil/Sair ficam so na
         superior; antes apareciam nos dois lugares.
         {% endcomment %}
-        <div class="sidebar-overlay" data-fechar-menu></div>
         <nav id="menu-lateral" class="sidebar" aria-label="Menu principal">
             <div class="sidebar-program">
                 <a class="sidebar-brand" href="{% url 'home' %}" aria-label="AcadFlow — ir para o início">
                     <img class="sidebar-brand-logo" src="{% static 'img/acadflow-wordmark-branco.png' %}" alt="AcadFlow">
                     <span class="sidebar-programa">PPGEC · Pós-Graduação em Engenharia de Computação</span>
                 </a>
-                <button type="button" class="menu-fechar" data-fechar-menu aria-label="Fechar menu">
-                    <svg class="nav-icon" aria-hidden="true"><use href="#i-fechar"></use></svg>
-                </button>
             </div>
 
         <div class="sidebar-scroll">
@@ -95,10 +101,13 @@
         <div class="app-main">
             <header class="topbar">
                 <div class="topbar-content">
-                    <button type="button" class="menu-toggle" data-abrir-menu
-                            aria-label="Abrir menu de navegação" aria-expanded="false" aria-controls="menu-lateral">
-                        <svg class="nav-icon" aria-hidden="true"><use href="#i-menu"></use></svg>
-                    </button>
+                    {% comment %}
+                    O botao de tres tracos vivia aqui. Com a barra flutuante, a
+                    navegacao passou a ter dois gatilhos para a mesma coisa --
+                    um no canto superior esquerdo, outro ao alcance do polegar.
+                    Ficou o de baixo: e onde a mao esta, e a folha que ele abre
+                    sobe de onde o dedo tocou.
+                    {% endcomment %}
                     <a class="brand-mobile" href="{% url 'home' %}" aria-label="AcadFlow">
                         <img src="{% static 'img/acadflow-wordmark.png' %}" alt="AcadFlow">
                     </a>
@@ -118,16 +127,45 @@
                                 </span>
                                 <svg class="user-chevron" aria-hidden="true"><use href="#i-chevron"></use></svg>
                             </summary>
+                            {% comment %}
+                            O painel era uma lista de dois itens sem contexto: nao
+                            dizia de quem era a conta -- o nome fica no chip, que
+                            some em tela estreita -- nem o que cada destino faz.
+                            {% endcomment %}
                             <div class="user-menu-panel">
-                                <a href="{% url 'me' %}">
-                                    <svg class="nav-icon" aria-hidden="true"><use href="#i-perfil"></use></svg>
-                                    Perfil
-                                </a>
-                                <form method="post" action="{% url 'logout' %}">
+                                <div class="user-menu-cabecalho">
+                                    <span class="avatar avatar-grande" aria-hidden="true">{{ user.nome|default:user.email|slice:":2"|upper }}</span>
+                                    <div class="user-menu-identidade">
+                                        <strong>{{ user.nome|default:user.email }}</strong>
+                                        <span class="user-menu-email">{{ user.email }}</span>
+                                        <span class="user-menu-papel">{{ user.get_tipo_usuario_display }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="user-menu-itens">
+                                    <a href="{% url 'me' %}">
+                                        <svg class="nav-icon" aria-hidden="true"><use href="#i-perfil"></use></svg>
+                                        <span>
+                                            <strong>Meu perfil</strong>
+                                            <small>Dados de acesso e senha</small>
+                                        </span>
+                                    </a>
+                                    {% if user.is_staff %}
+                                        <a href="/admin/">
+                                            <svg class="nav-icon" aria-hidden="true"><use href="#i-setores"></use></svg>
+                                            <span>
+                                                <strong>Administração</strong>
+                                                <small>Gestão de usuários e permissões</small>
+                                            </span>
+                                        </a>
+                                    {% endif %}
+                                </div>
+
+                                <form method="post" action="{% url 'logout' %}" class="user-menu-sair">
                                     {% csrf_token %}
                                     <button type="submit">
                                         <svg class="nav-icon" aria-hidden="true"><use href="#i-sair"></use></svg>
-                                        Sair
+                                        Sair da conta
                                     </button>
                                 </form>
                             </div>
@@ -139,7 +177,7 @@
     {% endif %}
 
     <main class="main-area">
-        <div class="container{% if user.is_authenticated %} content-area{% endif %}">
+        <div class="container{% if user.is_authenticated and mostra_moldura %} content-area{% endif %}">
             {% if messages %}
                 <ul class="messages">
                     {% for message in messages %}
@@ -151,59 +189,203 @@
         </div>
     </main>
 
-    {% if user.is_authenticated %}
+    {% if user.is_authenticated and mostra_moldura %}
         </div>{# .app-main -- aberta antes da barra superior #}
     {% endif %}
 </div>
-{% if user.is_authenticated %}
+{% if user.is_authenticated and mostra_moldura and barra_flutuante %}
+    {% comment %}
+    Barra flutuante, so em tela estreita.
+
+    Ali a navegacao inteira estava atras do botao de tres tracos, no canto
+    superior esquerdo -- o ponto mais distante do polegar de quem segura o
+    aparelho --, e o que se achava depois de tocar era uma lista de oito a
+    vinte e um destinos. Trocar de tela custava dois toques e uma leitura.
+
+    Os tres destinos que a pessoa abre todo dia passam a ficar a um toque, na
+    faixa que o polegar alcanca. O quarto lugar e a gaveta, que continua tendo
+    tudo: a barra e atalho, nao substituicao. O circulo destacado e a acao de
+    criar, separado dos destinos porque nao leva a lugar nenhum -- executa.
+    {% endcomment %}
+    <nav class="barra-flutuante" aria-label="Navegação rápida">
+        <ul class="barra-flutuante-itens">
+            {% for item in barra_flutuante %}
+                <li>
+                    <a href="{{ item.href }}"
+                       class="barra-flutuante-item{% if request.resolver_match.url_name in item.url_names %} is-active{% endif %}"
+                       {% if request.resolver_match.url_name in item.url_names %}aria-current="page"{% endif %}>
+                        <svg aria-hidden="true"><use href="#i-{{ item.icon }}"></use></svg>
+                        <span class="apenas-leitor">{{ item.label }}</span>
+                    </a>
+                </li>
+            {% endfor %}
+            <li>
+                <button type="button" class="barra-flutuante-item" data-abrir-folha
+                        aria-label="Abrir menu de navegação" aria-haspopup="dialog" aria-controls="folha-navegacao">
+                    <svg aria-hidden="true"><use href="#i-menu"></use></svg>
+                </button>
+            </li>
+        </ul>
+        {% if barra_flutuante_acao %}
+            <a class="barra-flutuante-acao" href="{{ barra_flutuante_acao.href }}"
+               aria-label="{{ barra_flutuante_acao.label }}">
+                <svg aria-hidden="true"><use href="#i-novo-processo"></use></svg>
+            </a>
+        {% endif %}
+    </nav>
+
+    {% comment %}
+    A folha com a navegacao completa.
+
+    Substitui a gaveta lateral em tela estreita. A gaveta entrava pela esquerda,
+    aberta por um botao no canto oposto ao polegar; a folha sobe do lado de onde
+    o dedo tocou. E um <dialog>, como os demais modais da plataforma, entao Esc,
+    prisao de foco e isolamento do que fica atras vem do navegador.
+
+    Os grupos aparecem abertos, e nao como sanfonas: numa lista de vinte e um
+    destinos, cada sanfona fechada e mais um toque entre a pessoa e o destino, e
+    o titulo do grupo ja separa visualmente sem esconder nada.
+    {% endcomment %}
+    <dialog id="folha-navegacao" class="folha-navegacao">
+        <div class="folha-cabecalho">
+            <span class="folha-alca" aria-hidden="true"></span>
+            <h2 class="folha-titulo">Navegação</h2>
+            <button type="button" class="folha-fechar" data-fechar-folha aria-label="Fechar menu">
+                <svg aria-hidden="true"><use href="#i-fechar"></use></svg>
+            </button>
+        </div>
+
+        <div class="folha-rolagem">
+            {% for section in nav_menu_sections %}
+                <p class="folha-secao" id="folha-secao-{{ forloop.counter }}">{{ section.label }}</p>
+                <ul class="folha-lista" aria-labelledby="folha-secao-{{ forloop.counter }}">
+                    {% for item in section.items %}
+                        {% if item.children %}
+                            {% comment %}
+                            O grupo nao vira link: o endereco dele repete o do
+                            primeiro filho, e dois toques para o mesmo lugar,
+                            um deles sem dizer que e o mesmo, so confunde.
+                            {% endcomment %}
+                            <li class="folha-grupo">
+                                <p class="folha-grupo-titulo">{{ item.label }}</p>
+                                <ul class="folha-lista">
+                                    {% for child in item.children %}
+                                        <li>
+                                            <a class="folha-item{% if request.resolver_match.url_name in child.url_names %} is-active{% endif %}"
+                                               href="{{ child.href }}"
+                                               {% if request.resolver_match.url_name in child.url_names %}aria-current="page"{% endif %}>
+                                                <svg class="folha-icone" aria-hidden="true"><use href="#i-{{ child.icon }}"></use></svg>
+                                                <span class="folha-texto">
+                                                    <span class="folha-rotulo">{{ child.label }}</span>
+                                                    {% if child.descricao %}<span class="folha-descricao">{{ child.descricao }}</span>{% endif %}
+                                                </span>
+                                            </a>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </li>
+                        {% else %}
+                            <li>
+                                <a class="folha-item{% if request.resolver_match.url_name in item.url_names %} is-active{% endif %}"
+                                   href="{{ item.href }}"
+                                   {% if request.resolver_match.url_name in item.url_names %}aria-current="page"{% endif %}>
+                                    <svg class="folha-icone" aria-hidden="true"><use href="#i-{{ item.icon }}"></use></svg>
+                                    <span class="folha-texto">
+                                        <span class="folha-rotulo">{{ item.label }}</span>
+                                        {% if item.descricao %}<span class="folha-descricao">{{ item.descricao }}</span>{% endif %}
+                                    </span>
+                                </a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            {% endfor %}
+        </div>
+
+        <p class="folha-rodape">
+            <a href="{% url 'version' %}">v{{ app_versao }}</a>
+            <span>{{ app_copyright }}</span>
+        </p>
+    </dialog>
+{% endif %}
+{% if user.is_authenticated and mostra_moldura %}
 <script>
-    // Menu lateral como gaveta no mobile. Em telas largas o CSS mantem a barra
-    // sempre visivel e nada aqui tem efeito.
+    // Folha de navegacao. So existe em tela estreita, onde a barra lateral nao
+    // cabe; acima de 920px o CSS a esconde e nada aqui e alcancavel.
+    //
+    // Sendo <dialog>, Esc, prisao de foco e isolamento do que fica atras vem do
+    // navegador. O que falta e o clique fora, que <dialog> nao trata: o alvo do
+    // clique no ::backdrop e o proprio dialogo, entao a conta e de coordenada.
     (function () {
-        const menu = document.getElementById("menu-lateral");
-        const abrir = document.querySelector("[data-abrir-menu]");
-        if (!menu || !abrir) return;
-
-        const focaveis = 'a[href], button:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
-
-        function estaAberto() {
-            return document.body.classList.contains("menu-aberto");
-        }
-
-        function abrirMenu() {
-            document.body.classList.add("menu-aberto");
-            abrir.setAttribute("aria-expanded", "true");
-            const primeiro = menu.querySelector(focaveis);
-            if (primeiro) primeiro.focus();
-        }
-
-        function fecharMenu(devolverFoco) {
-            document.body.classList.remove("menu-aberto");
-            abrir.setAttribute("aria-expanded", "false");
-            if (devolverFoco) abrir.focus();
-        }
+        const folha = document.getElementById("folha-navegacao");
+        const abrir = document.querySelector("[data-abrir-folha]");
+        if (!folha || !abrir) return;
 
         abrir.addEventListener("click", function () {
-            estaAberto() ? fecharMenu(true) : abrirMenu();
+            // Se a navegacao que pediu a saida instantanea nao chegou a
+            // acontecer, a marca ficaria e a folha perderia a saida para
+            // sempre. Tirar na abertura custa nada e fecha o caso.
+            folha.classList.remove("folha-sem-saida");
+            folha.showModal();
         });
 
-        document.querySelectorAll("[data-fechar-menu]").forEach(function (el) {
-            el.addEventListener("click", function () { fecharMenu(true); });
+        folha.querySelectorAll("[data-fechar-folha]").forEach(function (el) {
+            el.addEventListener("click", function () { folha.close(); });
+        });
+
+        folha.addEventListener("click", function (e) {
+            // Escolhido o destino, a folha ja cumpriu o papel dela. Some antes
+            // da navegacao para nao entrar na foto que a transicao de pagina
+            // tira da tela que sai: sem isso a tela nova nasce de uma imagem
+            // que ainda tem a folha por cima, e a troca fica confusa -- duas
+            // coisas se dissolvendo ao mesmo tempo.
+            //
+            // Sem o percurso de saida, que levaria 240ms que a navegacao nao
+            // espera: a folha ficaria congelada no meio do caminho na foto.
+            if (e.target.closest("a[href]")) {
+                folha.classList.add("folha-sem-saida");
+                folha.close();
+                return;
+            }
+
+            const area = folha.getBoundingClientRect();
+            const dentro =
+                e.clientX >= area.left && e.clientX <= area.right &&
+                e.clientY >= area.top && e.clientY <= area.bottom;
+            if (!dentro) folha.close();
+        });
+
+        // Voltar ao desktop com a folha aberta deixaria um menu suspenso sobre
+        // uma tela que ja mostra a barra lateral inteira.
+        window.matchMedia("(min-width: 921px)").addEventListener("change", function (e) {
+            if (e.matches && folha.open) folha.close();
+        });
+    })();
+
+    // Menu da conta.
+    //
+    // Ele e um <details>, e <details> so fecha por onde abriu: clicar no
+    // proprio resumo. Um clique em qualquer outro ponto da tela nao o alcanca,
+    // e a tecla Esc tambem nao -- o painel ficava aberto por cima do conteudo
+    // ate a pessoa voltar ao nome dela no canto e clicar de novo. Todo menu
+    // suspenso da plataforma fecha ao se clicar fora; este era a excecao.
+    (function () {
+        const conta = document.querySelector("details.user-menu");
+        if (!conta) return;
+
+        const resumo = conta.querySelector("summary");
+
+        // Clique dentro do painel segue valendo: e assim que se chega a "Meu
+        // perfil" e a "Sair da conta".
+        document.addEventListener("click", function (e) {
+            if (conta.open && !conta.contains(e.target)) conta.open = false;
         });
 
         document.addEventListener("keydown", function (e) {
-            if (e.key === "Escape" && estaAberto()) fecharMenu(true);
-        });
-
-        // Navegar fecha a gaveta; sem isso ela ficaria aberta sobre a pagina nova.
-        menu.addEventListener("click", function (e) {
-            if (e.target.closest("a[href]") && estaAberto()) fecharMenu(false);
-        });
-
-        // Voltar ao desktop com a gaveta aberta deixaria o body travado.
-        const largura = window.matchMedia("(min-width: 921px)");
-        largura.addEventListener("change", function (e) {
-            if (e.matches && estaAberto()) fecharMenu(false);
+            if (e.key === "Escape" && conta.open) {
+                conta.open = false;
+                if (resumo) resumo.focus();
+            }
         });
     })();
 </script>
@@ -217,11 +399,11 @@
         <form method="post" action="{% url 'aluno_informar_cpf' %}">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <div class="field">
+            <div class="formulario-campo">
                 <label for="cpf-pendente">CPF</label>
                 <input id="cpf-pendente" name="cpf" maxlength="14" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" required autofocus>
             </div>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn btn-secondary" type="button" data-close-cpf-modal>Fechar</button>
                 <button class="btn" type="submit">Atualizar cadastro</button>
             </div>
@@ -257,6 +439,120 @@
         });
     })();
 </script>
+
+<script>
+    // ======================================================================
+    // Data e hora em formato brasileiro, independente do navegador
+    //
+    // <input type="date"> e <input type="time"> sao desenhados pelo navegador,
+    // e o formato segue o idioma da INTERFACE dele -- nao o lang da pagina, nao
+    // o Accept-Language. Num Chrome em ingles, uma data aparece como
+    // "03/15/2026" e uma hora como "02:30 PM", num sistema em portugues. Testei
+    // lang no input, lang no elemento pai e locale do contexto: nenhum muda.
+    //
+    // A saida e mostrar um campo de texto que nos controlamos e manter o campo
+    // nativo por perto, invisivel, para duas coisas: continuar enviando o valor
+    // no formato que o servidor espera (ISO) e abrir o seletor nativo pelo
+    // showPicker(), que funciona mesmo com o campo fora de vista. Assim o
+    // calendario nao se perde.
+    //
+    // Sem JavaScript nada disso acontece e o campo nativo segue visivel, como
+    // hoje: e melhora, nao dependencia.
+    // ======================================================================
+    (function () {
+        const ehData = (campo) => campo.type === "date";
+
+        function paraExibicao(valor, campo) {
+            if (!valor) return "";
+            if (ehData(campo)) {
+                const [a, m, d] = valor.split("-");
+                return a && m && d ? `${d}/${m}/${a}` : "";
+            }
+            return valor.slice(0, 5); // HH:MM, descartando segundos se vierem
+        }
+
+        function paraIso(texto, campo) {
+            const numeros = texto.replace(/\D/g, "");
+            if (ehData(campo)) {
+                if (numeros.length !== 8) return "";
+                const d = numeros.slice(0, 2), m = numeros.slice(2, 4), a = numeros.slice(4);
+                const data = new Date(`${a}-${m}-${d}T00:00:00`);
+                // Confere se a data existe: 31/02 vira 03/03 no construtor, e
+                // aceitar isso seria gravar uma data que o usuario nao digitou.
+                if (data.getDate() !== +d || data.getMonth() + 1 !== +m) return "";
+                return `${a}-${m}-${d}`;
+            }
+            if (numeros.length !== 4) return "";
+            const h = +numeros.slice(0, 2), min = +numeros.slice(2);
+            if (h > 23 || min > 59) return "";
+            return `${numeros.slice(0, 2)}:${numeros.slice(2)}`;
+        }
+
+        function mascarar(texto, campo) {
+            const n = texto.replace(/\D/g, "").slice(0, ehData(campo) ? 8 : 4);
+            if (ehData(campo)) {
+                if (n.length <= 2) return n;
+                if (n.length <= 4) return `${n.slice(0, 2)}/${n.slice(2)}`;
+                return `${n.slice(0, 2)}/${n.slice(2, 4)}/${n.slice(4)}`;
+            }
+            return n.length <= 2 ? n : `${n.slice(0, 2)}:${n.slice(2)}`;
+        }
+
+        document.querySelectorAll('input[type="date"], input[type="time"]').forEach((nativo) => {
+            if (nativo.dataset.formatado) return;
+            nativo.dataset.formatado = "1";
+
+            const data = ehData(nativo);
+            const caixa = document.createElement("div");
+            caixa.className = "campo-datahora";
+
+            const texto = document.createElement("input");
+            texto.type = "text";
+            texto.inputMode = "numeric";
+            texto.autocomplete = "off";
+            texto.placeholder = data ? "dd/mm/aaaa" : "hh:mm";
+            texto.value = paraExibicao(nativo.value, nativo);
+            if (nativo.id) texto.id = `${nativo.id}-visivel`;
+
+            // A obrigatoriedade vai para o campo visivel: num campo escondido, o
+            // navegador barra o envio sem conseguir mostrar onde esta o erro.
+            if (nativo.required) {
+                texto.required = true;
+                nativo.required = false;
+            }
+            const rotulo = nativo.id && document.querySelector(`label[for="${nativo.id}"]`);
+            if (rotulo) rotulo.setAttribute("for", texto.id);
+
+            const botao = document.createElement("button");
+            botao.type = "button";
+            botao.className = "campo-datahora-seletor";
+            botao.setAttribute("aria-label", data ? "Abrir calendário" : "Abrir seletor de hora");
+            botao.innerHTML = '<svg aria-hidden="true"><use href="#i-' +
+                (data ? "periodos" : "pendencias") + '"></use></svg>';
+
+            nativo.classList.add("campo-datahora-nativo");
+            nativo.parentNode.insertBefore(caixa, nativo);
+            caixa.append(texto, botao, nativo);
+
+            texto.addEventListener("input", () => {
+                texto.value = mascarar(texto.value, nativo);
+                nativo.value = paraIso(texto.value, nativo);
+            });
+            texto.addEventListener("blur", () => {
+                // Texto incompleto ou data inexistente nao vira valor: limpa, em
+                // vez de enviar algo que o usuario nao quis dizer.
+                if (texto.value && !nativo.value) texto.value = "";
+            });
+            nativo.addEventListener("change", () => {
+                texto.value = paraExibicao(nativo.value, nativo);
+            });
+            botao.addEventListener("click", () => {
+                try { nativo.showPicker(); } catch (e) { nativo.focus(); }
+            });
+        });
+    })();
+</script>
+
 {% block scripts %}{% endblock %}
 </body>
 </html>

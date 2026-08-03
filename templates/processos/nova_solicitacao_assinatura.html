@@ -12,52 +12,62 @@
 </section>
 
 <section class="card panel">
-    <form method="post" enctype="multipart/form-data" class="stack form-coluna">
+    {% comment %}
+    Os tres campos de documento e os dois de destinatario aparecem conforme a
+    escolha feita acima -- o script alterna o atributo hidden nos envolvedores.
+    Eles existem so para carregar o data-, e por isso nao repetem a classe do
+    campo, que o include ja aplica.
+
+    Os rotulos aqui sao escritos no template, e nao vem do formulario, porque
+    dizem mais do que o nome do campo ("Número do documento no SEI" contra
+    "Numero documento sei").
+    {% endcomment %}
+    <form method="post" enctype="multipart/form-data" class="formulario">
         {% csrf_token %}
-        <div class="form-grid">
-            <div class="field">
-                <label for="{{ form.destinatario_tipo.id_for_label }}">{{ form.destinatario_tipo.label }}</label>
-                {{ form.destinatario_tipo }}
-                {{ form.destinatario_tipo.errors }}
-            </div>
-            <div class="field" data-destinatario-field="DOCENTE">
-                <label for="{{ form.docente.id_for_label }}">{{ form.docente.label }}</label>
-                {{ form.docente }}
-                {{ form.docente.errors }}
-            </div>
-            <div class="field" data-destinatario-field="SETOR">
-                <label for="{{ form.setor.id_for_label }}">{{ form.setor.label }}</label>
-                {{ form.setor }}
-                {{ form.setor.errors }}
-            </div>
-            <div class="field">
-                <label for="{{ form.tipo_documento.id_for_label }}">{{ form.tipo_documento.label }}</label>
-                {{ form.tipo_documento }}
-                {{ form.tipo_documento.errors }}
-            </div>
-            <div class="field" data-documento-field="DOCUMENTO_SEI">
-                <label for="{{ form.numero_documento_sei.id_for_label }}">Número do documento no SEI</label>
+        {{ form.non_field_errors }}
+
+        {% include "includes/campo_formulario.html" with campo=form.destinatario_tipo %}
+
+        <div data-destinatario-field="DOCENTE">
+            {% include "includes/campo_formulario.html" with campo=form.docente %}
+        </div>
+        <div data-destinatario-field="SETOR">
+            {% include "includes/campo_formulario.html" with campo=form.setor %}
+        </div>
+
+        {% include "includes/campo_formulario.html" with campo=form.tipo_documento %}
+
+        <div data-documento-field="DOCUMENTO_SEI">
+            <div class="formulario-campo">
+                <label for="{{ form.numero_documento_sei.id_for_label }}">
+                    Número do documento no SEI{% if form.numero_documento_sei.field.required %}<span class="obrigatorio" aria-hidden="true">*</span>{% endif %}
+                </label>
                 {{ form.numero_documento_sei }}
                 {{ form.numero_documento_sei.errors }}
             </div>
-            <div class="field" data-documento-field="BLOCO_SEI">
-                <label for="{{ form.numero_bloco_sei.id_for_label }}">Número do bloco de assinatura no SEI</label>
+        </div>
+        <div data-documento-field="BLOCO_SEI">
+            <div class="formulario-campo">
+                <label for="{{ form.numero_bloco_sei.id_for_label }}">
+                    Número do bloco de assinatura no SEI{% if form.numero_bloco_sei.field.required %}<span class="obrigatorio" aria-hidden="true">*</span>{% endif %}
+                </label>
                 {{ form.numero_bloco_sei }}
                 {{ form.numero_bloco_sei.errors }}
             </div>
-            <div class="field" data-documento-field="PDF">
-                <label for="{{ form.documento_pdf.id_for_label }}">PDF para assinatura eletronica</label>
+        </div>
+        <div data-documento-field="PDF">
+            <div class="formulario-campo">
+                <label for="{{ form.documento_pdf.id_for_label }}">
+                    PDF para assinatura eletrônica{% if form.documento_pdf.field.required %}<span class="obrigatorio" aria-hidden="true">*</span>{% endif %}
+                </label>
                 {{ form.documento_pdf }}
                 {{ form.documento_pdf.errors }}
             </div>
         </div>
-        <div class="field">
-            <label for="{{ form.observacao.id_for_label }}">{{ form.observacao.label }}</label>
-            {{ form.observacao }}
-            {{ form.observacao.errors }}
-        </div>
-        {{ form.non_field_errors }}
-        <div class="form-actions">
+
+        {% include "includes/campo_formulario.html" with campo=form.observacao %}
+
+        <div class="formulario-acoes">
             <a class="btn btn-secondary" href="{% url 'solicitacoes_assinatura' %}">Cancelar</a>
             <button class="btn" type="submit">Enviar solicitação</button>
         </div>

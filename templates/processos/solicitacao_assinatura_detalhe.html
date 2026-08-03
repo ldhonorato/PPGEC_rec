@@ -64,7 +64,7 @@
     <form method="post" enctype="multipart/form-data" class="stack">
         {% csrf_token %}
         {% if solicitacao.is_pdf %}
-            <div class="field">
+            <div class="formulario-campo">
                 <label for="{{ form.documento_assinado_pdf.id_for_label }}">PDF assinado</label>
                 {{ form.documento_assinado_pdf }}
                 {{ form.documento_assinado_pdf.errors }}
@@ -72,13 +72,13 @@
         {% else %}
             {{ form.documento_assinado_pdf }}
         {% endif %}
-        <div class="field">
+        <div class="formulario-campo">
             <label for="{{ form.observacao_assinatura.id_for_label }}">Observação</label>
             {{ form.observacao_assinatura }}
             {{ form.observacao_assinatura.errors }}
         </div>
         {{ form.non_field_errors }}
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button class="btn" type="submit">Confirmar assinatura</button>
         </div>
     </form>

@@ -20,17 +20,30 @@
 
 {% if show_status_filters %}
 <section class="card">
-    <form method="get" class="filter-form">
+    <form method="get" class="filtros">
         {% if status_filtro %}<input type="hidden" name="status" value="{{ status_filtro }}">{% endif %}
-        <div class="field">
-            <label for="assinaturas-q">Buscar pedidos de assinatura</label>
-            <input id="assinaturas-q" type="search" name="q" value="{{ termo_busca }}" placeholder="Número no SEI, nome do PDF ou observação">
-        </div>
-        <div class="form-actions">
-            <button class="btn" type="submit">Buscar</button>
-            {% if termo_busca %}<a class="btn btn-secondary" href="{% url 'solicitacoes_assinatura' %}{% if status_filtro %}?status={{ status_filtro }}{% endif %}">Limpar busca</a>{% endif %}
+        <div class="filtros-linha">
+            <div class="filtros-campo filtros-campo-busca">
+                <label for="assinaturas-q">Busca</label>
+                <input id="assinaturas-q" type="search" name="q" value="{{ termo_busca }}"
+                       placeholder="número no SEI, nome do PDF ou observação">
+            </div>
+            <div class="filtros-acoes">
+                <button class="btn btn-secondary" type="submit">Filtrar</button>
+            </div>
         </div>
     </form>
+
+    {% if termo_busca %}
+        <div class="filtros-ativos">
+            <span class="filtros-ativos-rotulo">Filtrando por</span>
+            <a class="filtro-marcador"
+               href="{% url 'solicitacoes_assinatura' %}{% if status_filtro %}?status={{ status_filtro }}{% endif %}"
+               title="Remover este filtro">
+                <span>Busca:</span> {{ termo_busca }}
+            </a>
+        </div>
+    {% endif %}
 </section>
 {% endif %}
 

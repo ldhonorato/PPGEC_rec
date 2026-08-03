@@ -33,13 +33,13 @@
             {% csrf_token %}
             <input type="hidden" name="acao" value="criar_sala">
             {% for field in sala_form %}
-                <div class="field">
+                <div class="formulario-campo">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
                     {{ field.errors }}
                 </div>
             {% endfor %}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Cadastrar sala</button>
             </div>
         </form>
@@ -122,23 +122,23 @@
 
                         {% if sala_edit_form and modal_aberto == sala_modal_id %}
                             {% for field in sala_edit_form %}
-                                <div class="field">
+                                <div class="formulario-campo">
                                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                                     {{ field }}
                                     {{ field.errors }}
                                 </div>
                             {% endfor %}
                         {% else %}
-                            <div class="field">
+                            <div class="formulario-campo">
                                 <label for="sala-edit-{{ sala.pk }}-nome">Nome</label>
                                 <input id="sala-edit-{{ sala.pk }}-nome" type="text" name="sala_edit-nome" value="{{ sala.nome }}" maxlength="120" required>
                             </div>
-                            <div class="field">
+                            <div class="formulario-campo">
                                 <label for="sala-edit-{{ sala.pk }}-capacidade">Capacidade</label>
                                 <input id="sala-edit-{{ sala.pk }}-capacidade" type="number" name="sala_edit-capacidade" value="{{ sala.capacidade|default_if_none:'' }}" min="0">
                             </div>
                             {% if can_choose_polo %}
-                                <div class="field">
+                                <div class="formulario-campo">
                                     <label for="sala-edit-{{ sala.pk }}-polo">Polo</label>
                                     <select id="sala-edit-{{ sala.pk }}-polo" name="sala_edit-polo" required>
                                         {% for polo_opcao in sala_form.fields.polo.queryset %}
@@ -147,13 +147,13 @@
                                     </select>
                                 </div>
                             {% endif %}
-                            <div class="field checkbox-field">
+                            <div class="formulario-campo formulario-campo-marcavel">
                                 <input id="sala-edit-{{ sala.pk }}-ativa" type="checkbox" name="sala_edit-ativa" {% if sala.ativa %}checked{% endif %}>
                                 <label for="sala-edit-{{ sala.pk }}-ativa">Ativa</label>
                             </div>
                         {% endif %}
 
-                        <div class="form-actions">
+                        <div class="formulario-acoes">
                             <button class="btn" type="submit">Salvar sala</button>
                         </div>
                     </form>
@@ -163,7 +163,7 @@
                         <input type="hidden" name="acao" value="adicionar_disponibilidade">
                         <input type="hidden" name="sala_id" value="{{ sala.pk }}">
 
-                        <div class="field">
+                        <div class="formulario-campo">
                             <label>Dias da semana</label>
                             <div class="weekday-grid">
                                 {% for value, label in disponibilidade_form.fields.dias_semana.choices %}
@@ -179,11 +179,11 @@
                         </div>
 
                         <div class="grid-two time-grid">
-                            <div class="field">
+                            <div class="formulario-campo">
                                 <label for="disp-{{ sala.pk }}-hora-inicio">Hora de início</label>
                                 <input id="disp-{{ sala.pk }}-hora-inicio" type="time" name="disp-hora_inicio" required>
                             </div>
-                            <div class="field">
+                            <div class="formulario-campo">
                                 <label for="disp-{{ sala.pk }}-hora-fim">Hora de fim</label>
                                 <input id="disp-{{ sala.pk }}-hora-fim" type="time" name="disp-hora_fim" required>
                                 {% if modal_aberto == sala_modal_id %}
@@ -192,7 +192,7 @@
                             </div>
                         </div>
 
-                        <div class="form-actions">
+                        <div class="formulario-acoes">
                             <button class="btn" type="submit">Adicionar horário</button>
                         </div>
                     </form>

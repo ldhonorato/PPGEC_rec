@@ -516,14 +516,14 @@ class PeriodoLetivo(models.Model):
 
     nome = models.CharField(max_length=20, unique=True, validators=[Aluno.semestre_validator])
     status = models.CharField(max_length=25, choices=Status.choices, default=Status.PLANEJAMENTO)
-    data_inicio = models.DateField(null=True, blank=True)
+    data_inicio = models.DateField(null=True, blank=True, verbose_name="Início do período letivo")
     data_fim = models.DateField(null=True, blank=True)
     prazo_cadastro_disciplinas = models.DateField()
     prazo_agendamento_aulas_presenciais = models.DateField(null=True, blank=True)
-    matricula_inicio = models.DateField()
-    matricula_fim = models.DateField()
-    modificacao_inicio = models.DateField()
-    modificacao_fim = models.DateField()
+    matricula_inicio = models.DateField(verbose_name="Início da matrícula")
+    matricula_fim = models.DateField(verbose_name="Fim da matrícula")
+    modificacao_inicio = models.DateField(verbose_name="Início da modificação")
+    modificacao_fim = models.DateField(verbose_name="Fim da modificação")
     encerrado_manualmente_em = models.DateTimeField(null=True, blank=True)
     encerrado_manualmente_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -722,7 +722,7 @@ class EncontroOferta(models.Model):
 
     oferta = models.ForeignKey(OfertaDisciplina, on_delete=models.CASCADE, related_name="encontros")
     dia_semana = models.PositiveSmallIntegerField(choices=DiaSemana.choices)
-    hora_inicio = models.TimeField()
+    hora_inicio = models.TimeField(verbose_name="Hora de início")
     hora_fim = models.TimeField()
 
     class Meta:
@@ -759,7 +759,7 @@ class AulaPresencialOferta(models.Model):
         blank=True,
     )
     data = models.DateField()
-    hora_inicio = models.TimeField()
+    hora_inicio = models.TimeField(verbose_name="Hora de início")
     hora_fim = models.TimeField()
     sala = models.ForeignKey("Sala", on_delete=models.PROTECT, related_name="aulas_presenciais_ofertas")
     reserva = models.OneToOneField(
@@ -1107,7 +1107,7 @@ class LancamentoHorasComplementares(models.Model):
         blank=True,
     )
     descricao = models.CharField(max_length=255, verbose_name="Descrição")
-    periodo_realizacao = models.CharField(max_length=120, blank=True)
+    periodo_realizacao = models.CharField(max_length=120, blank=True, verbose_name="Período de realização")
     quantidade = models.DecimalField(max_digits=8, decimal_places=2)
     unidade_quantidade = models.CharField(max_length=40)
     horas_solicitadas = models.DecimalField(max_digits=6, decimal_places=2, default=0)
@@ -1116,7 +1116,7 @@ class LancamentoHorasComplementares(models.Model):
     limite_grupo_no_lancamento = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     limite_individual_no_lancamento = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     observacoes_secretaria = models.TextField(blank=True)
-    referencia_decisao = models.TextField(blank=True)
+    referencia_decisao = models.TextField(blank=True, verbose_name="Referência da decisão")
     justificativa_excepcional = models.TextField(blank=True)
     excepcional_autorizado = models.BooleanField(default=False)
     criado_por = models.ForeignKey(
@@ -1658,8 +1658,8 @@ class SolicitacaoAssinatura(models.Model):
         related_name="solicitacoes_assinatura",
     )
     tipo_documento = models.CharField(max_length=20, choices=TipoDocumento.choices)
-    numero_documento_sei = models.CharField(max_length=80, blank=True)
-    numero_bloco_sei = models.CharField(max_length=80, blank=True)
+    numero_documento_sei = models.CharField(max_length=80, blank=True, verbose_name="Número do documento no SEI")
+    numero_bloco_sei = models.CharField(max_length=80, blank=True, verbose_name="Número do bloco de assinatura no SEI")
     documento_pdf = models.FileField(upload_to="assinaturas/originais/%Y/%m/", blank=True)
     documento_assinado_pdf = models.FileField(upload_to="assinaturas/assinados/%Y/%m/", blank=True)
     observacao = models.TextField(blank=True, verbose_name="Observação")
@@ -1674,7 +1674,7 @@ class SolicitacaoAssinatura(models.Model):
         related_name="solicitacoes_assinatura_atendidas",
     )
     assinado_em = models.DateTimeField(null=True, blank=True)
-    observacao_assinatura = models.TextField(blank=True)
+    observacao_assinatura = models.TextField(blank=True, verbose_name="Observação da assinatura")
 
     class Meta:
         ordering = ["-criado_em"]
@@ -2333,7 +2333,7 @@ class DisponibilidadeSala(models.Model):
 
     sala = models.ForeignKey(Sala, on_delete=models.CASCADE, related_name="disponibilidades")
     dia_semana = models.PositiveSmallIntegerField(choices=DiaSemana.choices)
-    hora_inicio = models.TimeField()
+    hora_inicio = models.TimeField(verbose_name="Hora de início")
     hora_fim = models.TimeField()
 
     class Meta:
