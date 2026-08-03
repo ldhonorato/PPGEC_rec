@@ -9,7 +9,6 @@ from django.core.mail import EmailMultiAlternatives
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.template import loader
-from django.views.static import serve
 
 
 password_reset_logger = logging.getLogger("acadflow.password_reset")
@@ -127,8 +126,3 @@ def version_view(request):
         }
     )
 
-
-@login_required
-def media_file_view(request, path):
-    """Serve uploads autenticados quando o proxy não possui rota de mídia."""
-    return serve(request, path, document_root=settings.MEDIA_ROOT)

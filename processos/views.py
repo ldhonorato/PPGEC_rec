@@ -8,7 +8,9 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q, Sum
-from django.http import HttpResponse, JsonResponse
+from django.conf import settings
+from django.http import Http404, HttpResponse, JsonResponse
+from django.views.static import serve
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -4992,3 +4994,59 @@ def menu_ciencias_manifestadas_view(request):
             "side_menu_items": _menu_lateral_home(request.user),
         },
     )
+
+
+# ==========================================================================
+# Entrega de arquivos enviados
+# ==========================================================================
+
+# Cada campo de arquivo do sistema, com a regra que decide quem pode le-lo.
+#
+# A entrega de /media/ era feita por django.views.static.serve atras de
+# @login_required, o que exige estar logado e nada mais: bastava conhecer o
+# caminho para baixar qualquer documento, inclusive os marcados como sigilosos.
+# A regra por documento existia (Documento.pode_visualizar_arquivo) e era
+# respeitada pelo template -- que esconde o link --, mas nao pelo arquivo.
+#
+# O registro e explicito de proposito. Um campo de arquivo novo que nao seja
+# declarado aqui nao e servido, em vez de ser servido sem regra: o esquecimento
+# vira arquivo inacessivel, que se percebe, e nao arquivo exposto, que nao se
+# percebe.
+def _regras_de_arquivo():
+    return (
+        (Documento, "arquivo", lambda obj, user: obj.pode_visualizar_arquivo(user)),
+        (SolicitacaoAssinatura, "documento_pdf", _can_view_solicitacao_assinatura_do_arquivo),
+        (SolicitacaoAssinatura, "documento_assinado_pdf", _can_view_solicitacao_assinatura_do_arquivo),
+    )
+
+
+def _can_view_solicitacao_assinatura_do_arquivo(solicitacao, user):
+    """Mesma regra que protege a tela de detalhe da solicitacao.
+
+    Os PDFs de assinatura so aparecem naquela tela; quem nao pode abri-la
+    tambem nao deve alcancar os arquivos por outro caminho.
+    """
+    return _can_view_solicitacao_assinatura(user, solicitacao)
+
+
+@login_required
+def arquivo_enviado_view(request, path):
+    """Entrega um arquivo de /media/ depois de aplicar a regra do dono dele.
+
+    Responde 404 -- e nao 403 -- quando o usuario nao tem acesso. Estes
+    documentos carregam classificacao de sigilo (informacao pessoal, sigilo
+    academico, propriedade intelectual, entre outras), e um 403 confirmaria que
+    existe um arquivo naquele caminho. Quem chega aqui sem permissao nao veio
+    pela interface: a tela esconde o link de quem nao pode ver.
+    """
+    for modelo, campo, pode_ver in _regras_de_arquivo():
+        dono = modelo.objects.filter(**{campo: path}).first()
+        if dono is None:
+            continue
+        if not pode_ver(dono, request.user):
+            raise Http404("Arquivo não encontrado.")
+        return serve(request, path, document_root=settings.MEDIA_ROOT)
+
+    # Nenhum registro reivindica este caminho: arquivo orfao, sobra de um
+    # registro apagado ou tentativa de adivinhar caminho.
+    raise Http404("Arquivo não encontrado.")

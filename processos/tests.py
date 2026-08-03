@@ -9,6 +9,7 @@ from unittest.mock import patch
 from zipfile import ZipFile
 
 from django.conf import settings
+from django.db import models
 from django.core import mail
 from django.templatetags.static import static
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -22,6 +23,7 @@ from .views import _linhas_trajetoria
 from .models import (
     AlteracaoAluno,
     Aluno,
+    Documento,
     AulaPresencialOferta,
     Disciplina,
     DisciplinaTrajetoria,
@@ -84,33 +86,125 @@ class SessionExpirationSettingsTests(SimpleTestCase):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, DEBUG=False)
-class MediaFilesProductionTests(TestCase):
+class ArquivoEnviadoTests(TestCase):
+    """Um arquivo de /media/ so e entregue a quem pode ver o registro dono dele.
+
+    A entrega era feita por django.views.static.serve atras de
+    @login_required: exigia estar logado e nada mais. Documento tem regra por
+    objeto -- pode_visualizar_arquivo, com oito classificacoes de sigilo -- e o
+    template a respeitava, escondendo o link de quem nao pode ver. O arquivo
+    nao. Bastava conhecer o caminho.
+
+    Reproduzido antes da correcao: com um documento marcado
+    INFORMACAO_PESSOAL, pode_visualizar_arquivo(aluno) devolvia False e
+    GET /media/documentos/processos/<arquivo> como aquele aluno devolvia 200
+    com o conteudo.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._media = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._media.cleanup)
+        cls._override = override_settings(MEDIA_ROOT=cls._media.name)
+        cls._override.enable()
+        cls.addClassCleanup(cls._override.disable)
+
     def setUp(self):
-        self.media_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self.media_dir.cleanup)
-        self.settings_override = override_settings(MEDIA_ROOT=self.media_dir.name)
-        self.settings_override.enable()
-        self.addCleanup(self.settings_override.disable)
-        arquivo = Path(self.media_dir.name) / "documentos" / "processos" / "Email_Prorrogacao.pdf"
-        arquivo.parent.mkdir(parents=True)
-        arquivo.write_bytes(b"%PDF-1.4 arquivo de teste")
-        self.usuario = User.objects.create_user(
-            email="usuario.media@example.com",
-            password="senha-segura-123",
-            nome="Usuário de Mídia",
-            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        senha = "senha-segura-123"
+        self.servidor = User.objects.create_user(
+            email="servidor.arquivo@example.com", password=senha,
+            nome="Servidor Arquivo", tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.aluno = Aluno.objects.create_user(
+            email="aluno.arquivo@example.com", password=senha, nome="Aluno Arquivo",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026F0001",
+        )
+        self.setor = Setor.objects.create(nome="Setor de Arquivo", descricao="Teste")
+        self.processo = Processo.objects.create(
+            tipo=Processo.TipoProcesso.OUTRO, assunto="Processo de teste de arquivo",
+            descricao="Teste", usuario_criado_por=self.aluno, setor_atual=self.setor,
         )
 
-    def test_midia_exige_login_e_e_servida_com_debug_desativado(self):
-        url = "/media/documentos/processos/Email_Prorrogacao.pdf"
+    def _documento(self, *, restricao, conteudo=b"conteudo confidencial"):
+        return Documento.objects.create(
+            processo=self.processo, titulo="Documento de teste",
+            enviado_por=self.servidor, restricao_tipo=restricao,
+            arquivo=SimpleUploadedFile("documento-teste.txt", conteudo),
+        )
 
-        anonimo = self.client.get(url)
-        self.assertRedirects(anonimo, f"{reverse('login')}?next={url}")
+    def test_documento_livre_e_entregue_a_quem_esta_logado(self):
+        documento = self._documento(restricao=Documento.RestricaoAcesso.NAO)
+        self.client.force_login(self.aluno)
 
-        self.client.force_login(self.usuario)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(b"".join(response.streaming_content), b"%PDF-1.4 arquivo de teste")
+        resposta = self.client.get(documento.arquivo.url)
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(b"".join(resposta.streaming_content), b"conteudo confidencial")
+
+    def test_documento_restrito_nao_e_entregue_a_quem_nao_pode_ver(self):
+        """O caso que estava aberto."""
+        documento = self._documento(restricao=Documento.RestricaoAcesso.INFORMACAO_PESSOAL)
+        self.assertFalse(documento.pode_visualizar_arquivo(self.aluno))
+        self.client.force_login(self.aluno)
+
+        resposta = self.client.get(documento.arquivo.url)
+
+        # 404 e nao 403: um 403 confirmaria que existe arquivo naquele caminho,
+        # e estes documentos carregam classificacao de sigilo.
+        self.assertEqual(resposta.status_code, 404)
+
+    def test_documento_restrito_e_entregue_a_quem_pode_ver(self):
+        """A regra fecha o acesso indevido sem fechar o devido."""
+        documento = self._documento(restricao=Documento.RestricaoAcesso.INFORMACAO_PESSOAL)
+        self.assertTrue(documento.pode_visualizar_arquivo(self.servidor))
+        self.client.force_login(self.servidor)
+
+        self.assertEqual(self.client.get(documento.arquivo.url).status_code, 200)
+
+    def test_arquivo_sem_registro_nao_e_entregue(self):
+        """Sobra no disco nao e conteudo do sistema.
+
+        Antes, qualquer caminho existente sob MEDIA_ROOT era servido -- inclusive
+        arquivo de registro apagado, ou deixado ali por engano.
+        """
+        orfao = Path(settings.MEDIA_ROOT) / "documentos" / "processos" / "orfao.txt"
+        orfao.parent.mkdir(parents=True, exist_ok=True)
+        orfao.write_bytes(b"arquivo sem dono")
+        self.client.force_login(self.servidor)
+
+        resposta = self.client.get("/media/documentos/processos/orfao.txt")
+
+        self.assertEqual(resposta.status_code, 404)
+
+    def test_anonimo_vai_para_o_login(self):
+        """Comportamento preservado de quando a rota foi criada."""
+        documento = self._documento(restricao=Documento.RestricaoAcesso.NAO)
+        url = documento.arquivo.url
+
+        self.assertRedirects(self.client.get(url), f"{reverse('login')}?next={url}")
+
+    def test_todo_campo_de_arquivo_do_sistema_tem_regra_declarada(self):
+        """Campo novo nasce protegido, ou nao e servido.
+
+        O registro em _regras_de_arquivo e explicito. Este teste existe para que
+        um FileField acrescentado a qualquer modelo apareca aqui como falha, em
+        vez de ficar sem regra sem que ninguem note.
+        """
+        from django.apps import apps
+
+        from processos.views import _regras_de_arquivo
+
+        declarados = {(modelo, campo) for modelo, campo, _ in _regras_de_arquivo()}
+        no_sistema = {
+            (modelo, campo.name)
+            for modelo in apps.get_app_config("processos").get_models()
+            for campo in modelo._meta.get_fields()
+            if isinstance(campo, models.FileField)
+        }
+
+        faltando = sorted(f"{m.__name__}.{c}" for m, c in no_sistema - declarados)
+        self.assertEqual(faltando, [], f"campos de arquivo sem regra de acesso: {faltando}")
 
 
 def criar_trajetoria(aluno, **kwargs):
@@ -4695,6 +4789,16 @@ class VersaoExibidaTests(SimpleTestCase):
     que a aplicacao nao aceite no lugar da versao um valor que nao seja uma.
     """
 
+    @property
+    def versao_do_arquivo(self):
+        """Lida do arquivo, nao fixada aqui.
+
+        Com o numero escrito no teste, subir a versao do projeto quebrava a
+        suite -- e o que se quer verificar e que o valor invalido cai para o
+        arquivo, nao que o arquivo diga 1.0.0.
+        """
+        return (Path(settings.BASE_DIR) / "VERSION").read_text(encoding="utf-8").strip()
+
     def _resolver(self, valor):
         from ppgec.settings import _versao_publicada
 
@@ -4719,7 +4823,7 @@ class VersaoExibidaTests(SimpleTestCase):
             with self.subTest(ref=nome):
                 with self.assertWarns(RuntimeWarning):
                     resolvido = self._resolver(nome)
-                self.assertEqual(resolvido, "1.0.0", "deve cair para a versao do arquivo")
+                self.assertEqual(resolvido, self.versao_do_arquivo, "deve cair para a versao do arquivo")
 
     def test_versao_valida_no_ambiente_e_usada(self):
         """A esteira precisa conseguir sobrescrever com uma versao de verdade."""
@@ -4736,8 +4840,8 @@ class VersaoExibidaTests(SimpleTestCase):
         self.assertEqual(self._resolver("v1.0.0"), "1.0.0")
 
     def test_ambiente_vazio_usa_o_arquivo(self):
-        self.assertEqual(self._resolver(""), "1.0.0")
-        self.assertEqual(self._resolver(None), "1.0.0")
+        self.assertEqual(self._resolver(""), self.versao_do_arquivo)
+        self.assertEqual(self._resolver(None), self.versao_do_arquivo)
 
     def test_o_rodape_mostra_a_versao_do_arquivo(self):
         """Ponta a ponta: o que o usuario le na tela."""

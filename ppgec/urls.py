@@ -25,10 +25,11 @@ from django.contrib.auth.views import (
     PasswordResetDoneView,
 )
 from django.views.generic import RedirectView
-from ppgec.views import AuditedPasswordResetView, SafeLogoutView, media_file_view, version_view
+from ppgec.views import AuditedPasswordResetView, SafeLogoutView, version_view
 
 from processos.views import (
     aluno_detalhe_view,
+    arquivo_enviado_view,
     alunos_view,
     aluno_documento_historico_view,
     aluno_documento_vinculo_view,
@@ -77,7 +78,7 @@ from processos.views import (
 )
 
 urlpatterns = [
-    re_path(r"^media/(?P<path>.+)$", media_file_view, name="media_file"),
+    re_path(r"^media/(?P<path>.+)$", arquivo_enviado_view, name="media_file"),
     path("", home_view, name="home"),
     path("version/", version_view, name="version"),
     path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}img/acadflow-logo.png", permanent=True)),
