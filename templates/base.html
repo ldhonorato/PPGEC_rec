@@ -322,6 +322,10 @@ propria sessao por cima -- nome, avisos e menu da conta.
         if (!folha || !abrir) return;
 
         abrir.addEventListener("click", function () {
+            // Se a navegacao que pediu a saida instantanea nao chegou a
+            // acontecer, a marca ficaria e a folha perderia a saida para
+            // sempre. Tirar na abertura custa nada e fecha o caso.
+            folha.classList.remove("folha-sem-saida");
             folha.showModal();
         });
 
@@ -330,6 +334,20 @@ propria sessao por cima -- nome, avisos e menu da conta.
         });
 
         folha.addEventListener("click", function (e) {
+            // Escolhido o destino, a folha ja cumpriu o papel dela. Some antes
+            // da navegacao para nao entrar na foto que a transicao de pagina
+            // tira da tela que sai: sem isso a tela nova nasce de uma imagem
+            // que ainda tem a folha por cima, e a troca fica confusa -- duas
+            // coisas se dissolvendo ao mesmo tempo.
+            //
+            // Sem o percurso de saida, que levaria 240ms que a navegacao nao
+            // espera: a folha ficaria congelada no meio do caminho na foto.
+            if (e.target.closest("a[href]")) {
+                folha.classList.add("folha-sem-saida");
+                folha.close();
+                return;
+            }
+
             const area = folha.getBoundingClientRect();
             const dentro =
                 e.clientX >= area.left && e.clientX <= area.right &&

@@ -3489,10 +3489,10 @@ dialog::backdrop {
         animation: none !important;
     }
 
-    /* A folha aparece e some sem subir. */
+    /* A folha aparece e some sem subir. Sem transicao, o display discreto
+       troca no mesmo quadro, que e o comportamento desejado aqui. */
     .folha-navegacao,
     .folha-navegacao::backdrop {
-        animation: none !important;
         transition: none !important;
     }
 }
@@ -4776,7 +4776,7 @@ dialog::backdrop {
        conjunto, e o que estiver ativo se destaca por contraste dentro dele. */
     color: rgba(255, 255, 255, 0.62);
     cursor: pointer;
-    transition: color 140ms ease, background-color 140ms ease;
+    transition: color 140ms ease, background-color 140ms ease, scale 120ms ease;
 }
 
 .barra-flutuante-item svg {
@@ -4794,6 +4794,18 @@ dialog::backdrop {
         color: #ffffff;
         background: rgba(255, 255, 255, 0.1);
     }
+}
+
+/* Retorno ao toque.
+
+   O hover ficou atras de (hover: hover) para nao grudar no ultimo item tocado,
+   e isso deixou o toque sem sinal nenhum: entre o dedo e a tela seguinte havia
+   so espera. :active dura o tempo do dedo encostado, entao nao gruda, e vale
+   para ponteiro e para toque. */
+.barra-flutuante-item:active {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.16);
+    scale: 0.94;
 }
 
 /* O ponto abaixo do icone e o que diz onde a pessoa esta. So a cor nao bastaria
@@ -4830,7 +4842,7 @@ dialog::backdrop {
     background: var(--color-accent-strong);
     color: #ffffff;
     box-shadow: 0 2px 6px rgba(0, 20, 50, 0.2), 0 12px 26px rgba(47, 169, 107, 0.34);
-    transition: transform 140ms ease, background-color 140ms ease;
+    transition: transform 140ms ease, background-color 140ms ease, scale 120ms ease;
 }
 
 .barra-flutuante-acao svg {
@@ -4849,6 +4861,11 @@ dialog::backdrop {
     }
 }
 
+.barra-flutuante-acao:active {
+    background: #268a58;
+    scale: 0.94;
+}
+
 @media (max-width: 920px) {
     .barra-flutuante {
         display: flex;
@@ -4864,12 +4881,20 @@ dialog::backdrop {
 
 @media (prefers-reduced-motion: reduce) {
     .barra-flutuante-item,
-    .barra-flutuante-acao {
+    .barra-flutuante-acao,
+    .folha-item {
         transition: none;
     }
 
     .barra-flutuante-acao:hover {
         transform: none;
+    }
+
+    /* A mudanca de cor do :active permanece -- e ela que diz "recebi o toque".
+       O que sai e o encolhimento, que e movimento. */
+    .barra-flutuante-item:active,
+    .barra-flutuante-acao:active {
+        scale: 1;
     }
 }
 
@@ -4894,10 +4919,22 @@ dialog::backdrop {
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     background: var(--color-surface);
     box-shadow: 0 -8px 40px rgba(4, 22, 48, 0.24);
-}
 
-.folha-navegacao::backdrop {
-    background: rgba(4, 22, 48, 0.5);
+    /* Estado fechado -- e tambem o ponto de partida da entrada e o de chegada
+       da saida. Com @keyframes so havia entrada: fechar era um corte seco, o
+       oposto do que a abertura ensinava. Transicao serve aos dois sentidos.
+
+       display e overlay entram na lista com allow-discrete porque sao
+       propriedades discretas: sem isso o navegador aplica display:none e
+       remove da camada superior no primeiro quadro, e a saida nao chega a ser
+       vista. Com allow-discrete, a troca espera o fim do percurso. */
+    translate: 0 100%;
+    opacity: 0;
+    transition:
+        translate 240ms ease,
+        opacity 200ms ease,
+        display 240ms allow-discrete,
+        overlay 240ms allow-discrete;
 }
 
 /* O display vive aqui, e nao na regra acima, por causa de como <dialog> se
@@ -4908,26 +4945,47 @@ dialog::backdrop {
    Com display:flex fixo, fechar a folha tirava o modo modal sem tirar a folha
    da tela: ela continuava pintada, agora fora da camada superior, e a barra
    flutuante passava por cima dela. Quem fechasse pelo X ficava com a folha
-   presa no rodape. Pelo clique fora o efeito era outro so por acaso.
-
-   Sobe do rodape em vez de aparecer inteira: e o movimento que liga a folha ao
-   toque que a abriu, na barra logo abaixo. */
+   presa no rodape. Pelo clique fora o efeito era outro so por acaso. */
 .folha-navegacao[open] {
     display: flex;
     flex-direction: column;
-    animation: folha-sobe 0.24s ease;
+    translate: 0 0;
+    opacity: 1;
+}
+
+/* Sem isto a entrada nao acontece: o elemento nasce ja com o estado aberto, e
+   nao ha de onde transicionar. @starting-style diz de onde comecar no primeiro
+   quadro depois de o display virar flex. */
+@starting-style {
+    .folha-navegacao[open] {
+        translate: 0 100%;
+        opacity: 0;
+    }
+}
+
+/* Saida instantanea, para o caso em que a folha sai porque a pagina vai mudar:
+   nao ha 240ms disponiveis, e a alternativa e aparecer congelada no meio do
+   percurso na foto que a transicao de pagina tira. */
+.folha-navegacao.folha-sem-saida {
+    transition: none;
+}
+
+.folha-navegacao::backdrop {
+    background: rgba(4, 22, 48, 0);
+    transition:
+        background-color 240ms ease,
+        display 240ms allow-discrete,
+        overlay 240ms allow-discrete;
 }
 
 .folha-navegacao[open]::backdrop {
-    animation: folha-escurece 0.24s ease;
+    background: rgba(4, 22, 48, 0.5);
 }
 
-@keyframes folha-sobe {
-    from { transform: translateY(12%); }
-}
-
-@keyframes folha-escurece {
-    from { background: rgba(4, 22, 48, 0); }
+@starting-style {
+    .folha-navegacao[open]::backdrop {
+        background: rgba(4, 22, 48, 0);
+    }
 }
 
 .folha-cabecalho {
@@ -5036,6 +5094,7 @@ dialog::backdrop {
     border-radius: var(--radius-md);
     color: var(--color-text);
     text-decoration: none;
+    transition: background-color 120ms ease;
 }
 
 /* O hover fica atras de (hover: hover) porque em tela de toque ele nao existe
@@ -5050,6 +5109,10 @@ dialog::backdrop {
     .folha-item:hover {
         background: var(--color-primary-soft);
     }
+}
+
+.folha-item:active {
+    background: var(--color-primary-soft);
 }
 
 .folha-icone {

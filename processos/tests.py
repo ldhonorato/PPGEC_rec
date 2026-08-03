@@ -5124,6 +5124,46 @@ class LayoutResponsivoTests(SimpleTestCase):
         )
         self.assertTrue(posicionado, ".tabela-envolvido sem position: os absolutos escapam da rolagem")
 
+    def test_a_folha_entra_e_sai_pelo_mesmo_caminho(self):
+        """Fechar era um corte seco, o oposto do que a abertura ensinava.
+
+        Com @keyframes so havia entrada. Transicao serve aos dois sentidos, mas
+        num <dialog> ela sozinha nao basta: display e overlay sao discretos, e
+        sem allow-discrete o navegador aplica display:none no primeiro quadro --
+        a saida existe no papel e nao chega a ser vista. @starting-style e o
+        outro lado: sem ele o elemento nasce ja no estado final e a entrada nao
+        tem de onde partir.
+        """
+        declaracoes = list(self._declaracoes_de(".folha-navegacao"))
+        transicao = " ".join(declaracoes)
+        self.assertRegex(transicao, r"transition\s*:", "a folha nao declara transicao")
+        for discreta in ("display", "overlay"):
+            with self.subTest(propriedade=discreta):
+                self.assertRegex(
+                    transicao, rf"{discreta}\s+[^;,]*allow-discrete",
+                    f"{discreta} sem allow-discrete: a saida nao aparece",
+                )
+        self.assertIn("@starting-style", self.css, "sem @starting-style a folha nao tem entrada")
+
+    def test_os_itens_de_toque_respondem_ao_dedo(self):
+        """O hover ficou atras de (hover: hover) para nao grudar no ultimo item
+        tocado, e isso deixou o toque sem sinal nenhum ate a tela seguinte
+        chegar. :active dura o tempo do dedo encostado."""
+        alvos = (".barra-flutuante-item", ".barra-flutuante-acao", ".folha-item")
+        # Exige a mudanca de fundo, e nao so a existencia do seletor: o bloco de
+        # movimento reduzido tambem casa ":active", e la a declaracao e
+        # scale: 1 -- ou seja, a retirada do movimento, nao o retorno. Sem esta
+        # condicao o teste passava com o retorno apagado.
+        com_retorno = set()
+        for seletores, declaracoes in self._regras():
+            if not re.search(r"(?:^|;)\s*background(-color)?\s*:", declaracoes):
+                continue
+            for seletor in seletores:
+                if seletor.endswith(":active"):
+                    com_retorno.add(seletor[: -len(":active")])
+        faltando = [a for a in alvos if a not in com_retorno]
+        self.assertEqual(faltando, [], f"itens sem retorno ao toque: {faltando}")
+
     def test_as_grades_de_item_largo_deixam_o_item_encolher(self):
         for seletor in self.GRADES_QUE_ENCOLHEM:
             with self.subTest(grade=seletor):
