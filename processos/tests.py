@@ -4615,6 +4615,46 @@ class NomeDoColegiadoTests(TestCase):
         self.assertIn("Processos no Pleno", rotulos)
 
 
+class CampoDeDataEHoraTests(SimpleTestCase):
+    """Data e hora sao escritas em formato brasileiro, seja qual for o navegador.
+
+    <input type="date"> e <input type="time"> sao desenhados pelo navegador, e o
+    formato segue o idioma da interface dele -- nao o lang da pagina, nao o
+    Accept-Language. Num Chrome em ingles, uma data aparece "03/15/2026" e uma
+    hora "02:30 PM" num sistema em portugues. Testei lang no input, lang no
+    elemento pai e locale do contexto: nenhum dos tres muda o formato.
+
+    A solucao mostra um campo de texto sob nosso controle e mantem o nativo ao
+    lado, invisivel, para enviar o valor em ISO e abrir o seletor pelo
+    showPicker(). Estes testes protegem as duas pontas disso.
+    """
+
+    DIRETORIO = Path(settings.BASE_DIR) / "templates"
+
+    def test_o_script_de_formatacao_esta_na_base(self):
+        base = (self.DIRETORIO / "base.html").read_text(encoding="utf-8")
+        self.assertIn("campo-datahora", base)
+        self.assertIn("showPicker", base)
+
+    def test_os_templates_mantem_o_campo_nativo(self):
+        """A troca e progressiva: sem JavaScript, o campo nativo continua valendo.
+
+        Se alguem "resolver" o formato trocando type="date" por type="text" no
+        template, perde-se o seletor de calendario, o teclado numerico do
+        celular e o envio em ISO -- e o campo passa a depender do script para
+        funcionar, em vez de ser melhorado por ele.
+        """
+        suspeitos = []
+        for caminho in sorted(self.DIRETORIO.rglob("*.html")):
+            if "emails" in caminho.parts:
+                continue
+            texto = caminho.read_text(encoding="utf-8")
+            for campo in re.findall(r'<input[^>]*name="[^"]*(?:data|hora)[^"]*"[^>]*>', texto):
+                if 'type="text"' in campo and "dd/mm" not in campo:
+                    suspeitos.append(f"{caminho.name}: {campo[:70]}")
+        self.assertEqual(suspeitos, [], f"campo de data/hora como texto no template: {suspeitos}")
+
+
 class PadraoVisualDosTemplatesTests(SimpleTestCase):
     """Guarda os padroes que a revisao visual estabeleceu.
 

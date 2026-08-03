@@ -4350,3 +4350,57 @@ dialog::backdrop {
         flex: 1 1 auto;
     }
 }
+
+/* Campo de data ou hora em formato brasileiro.
+
+   O controle nativo e desenhado pelo navegador e segue o idioma da interface
+   dele: num Chrome em ingles, "03/15/2026" e "02:30 PM" num sistema em
+   portugues. O campo visivel e nosso; o nativo fica ao lado, invisivel, so para
+   enviar o valor em ISO e abrir o seletor pelo botao. */
+.campo-datahora {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.campo-datahora > input[type="text"] {
+    padding-right: 2.6rem;
+}
+
+.campo-datahora-nativo {
+    position: absolute;
+    right: 0.5rem;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.campo-datahora-seletor {
+    position: absolute;
+    right: 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-muted);
+    cursor: pointer;
+}
+
+.campo-datahora-seletor svg {
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+.campo-datahora-seletor:hover,
+.campo-datahora-seletor:focus-visible {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+}

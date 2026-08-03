@@ -257,6 +257,120 @@
         });
     })();
 </script>
+
+<script>
+    // ======================================================================
+    // Data e hora em formato brasileiro, independente do navegador
+    //
+    // <input type="date"> e <input type="time"> sao desenhados pelo navegador,
+    // e o formato segue o idioma da INTERFACE dele -- nao o lang da pagina, nao
+    // o Accept-Language. Num Chrome em ingles, uma data aparece como
+    // "03/15/2026" e uma hora como "02:30 PM", num sistema em portugues. Testei
+    // lang no input, lang no elemento pai e locale do contexto: nenhum muda.
+    //
+    // A saida e mostrar um campo de texto que nos controlamos e manter o campo
+    // nativo por perto, invisivel, para duas coisas: continuar enviando o valor
+    // no formato que o servidor espera (ISO) e abrir o seletor nativo pelo
+    // showPicker(), que funciona mesmo com o campo fora de vista. Assim o
+    // calendario nao se perde.
+    //
+    // Sem JavaScript nada disso acontece e o campo nativo segue visivel, como
+    // hoje: e melhora, nao dependencia.
+    // ======================================================================
+    (function () {
+        const ehData = (campo) => campo.type === "date";
+
+        function paraExibicao(valor, campo) {
+            if (!valor) return "";
+            if (ehData(campo)) {
+                const [a, m, d] = valor.split("-");
+                return a && m && d ? `${d}/${m}/${a}` : "";
+            }
+            return valor.slice(0, 5); // HH:MM, descartando segundos se vierem
+        }
+
+        function paraIso(texto, campo) {
+            const numeros = texto.replace(/\D/g, "");
+            if (ehData(campo)) {
+                if (numeros.length !== 8) return "";
+                const d = numeros.slice(0, 2), m = numeros.slice(2, 4), a = numeros.slice(4);
+                const data = new Date(`${a}-${m}-${d}T00:00:00`);
+                // Confere se a data existe: 31/02 vira 03/03 no construtor, e
+                // aceitar isso seria gravar uma data que o usuario nao digitou.
+                if (data.getDate() !== +d || data.getMonth() + 1 !== +m) return "";
+                return `${a}-${m}-${d}`;
+            }
+            if (numeros.length !== 4) return "";
+            const h = +numeros.slice(0, 2), min = +numeros.slice(2);
+            if (h > 23 || min > 59) return "";
+            return `${numeros.slice(0, 2)}:${numeros.slice(2)}`;
+        }
+
+        function mascarar(texto, campo) {
+            const n = texto.replace(/\D/g, "").slice(0, ehData(campo) ? 8 : 4);
+            if (ehData(campo)) {
+                if (n.length <= 2) return n;
+                if (n.length <= 4) return `${n.slice(0, 2)}/${n.slice(2)}`;
+                return `${n.slice(0, 2)}/${n.slice(2, 4)}/${n.slice(4)}`;
+            }
+            return n.length <= 2 ? n : `${n.slice(0, 2)}:${n.slice(2)}`;
+        }
+
+        document.querySelectorAll('input[type="date"], input[type="time"]').forEach((nativo) => {
+            if (nativo.dataset.formatado) return;
+            nativo.dataset.formatado = "1";
+
+            const data = ehData(nativo);
+            const caixa = document.createElement("div");
+            caixa.className = "campo-datahora";
+
+            const texto = document.createElement("input");
+            texto.type = "text";
+            texto.inputMode = "numeric";
+            texto.autocomplete = "off";
+            texto.placeholder = data ? "dd/mm/aaaa" : "hh:mm";
+            texto.value = paraExibicao(nativo.value, nativo);
+            if (nativo.id) texto.id = `${nativo.id}-visivel`;
+
+            // A obrigatoriedade vai para o campo visivel: num campo escondido, o
+            // navegador barra o envio sem conseguir mostrar onde esta o erro.
+            if (nativo.required) {
+                texto.required = true;
+                nativo.required = false;
+            }
+            const rotulo = nativo.id && document.querySelector(`label[for="${nativo.id}"]`);
+            if (rotulo) rotulo.setAttribute("for", texto.id);
+
+            const botao = document.createElement("button");
+            botao.type = "button";
+            botao.className = "campo-datahora-seletor";
+            botao.setAttribute("aria-label", data ? "Abrir calendário" : "Abrir seletor de hora");
+            botao.innerHTML = '<svg aria-hidden="true"><use href="#i-' +
+                (data ? "periodos" : "pendencias") + '"></use></svg>';
+
+            nativo.classList.add("campo-datahora-nativo");
+            nativo.parentNode.insertBefore(caixa, nativo);
+            caixa.append(texto, botao, nativo);
+
+            texto.addEventListener("input", () => {
+                texto.value = mascarar(texto.value, nativo);
+                nativo.value = paraIso(texto.value, nativo);
+            });
+            texto.addEventListener("blur", () => {
+                // Texto incompleto ou data inexistente nao vira valor: limpa, em
+                // vez de enviar algo que o usuario nao quis dizer.
+                if (texto.value && !nativo.value) texto.value = "";
+            });
+            nativo.addEventListener("change", () => {
+                texto.value = paraExibicao(nativo.value, nativo);
+            });
+            botao.addEventListener("click", () => {
+                try { nativo.showPicker(); } catch (e) { nativo.focus(); }
+            });
+        });
+    })();
+</script>
+
 {% block scripts %}{% endblock %}
 </body>
 </html>
