@@ -5078,6 +5078,60 @@ class LayoutResponsivoTests(SimpleTestCase):
             f"grades sem colapso para uma coluna ate {self.LARGURA_DE_CELULAR}px: {faltando}",
         )
 
+    # Blocos que nao cabem num celular e nao devem encolher: uma tabela de sete
+    # colunas e a grade da semana, onde um dia de 40px nao mostra nome nenhum.
+    # A saida e rolarem dentro de si, e nao alargarem a pagina.
+    ENVOLVENTES_QUE_ROLAM = (".tabela-envolvido", ".grade-horario-envolvido")
+
+    # Grades cujos itens tem largura imprevisivel. Item de grade nasce com
+    # min-width: auto e nao encolhe abaixo do proprio conteudo -- o que sobra
+    # vira largura de pagina.
+    GRADES_QUE_ENCOLHEM = (".pilha-trajetorias > *", ".stack > *")
+
+    def _declaracoes_de(self, seletor):
+        for seletores, declaracoes in self._regras():
+            if seletor in seletores:
+                yield declaracoes
+
+    def test_o_que_e_largo_demais_rola_dentro_de_si(self):
+        """Pagina mais larga que a tela agora custa a navegacao.
+
+        Ate a barra flutuante existir, transbordar na horizontal custava uma
+        rolagem lateral. Com ela, custa a propria barra: em celular o
+        position: fixed se ancora na pagina, e nao no pedaco visivel dela, entao
+        uma pagina de 714px numa tela de 390 leva a barra para fora do campo de
+        visao. Foi assim que o defeito apareceu -- como sumico de navegacao.
+        """
+        for seletor in self.ENVOLVENTES_QUE_ROLAM:
+            with self.subTest(envolvente=seletor):
+                rola = any(
+                    re.search(r"overflow(-x)?\s*:\s*(auto|scroll)", d)
+                    for d in self._declaracoes_de(seletor)
+                )
+                self.assertTrue(rola, f"{seletor} nao rola: o excedente vira largura de pagina")
+
+    def test_o_envolvente_da_tabela_contem_os_absolutos(self):
+        """Descendente absoluto so e recortado por quem for bloco de contencao.
+
+        O rotulo "Acoes" da coluna de botoes e escondido com .apenas-leitor, que
+        e position: absolute. Sem position no envolvente, ele subia para o bloco
+        inicial: 1px de largura, invisivel, ancorado a 714px do inicio -- e a
+        pagina media 714px com a tabela rolando certinho dentro do cartao.
+        """
+        posicionado = any(
+            re.search(r"position\s*:\s*(relative|sticky)", d)
+            for d in self._declaracoes_de(".tabela-envolvido")
+        )
+        self.assertTrue(posicionado, ".tabela-envolvido sem position: os absolutos escapam da rolagem")
+
+    def test_as_grades_de_item_largo_deixam_o_item_encolher(self):
+        for seletor in self.GRADES_QUE_ENCOLHEM:
+            with self.subTest(grade=seletor):
+                encolhe = any(
+                    re.search(r"min-width\s*:\s*0", d) for d in self._declaracoes_de(seletor)
+                )
+                self.assertTrue(encolhe, f"{seletor} sem min-width: 0")
+
 
 class VersaoExibidaTests(SimpleTestCase):
     """A versao que aparece no rodape precisa ter forma de versao.

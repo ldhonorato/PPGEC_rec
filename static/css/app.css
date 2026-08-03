@@ -1134,6 +1134,13 @@ input[type="checkbox"] {
     gap: 1rem;
 }
 
+/* Vale o mesmo que em .pilha-trajetorias: item de grade nao encolhe abaixo do
+   proprio conteudo enquanto tiver min-width: auto, e o que nao coube vira
+   largura de pagina em vez de rolagem interna. */
+.stack > * {
+    min-width: 0;
+}
+
 .panel {
     margin-bottom: 1rem;
 }
@@ -2666,6 +2673,15 @@ dialog::backdrop {
 
 .tabela-envolvido {
     overflow-x: auto;
+    /* O envolvente precisa ser bloco de contencao dos descendentes absolutos,
+       senao eles nao sao recortados junto com a rolagem: sobem para o bloco
+       inicial e passam a contar na largura da pagina.
+
+       Era o caso do rotulo "Acoes", escondido com .apenas-leitor -- 1px de
+       largura, invisivel, e mesmo assim ancorado na coluna onde o cabecalho
+       cai, a 714px do inicio. A tabela rolava certinho dentro do cartao e a
+       pagina, mesmo assim, media 714px numa tela de 390. */
+    position: relative;
     margin: 0 -0.35rem;
     padding: 0 0.35rem;
 }
@@ -3519,6 +3535,14 @@ dialog::backdrop {
     border-color: var(--color-muted);
 }
 
+/* A grade tem seis dias de no minimo 6rem mais a coluna das horas: 530px, que
+   nao cabem num celular e nao devem encolher -- um dia de 40px nao mostra o
+   nome da disciplina. Entao ela rola dentro do proprio bloco, como as tabelas
+   largas ja faziam, em vez de empurrar a pagina. */
+.grade-horario-envolvido {
+    overflow-x: auto;
+}
+
 .grade-horario {
     display: grid;
     grid-template-columns: 3.5rem repeat(6, minmax(6rem, 1fr));
@@ -3825,6 +3849,19 @@ dialog::backdrop {
 .pilha-trajetorias {
     display: grid;
     gap: var(--espaco-4);
+}
+
+/* Item de grade nasce com min-width: auto, ou seja, nao encolhe abaixo do que
+   o conteudo dele pede. Numa trajetoria isso ia longe: o resumo tem titulo,
+   etiqueta de status e a linha de metadados -- "Ingresso 2024-0 · Docente
+   Mock" --, e o conjunto pedia 429px numa faixa de 309.
+
+   O excedente nao ficava dentro do cartao: empurrava a pagina para 470px numa
+   tela de 390, e em celular isso tira a barra flutuante de vista, porque
+   position: fixed se ancora na pagina, e nao no pedaco visivel dela. Um
+   defeito de largura virava um sumico de navegacao. */
+.pilha-trajetorias > * {
+    min-width: 0;
 }
 
 .trajetoria {
@@ -4728,6 +4765,7 @@ dialog::backdrop {
 .barra-flutuante-item {
     display: grid;
     place-items: center;
+    -webkit-tap-highlight-color: transparent;
     width: 54px;
     height: 50px;
     padding: 0;
@@ -4785,6 +4823,7 @@ dialog::backdrop {
     display: grid;
     place-items: center;
     flex: 0 0 auto;
+    -webkit-tap-highlight-color: transparent;
     width: 58px;
     height: 58px;
     border-radius: 50%;
@@ -4851,8 +4890,6 @@ dialog::backdrop {
     margin: 0;
     margin-top: auto;
     padding: 0;
-    display: flex;
-    flex-direction: column;
     border: 0;
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     background: var(--color-surface);
@@ -4863,9 +4900,21 @@ dialog::backdrop {
     background: rgba(4, 22, 48, 0.5);
 }
 
-/* Sobe do rodape em vez de aparecer inteira: e o movimento que liga a folha ao
+/* O display vive aqui, e nao na regra acima, por causa de como <dialog> se
+   esconde: a folha do navegador diz dialog:not([open]) { display: none }, e
+   qualquer display escrito por nos vence essa regra -- folha de autor ganha da
+   folha do navegador, independentemente de especificidade.
+
+   Com display:flex fixo, fechar a folha tirava o modo modal sem tirar a folha
+   da tela: ela continuava pintada, agora fora da camada superior, e a barra
+   flutuante passava por cima dela. Quem fechasse pelo X ficava com a folha
+   presa no rodape. Pelo clique fora o efeito era outro so por acaso.
+
+   Sobe do rodape em vez de aparecer inteira: e o movimento que liga a folha ao
    toque que a abriu, na barra logo abaixo. */
 .folha-navegacao[open] {
+    display: flex;
+    flex-direction: column;
     animation: folha-sobe 0.24s ease;
 }
 
@@ -4979,6 +5028,7 @@ dialog::backdrop {
 .folha-item {
     display: flex;
     align-items: center;
+    -webkit-tap-highlight-color: transparent;
     gap: var(--espaco-3);
     /* 52px de altura util: o alvo de toque nao depende do tamanho do rotulo. */
     min-height: 52px;
