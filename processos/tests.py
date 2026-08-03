@@ -5172,6 +5172,23 @@ class PadraoVisualDosTemplatesTests(SimpleTestCase):
         # considera tudo o que vem depois, que e a leitura conservadora.
         return html[abertura.end():]
 
+    def test_nenhum_elemento_tem_class_duplicado(self):
+        """Dois atributos class no mesmo elemento: o navegador ignora o segundo.
+
+        E um defeito silencioso -- o HTML e valido o bastante para renderizar, a
+        pagina nao quebra, e a classe simplesmente nao se aplica. Aconteceu ao
+        acrescentar uma classe a elementos que ja tinham uma: sairam tres
+        <h2 class="section-title" class="titulo-interno"> e um
+        <div class="actions-row" class="secao-cabecalho">, todos sem o efeito
+        pretendido.
+        """
+        culpados = []
+        for caminho, texto in self._templates():
+            for numero, linha in enumerate(texto.splitlines(), 1):
+                if re.search(r'class="[^"]*"\s+class="', linha):
+                    culpados.append(f"{caminho.name}:{numero}")
+        self.assertEqual(culpados, [], f"elementos com class duplicado: {culpados}")
+
     def test_nenhum_template_carrega_anotacao_de_desenvolvimento(self):
         """TODO/FIXME nao sao conteudo de tela.
 

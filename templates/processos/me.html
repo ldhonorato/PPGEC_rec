@@ -8,7 +8,7 @@
             {% csrf_token %}
             <input type="hidden" name="save_profile" value="1">
             {% for field in profile_form %}
-                <div class="field">
+                <div class="formulario-campo">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
                     {{ field.errors }}

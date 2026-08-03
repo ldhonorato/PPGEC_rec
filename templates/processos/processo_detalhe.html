@@ -362,7 +362,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         <input type="hidden" name="registrar_horas_complementares" value="1">
         <div class="grid-two">
             {% for field in horas_complementares_form %}
-                <div class="field">
+                <div class="formulario-campo">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
                     {{ field.errors }}
@@ -392,7 +392,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% csrf_token %}
         <input type="hidden" name="adicionar_documento" value="1">
         {% for field in documento_form %}
-            <div class="field">
+            <div class="formulario-campo">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {{ field.errors }}
@@ -420,7 +420,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% csrf_token %}
         <input type="hidden" name="encaminhar_processo" value="1">
         {% for field in encaminhamento_form %}
-            <div class="field" {% if field.html_name == "prazo_limite" %}id="campo-prazo-pleno" hidden{% endif %}>
+            <div class="formulario-campo" {% if field.html_name == "prazo_limite" %}id="campo-prazo-pleno" hidden{% endif %}>
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {{ field.errors }}
@@ -450,7 +450,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% if can_manifestar_ciente %}
             <input type="hidden" name="manifestar_ciente_orientador" value="1">
             {% for field in manifestar_ciente_form %}
-                <div class="field">
+                <div class="formulario-campo">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
                     {{ field.errors }}
@@ -464,7 +464,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% else %}
             <input type="hidden" name="solicitar_ciente_orientador" value="1">
             {% for field in solicitar_ciente_form %}
-                <div class="field">
+                <div class="formulario-campo">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
                     {{ field.errors }}
@@ -486,7 +486,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% csrf_token %}
         <input type="hidden" name="finalizar_processo" value="1">
         {% for field in finalizar_form %}
-            <div class="field">
+            <div class="formulario-campo">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {{ field.errors }}
@@ -567,7 +567,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% csrf_token %}
         <input type="hidden" name="adicionar_comentario" value="1">
         {% for field in comentario_form %}
-            <div class="field">
+            <div class="formulario-campo">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {{ field.errors }}
@@ -651,7 +651,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% csrf_token %}
         <input type="hidden" name="remover_arquivo_documento" value="1">
         <input type="hidden" name="documento_id" id="input-documento-id-remocao">
-        <div class="field">
+        <div class="formulario-campo">
             <label for="id_motivo_remocao">Motivo da remoção</label>
             <textarea id="id_motivo_remocao" name="motivo_remocao" rows="4" required></textarea>
         </div>

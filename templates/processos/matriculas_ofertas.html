@@ -65,7 +65,7 @@ tinha um unico filho e os cartoes encostavam um no outro.
                 {% include "includes/campo_formulario.html" with campo=oferta_form.periodo %}
                 {% include "includes/campo_formulario.html" with campo=oferta_form.disciplina %}
                 {% include "includes/campo_formulario.html" with campo=oferta_form.docente_responsavel %}
-                <div class="field"><label for="{{ oferta_form.docente_colaborador.id_for_label }}">Segundo docente</label>{{ oferta_form.docente_colaborador }}{{ oferta_form.docente_colaborador.errors }}</div>
+                <div class="formulario-campo"><label for="{{ oferta_form.docente_colaborador.id_for_label }}">Segundo docente</label>{{ oferta_form.docente_colaborador }}{{ oferta_form.docente_colaborador.errors }}</div>
                 {% include "includes/campo_formulario.html" with campo=oferta_form.modalidade %}
                 {% include "includes/campo_formulario.html" with campo=oferta_form.vagas_regulares %}
                 {% include "includes/campo_formulario.html" with campo=oferta_form.vagas_especiais %}
@@ -195,7 +195,7 @@ tinha um unico filho e os cartoes encostavam um no outro.
                 {{ oferta_form.non_field_errors }}
                 <div class="grid-two">
                     {% for field in oferta_form %}
-                        <div class="field">
+                        <div class="formulario-campo">
                             <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                             {{ field }}
                             {{ field.errors }}
@@ -204,7 +204,7 @@ tinha um unico filho e os cartoes encostavam um no outro.
                 </div>
             {% else %}
                 <div class="grid-two">
-                    <div class="field">
+                    <div class="formulario-campo">
                         <label>Período</label>
                         <select name="periodo" required>
                             {% for periodo in oferta_form.fields.periodo.queryset %}
@@ -212,7 +212,7 @@ tinha um unico filho e os cartoes encostavam um no outro.
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="field">
+                    <div class="formulario-campo">
                         <label>Disciplina</label>
                         <select name="disciplina" required>
                             {% for disciplina in oferta_form.fields.disciplina.queryset %}
@@ -220,7 +220,7 @@ tinha um unico filho e os cartoes encostavam um no outro.
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="field">
+                    <div class="formulario-campo">
                         <label>Docente responsável</label>
                         <select name="docente_responsavel" required>
                             {% for docente in oferta_form.fields.docente_responsavel.queryset %}
@@ -228,7 +228,7 @@ tinha um unico filho e os cartoes encostavam um no outro.
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="field">
+                    <div class="formulario-campo">
                         <label>Segundo docente</label>
                         <select name="docente_colaborador">
                             <option value="">---------</option>
@@ -237,7 +237,7 @@ tinha um unico filho e os cartoes encostavam um no outro.
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="field">
+                    <div class="formulario-campo">
                         <label>Modalidade</label>
                         <select name="modalidade">
                             {% for value, label in oferta_form.fields.modalidade.choices %}
@@ -245,14 +245,14 @@ tinha um unico filho e os cartoes encostavam um no outro.
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="field"><label>Vagas regulares</label><input type="number" name="vagas_regulares" min="0" value="{{ oferta.vagas_regulares }}" required></div>
-                    <div class="field"><label>Vagas especiais</label><input type="number" name="vagas_especiais" min="0" value="{{ oferta.vagas_especiais }}" required></div>
+                    <div class="formulario-campo"><label>Vagas regulares</label><input type="number" name="vagas_regulares" min="0" value="{{ oferta.vagas_regulares }}" required></div>
+                    <div class="formulario-campo"><label>Vagas especiais</label><input type="number" name="vagas_especiais" min="0" value="{{ oferta.vagas_especiais }}" required></div>
                 </div>
                 <div class="card room-modal-card panel">
                     <h3 class="section-title">Horário principal</h3>
                     <div class="grid-two">
                     {% for encontro in oferta.encontros.all|slice:":1" %}
-                        <div class="field">
+                        <div class="formulario-campo">
                             <label>Dia da semana 1</label>
                             <select name="dia_semana_1">
                                 {% for value, label in oferta_form.fields.dia_semana_1.choices %}
@@ -260,8 +260,8 @@ tinha um unico filho e os cartoes encostavam um no outro.
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="field"><label>Horário inicial 1</label><input type="time" name="hora_inicio_1" value="{{ encontro.hora_inicio|time:'H:i' }}" required></div>
-                        <div class="field"><label>Horário final 1</label><input type="time" name="hora_fim_1" value="{{ encontro.hora_fim|time:'H:i' }}" required></div>
+                        <div class="formulario-campo"><label>Horário inicial 1</label><input type="time" name="hora_inicio_1" value="{{ encontro.hora_inicio|time:'H:i' }}" required></div>
+                        <div class="formulario-campo"><label>Horário final 1</label><input type="time" name="hora_fim_1" value="{{ encontro.hora_fim|time:'H:i' }}" required></div>
                     {% endfor %}
                     </div>
                 </div>
@@ -270,7 +270,7 @@ tinha um unico filho e os cartoes encostavam um no outro.
                     <h3 class="section-title">Segundo dia</h3>
                     <div class="grid-two">
                     {% for encontro in oferta.encontros.all|slice:"1:2" %}
-                        <div class="field">
+                        <div class="formulario-campo">
                             <label>Dia da semana 2</label>
                             <select name="dia_semana_2">
                                 {% for value, label in oferta_form.fields.dia_semana_1.choices %}
@@ -278,10 +278,10 @@ tinha um unico filho e os cartoes encostavam um no outro.
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="field"><label>Horário inicial 2</label><input type="time" name="hora_inicio_2" value="{{ encontro.hora_inicio|time:'H:i' }}"></div>
-                        <div class="field"><label>Horário final 2</label><input type="time" name="hora_fim_2" value="{{ encontro.hora_fim|time:'H:i' }}"></div>
+                        <div class="formulario-campo"><label>Horário inicial 2</label><input type="time" name="hora_inicio_2" value="{{ encontro.hora_inicio|time:'H:i' }}"></div>
+                        <div class="formulario-campo"><label>Horário final 2</label><input type="time" name="hora_fim_2" value="{{ encontro.hora_fim|time:'H:i' }}"></div>
                     {% empty %}
-                        <div class="field">
+                        <div class="formulario-campo">
                             <label>Dia da semana 2</label>
                             <select name="dia_semana_2">
                                 <option value="">---------</option>
@@ -290,8 +290,8 @@ tinha um unico filho e os cartoes encostavam um no outro.
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="field"><label>Horário inicial 2</label><input type="time" name="hora_inicio_2"></div>
-                        <div class="field"><label>Horário final 2</label><input type="time" name="hora_fim_2"></div>
+                        <div class="formulario-campo"><label>Horário inicial 2</label><input type="time" name="hora_inicio_2"></div>
+                        <div class="formulario-campo"><label>Horário final 2</label><input type="time" name="hora_fim_2"></div>
                     {% endfor %}
                     </div>
                 </div>
