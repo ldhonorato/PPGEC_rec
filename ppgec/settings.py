@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+import re
+import warnings
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
 
@@ -77,10 +79,9 @@ if env_bool("USE_X_FORWARDED_PROTO", not DEBUG):
 def _versao_do_arquivo():
     """Le o arquivo VERSION da raiz do projeto.
 
-    E a fonte da verdade da versao em desenvolvimento e a referencia para
-    quem le o repositorio. Em producao a esteira sobrescreve via APP_VERSION
-    (veja .github/workflows/build-web-image.yml), entao a variavel de
-    ambiente tem precedencia.
+    E a fonte da verdade da versao, em desenvolvimento e em producao: a esteira
+    le este mesmo arquivo e o passa como APP_VERSION na construcao da imagem
+    (veja .github/workflows/build-web-image.yml).
     """
     arquivo = BASE_DIR / "VERSION"
     try:
@@ -89,7 +90,45 @@ def _versao_do_arquivo():
         return "0.0.0"
 
 
-APP_VERSION = os.getenv("APP_VERSION") or _versao_do_arquivo()
+# Numero, com pontos, e um sufixo opcional para pre-lancamento ("1.2.0-rc.1").
+# O "v" e aceito na entrada e descartado: quem exibe a versao ja escreve o "v",
+# e um valor "v1.0.0" renderizaria "vv1.0.0".
+_FORMATO_VERSAO = re.compile(r"^v?\d+(?:\.\d+)*(?:[-+][0-9A-Za-z.-]+)?$")
+
+
+def _versao_publicada():
+    """A versao exibida ao usuario, vinda do ambiente ou do arquivo.
+
+    APP_VERSION so e aceito se tiver forma de versao. Ja aconteceu de a esteira
+    passar ali o nome do branch que disparou o build -- todo merge em main
+    produzia APP_VERSION="main", e o rodape de todas as telas exibia "vmain".
+
+    A esteira foi corrigida para ler o arquivo VERSION, entao este filtro nao e
+    o conserto: e a garantia de que um erro de configuracao volte a degradar
+    para a versao do repositorio, em vez de escrever qualquer texto no lugar
+    onde o usuario espera uma versao.
+
+    O aviso existe para o caso nao ser silencioso: um valor descartado sem
+    rastro e um problema que ninguem descobre.
+    """
+    do_ambiente = (os.getenv("APP_VERSION") or "").strip()
+    if not do_ambiente:
+        return _versao_do_arquivo()
+
+    if _FORMATO_VERSAO.match(do_ambiente):
+        return do_ambiente.lstrip("v")
+
+    do_arquivo = _versao_do_arquivo()
+    warnings.warn(
+        f"APP_VERSION={do_ambiente!r} nao tem forma de versao e foi ignorado; "
+        f"exibindo {do_arquivo!r}, do arquivo VERSION.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
+    return do_arquivo
+
+
+APP_VERSION = _versao_publicada()
 APP_REVISION = os.getenv("APP_REVISION", "unknown")
 APP_BUILD_RUN_ID = os.getenv("APP_BUILD_RUN_ID", "local")
 
@@ -227,6 +266,38 @@ STORAGES = {
 }
 MEDIA_URL = '/media/'
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", BASE_DIR / "media"))
+
+# --------------------------------------------------------------------------
+# Armazenamento dos documentos enviados
+#
+# Sem AWS_STORAGE_BUCKET_NAME, os arquivos ficam em disco (MEDIA_ROOT) -- e o
+# modo de desenvolvimento. Com o nome do bucket definido, passam para o S3.
+#
+# A escolha e pela presenca do bucket, e nao por um booleano separado, para nao
+# existir o estado "S3 ligado, bucket nao informado": ou ha destino, ou nao ha.
+# --------------------------------------------------------------------------
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "").strip()
+USA_S3 = bool(AWS_STORAGE_BUCKET_NAME)
+
+if USA_S3:
+    from ppgec.storage import configuracao_s3
+
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
+    AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1").strip()
+
+    # Vida da URL assinada, em segundos. Curta de proposito: a URL e entregue
+    # depois da verificacao de permissao e, a partir dai, vale por si -- quanto
+    # menos durar, menor a janela em que um link repassado ainda abre.
+    AWS_QUERYSTRING_EXPIRE = int(os.getenv("AWS_QUERYSTRING_EXPIRE", "300"))
+
+    STORAGES["default"] = configuracao_s3(
+        bucket=AWS_STORAGE_BUCKET_NAME,
+        regiao=AWS_S3_REGION_NAME,
+        chave=AWS_ACCESS_KEY_ID,
+        segredo=AWS_SECRET_ACCESS_KEY,
+        expiracao_da_url=AWS_QUERYSTRING_EXPIRE,
+    )
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

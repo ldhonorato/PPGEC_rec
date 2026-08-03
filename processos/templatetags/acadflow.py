@@ -1,6 +1,7 @@
 """Filtros de apresentacao compartilhados pelos templates."""
 
 from django import template
+from django.urls import reverse
 
 register = template.Library()
 
@@ -40,3 +41,23 @@ def primeiro_nome(nome_completo):
     if not nome_completo:
         return ""
     return str(nome_completo).strip().split()[0]
+
+
+@register.filter
+def url_protegida(arquivo):
+    """Endereco de um arquivo enviado, passando pela verificacao de permissao.
+
+    Os templates usavam ``documento.arquivo.url`` e isso funcionava por
+    coincidencia: com armazenamento em disco, ``.url`` produz "/media/<caminho>",
+    que e a rota da view que confere a regra do documento.
+
+    Com o S3 a coincidencia acaba. ``.url`` passa a devolver o endereco assinado
+    do bucket, que abre o arquivo sem passar por lugar nenhum do sistema -- e o
+    link, uma vez na tela, vale para quem o pegar.
+
+    Este filtro devolve sempre a rota interna, seja qual for o armazenamento.
+    Quem confere a permissao e decide como entregar e a view.
+    """
+    if not arquivo:
+        return ""
+    return reverse("media_file", kwargs={"path": arquivo.name})
