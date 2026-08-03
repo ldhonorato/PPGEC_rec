@@ -19,13 +19,12 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, re_path, reverse_lazy
 from django.contrib.auth.views import (
-    LoginView,
     PasswordResetCompleteView,
     PasswordResetConfirmView,
     PasswordResetDoneView,
 )
 from django.views.generic import RedirectView
-from ppgec.views import AuditedPasswordResetView, SafeLogoutView, version_view
+from ppgec.views import AuditedPasswordResetView, RateLimitedLoginView, SafeLogoutView, version_view
 
 from processos.views import (
     aluno_detalhe_view,
@@ -88,7 +87,7 @@ urlpatterns = [
     # layout que nao foi feito para conviver com ela.
     path(
         "login/",
-        LoginView.as_view(
+        RateLimitedLoginView.as_view(
             template_name="registration/login.html",
             redirect_authenticated_user=True,
             extra_context={"mostra_moldura": False},

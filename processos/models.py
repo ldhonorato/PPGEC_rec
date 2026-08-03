@@ -2529,6 +2529,24 @@ class ReservaAmbiente(models.Model):
         return resultado
 
 
+class LoginThrottle(models.Model):
+    """Contador persistente de falhas de login, sem armazenar e-mail ou IP."""
+
+    scope = models.CharField(max_length=16)
+    fingerprint = models.CharField(max_length=64)
+    failure_count = models.PositiveIntegerField(default=0)
+    window_started_at = models.DateTimeField()
+    locked_until = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["scope", "fingerprint"],
+                name="processos_login_throttle_scope_fingerprint_uniq",
+            )
+        ]
+
+
 class EstagioDocencia(models.Model):
 
     class Status(models.TextChoices):

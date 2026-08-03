@@ -33,6 +33,7 @@ from .models import (
     EncontroOferta,
     ItemSolicitacaoMatricula,
     LancamentoHorasComplementares,
+    LoginThrottle,
     ManifestacaoProcesso,
     MembroBanca,
     OfertaDisciplina,
@@ -84,6 +85,124 @@ class SessionExpirationSettingsTests(SimpleTestCase):
     def test_login_expira_apos_vinte_minutos_sem_atividade(self):
         self.assertEqual(settings.SESSION_COOKIE_AGE, 20 * 60)
         self.assertTrue(settings.SESSION_SAVE_EVERY_REQUEST)
+
+
+@override_settings(
+    SECURE_SSL_REDIRECT=False,
+    LOGIN_MAX_FAILURES=5,
+    LOGIN_FAILURE_WINDOW_SECONDS=900,
+    LOGIN_LOCKOUT_SECONDS=900,
+)
+class LoginSecurityTests(TestCase):
+    def setUp(self):
+        self.password = "senha-segura-123"
+        self.user = User.objects.create_user(
+            email="login.security@example.com",
+            password=self.password,
+            nome="Login Security",
+        )
+        self.url = reverse("login")
+
+    def _post(self, password="incorreta", ip="192.0.2.10"):
+        return self.client.post(
+            self.url,
+            {"username": self.user.email, "password": password},
+            REMOTE_ADDR=ip,
+        )
+
+    def test_quinta_falha_bloqueia_e_informa_retry_after(self):
+        for _ in range(4):
+            self.assertEqual(self._post().status_code, 200)
+
+        response = self._post()
+
+        self.assertEqual(response.status_code, 429)
+        self.assertIn("Retry-After", response)
+        self.assertContains(response, "Muitas tentativas", status_code=429)
+        self.assertEqual(LoginThrottle.objects.count(), 2)
+
+    def test_bloqueio_por_conta_vale_para_outro_ip(self):
+        for _ in range(5):
+            self._post()
+
+        response = self._post(password=self.password, ip="198.51.100.25")
+
+        self.assertEqual(response.status_code, 429)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_login_valido_limpa_falhas_anteriores(self):
+        for _ in range(4):
+            self._post()
+
+        response = self._post(password=self.password)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(LoginThrottle.objects.exists())
+
+    @override_settings(SECURE_SSL_REDIRECT=True)
+    def test_post_de_login_em_http_e_redirecionado_sem_validar_credenciais(self):
+        response = self.client.post(
+            self.url,
+            {"username": self.user.email, "password": self.password},
+            secure=False,
+        )
+
+        self.assertEqual(response.status_code, 301)
+        self.assertTrue(response["Location"].startswith("https://"))
+        self.assertFalse(LoginThrottle.objects.exists())
+
+
+class TelaDeLoginTests(TestCase):
+    """A rota /login/ acumula duas responsabilidades que chegaram separadas.
+
+    A limitacao de tentativas mora na RateLimitedLoginView; o desvio de quem ja
+    tem sessao e o sumico da moldura moram nos argumentos do as_view(). As duas
+    coisas ocupam a mesma linha do urls.py, e ja se perderam uma vez num merge:
+    trocar a classe da view derruba silenciosamente os argumentos, e acrescentar
+    argumentos derruba silenciosamente a classe. Nenhuma das duas quedas aparece
+    em teste de tela.
+    """
+
+    def setUp(self):
+        self.url = reverse("login")
+
+    def test_quem_ja_tem_sessao_vai_para_o_inicio(self):
+        """Sem isto, /login/ logado mostrava o formulario de entrada com a barra
+        da sessao ativa por cima -- nome, avisos e tudo."""
+        user = User.objects.create_user(
+            email="ja.logado@example.com",
+            password="senha-segura-123",
+            nome="Ja Logado",
+        )
+        self.client.force_login(user)
+
+        resposta = self.client.get(self.url)
+
+        self.assertRedirects(resposta, reverse(settings.LOGIN_REDIRECT_URL))
+
+    def test_anonimo_recebe_o_formulario_sem_a_moldura_da_sessao(self):
+        resposta = self.client.get(self.url)
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertFalse(resposta.context["mostra_moldura"])
+        self.assertNotContains(resposta, 'class="user-menu"')
+
+    def test_o_limite_de_tentativas_continua_valendo_nesta_rota(self):
+        """Guarda a convivencia: os argumentos do as_view() nao substituiram a
+        view que conta as falhas."""
+        User.objects.create_user(
+            email="tentativas@example.com",
+            password="senha-segura-123",
+            nome="Tentativas",
+        )
+        for _ in range(settings.LOGIN_MAX_FAILURES):
+            self.client.post(self.url, {"username": "tentativas@example.com", "password": "errada"})
+
+        resposta = self.client.post(
+            self.url, {"username": "tentativas@example.com", "password": "senha-segura-123"}
+        )
+
+        self.assertEqual(resposta.status_code, 429)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, DEBUG=False)

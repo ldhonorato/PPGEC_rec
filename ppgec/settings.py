@@ -76,6 +76,12 @@ X_FRAME_OPTIONS = os.getenv("X_FRAME_OPTIONS", "DENY")
 if env_bool("USE_X_FORWARDED_PROTO", not DEBUG):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# Limite de autenticacao aplicado por conta e por endereco de origem. Os
+# contadores ficam no banco para valer entre todos os workers/containers.
+LOGIN_MAX_FAILURES = env_int("LOGIN_MAX_FAILURES", 5)
+LOGIN_FAILURE_WINDOW_SECONDS = env_int("LOGIN_FAILURE_WINDOW_SECONDS", 15 * 60)
+LOGIN_LOCKOUT_SECONDS = env_int("LOGIN_LOCKOUT_SECONDS", 15 * 60)
+
 def _versao_do_arquivo():
     """Le o arquivo VERSION da raiz do projeto.
 
@@ -344,6 +350,11 @@ LOGGING = {
         },
     },
     "loggers": {
+        "acadflow.authentication": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
         "acadflow.password_reset": {
             "handlers": ["console"],
             "level": "INFO",

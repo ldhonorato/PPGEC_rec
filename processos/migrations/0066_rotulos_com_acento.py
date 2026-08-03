@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('processos', '0064_alter_trajetoria_nivel_pos_doutorado'),
+        ('processos', '0065_login_throttle'),
     ]
 
     operations = [
