@@ -245,6 +245,33 @@ propria sessao por cima -- nome, avisos e menu da conta.
             if (e.matches && estaAberto()) fecharMenu(false);
         });
     })();
+
+    // Menu da conta.
+    //
+    // Ele e um <details>, e <details> so fecha por onde abriu: clicar no
+    // proprio resumo. Um clique em qualquer outro ponto da tela nao o alcanca,
+    // e a tecla Esc tambem nao -- o painel ficava aberto por cima do conteudo
+    // ate a pessoa voltar ao nome dela no canto e clicar de novo. Todo menu
+    // suspenso da plataforma fecha ao se clicar fora; este era a excecao.
+    (function () {
+        const conta = document.querySelector("details.user-menu");
+        if (!conta) return;
+
+        const resumo = conta.querySelector("summary");
+
+        // Clique dentro do painel segue valendo: e assim que se chega a "Meu
+        // perfil" e a "Sair da conta".
+        document.addEventListener("click", function (e) {
+            if (conta.open && !conta.contains(e.target)) conta.open = false;
+        });
+
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape" && conta.open) {
+                conta.open = false;
+                if (resumo) resumo.focus();
+            }
+        });
+    })();
 </script>
 {% endif %}
 {% if solicitar_cpf_aluno %}

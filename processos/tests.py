@@ -5347,6 +5347,32 @@ class PadraoVisualDosTemplatesTests(SimpleTestCase):
         self.assertEqual(culpados, [], f"templates com anotacao de desenvolvimento: {culpados}")
 
 
+class MenuDaContaFechaTests(SimpleTestCase):
+    """O painel da conta fecha por fora, nao so pelo chip que o abriu.
+
+    Ele e um <details>, e <details> abre e fecha pelo proprio resumo -- nada
+    mais o alcanca. Clicar em qualquer outro ponto da tela, ou apertar Esc,
+    deixava o painel aberto por cima do conteudo, e a unica saida era voltar ao
+    nome no canto e clicar de novo. E a excecao entre os menus da plataforma: a
+    gaveta lateral, os modais e os blocos que abrem ja fechavam assim.
+
+    O comportamento vive em JavaScript, sem executor de JS na suite; o que da
+    para garantir aqui e que os dois tratadores continuam registrados. A
+    verificacao de que fecham mesmo foi feita no navegador, nos tres perfis.
+    """
+
+    def setUp(self):
+        self.base = (Path(settings.BASE_DIR) / "templates" / "base.html").read_text(encoding="utf-8")
+
+    def test_fecha_com_clique_fora(self):
+        self.assertIn("details.user-menu", self.base)
+        self.assertIn("!conta.contains(e.target)", self.base)
+
+    def test_fecha_com_esc_e_devolve_o_foco(self):
+        self.assertIn('e.key === "Escape" && conta.open', self.base)
+        self.assertIn("resumo.focus()", self.base)
+
+
 class MenuMarcaItemAtivoTests(TestCase):
     """Toda tela acende exatamente um item da barra lateral.
 
