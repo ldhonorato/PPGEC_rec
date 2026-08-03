@@ -118,16 +118,45 @@
                                 </span>
                                 <svg class="user-chevron" aria-hidden="true"><use href="#i-chevron"></use></svg>
                             </summary>
+                            {% comment %}
+                            O painel era uma lista de dois itens sem contexto: nao
+                            dizia de quem era a conta -- o nome fica no chip, que
+                            some em tela estreita -- nem o que cada destino faz.
+                            {% endcomment %}
                             <div class="user-menu-panel">
-                                <a href="{% url 'me' %}">
-                                    <svg class="nav-icon" aria-hidden="true"><use href="#i-perfil"></use></svg>
-                                    Perfil
-                                </a>
-                                <form method="post" action="{% url 'logout' %}">
+                                <div class="user-menu-cabecalho">
+                                    <span class="avatar avatar-grande" aria-hidden="true">{{ user.nome|default:user.email|slice:":2"|upper }}</span>
+                                    <div class="user-menu-identidade">
+                                        <strong>{{ user.nome|default:user.email }}</strong>
+                                        <span class="user-menu-email">{{ user.email }}</span>
+                                        <span class="user-menu-papel">{{ user.get_tipo_usuario_display }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="user-menu-itens">
+                                    <a href="{% url 'me' %}">
+                                        <svg class="nav-icon" aria-hidden="true"><use href="#i-perfil"></use></svg>
+                                        <span>
+                                            <strong>Meu perfil</strong>
+                                            <small>Dados de acesso e senha</small>
+                                        </span>
+                                    </a>
+                                    {% if user.is_staff %}
+                                        <a href="/admin/">
+                                            <svg class="nav-icon" aria-hidden="true"><use href="#i-setores"></use></svg>
+                                            <span>
+                                                <strong>Administração</strong>
+                                                <small>Gestão de usuários e permissões</small>
+                                            </span>
+                                        </a>
+                                    {% endif %}
+                                </div>
+
+                                <form method="post" action="{% url 'logout' %}" class="user-menu-sair">
                                     {% csrf_token %}
                                     <button type="submit">
                                         <svg class="nav-icon" aria-hidden="true"><use href="#i-sair"></use></svg>
-                                        Sair
+                                        Sair da conta
                                     </button>
                                 </form>
                             </div>

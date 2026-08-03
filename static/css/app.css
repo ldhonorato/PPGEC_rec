@@ -420,48 +420,168 @@ input[type="checkbox"] {
     color: var(--color-muted);
 }
 
+/* Painel da conta.
+
+   Era uma caixa de 190px com dois itens em negrito e nada mais: nao dizia de
+   quem e a conta -- o nome vive no chip, que some abaixo de 640px -- nem o que
+   cada destino faz. Agora abre com a identidade no topo e cada item leva uma
+   linha de apoio, como os itens da barra lateral ja fazem.
+
+   O painel entra com um leve deslocamento e some no caminho inverso. Sem isso
+   ele aparecia e sumia de um quadro para o outro, o que num elemento que se
+   sobrepoe ao conteudo se le como salto. */
 .user-menu-panel {
     position: absolute;
     right: 0;
     top: calc(100% + 10px);
     z-index: 30;
-    width: 190px;
-    padding: 0.4rem;
+    width: min(19rem, calc(100vw - 2rem));
+    padding: var(--espaco-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: #ffffff;
-    box-shadow: var(--shadow-card);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    box-shadow:
+        0 1px 2px rgba(8, 20, 38, 0.06),
+        0 12px 32px rgba(8, 20, 38, 0.14);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .user-menu[open] .user-menu-panel {
+        animation: painel-conta-entra 0.16s ease-out;
+    }
+}
+
+@keyframes painel-conta-entra {
+    from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.user-menu-cabecalho {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    padding: var(--espaco-3);
+}
+
+.avatar-grande {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    font-size: 0.9rem;
+}
+
+.user-menu-identidade {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.user-menu-identidade strong {
+    font-size: 0.9375rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.user-menu-email {
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+}
+
+/* O papel vem de uma etiqueta, e nao de mais uma linha de texto: e o que
+   distingue duas contas com o mesmo nome, e merece ser visto de relance. */
+.user-menu-papel {
+    justify-self: start;
+    margin-top: 0.2rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.user-menu-itens {
+    display: grid;
+    gap: 0.1rem;
+    padding-top: var(--espaco-2);
+    border-top: 1px solid var(--color-border);
 }
 
 .user-menu-panel a,
 .user-menu-panel button {
     display: flex;
-    width: 100%;
-    min-height: 42px;
     align-items: center;
-    padding: 0.55rem 0.7rem;
+    gap: var(--espaco-3);
+    width: 100%;
+    min-height: 44px;
+    padding: var(--espaco-3);
     border: 0;
     border-radius: var(--radius-sm);
     color: var(--color-text);
     background: transparent;
-    font-weight: 600;
     text-align: left;
     text-decoration: none;
     cursor: pointer;
+    transition: background 0.14s ease, color 0.14s ease;
+}
+
+.user-menu-panel a span,
+.user-menu-panel button span {
+    display: grid;
+    gap: 0.05rem;
+    min-width: 0;
+}
+
+.user-menu-panel strong {
+    font-size: 0.875rem;
+    font-weight: 560;
+}
+
+.user-menu-panel small {
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    line-height: 1.35;
 }
 
 .user-menu-panel a:hover,
-.user-menu-panel button:hover,
-.user-menu-panel a:focus-visible,
-.user-menu-panel button:focus-visible {
+.user-menu-panel a:focus-visible {
     color: var(--color-primary);
     background: var(--color-primary-soft);
     outline: none;
 }
 
-.user-menu-panel form {
-    margin: 0;
+.user-menu-panel a:hover .nav-icon,
+.user-menu-panel a:focus-visible .nav-icon {
+    color: var(--color-primary);
 }
+
+/* Sair e a unica acao destrutiva do painel, e fica separada das demais: um
+   clique errado aqui custa a sessao. */
+.user-menu-sair {
+    margin: var(--espaco-2) 0 0;
+    padding-top: var(--espaco-2);
+    border-top: 1px solid var(--color-border);
+}
+
+.user-menu-sair button {
+    font-size: 0.875rem;
+    font-weight: 560;
+}
+
+.user-menu-sair button:hover,
+.user-menu-sair button:focus-visible {
+    color: var(--color-danger);
+    background: #fff0f1;
+    outline: none;
+}
+
+.user-menu-sair button:hover .nav-icon,
+.user-menu-sair button:focus-visible .nav-icon {
+    color: var(--color-danger);
+}
+
 
 .inline-form {
     margin: 0;
@@ -4599,4 +4719,57 @@ dialog::backdrop {
 .campo-datahora-seletor:focus-visible {
     background: var(--color-primary-soft);
     color: var(--color-primary);
+}
+
+/* Cabecalho do perfil: quem e a pessoa, antes do que ela pode alterar. */
+.perfil-cabecalho {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--espaco-3) var(--espaco-4);
+    align-items: center;
+}
+
+.avatar-perfil {
+    width: 56px;
+    height: 56px;
+    font-size: 1.05rem;
+}
+
+.perfil-identidade {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.perfil-identidade > .section-title {
+    margin: 0;
+}
+
+/* O papel e etiqueta, nao mais uma linha de texto: e o que distingue duas
+   contas de mesmo nome, e vale ser visto de relance. */
+.perfil-papel {
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* A grade de dados ocupa a largura toda, abaixo do avatar e do nome. */
+.perfil-cabecalho > .dados-grid {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding-top: var(--espaco-4);
+    border-top: 1px solid var(--color-border);
+    border-bottom: 0;
+}
+
+@media (max-width: 640px) {
+    .perfil-cabecalho {
+        grid-template-columns: 1fr;
+        justify-items: start;
+    }
 }

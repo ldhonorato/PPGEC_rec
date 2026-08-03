@@ -2775,8 +2775,12 @@ class FrontendIdentityTests(TestCase):
         self.assertContains(response, "Meus Processos")
         self.assertNotContains(response, "Processos no Pleno")
         self.assertNotContains(response, 'class="nav"')
-        self.assertContains(response, "Perfil")
-        self.assertContains(response, "Sair")
+        # O painel da conta ganhou identidade e descricoes: os rotulos passaram
+        # de "Perfil" e "Sair" para "Meu perfil" e "Sair da conta". O que este
+        # teste verifica -- que os dois destinos existem no painel -- continua.
+        self.assertContains(response, "Meu perfil")
+        self.assertContains(response, "Sair da conta")
+        self.assertContains(response, self.docente.email)
 
     def test_membro_do_pleno_ve_menu_e_rota_de_processos_do_pleno(self):
         pleno = Setor.objects.get(nome=Setor.NOME_PLENO)

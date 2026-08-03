@@ -1,32 +1,55 @@
 {% extends "base.html" %}
 {% block title %}Meu perfil{% endblock %}
 {% block content %}
+{% comment %}
+A tela abria direto em dois cartoes de formulario, sem dizer de quem e o perfil.
+O nome vive no chip da barra superior, que some abaixo de 640px, entao a
+identidade nao estava em lugar nenhum desta pagina.
+
+Agora ela abre com quem e a pessoa -- avatar, nome, papel e os dados que
+identificam a conta -- e so depois vem o que se pode alterar.
+{% endcomment %}
+<section class="card perfil-cabecalho">
+    <span class="avatar avatar-perfil" aria-hidden="true">{{ user.nome|default:user.email|slice:":2"|upper }}</span>
+    <div class="perfil-identidade">
+        <h1 class="section-title">{{ user.nome|default:user.email }}</h1>
+        <span class="perfil-papel">{{ user.get_tipo_usuario_display }}</span>
+    </div>
+    <dl class="dados-grid">
+        <div><dt>E-mail</dt><dd>{{ user.email }}</dd></div>
+        {% if user.tipo_usuario == "ALUNO" and user.aluno.matricula %}
+            <div><dt>Matrícula</dt><dd>{{ user.aluno.matricula }}</dd></div>
+        {% endif %}
+        <div><dt>Último acesso</dt><dd>{{ user.last_login|date:"d/m/Y H:i"|default:"—" }}</dd></div>
+    </dl>
+</section>
+
 <section class="grid-two">
     <article class="card">
-        <h1 class="section-title">Meu perfil</h1>
-        <form method="post" class="form-coluna">
+        <h2 class="section-title">Dados de acesso</h2>
+        <p class="muted">Como você entra e para onde o sistema envia os avisos.</p>
+        <form method="post" class="formulario">
             {% csrf_token %}
             <input type="hidden" name="save_profile" value="1">
             {% for field in profile_form %}
-                <div class="formulario-campo">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {{ field.errors }}
-                </div>
+                {% include "includes/campo_formulario.html" with campo=field %}
             {% endfor %}
-            <button type="submit" class="btn">Salvar perfil</button>
+            <div class="formulario-acoes">
+                <button type="submit" class="btn">Salvar</button>
+            </div>
         </form>
     </article>
 
     <article class="card">
         <h2 class="section-title">Alterar senha</h2>
-        <form method="post" class="form-coluna">
+        <p class="muted">Preencha apenas se quiser trocar a senha agora.</p>
+        <form method="post" class="formulario">
             {% csrf_token %}
             <input type="hidden" name="change_password" value="1">
             {% comment %}
-            Os campos de senha ganham o mesmo botao de revelar das telas de
-            acesso -- era a unica parte do sistema onde digitar senha as cegas
-            continuava sendo a unica opcao.
+            Os campos de senha mantem o padrao das telas de acesso, com o botao
+            de revelar: e o mesmo gesto, e mudar a forma so aqui obrigaria a
+            reaprender.
             {% endcomment %}
             {% for field in password_form %}
                 <div class="campo{% if field.errors %} tem-erro{% endif %}">
@@ -42,58 +65,66 @@
                     {% for erro in field.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
                 </div>
             {% endfor %}
-            <button type="submit" class="btn">Atualizar senha</button>
+            <div class="formulario-acoes">
+                <button type="submit" class="btn">Atualizar senha</button>
+            </div>
         </form>
     </article>
 </section>
 
-<section class="grid-two">
-    <article class="card">
-        <h2 class="section-title">Setores e comissões atuais</h2>
-        {% if participacoes_ativas %}
-            <ul class="list">
-                {% for participacao in participacoes_ativas %}
-                    <li>
-                        <strong>{{ participacao.setor.nome }}</strong>
-                        <br>
-                        <span class="meta-linha">
-                            <span>Desde {{ participacao.data_entrada|date:"d/m/Y" }}</span>
-                            {% if participacao.designado_por %}<span>Designado por {{ participacao.designado_por.nome }}</span>{% endif %}
-                        </span>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <div class="estado-vazio">
-                <svg aria-hidden="true"><use href="#i-setores"></use></svg>
-                <p class="estado-vazio-titulo">Sem participação em setores</p>
-                <p>A secretaria vincula servidores e docentes aos setores que tramitam processos.</p>
-            </div>
-        {% endif %}
-    </article>
+{% comment %}
+Aluno nao entra em setor nem em comissao -- e a secretaria que vincula
+servidores e docentes. Sem esta condicao ele via dois blocos que nunca teriam
+conteudo, e um estado vazio permanente ensina a ignorar os estados vazios que
+significam alguma coisa.
+{% endcomment %}
+{% if mostra_setores %}
+    <section class="grid-two">
+        <article class="card">
+            <h2 class="section-title">Setores e comissões atuais</h2>
+            {% if participacoes_ativas %}
+                <ul class="list">
+                    {% for participacao in participacoes_ativas %}
+                        <li>
+                            <strong>{{ participacao.setor.nome }}</strong>
+                            <span class="meta-linha">
+                                <span>Desde {{ participacao.data_entrada|date:"d/m/Y" }}</span>
+                                {% if participacao.designado_por %}<span>Designado por {{ participacao.designado_por.nome }}</span>{% endif %}
+                            </span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="estado-vazio">
+                    <svg aria-hidden="true"><use href="#i-setores"></use></svg>
+                    <p class="estado-vazio-titulo">Sem participação em setores</p>
+                    <p>A secretaria vincula servidores e docentes aos setores que tramitam processos.</p>
+                </div>
+            {% endif %}
+        </article>
 
-    <article class="card">
-        <h2 class="section-title">Histórico de participação</h2>
-        {% if historico_participacoes %}
-            <ul class="list">
-                {% for participacao in historico_participacoes %}
-                    <li>
-                        <strong>{{ participacao.setor.nome }}</strong>
-                        <br>
-                        <span class="meta-linha">
-                            <span>{{ participacao.data_entrada|date:"d/m/Y" }} a {{ participacao.data_saida|date:"d/m/Y" }}</span>
-                            {% if participacao.designado_por %}<span>Designado por {{ participacao.designado_por.nome }}</span>{% endif %}
-                        </span>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <div class="estado-vazio">
-                <svg aria-hidden="true"><use href="#i-pendencias"></use></svg>
-                <p class="estado-vazio-titulo">Nenhuma participação encerrada</p>
-                <p>Vínculos com setores que forem encerrados ficam registrados aqui.</p>
-            </div>
-        {% endif %}
-    </article>
-</section>
+        <article class="card">
+            <h2 class="section-title">Histórico de participação</h2>
+            {% if historico_participacoes %}
+                <ul class="list">
+                    {% for participacao in historico_participacoes %}
+                        <li>
+                            <strong>{{ participacao.setor.nome }}</strong>
+                            <span class="meta-linha">
+                                <span>{{ participacao.data_entrada|date:"d/m/Y" }} a {{ participacao.data_saida|date:"d/m/Y" }}</span>
+                                {% if participacao.designado_por %}<span>Designado por {{ participacao.designado_por.nome }}</span>{% endif %}
+                            </span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="estado-vazio">
+                    <svg aria-hidden="true"><use href="#i-pendencias"></use></svg>
+                    <p class="estado-vazio-titulo">Nenhuma participação encerrada</p>
+                    <p>Vínculos com setores que forem encerrados ficam registrados aqui.</p>
+                </div>
+            {% endif %}
+        </article>
+    </section>
+{% endif %}
 {% endblock %}

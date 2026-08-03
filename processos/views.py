@@ -1852,6 +1852,14 @@ def me_view(request):
             "password_form": password_form,
             "participacoes_ativas": participacoes_ativas,
             "historico_participacoes": historico_participacoes,
+            # Aluno nao entra em setor nem em comissao -- e a secretaria que
+            # vincula servidores e docentes. Sem esta condicao ele via dois
+            # blocos que nunca teriam conteudo, e um estado vazio permanente
+            # ensina a ignorar os estados vazios que significam algo.
+            #
+            # A condicao e pelo tipo, e nao por "tem participacoes": um docente
+            # recem-cadastrado tambem tem zero, e para ele o bloco vazio informa.
+            "mostra_setores": request.user.tipo_usuario != User.TipoUsuario.ALUNO,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
