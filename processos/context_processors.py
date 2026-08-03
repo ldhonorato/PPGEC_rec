@@ -415,6 +415,47 @@ def _menu_lateral_items(user):
     return items
 
 
+# Os tres destinos que a barra flutuante oferece em tela estreita, por perfil.
+#
+# Nao e o menu resumido: e o que a pessoa abre todo dia. O aluno vive entre os
+# processos que abriu e a matricula do periodo; o docente, entre os processos e
+# os orientandos; o servidor, entre a caixa que recebe os processos do setor e a
+# listagem de alunos. O resto continua na gaveta, que a propria barra abre.
+#
+# Sao rotulos, e nao rotas, de proposito: o item vem inteiro do menu lateral --
+# endereco, icone e a lista de url_names que decide quando ele acende. Assim a
+# barra nao pode discordar do menu sobre onde um destino fica ou quando ele esta
+# ativo, que e a divergencia que uma segunda lista de rotas produziria.
+BARRA_FLUTUANTE = {
+    User.TipoUsuario.ALUNO: ("Início", "Meus Processos", "Matrícula"),
+    User.TipoUsuario.DOCENTE: ("Início", "Meus Processos", "Meus Orientandos"),
+    User.TipoUsuario.SERVIDOR: ("Início", "Caixa de Processos", "Alunos"),
+}
+
+# O circulo de destaque e uma acao, nao um destino: abre um processo. Quem nao
+# pode abrir -- o servidor, por regra do proprio sistema -- fica sem ele, e a
+# barra centraliza.
+ROTULO_ACAO_FLUTUANTE = "Novo Processo"
+
+
+def _barra_flutuante(user, items):
+    """Os destinos do menu que a barra mostra, na ordem em que os mostra.
+
+    Percorre tambem os filhos dos grupos: "Alunos" e "Disciplinas" nao ficam no
+    primeiro nivel do menu do servidor, e procurar so na superficie devolvia uma
+    barra mais curta sem nenhum sinal de que faltava alguem.
+    """
+    por_rotulo = {}
+    pendentes = list(items)
+    while pendentes:
+        item = pendentes.pop(0)
+        por_rotulo.setdefault(item["label"], item)
+        pendentes.extend(item["children"])
+
+    rotulos = BARRA_FLUTUANTE.get(user.tipo_usuario, ())
+    return [por_rotulo[rotulo] for rotulo in rotulos if rotulo in por_rotulo]
+
+
 def navegacao_lateral(request):
     if not request.user.is_authenticated:
         return {}
@@ -427,6 +468,9 @@ def navegacao_lateral(request):
             solicitar_cpf_aluno = not bool(request.user.aluno.cpf)
         except Aluno.DoesNotExist:
             pass
+    # Um levantamento so: a barra flutuante escolhe entre os mesmos itens que a
+    # gaveta mostra, e montar o menu duas vezes repetiria as consultas de setor.
+    itens_do_menu = _menu_lateral_items(request.user)
     return {
         "is_coordenador": _is_coordenador(request.user),
         "has_gestao_access": has_gestao_access,
@@ -441,6 +485,11 @@ def navegacao_lateral(request):
         # com extra_context, porque tem layout proprio de janela inteira.
         "mostra_moldura": True,
         "nav_menu_sections": _menu_lateral_sections(request.user),
-        "nav_side_menu_items": _menu_lateral_items(request.user),
+        "nav_side_menu_items": itens_do_menu,
+        "barra_flutuante": _barra_flutuante(request.user, itens_do_menu),
+        "barra_flutuante_acao": next(
+            (item for item in itens_do_menu if item["label"] == ROTULO_ACAO_FLUTUANTE),
+            None,
+        ),
         "solicitar_cpf_aluno": solicitar_cpf_aluno,
     }

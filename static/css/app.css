@@ -4765,3 +4765,149 @@ dialog::backdrop {
         justify-items: start;
     }
 }
+
+/* ==========================================================================
+   Barra flutuante de navegacao (somente em tela estreita)
+   ========================================================================== */
+
+/* Abaixo de 920px a barra lateral vira gaveta, e a navegacao inteira passava a
+   viver atras do botao de tres tracos -- no canto superior esquerdo, o ponto
+   mais distante do polegar de quem segura o aparelho com uma mao so. O que se
+   encontrava depois de tocar era uma lista de oito a vinte e um destinos.
+   Trocar de tela custava dois toques e uma leitura.
+
+   A barra traz os tres destinos de uso diario para a faixa que o polegar
+   alcanca, deixa a gaveta no quarto lugar -- ela continua tendo tudo -- e
+   separa a acao de criar num circulo proprio, porque criar nao e ir a lugar
+   nenhum. A forma vem da barra lateral, e nao de um preto generico: e o mesmo
+   azul, com o mesmo verde marcando o item ativo. */
+.barra-flutuante {
+    display: none;
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--espaco-4) + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 60;
+    align-items: center;
+    gap: var(--espaco-3);
+    max-width: calc(100vw - 2 * var(--espaco-4));
+    transition: opacity 160ms ease;
+}
+
+.barra-flutuante-itens {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    border-radius: 999px;
+    background:
+        radial-gradient(circle at 18% 0%, rgba(88, 201, 141, 0.18), transparent 55%),
+        linear-gradient(180deg, #063a78 0%, #002b63 100%);
+    box-shadow: 0 2px 6px rgba(0, 20, 50, 0.24), 0 14px 32px rgba(0, 20, 50, 0.28);
+}
+
+.barra-flutuante-item {
+    display: grid;
+    place-items: center;
+    width: 54px;
+    height: 50px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    /* Branco a 62% no repouso: os quatro icones precisam se ler como um
+       conjunto, e o que estiver ativo se destaca por contraste dentro dele. */
+    color: rgba(255, 255, 255, 0.62);
+    cursor: pointer;
+    transition: color 140ms ease, background-color 140ms ease;
+}
+
+.barra-flutuante-item svg {
+    width: 22px;
+    height: 22px;
+}
+
+.barra-flutuante-item:hover,
+.barra-flutuante-item:focus-visible {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* O ponto abaixo do icone e o que diz onde a pessoa esta. So a cor nao bastaria
+   -- num icone de 22px a diferenca entre branco e branco-62% e sutil, e quem
+   nao distingue matiz nao teria pista nenhuma. */
+.barra-flutuante-item.is-active {
+    color: #ffffff;
+}
+
+.barra-flutuante-item.is-active::after {
+    content: "";
+    width: 5px;
+    height: 5px;
+    margin-top: 3px;
+    border-radius: 50%;
+    background: var(--color-accent);
+}
+
+.barra-flutuante-item.is-active svg {
+    margin-top: 3px;
+}
+
+/* Fora da pilula, e nao dentro: e a unica coisa aqui que nao leva a outra tela,
+   e sim cria alguma coisa. A separacao fisica e o que diz isso antes da leitura
+   do icone. */
+.barra-flutuante-acao {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: var(--color-accent-strong);
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 20, 50, 0.2), 0 12px 26px rgba(47, 169, 107, 0.34);
+    transition: transform 140ms ease, background-color 140ms ease;
+}
+
+.barra-flutuante-acao svg {
+    width: 24px;
+    height: 24px;
+}
+
+.barra-flutuante-acao:hover,
+.barra-flutuante-acao:focus-visible {
+    background: #268a58;
+    transform: translateY(-1px);
+}
+
+@media (max-width: 920px) {
+    .barra-flutuante {
+        display: flex;
+    }
+
+    /* O ultimo cartao terminava embaixo da barra. A folga e a altura dela mais
+       o respiro que separa os cartoes entre si. */
+    .main-area {
+        padding-bottom: calc(72px + var(--espaco-5) + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* Com a gaveta aberta, a barra ficaria por cima da cortina escura,
+       oferecendo atalhos para um menu que ja esta na tela. */
+    body.menu-aberto .barra-flutuante {
+        opacity: 0;
+        pointer-events: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .barra-flutuante-item,
+    .barra-flutuante-acao {
+        transition: none;
+    }
+
+    .barra-flutuante-acao:hover {
+        transform: none;
+    }
+}

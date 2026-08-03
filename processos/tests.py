@@ -5347,6 +5347,114 @@ class PadraoVisualDosTemplatesTests(SimpleTestCase):
         self.assertEqual(culpados, [], f"templates com anotacao de desenvolvimento: {culpados}")
 
 
+class BarraFlutuanteTests(TestCase):
+    """A barra de navegacao que aparece em tela estreita.
+
+    Abaixo de 920px a barra lateral vira gaveta, e a navegacao inteira passava a
+    viver atras do botao no canto superior esquerdo -- o ponto mais distante do
+    polegar --, com uma lista de oito a vinte e um destinos do outro lado do
+    toque.
+
+    A barra monta a partir dos itens do proprio menu, e nao de uma segunda lista
+    de rotas: e o que impede que as duas discordem sobre onde um destino fica ou
+    quando ele esta ativo. O preco dessa escolha e que um rotulo que nao case com
+    nada some da barra em silencio -- foi o que aconteceu com "Alunos", que mora
+    dentro de um grupo do menu do servidor, enquanto a busca so olhava o primeiro
+    nivel. Dai a asercao ser sobre os rotulos exatos, e nao "pelo menos um".
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        senha = "senha-segura-123"
+        cls.aluno = Aluno.objects.create_user(
+            email="aluno.barra@example.com", password=senha, nome="Aluno Barra",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026M0009",
+        )
+        cls.docente = Docente.objects.create_user(
+            email="docente.barra@example.com", password=senha, nome="Docente Barra",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        cls.servidor = User.objects.create_user(
+            email="servidor.barra@example.com", password=senha, nome="Servidor Barra",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+
+    def _menu_e_barra(self, usuario):
+        """O menu e a barra da mesma construcao.
+
+        Cada chamada a _menu_lateral_items monta itens novos, entao comparar
+        objetos entre duas construcoes nunca daria identidade -- o que se quer
+        garantir e que a barra devolve os itens que recebeu, sem copiar.
+        """
+        from processos.context_processors import _barra_flutuante, _menu_lateral_items
+
+        itens = _menu_lateral_items(usuario)
+        return itens, _barra_flutuante(usuario, itens)
+
+    def _barra(self, usuario):
+        return self._menu_e_barra(usuario)[1]
+
+    def test_cada_perfil_recebe_os_tres_destinos_declarados(self):
+        esperado = {
+            "aluno": (self.aluno, ["Início", "Meus Processos", "Matrícula"]),
+            "docente": (self.docente, ["Início", "Meus Processos", "Meus Orientandos"]),
+            "servidor": (self.servidor, ["Início", "Caixa de Processos", "Alunos"]),
+        }
+        for perfil, (usuario, rotulos) in esperado.items():
+            with self.subTest(perfil=perfil):
+                self.assertEqual([item["label"] for item in self._barra(usuario)], rotulos)
+
+    def test_o_destino_da_barra_e_o_mesmo_do_menu(self):
+        """Endereco, icone e url_names vem do item do menu, nao de uma copia."""
+        for perfil, usuario in (("aluno", self.aluno), ("docente", self.docente), ("servidor", self.servidor)):
+            itens, barra = self._menu_e_barra(usuario)
+            do_menu = {}
+            pendentes = list(itens)
+            while pendentes:
+                item = pendentes.pop(0)
+                do_menu.setdefault(item["label"], item)
+                pendentes.extend(item["children"])
+            for item in barra:
+                with self.subTest(perfil=perfil, destino=item["label"]):
+                    self.assertIs(item, do_menu[item["label"]])
+
+    def test_o_circulo_de_acao_segue_a_permissao_de_abrir_processo(self):
+        """Servidor nao abre processo -- a barra dele nao oferece o atalho."""
+        for perfil, usuario, tem_acao in (
+            ("aluno", self.aluno, True),
+            ("docente", self.docente, True),
+            ("servidor", self.servidor, False),
+        ):
+            with self.subTest(perfil=perfil):
+                self.client.force_login(usuario)
+                resposta = self.client.get(reverse("home"))
+                self.assertEqual(bool(resposta.context["barra_flutuante_acao"]), tem_acao)
+                self.assertEqual("barra-flutuante-acao" in resposta.content.decode(), tem_acao)
+
+    def test_a_tela_atual_acende_exatamente_um_destino(self):
+        """Zero destinos acesos e o defeito que a busca rasa produzia."""
+        telas = {
+            "aluno": (self.aluno, ["home", "menu_meus_processos", "matriculas_minhas"]),
+            "docente": (self.docente, ["home", "menu_meus_processos", "menu_meus_orientandos"]),
+            "servidor": (self.servidor, ["home", "coordenacao_caixa_processos", "coordenacao_alunos"]),
+        }
+        for perfil, (usuario, url_names) in telas.items():
+            barra = self._barra(usuario)
+            for url_name in url_names:
+                with self.subTest(perfil=perfil, tela=url_name):
+                    acesos = [item["label"] for item in barra if url_name in item["url_names"]]
+                    self.assertEqual(len(acesos), 1, f"{url_name} acendeu {acesos or 'nada'} para {perfil}")
+
+    def test_a_gaveta_continua_alcancavel_pela_barra(self):
+        """A barra e atalho, nao substituicao: os outros destinos seguem na gaveta."""
+        self.client.force_login(self.servidor)
+        corpo = self.client.get(reverse("home")).content.decode()
+        # Os dois gatilhos: o da barra superior e o quarto lugar da barra de
+        # baixo. Conta-se aria-controls, e nao o data-, porque o proprio script
+        # cita o atributo ao procurar os gatilhos.
+        self.assertEqual(corpo.count('aria-controls="menu-lateral"'), 2)
+
+
 class MenuDaContaFechaTests(SimpleTestCase):
     """O painel da conta fecha por fora, nao so pelo chip que o abriu.
 

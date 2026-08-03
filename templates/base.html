@@ -194,13 +194,59 @@ propria sessao por cima -- nome, avisos e menu da conta.
         </div>{# .app-main -- aberta antes da barra superior #}
     {% endif %}
 </div>
+{% if user.is_authenticated and mostra_moldura and barra_flutuante %}
+    {% comment %}
+    Barra flutuante, so em tela estreita.
+
+    Ali a navegacao inteira estava atras do botao de tres tracos, no canto
+    superior esquerdo -- o ponto mais distante do polegar de quem segura o
+    aparelho --, e o que se achava depois de tocar era uma lista de oito a
+    vinte e um destinos. Trocar de tela custava dois toques e uma leitura.
+
+    Os tres destinos que a pessoa abre todo dia passam a ficar a um toque, na
+    faixa que o polegar alcanca. O quarto lugar e a gaveta, que continua tendo
+    tudo: a barra e atalho, nao substituicao. O circulo destacado e a acao de
+    criar, separado dos destinos porque nao leva a lugar nenhum -- executa.
+    {% endcomment %}
+    <nav class="barra-flutuante" aria-label="Navegação rápida">
+        <ul class="barra-flutuante-itens">
+            {% for item in barra_flutuante %}
+                <li>
+                    <a href="{{ item.href }}"
+                       class="barra-flutuante-item{% if request.resolver_match.url_name in item.url_names %} is-active{% endif %}"
+                       {% if request.resolver_match.url_name in item.url_names %}aria-current="page"{% endif %}>
+                        <svg aria-hidden="true"><use href="#i-{{ item.icon }}"></use></svg>
+                        <span class="apenas-leitor">{{ item.label }}</span>
+                    </a>
+                </li>
+            {% endfor %}
+            <li>
+                <button type="button" class="barra-flutuante-item" data-abrir-menu
+                        aria-label="Abrir menu de navegação" aria-expanded="false" aria-controls="menu-lateral">
+                    <svg aria-hidden="true"><use href="#i-menu"></use></svg>
+                </button>
+            </li>
+        </ul>
+        {% if barra_flutuante_acao %}
+            <a class="barra-flutuante-acao" href="{{ barra_flutuante_acao.href }}"
+               aria-label="{{ barra_flutuante_acao.label }}">
+                <svg aria-hidden="true"><use href="#i-novo-processo"></use></svg>
+            </a>
+        {% endif %}
+    </nav>
+{% endif %}
 {% if user.is_authenticated and mostra_moldura %}
 <script>
     // Menu lateral como gaveta no mobile. Em telas largas o CSS mantem a barra
     // sempre visivel e nada aqui tem efeito.
     (function () {
         const menu = document.getElementById("menu-lateral");
-        const abrir = document.querySelector("[data-abrir-menu]");
+        // Dois gatilhos desde a barra flutuante: o dos tres tracos na barra
+        // superior e o quarto lugar da barra de baixo. Os dois abrem a mesma
+        // gaveta e os dois precisam anunciar o estado, senao o leitor de tela
+        // diz "recolhido" sobre um menu aberto.
+        const gatilhos = [...document.querySelectorAll("[data-abrir-menu]")];
+        const abrir = gatilhos[0];
         if (!menu || !abrir) return;
 
         const focaveis = 'a[href], button:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
@@ -209,21 +255,33 @@ propria sessao por cima -- nome, avisos e menu da conta.
             return document.body.classList.contains("menu-aberto");
         }
 
+        // O foco volta para o gatilho que abriu, e nao sempre para o de cima:
+        // quem abriu pela barra de baixo teria o foco jogado para o outro
+        // extremo da tela ao fechar.
+        let ultimoGatilho = abrir;
+
+        function anunciar(estado) {
+            gatilhos.forEach(function (g) { g.setAttribute("aria-expanded", estado); });
+        }
+
         function abrirMenu() {
             document.body.classList.add("menu-aberto");
-            abrir.setAttribute("aria-expanded", "true");
+            anunciar("true");
             const primeiro = menu.querySelector(focaveis);
             if (primeiro) primeiro.focus();
         }
 
         function fecharMenu(devolverFoco) {
             document.body.classList.remove("menu-aberto");
-            abrir.setAttribute("aria-expanded", "false");
-            if (devolverFoco) abrir.focus();
+            anunciar("false");
+            if (devolverFoco) ultimoGatilho.focus();
         }
 
-        abrir.addEventListener("click", function () {
-            estaAberto() ? fecharMenu(true) : abrirMenu();
+        gatilhos.forEach(function (gatilho) {
+            gatilho.addEventListener("click", function () {
+                ultimoGatilho = gatilho;
+                estaAberto() ? fecharMenu(true) : abrirMenu();
+            });
         });
 
         document.querySelectorAll("[data-fechar-menu]").forEach(function (el) {
