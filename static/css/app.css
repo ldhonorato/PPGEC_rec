@@ -960,39 +960,6 @@ input[type="checkbox"] {
 
 
 
-/* --- Gaveta no mobile --- */
-
-.menu-toggle,
-.menu-fechar {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    width: 42px;
-    height: 42px;
-    padding: 0;
-    color: var(--color-primary);
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-}
-
-.menu-toggle:focus-visible,
-.menu-fechar:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
-}
-
-.menu-fechar {
-    margin-left: auto;
-    color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.28);
-}
-
-.sidebar-overlay {
-    display: none;
-}
-
 /* Ritmo vertical da coluna de conteudo.
 
    Cada bloco irmao se afasta do anterior sozinho. Antes o respiro dependia de
@@ -2436,63 +2403,15 @@ dialog::backdrop {
     /* Abaixo de 920px a barra vira gaveta. Antes ela ficava estatica no topo,
        empilhada acima do conteudo: em toda pagina o usuario rolava ~470px de
        menu antes de ver qualquer coisa. */
-    .menu-toggle,
-    .menu-fechar {
-        display: inline-flex;
-    }
-
     .brand-mobile {
         display: flex;
     }
 
-    /* A gaveta desliza nos dois sentidos.
-
-       O deslize de saida sempre existiu, mas ninguem o via: "visibility:
-       hidden" nao e animavel e valia no mesmo instante em que a classe saia do
-       body, entao a barra ficava invisivel enquanto percorria os 320px. Na tela
-       ela sumia de uma vez.
-
-       A visibilidade passa a esperar o fim do deslize para virar "hidden"
-       (delay de 0.24s ao fechar) e a mudar na hora ao abrir (delay 0), senao a
-       barra so apareceria depois de ja ter entrado. O elemento continua fora da
-       arvore de acessibilidade e do foco quando fechado, que e o motivo de o
-       visibility existir aqui. */
+    /* A barra lateral sai de cena: quem navega aqui e a barra flutuante, e a
+       folha que ela abre. A gaveta que existia neste lugar entrava pela
+       esquerda, puxada por um botao no canto oposto ao polegar. */
     .sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        z-index: 60;
-        flex-basis: auto;
-        width: min(86vw, 320px);
-        transform: translateX(-100%);
-        visibility: hidden;
-        transition: transform 0.24s ease, visibility 0s linear 0.24s;
-    }
-
-    .menu-aberto .sidebar {
-        transform: translateX(0);
-        visibility: visible;
-        transition: transform 0.24s ease, visibility 0s linear 0s;
-    }
-
-    .sidebar-overlay {
-        display: block;
-        position: fixed;
-        inset: 0;
-        z-index: 50;
-        background: rgba(4, 22, 48, 0.5);
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.24s ease;
-    }
-
-    .menu-aberto .sidebar-overlay {
-        opacity: 1;
-        pointer-events: auto;
-    }
-
-    .menu-aberto {
-        overflow: hidden;
+        display: none;
     }
 
     /* .dashboard-grid estava, por engano, na lista da regra de display acima --
@@ -3554,12 +3473,10 @@ dialog::backdrop {
         animation: none !important;
     }
 
-    /* A gaveta aparece e some sem deslizar. O delay da visibilidade cai junto:
-       mantido, ela continuaria visivel por 0.24s depois de fechada, sem
-       movimento nenhum -- o pior dos dois mundos. */
-    .sidebar,
-    .menu-aberto .sidebar,
-    .sidebar-overlay {
+    /* A folha aparece e some sem subir. */
+    .folha-navegacao,
+    .folha-navegacao::backdrop {
+        animation: none !important;
         transition: none !important;
     }
 }
@@ -4829,10 +4746,16 @@ dialog::backdrop {
     height: 22px;
 }
 
-.barra-flutuante-item:hover,
 .barra-flutuante-item:focus-visible {
     color: #ffffff;
     background: rgba(255, 255, 255, 0.1);
+}
+
+@media (hover: hover) {
+    .barra-flutuante-item:hover {
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.1);
+    }
 }
 
 /* O ponto abaixo do icone e o que diz onde a pessoa esta. So a cor nao bastaria
@@ -4876,10 +4799,15 @@ dialog::backdrop {
     height: 24px;
 }
 
-.barra-flutuante-acao:hover,
 .barra-flutuante-acao:focus-visible {
     background: #268a58;
-    transform: translateY(-1px);
+}
+
+@media (hover: hover) {
+    .barra-flutuante-acao:hover {
+        background: #268a58;
+        transform: translateY(-1px);
+    }
 }
 
 @media (max-width: 920px) {
@@ -4893,12 +4821,6 @@ dialog::backdrop {
         padding-bottom: calc(72px + var(--espaco-5) + env(safe-area-inset-bottom, 0px));
     }
 
-    /* Com a gaveta aberta, a barra ficaria por cima da cortina escura,
-       oferecendo atalhos para um menu que ja esta na tela. */
-    body.menu-aberto .barra-flutuante {
-        opacity: 0;
-        pointer-events: none;
-    }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4909,5 +4831,231 @@ dialog::backdrop {
 
     .barra-flutuante-acao:hover {
         transform: none;
+    }
+}
+
+/* ==========================================================================
+   Folha de navegacao (somente em tela estreita)
+   ========================================================================== */
+
+/* Substitui a gaveta lateral. A gaveta entrava pela esquerda, puxada por um
+   botao no canto superior esquerdo -- o ponto mais distante do polegar. A folha
+   sobe do lado de onde o dedo tocou, que e a barra flutuante.
+
+   Sendo <dialog>, ela ja nasce com Esc, prisao de foco e o conteudo de tras
+   inerte; o que se escreve aqui e so a forma. */
+.folha-navegacao {
+    width: 100%;
+    max-width: none;
+    max-height: 82dvh;
+    margin: 0;
+    margin-top: auto;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    border: 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    background: var(--color-surface);
+    box-shadow: 0 -8px 40px rgba(4, 22, 48, 0.24);
+}
+
+.folha-navegacao::backdrop {
+    background: rgba(4, 22, 48, 0.5);
+}
+
+/* Sobe do rodape em vez de aparecer inteira: e o movimento que liga a folha ao
+   toque que a abriu, na barra logo abaixo. */
+.folha-navegacao[open] {
+    animation: folha-sobe 0.24s ease;
+}
+
+.folha-navegacao[open]::backdrop {
+    animation: folha-escurece 0.24s ease;
+}
+
+@keyframes folha-sobe {
+    from { transform: translateY(12%); }
+}
+
+@keyframes folha-escurece {
+    from { background: rgba(4, 22, 48, 0); }
+}
+
+.folha-cabecalho {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    flex: 0 0 auto;
+    padding: var(--espaco-5) var(--espaco-5) var(--espaco-4);
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* A pega no topo diz que a folha vem de baixo e pode voltar para la. Nao e
+   controle -- nao ha arrasto --, e sinal de origem. */
+.folha-alca {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--color-border);
+}
+
+.folha-titulo {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.folha-fechar {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-left: auto;
+    padding: 0;
+    color: var(--color-muted);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.folha-fechar svg {
+    width: 18px;
+    height: 18px;
+}
+
+.folha-rolagem {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--espaco-4) var(--espaco-4) var(--espaco-5);
+}
+
+.folha-secao {
+    margin: var(--espaco-4) 0 var(--espaco-2);
+    padding: 0 var(--espaco-2);
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.folha-rolagem > .folha-secao:first-child {
+    margin-top: 0;
+}
+
+.folha-lista {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* O grupo tem titulo e um filete a esquerda, e nao uma sanfona: numa lista de
+   vinte e um destinos, cada sanfona fechada e mais um toque entre a pessoa e o
+   lugar aonde ela vai. */
+.folha-grupo {
+    margin: var(--espaco-2) 0;
+    padding-left: var(--espaco-3);
+    border-left: 2px solid var(--color-border);
+}
+
+.folha-grupo-titulo {
+    margin: 0 0 var(--espaco-1);
+    padding: 0 var(--espaco-2);
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.folha-item {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    /* 52px de altura util: o alvo de toque nao depende do tamanho do rotulo. */
+    min-height: 52px;
+    padding: var(--espaco-2) var(--espaco-3);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+/* O hover fica atras de (hover: hover) porque em tela de toque ele nao existe
+   de verdade: o navegador o aplica no ultimo item tocado e nao o retira, entao
+   um destino qualquer ficava com a marca de destino atual depois de a folha
+   abrir. O foco continua valendo sempre -- e por ele que se navega no teclado. */
+.folha-item:focus-visible {
+    background: var(--color-primary-soft);
+}
+
+@media (hover: hover) {
+    .folha-item:hover {
+        background: var(--color-primary-soft);
+    }
+}
+
+.folha-icone {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    color: var(--color-muted);
+}
+
+.folha-texto {
+    display: grid;
+    min-width: 0;
+}
+
+.folha-rotulo {
+    font-weight: 600;
+    font-size: 0.94rem;
+}
+
+.folha-descricao {
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+/* Mesma marcacao da barra lateral: fundo claro, rotulo no azul da marca e o
+   icone no verde. Quem passa do desktop para o celular reconhece o estado. */
+.folha-item.is-active {
+    background: var(--color-primary-soft);
+}
+
+.folha-item.is-active .folha-rotulo {
+    color: var(--color-primary);
+}
+
+.folha-item.is-active .folha-icone {
+    color: var(--color-accent-strong);
+}
+
+.folha-rodape {
+    display: grid;
+    gap: 2px;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: var(--espaco-4) var(--espaco-5) calc(var(--espaco-4) + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.78rem;
+}
+
+/* Acima de 920px a barra lateral esta na tela inteira o tempo todo, e nao ha
+   gatilho que alcance a folha. A regra existe para o caso de o dialogo ser
+   aberto por outro caminho -- teclado, script -- numa largura em que ele nao
+   faz sentido. */
+@media (min-width: 921px) {
+    .folha-navegacao {
+        display: none;
     }
 }

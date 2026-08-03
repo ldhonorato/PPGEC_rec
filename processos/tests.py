@@ -5445,14 +5445,52 @@ class BarraFlutuanteTests(TestCase):
                     acesos = [item["label"] for item in barra if url_name in item["url_names"]]
                     self.assertEqual(len(acesos), 1, f"{url_name} acendeu {acesos or 'nada'} para {perfil}")
 
-    def test_a_gaveta_continua_alcancavel_pela_barra(self):
-        """A barra e atalho, nao substituicao: os outros destinos seguem na gaveta."""
+    def test_a_navegacao_completa_tem_um_gatilho_so(self):
+        """A barra e atalho, nao substituicao -- mas o caminho para o resto e um.
+
+        Quando a barra flutuante nasceu, o botao de tres tracos continuou na
+        barra superior: dois gatilhos para a mesma gaveta, um deles no canto
+        oposto ao polegar. Ficou o de baixo, e o que ele abre e a folha.
+        """
         self.client.force_login(self.servidor)
         corpo = self.client.get(reverse("home")).content.decode()
-        # Os dois gatilhos: o da barra superior e o quarto lugar da barra de
-        # baixo. Conta-se aria-controls, e nao o data-, porque o proprio script
-        # cita o atributo ao procurar os gatilhos.
-        self.assertEqual(corpo.count('aria-controls="menu-lateral"'), 2)
+        # aria-controls, e nao o data-: o proprio script cita o atributo ao
+        # procurar o gatilho, e contar o data- somaria o botao com o codigo.
+        self.assertEqual(corpo.count('aria-controls="folha-navegacao"'), 1)
+        self.assertNotIn('class="menu-toggle"', corpo)
+        self.assertIn('id="folha-navegacao"', corpo)
+
+    @staticmethod
+    def _marcacao_da_folha(corpo):
+        """So o trecho do dialogo.
+
+        A pagina inteira nao serve: a barra lateral continua no HTML -- oculta
+        por CSS em tela estreita, mas presente -- e carrega os mesmos enderecos.
+        Procurar no corpo todo dava um teste que passava com a folha vazia.
+        """
+        inicio = corpo.index('<dialog id="folha-navegacao"')
+        return corpo[inicio:corpo.index("</dialog>", inicio)]
+
+    def test_a_folha_leva_a_todo_destino_do_menu(self):
+        """O que sai da barra tem de estar na folha, senao fica inalcancavel.
+
+        A folha achata os grupos -- um grupo nao vira link, porque o endereco
+        dele repete o do primeiro filho --, entao a conta e sobre as folhas da
+        arvore, e nao sobre o primeiro nivel.
+        """
+        from processos.context_processors import _menu_lateral_items
+
+        for perfil, usuario in (("aluno", self.aluno), ("docente", self.docente), ("servidor", self.servidor)):
+            with self.subTest(perfil=perfil):
+                self.client.force_login(usuario)
+                folha = self._marcacao_da_folha(self.client.get(reverse("home")).content.decode())
+                pendentes = list(_menu_lateral_items(usuario))
+                while pendentes:
+                    item = pendentes.pop(0)
+                    if item["children"]:
+                        pendentes.extend(item["children"])
+                        continue
+                    self.assertIn(f'href="{item["href"]}"', folha, f'{item["label"]} sumiu da folha')
 
 
 class MenuDaContaFechaTests(SimpleTestCase):

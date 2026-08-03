@@ -32,16 +32,12 @@ propria sessao por cima -- nome, avisos e menu da conta.
         navegacao, a superior cuida de alertas e conta. Perfil/Sair ficam so na
         superior; antes apareciam nos dois lugares.
         {% endcomment %}
-        <div class="sidebar-overlay" data-fechar-menu></div>
         <nav id="menu-lateral" class="sidebar" aria-label="Menu principal">
             <div class="sidebar-program">
                 <a class="sidebar-brand" href="{% url 'home' %}" aria-label="AcadFlow — ir para o início">
                     <img class="sidebar-brand-logo" src="{% static 'img/acadflow-wordmark-branco.png' %}" alt="AcadFlow">
                     <span class="sidebar-programa">PPGEC · Pós-Graduação em Engenharia de Computação</span>
                 </a>
-                <button type="button" class="menu-fechar" data-fechar-menu aria-label="Fechar menu">
-                    <svg class="nav-icon" aria-hidden="true"><use href="#i-fechar"></use></svg>
-                </button>
             </div>
 
         <div class="sidebar-scroll">
@@ -105,10 +101,13 @@ propria sessao por cima -- nome, avisos e menu da conta.
         <div class="app-main">
             <header class="topbar">
                 <div class="topbar-content">
-                    <button type="button" class="menu-toggle" data-abrir-menu
-                            aria-label="Abrir menu de navegação" aria-expanded="false" aria-controls="menu-lateral">
-                        <svg class="nav-icon" aria-hidden="true"><use href="#i-menu"></use></svg>
-                    </button>
+                    {% comment %}
+                    O botao de tres tracos vivia aqui. Com a barra flutuante, a
+                    navegacao passou a ter dois gatilhos para a mesma coisa --
+                    um no canto superior esquerdo, outro ao alcance do polegar.
+                    Ficou o de baixo: e onde a mao esta, e a folha que ele abre
+                    sobe de onde o dedo tocou.
+                    {% endcomment %}
                     <a class="brand-mobile" href="{% url 'home' %}" aria-label="AcadFlow">
                         <img src="{% static 'img/acadflow-wordmark.png' %}" alt="AcadFlow">
                     </a>
@@ -221,8 +220,8 @@ propria sessao por cima -- nome, avisos e menu da conta.
                 </li>
             {% endfor %}
             <li>
-                <button type="button" class="barra-flutuante-item" data-abrir-menu
-                        aria-label="Abrir menu de navegação" aria-expanded="false" aria-controls="menu-lateral">
+                <button type="button" class="barra-flutuante-item" data-abrir-folha
+                        aria-label="Abrir menu de navegação" aria-haspopup="dialog" aria-controls="folha-navegacao">
                     <svg aria-hidden="true"><use href="#i-menu"></use></svg>
                 </button>
             </li>
@@ -234,73 +233,114 @@ propria sessao por cima -- nome, avisos e menu da conta.
             </a>
         {% endif %}
     </nav>
+
+    {% comment %}
+    A folha com a navegacao completa.
+
+    Substitui a gaveta lateral em tela estreita. A gaveta entrava pela esquerda,
+    aberta por um botao no canto oposto ao polegar; a folha sobe do lado de onde
+    o dedo tocou. E um <dialog>, como os demais modais da plataforma, entao Esc,
+    prisao de foco e isolamento do que fica atras vem do navegador.
+
+    Os grupos aparecem abertos, e nao como sanfonas: numa lista de vinte e um
+    destinos, cada sanfona fechada e mais um toque entre a pessoa e o destino, e
+    o titulo do grupo ja separa visualmente sem esconder nada.
+    {% endcomment %}
+    <dialog id="folha-navegacao" class="folha-navegacao">
+        <div class="folha-cabecalho">
+            <span class="folha-alca" aria-hidden="true"></span>
+            <h2 class="folha-titulo">Navegação</h2>
+            <button type="button" class="folha-fechar" data-fechar-folha aria-label="Fechar menu">
+                <svg aria-hidden="true"><use href="#i-fechar"></use></svg>
+            </button>
+        </div>
+
+        <div class="folha-rolagem">
+            {% for section in nav_menu_sections %}
+                <p class="folha-secao" id="folha-secao-{{ forloop.counter }}">{{ section.label }}</p>
+                <ul class="folha-lista" aria-labelledby="folha-secao-{{ forloop.counter }}">
+                    {% for item in section.items %}
+                        {% if item.children %}
+                            {% comment %}
+                            O grupo nao vira link: o endereco dele repete o do
+                            primeiro filho, e dois toques para o mesmo lugar,
+                            um deles sem dizer que e o mesmo, so confunde.
+                            {% endcomment %}
+                            <li class="folha-grupo">
+                                <p class="folha-grupo-titulo">{{ item.label }}</p>
+                                <ul class="folha-lista">
+                                    {% for child in item.children %}
+                                        <li>
+                                            <a class="folha-item{% if request.resolver_match.url_name in child.url_names %} is-active{% endif %}"
+                                               href="{{ child.href }}"
+                                               {% if request.resolver_match.url_name in child.url_names %}aria-current="page"{% endif %}>
+                                                <svg class="folha-icone" aria-hidden="true"><use href="#i-{{ child.icon }}"></use></svg>
+                                                <span class="folha-texto">
+                                                    <span class="folha-rotulo">{{ child.label }}</span>
+                                                    {% if child.descricao %}<span class="folha-descricao">{{ child.descricao }}</span>{% endif %}
+                                                </span>
+                                            </a>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </li>
+                        {% else %}
+                            <li>
+                                <a class="folha-item{% if request.resolver_match.url_name in item.url_names %} is-active{% endif %}"
+                                   href="{{ item.href }}"
+                                   {% if request.resolver_match.url_name in item.url_names %}aria-current="page"{% endif %}>
+                                    <svg class="folha-icone" aria-hidden="true"><use href="#i-{{ item.icon }}"></use></svg>
+                                    <span class="folha-texto">
+                                        <span class="folha-rotulo">{{ item.label }}</span>
+                                        {% if item.descricao %}<span class="folha-descricao">{{ item.descricao }}</span>{% endif %}
+                                    </span>
+                                </a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            {% endfor %}
+        </div>
+
+        <p class="folha-rodape">
+            <a href="{% url 'version' %}">v{{ app_versao }}</a>
+            <span>{{ app_copyright }}</span>
+        </p>
+    </dialog>
 {% endif %}
 {% if user.is_authenticated and mostra_moldura %}
 <script>
-    // Menu lateral como gaveta no mobile. Em telas largas o CSS mantem a barra
-    // sempre visivel e nada aqui tem efeito.
+    // Folha de navegacao. So existe em tela estreita, onde a barra lateral nao
+    // cabe; acima de 920px o CSS a esconde e nada aqui e alcancavel.
+    //
+    // Sendo <dialog>, Esc, prisao de foco e isolamento do que fica atras vem do
+    // navegador. O que falta e o clique fora, que <dialog> nao trata: o alvo do
+    // clique no ::backdrop e o proprio dialogo, entao a conta e de coordenada.
     (function () {
-        const menu = document.getElementById("menu-lateral");
-        // Dois gatilhos desde a barra flutuante: o dos tres tracos na barra
-        // superior e o quarto lugar da barra de baixo. Os dois abrem a mesma
-        // gaveta e os dois precisam anunciar o estado, senao o leitor de tela
-        // diz "recolhido" sobre um menu aberto.
-        const gatilhos = [...document.querySelectorAll("[data-abrir-menu]")];
-        const abrir = gatilhos[0];
-        if (!menu || !abrir) return;
+        const folha = document.getElementById("folha-navegacao");
+        const abrir = document.querySelector("[data-abrir-folha]");
+        if (!folha || !abrir) return;
 
-        const focaveis = 'a[href], button:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
-
-        function estaAberto() {
-            return document.body.classList.contains("menu-aberto");
-        }
-
-        // O foco volta para o gatilho que abriu, e nao sempre para o de cima:
-        // quem abriu pela barra de baixo teria o foco jogado para o outro
-        // extremo da tela ao fechar.
-        let ultimoGatilho = abrir;
-
-        function anunciar(estado) {
-            gatilhos.forEach(function (g) { g.setAttribute("aria-expanded", estado); });
-        }
-
-        function abrirMenu() {
-            document.body.classList.add("menu-aberto");
-            anunciar("true");
-            const primeiro = menu.querySelector(focaveis);
-            if (primeiro) primeiro.focus();
-        }
-
-        function fecharMenu(devolverFoco) {
-            document.body.classList.remove("menu-aberto");
-            anunciar("false");
-            if (devolverFoco) ultimoGatilho.focus();
-        }
-
-        gatilhos.forEach(function (gatilho) {
-            gatilho.addEventListener("click", function () {
-                ultimoGatilho = gatilho;
-                estaAberto() ? fecharMenu(true) : abrirMenu();
-            });
+        abrir.addEventListener("click", function () {
+            folha.showModal();
         });
 
-        document.querySelectorAll("[data-fechar-menu]").forEach(function (el) {
-            el.addEventListener("click", function () { fecharMenu(true); });
+        folha.querySelectorAll("[data-fechar-folha]").forEach(function (el) {
+            el.addEventListener("click", function () { folha.close(); });
         });
 
-        document.addEventListener("keydown", function (e) {
-            if (e.key === "Escape" && estaAberto()) fecharMenu(true);
+        folha.addEventListener("click", function (e) {
+            const area = folha.getBoundingClientRect();
+            const dentro =
+                e.clientX >= area.left && e.clientX <= area.right &&
+                e.clientY >= area.top && e.clientY <= area.bottom;
+            if (!dentro) folha.close();
         });
 
-        // Navegar fecha a gaveta; sem isso ela ficaria aberta sobre a pagina nova.
-        menu.addEventListener("click", function (e) {
-            if (e.target.closest("a[href]") && estaAberto()) fecharMenu(false);
-        });
-
-        // Voltar ao desktop com a gaveta aberta deixaria o body travado.
-        const largura = window.matchMedia("(min-width: 921px)");
-        largura.addEventListener("change", function (e) {
-            if (e.matches && estaAberto()) fecharMenu(false);
+        // Voltar ao desktop com a folha aberta deixaria um menu suspenso sobre
+        // uma tela que ja mostra a barra lateral inteira.
+        window.matchMedia("(min-width: 921px)").addEventListener("change", function (e) {
+            if (e.matches && folha.open) folha.close();
         });
     })();
 
