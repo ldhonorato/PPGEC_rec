@@ -19,7 +19,7 @@
         <h2 class="section-title">Discente e trajetória</h2>
         {% include "includes/campo_formulario.html" with campo=form.aluno %}
 
-        <div class="field hidden-field">
+        <div class="formulario-campo" hidden>
             <label for="{{ form.trajetoria.id_for_label }}">{{ form.trajetoria.label }}</label>
             {{ form.trajetoria }}
             {{ form.trajetoria.errors }}
@@ -163,12 +163,12 @@
     {{ papel.nome_field }}
     {{ papel.nome_field.errors }}
 </div>
-                            <div class="field {% if not papel.exige_instituicao %}optional-banca-field{% endif %}">
+                            <div class="formulario-campo {% if not papel.exige_instituicao %}optional-banca-field{% endif %}">
                                 <label for="{{ papel.instituicao_field.id_for_label }}">Instituição/IES</label>
                                 {{ papel.instituicao_field }}
                                 {{ papel.instituicao_field.errors }}
                             </div>
-                            <div class="field {% if not papel.exige_cpf %}optional-banca-field{% endif %}">
+                            <div class="formulario-campo {% if not papel.exige_cpf %}optional-banca-field{% endif %}">
                                 <label for="{{ papel.cpf_field.id_for_label }}">CPF</label>
                                 {{ papel.cpf_field }}
                                 {{ papel.cpf_field.errors }}
@@ -180,7 +180,7 @@
         {% endfor %}
     </section>
 
-    <div class="form-actions">
+    <div class="formulario-acoes">
         <button class="btn btn-secondary" type="submit" name="acao" value="rascunho">Salvar rascunho</button>
         <button class="btn" type="submit" name="acao" value="finalizar">Finalizar solicitação</button>
     </div>

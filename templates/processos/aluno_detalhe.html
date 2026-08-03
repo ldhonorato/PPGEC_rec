@@ -458,7 +458,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
             </div>
             <label>Comentário</label>
             {{ dados_form.comentario }}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar dados</button>
             </div>
         </form>
@@ -525,7 +525,7 @@ faltava a da coordenacao.
 
             <label>Comentário</label>
             {{ nova_trajetoria_form.comentario }}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Cadastrar trajetória</button>
             </div>
         </form>
@@ -556,7 +556,7 @@ faltava a da coordenacao.
             <p class="item-observacao">
                 O comentário será registrado como observação administrativa da secretaria.
             </p>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar lançamento</button>
             </div>
         </form>
@@ -580,7 +580,7 @@ faltava a da coordenacao.
             </select>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar status</button>
             </div>
         </form>
@@ -599,7 +599,7 @@ faltava a da coordenacao.
             {{ form.nivel_curso }}
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar nível</button>
             </div>
         </form>
@@ -618,7 +618,7 @@ faltava a da coordenacao.
             <input name="prazo_qualificacao" value="{{ trajetoria.prazo_qualificacao }}" placeholder="YYYY.1 ou YYYY.2">
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar prazo</button>
             </div>
         </form>
@@ -637,7 +637,7 @@ faltava a da coordenacao.
             <input name="prazo_defesa" value="{{ trajetoria.prazo_defesa }}" placeholder="YYYY.1 ou YYYY.2">
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar prazo</button>
             </div>
         </form>
@@ -655,7 +655,7 @@ faltava a da coordenacao.
             <label><input type="checkbox" name="reingressante" {% if trajetoria.reingressante %}checked{% endif %}> Reingressante</label>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar reingressante</button>
             </div>
         </form>
@@ -703,7 +703,7 @@ faltava a da coordenacao.
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
 
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">
                 Criar estágio
             </button>
@@ -775,7 +775,7 @@ faltava a da coordenacao.
                       rows="3"
                       required></textarea>
 
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar alterações</button>
             </div>
 
@@ -796,7 +796,7 @@ faltava a da coordenacao.
             <label><input type="checkbox" name="isQualificado" {% if trajetoria.isQualificado %}checked{% endif %}> {{ trajetoria.qualificacao_label }} concluído</label>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar</button>
             </div>
         </form>
@@ -815,7 +815,7 @@ faltava a da coordenacao.
             {{ form.orientador }}
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar {% if trajetoria.nivel_curso == "POSDOUTORADO" %}supervisor{% else %}orientador{% endif %}</button>
             </div>
         </form>
@@ -846,7 +846,7 @@ faltava a da coordenacao.
             </div>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar coorientador</button>
             </div>
         </form>
@@ -867,7 +867,7 @@ faltava a da coordenacao.
             </div>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar {{ trajetoria.conclusao_label_lower }}</button>
             </div>
         </form>
@@ -885,7 +885,7 @@ faltava a da coordenacao.
             <label><input type="checkbox" name="deposito_versao_final" {% if trajetoria.deposito_versao_final %}checked{% endif %}> Depósito da versão final</label>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar depósito</button>
             </div>
         </form>
@@ -910,7 +910,7 @@ faltava a da coordenacao.
             </div>
             <label>Autores</label>
             {{ publicacao_form.autores }}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar publicação</button>
             </div>
         </form>
@@ -943,7 +943,7 @@ faltava a da coordenacao.
             </div>
             <label>Autores</label>
             <textarea name="autores" rows="3">{{ publicacao.autores }}</textarea>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar publicação</button>
             </div>
         </form>
@@ -969,7 +969,7 @@ faltava a da coordenacao.
                 <div class="formulario-campo"><label>Carga horária</label>{{ disciplina_form.carga_horaria }}</div>
                 <div class="formulario-campo"><label>Situação</label>{{ disciplina_form.situacao }}</div>
             </div>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar disciplina</button>
             </div>
         </form>
@@ -1002,7 +1002,7 @@ faltava a da coordenacao.
                     </select>
                 </div>
             </div>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar disciplina</button>
             </div>
         </form>

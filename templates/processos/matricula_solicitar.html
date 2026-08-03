@@ -65,13 +65,13 @@ nenhum para mostrar.
             </div>
         </dl>
 
-        <div class="field checkbox-field">
+        <div class="formulario-campo formulario-campo-marcavel">
             {{ form.matricula_vinculo }}
             <label for="{{ form.matricula_vinculo.id_for_label }}">{{ form.matricula_vinculo.label }}</label>
             {{ form.matricula_vinculo.errors }}
         </div>
 
-        <div class="field" data-disciplinas-field>
+        <div class="formulario-campo" data-disciplinas-field>
             <label>{{ form.ofertas.label }}</label>
             {{ form.ofertas.errors }}
             {% if form.fields.ofertas.queryset %}
@@ -134,12 +134,12 @@ nenhum para mostrar.
             {% endif %}
         </div>
 
-        <div class="field">
+        <div class="formulario-campo">
             {{ form.aceitar_lista_espera.errors }}
         </div>
 
         {% include "includes/campo_formulario.html" with campo=form.observacao %}
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button class="btn" type="button" data-open-confirmacao>Enviar solicitação</button>
         </div>
     </form>
@@ -174,7 +174,7 @@ comparar de cabeca.
             </div>
             <div><dt>Solicitação</dt><dd data-resumo-tipo>Matrícula vínculo</dd></div>
         </dl>
-        <div class="field" data-resumo-disciplinas-wrap hidden>
+        <div class="formulario-campo" data-resumo-disciplinas-wrap hidden>
             <label>Disciplinas selecionadas</label>
             <ul class="list" data-resumo-disciplinas></ul>
         </div>
@@ -182,7 +182,7 @@ comparar de cabeca.
             Estou ciente de que as matrículas serão processadas por ordem de inscrição
             e que posso ficar em lista de espera quando não houver vaga.
         </p>
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button class="btn btn-secondary" type="button" data-close-confirmacao>Voltar</button>
             <button class="btn" type="button" data-confirmar-matricula>Confirmar e enviar</button>
         </div>

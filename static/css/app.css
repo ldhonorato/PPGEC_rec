@@ -1227,10 +1227,6 @@ label {
     font-weight: 600;
 }
 
-.field {
-    margin-bottom: 0.9rem;
-}
-
 .checkbox-field {
     display: flex;
     align-items: center;
@@ -1276,10 +1272,6 @@ label {
 
 .time-grid {
     gap: 0.75rem;
-}
-
-.hidden-field {
-    display: none;
 }
 
 .trajectory-panel {
@@ -1483,6 +1475,14 @@ dialog::backdrop {
     padding: var(--espaco-5);
 }
 
+/* Fora do modal, o limite de 42rem existe para a linha do campo nao ficar
+   larga demais para o olho percorrer. Dentro, quem ja limita e o proprio
+   dialogo -- manter os dois faz o formulario parar antes da borda e deixar
+   uma faixa vazia a direita, como se algo tivesse ficado de fora. */
+.modal-dialog .formulario {
+    max-width: none;
+}
+
 .cpf-pendente-modal {
     width: min(520px, 92vw);
     border: 2px solid var(--color-primary);
@@ -1495,7 +1495,7 @@ dialog::backdrop {
     backdrop-filter: blur(2px);
 }
 
-.cpf-pendente-modal .field {
+.cpf-pendente-modal .formulario-campo {
     text-align: left;
 }
 
@@ -1515,13 +1515,6 @@ dialog::backdrop {
 .field-tooltip {
     cursor: help;
     color: var(--color-primary);
-}
-
-.form-actions {
-    display: flex;
-    gap: 0.7rem;
-    justify-content: flex-end;
-    flex-wrap: wrap;
 }
 
 /* Faixa de abertura. Substitui um bloco de 245px que repetia a marca da
@@ -2108,7 +2101,7 @@ dialog::backdrop {
 
 /* Botoes do formulario acompanham a largura dos campos, senao ficam soltos
    na outra ponta do cartao. */
-.form-coluna .form-actions,
+.form-coluna .formulario-acoes,
 .form-coluna .actions-row {
     max-width: 42rem;
 }
@@ -4500,6 +4493,24 @@ dialog::backdrop {
 .formulario-campo {
     display: grid;
     gap: 0.35rem;
+    /* As linhas empacotam em cima em vez de esticar. Num formulario de duas
+       colunas, a altura da linha e a do campo mais alto -- uma ementa de seis
+       linhas ao lado de "Carga horaria" fazia a caixa de uma linha so crescer
+       ate o rodape da outra, com o rotulo la em cima e o campo la embaixo,
+       parecendo dois campos diferentes. */
+    align-content: start;
+    margin-bottom: var(--espaco-4);
+}
+
+/* Dentro dos envolventes que ja distribuem o espaco -- .formulario com o seu
+   gap, .filtros com o dele --, a margem viraria soma: um campo afastado do
+   proximo por gap + margem, e o ultimo empurrando os botoes para longe. Fora
+   deles, e a margem que separa um campo do outro; nem todo formulario da casa
+   e uma pilha de campos, e os que misturam campo e conteudo continuam
+   dependendo dela. */
+.formulario .formulario-campo,
+.filtros .formulario-campo {
+    margin-bottom: 0;
 }
 
 .formulario-campo > label {
@@ -4516,6 +4527,32 @@ dialog::backdrop {
     margin-left: 0.15rem;
     color: var(--color-danger);
     font-weight: 600;
+}
+
+/* O display:grid acima venceria o display:none que o atributo hidden aplica
+   pela folha do navegador -- classe ganha de seletor de elemento. Sem esta
+   regra, esconder um campo pelo atributo nao esconde nada. */
+.formulario-campo[hidden] {
+    display: none;
+}
+
+/* Caixa de marcar: o controle vem antes do rotulo, os dois na mesma linha. A
+   pergunta e a resposta sao a mesma coisa aqui -- empilhar rotulo e caixa,
+   como nos outros campos, separaria o que se le do que se clica. */
+.formulario-campo-marcavel {
+    grid-auto-flow: column;
+    justify-content: start;
+    align-items: center;
+    gap: var(--espaco-3);
+}
+
+.formulario-campo-marcavel input {
+    width: auto;
+    margin: 0;
+}
+
+.formulario-campo-marcavel > label {
+    font-weight: 500;
 }
 
 .formulario-campo input,

@@ -5,7 +5,7 @@
     <h1 class="section-title">Caixa de processos</h1>
     {% if opcoes_caixa %}
         <form method="get" class="form-busca">
-            <div class="field">
+            <div class="formulario-campo">
                 <label for="id_caixa">Visualizar caixa</label>
                 <select id="id_caixa" name="caixa" onchange="this.form.submit()">
                     {% for opcao in opcoes_caixa %}

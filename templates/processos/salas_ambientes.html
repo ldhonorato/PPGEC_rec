@@ -39,7 +39,7 @@
                     {{ field.errors }}
                 </div>
             {% endfor %}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Cadastrar sala</button>
             </div>
         </form>
@@ -147,13 +147,13 @@
                                     </select>
                                 </div>
                             {% endif %}
-                            <div class="field checkbox-field">
+                            <div class="formulario-campo formulario-campo-marcavel">
                                 <input id="sala-edit-{{ sala.pk }}-ativa" type="checkbox" name="sala_edit-ativa" {% if sala.ativa %}checked{% endif %}>
                                 <label for="sala-edit-{{ sala.pk }}-ativa">Ativa</label>
                             </div>
                         {% endif %}
 
-                        <div class="form-actions">
+                        <div class="formulario-acoes">
                             <button class="btn" type="submit">Salvar sala</button>
                         </div>
                     </form>
@@ -179,11 +179,11 @@
                         </div>
 
                         <div class="grid-two time-grid">
-                            <div class="field">
+                            <div class="formulario-campo">
                                 <label for="disp-{{ sala.pk }}-hora-inicio">Hora de início</label>
                                 <input id="disp-{{ sala.pk }}-hora-inicio" type="time" name="disp-hora_inicio" required>
                             </div>
-                            <div class="field">
+                            <div class="formulario-campo">
                                 <label for="disp-{{ sala.pk }}-hora-fim">Hora de fim</label>
                                 <input id="disp-{{ sala.pk }}-hora-fim" type="time" name="disp-hora_fim" required>
                                 {% if modal_aberto == sala_modal_id %}
@@ -192,7 +192,7 @@
                             </div>
                         </div>
 
-                        <div class="form-actions">
+                        <div class="formulario-acoes">
                             <button class="btn" type="submit">Adicionar horário</button>
                         </div>
                     </form>

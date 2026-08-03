@@ -14,7 +14,7 @@
     {% endfor %}
 
     <h2 class="section-title titulo-interno">Membros docentes</h2>
-    <div class="field">
+    <div class="formulario-campo">
         {{ form.docentes.errors }}
         <div class="checkbox-list">
             {{ form.docentes }}
@@ -22,7 +22,7 @@
     </div>
 
     <h2 class="section-title titulo-interno">Membros servidores</h2>
-    <div class="field">
+    <div class="formulario-campo">
         {{ form.servidores.errors }}
         <div class="checkbox-list">
             {{ form.servidores }}
@@ -30,7 +30,7 @@
     </div>
 
     <h2 class="section-title titulo-interno">Membros alunos</h2>
-    <div class="field">
+    <div class="formulario-campo">
         <label for="busca-alunos-comissao">Buscar aluno por nome ou email</label>
         <input id="busca-alunos-comissao" type="search" placeholder="Digite para filtrar alunos">
         {{ form.alunos.errors }}
@@ -46,7 +46,7 @@
     </div>
 
     {% for field in form.hidden_fields %}
-        <div class="field">
+        <div class="formulario-campo">
             {{ field }}
             {{ field.errors }}
         </div>

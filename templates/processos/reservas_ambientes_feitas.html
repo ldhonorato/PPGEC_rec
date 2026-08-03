@@ -160,11 +160,11 @@
                     {% csrf_token %}
                     <input type="hidden" name="acao" value="excluir_reserva">
                     <input type="hidden" name="reserva_id" value="{{ reserva.id }}">
-                    <div class="field">
+                    <div class="formulario-campo">
                         <label for="justificativa-exclusao-{{ reserva.id }}">Justificativa</label>
                         <textarea id="justificativa-exclusao-{{ reserva.id }}" name="justificativa" rows="4" required></textarea>
                     </div>
-                    <div class="form-actions">
+                    <div class="formulario-acoes">
                         <button class="btn btn-secondary" type="button" data-close-dialog>Cancelar</button>
                         <button class="btn" type="submit">Confirmar exclusão</button>
                     </div>

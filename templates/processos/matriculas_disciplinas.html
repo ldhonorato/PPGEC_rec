@@ -22,7 +22,7 @@
             <input type="hidden" name="acao" value="criar_disciplina">
             <div class="grid-two">
                 {% for field in disciplina_form %}
-                    <div class="field{% if field.field.widget.input_type == 'checkbox' %} checkbox-field{% endif %}">
+                    <div class="formulario-campo{% if field.field.widget.input_type == 'checkbox' %} formulario-campo-marcavel{% endif %}">
                         {% if field.field.widget.input_type == 'checkbox' %}
                             {{ field }} <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {% else %}
@@ -33,7 +33,7 @@
                     </div>
                 {% endfor %}
             </div>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Cadastrar disciplina</button>
             </div>
         </form>
@@ -121,7 +121,7 @@
             {% if disciplina_editando.pk == disciplina.pk and disciplina_edit_form %}
                 <div class="grid-two">
                     {% for field in disciplina_edit_form %}
-                        <div class="field{% if field.field.widget.input_type == 'checkbox' %} checkbox-field{% endif %}">
+                        <div class="formulario-campo{% if field.field.widget.input_type == 'checkbox' %} formulario-campo-marcavel{% endif %}">
                             {% if field.field.widget.input_type == 'checkbox' %}
                                 {{ field }} <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                             {% else %}
@@ -155,10 +155,10 @@
                     <div class="formulario-campo"><label>Pré-requisitos</label><textarea name="pre_requisitos" rows="3">{{ disciplina.pre_requisitos }}</textarea></div>
                     <div class="formulario-campo"><label>Ementa</label><textarea name="ementa" rows="5">{{ disciplina.ementa }}</textarea></div>
                     <div class="formulario-campo"><label>Bibliografia</label><textarea name="bibliografia" rows="5">{{ disciplina.bibliografia }}</textarea></div>
-                    <div class="field checkbox-field"><input type="checkbox" name="ativa" {% if disciplina.ativa %}checked{% endif %}> <label>Ativa</label></div>
+                    <div class="formulario-campo formulario-campo-marcavel"><input type="checkbox" name="ativa" {% if disciplina.ativa %}checked{% endif %}> <label>Ativa</label></div>
                 </div>
             {% endif %}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar disciplina</button>
             </div>
         </form>

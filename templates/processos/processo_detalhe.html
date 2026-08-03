@@ -376,7 +376,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         <p class="muted nota-espacada">
             A carga calculada segue a norma vigente do discente. Caso as horas aprovadas sejam diferentes ou excedam o saldo normativo, registre a justificativa.
         </p>
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button type="button" class="btn btn-secondary" id="btn-fechar-modal-horas">Cancelar</button>
             <button type="submit" class="btn">Registrar lançamento</button>
         </div>
@@ -398,7 +398,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                 {{ field.errors }}
             </div>
         {% endfor %}
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button type="button" class="btn btn-secondary" id="btn-fechar-modal-documento">Cancelar</button>
             <button type="submit" class="btn">Salvar documento</button>
         </div>
@@ -426,7 +426,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                 {{ field.errors }}
             </div>
         {% endfor %}
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button type="button" class="btn btn-secondary" id="btn-fechar-modal-encaminhamento">Cancelar</button>
             {% if can_manage_requerente %}
                 <button type="submit" class="btn">Devolver</button>
@@ -456,7 +456,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                     {{ field.errors }}
                 </div>
             {% endfor %}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button type="button" class="btn btn-secondary" id="btn-fechar-modal-ciente">Cancelar</button>
                 <button type="submit" class="btn btn-secondary" name="acao_ciente" value="recusar">Recusar</button>
                 <button type="submit" class="btn" name="acao_ciente" value="ciente">Dar ciente</button>
@@ -470,7 +470,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                     {{ field.errors }}
                 </div>
             {% endfor %}
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button type="button" class="btn btn-secondary" id="btn-fechar-modal-ciente">Cancelar</button>
                 <button type="submit" class="btn">Solicitar</button>
             </div>
@@ -492,7 +492,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                 {{ field.errors }}
             </div>
         {% endfor %}
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button type="button" class="btn btn-secondary" id="btn-fechar-modal-finalizar">Cancelar</button>
             <button type="submit" class="btn">Confirmar finalização</button>
         </div>
@@ -655,7 +655,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
             <label for="id_motivo_remocao">Motivo da remoção</label>
             <textarea id="id_motivo_remocao" name="motivo_remocao" rows="4" required></textarea>
         </div>
-        <div class="form-actions">
+        <div class="formulario-acoes">
             <button type="button" class="btn btn-secondary" id="btn-cancelar-remocao">Cancelar</button>
             <button type="submit" class="btn">Confirmar remoção</button>
         </div>

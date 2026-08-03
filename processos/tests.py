@@ -5220,6 +5220,27 @@ class PadraoVisualDosTemplatesTests(SimpleTestCase):
         ]
         self.assertEqual(culpados, [], f"templates com <style> proprio: {culpados}")
 
+    def test_nenhum_template_usa_o_padrao_antigo_de_formulario(self):
+        """Campo e faixa de botoes tem uma classe so em todo o projeto.
+
+        As duas conviveram: .field/.form-actions, que so davam margem e
+        alinhamento, e .formulario-campo/.formulario-acoes, que trazem o rotulo
+        em peso, a marca de obrigatorio, o erro em vermelho e a linha acima dos
+        botoes. Na tela de novo processo as duas apareciam juntas -- o
+        formulario no padrao novo e o modal dele no antigo.
+
+        As regras antigas foram removidas do app.css; escrever a classe antiga
+        hoje nao produz nem o estilo antigo, apenas um campo sem estilo nenhum.
+        """
+        antigas = ('class="field"', 'class="field ', 'class="form-actions"', "hidden-field")
+        culpados = []
+        for caminho, texto in self._templates():
+            limpo = self._sem_comentarios(texto)
+            for antiga in antigas:
+                if antiga in limpo:
+                    culpados.append(f"{caminho.name}: {antiga}")
+        self.assertEqual(culpados, [], f"padrao antigo de formulario: {culpados}")
+
     def test_nenhum_template_separa_dados_com_pipe(self):
         """Metadados usam .meta-linha, nao "a | b | c".
 

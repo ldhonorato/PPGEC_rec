@@ -256,11 +256,11 @@ propria sessao por cima -- nome, avisos e menu da conta.
         <form method="post" action="{% url 'aluno_informar_cpf' %}">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <div class="field">
+            <div class="formulario-campo">
                 <label for="cpf-pendente">CPF</label>
                 <input id="cpf-pendente" name="cpf" maxlength="14" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" required autofocus>
             </div>
-            <div class="form-actions">
+            <div class="formulario-acoes">
                 <button class="btn btn-secondary" type="button" data-close-cpf-modal>Fechar</button>
                 <button class="btn" type="submit">Atualizar cadastro</button>
             </div>
