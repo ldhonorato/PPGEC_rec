@@ -1,4 +1,5 @@
 import ast
+import os
 import re
 import tempfile
 from datetime import date, datetime, time, timedelta
@@ -8,19 +9,22 @@ from unittest.mock import patch
 from zipfile import ZipFile
 
 from django.conf import settings
+from django.db import models
 from django.core import mail
 from django.templatetags.static import static
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.utils import timezone
 
 
+from .templatetags.acadflow import url_protegida
 from .views import _linhas_trajetoria
 from .models import (
     AlteracaoAluno,
     Aluno,
+    Documento,
     AulaPresencialOferta,
     Disciplina,
     DisciplinaTrajetoria,
@@ -83,33 +87,211 @@ class SessionExpirationSettingsTests(SimpleTestCase):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, DEBUG=False)
-class MediaFilesProductionTests(TestCase):
+class ArquivoEnviadoTests(TestCase):
+    """Um arquivo de /media/ so e entregue a quem pode ver o registro dono dele.
+
+    A entrega era feita por django.views.static.serve atras de
+    @login_required: exigia estar logado e nada mais. Documento tem regra por
+    objeto -- pode_visualizar_arquivo, com oito classificacoes de sigilo -- e o
+    template a respeitava, escondendo o link de quem nao pode ver. O arquivo
+    nao. Bastava conhecer o caminho.
+
+    Reproduzido antes da correcao: com um documento marcado
+    INFORMACAO_PESSOAL, pode_visualizar_arquivo(aluno) devolvia False e
+    GET /media/documentos/processos/<arquivo> como aquele aluno devolvia 200
+    com o conteudo.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._media = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._media.cleanup)
+        cls._override = override_settings(MEDIA_ROOT=cls._media.name)
+        cls._override.enable()
+        cls.addClassCleanup(cls._override.disable)
+
     def setUp(self):
-        self.media_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self.media_dir.cleanup)
-        self.settings_override = override_settings(MEDIA_ROOT=self.media_dir.name)
-        self.settings_override.enable()
-        self.addCleanup(self.settings_override.disable)
-        arquivo = Path(self.media_dir.name) / "documentos" / "processos" / "Email_Prorrogacao.pdf"
-        arquivo.parent.mkdir(parents=True)
-        arquivo.write_bytes(b"%PDF-1.4 arquivo de teste")
-        self.usuario = User.objects.create_user(
-            email="usuario.media@example.com",
-            password="senha-segura-123",
-            nome="Usuário de Mídia",
-            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        senha = "senha-segura-123"
+        self.servidor = User.objects.create_user(
+            email="servidor.arquivo@example.com", password=senha,
+            nome="Servidor Arquivo", tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.aluno = Aluno.objects.create_user(
+            email="aluno.arquivo@example.com", password=senha, nome="Aluno Arquivo",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026F0001",
+        )
+        self.setor = Setor.objects.create(nome="Setor de Arquivo", descricao="Teste")
+        self.processo = Processo.objects.create(
+            tipo=Processo.TipoProcesso.OUTRO, assunto="Processo de teste de arquivo",
+            descricao="Teste", usuario_criado_por=self.aluno, setor_atual=self.setor,
         )
 
-    def test_midia_exige_login_e_e_servida_com_debug_desativado(self):
-        url = "/media/documentos/processos/Email_Prorrogacao.pdf"
+    def _documento(self, *, restricao, conteudo=b"conteudo confidencial"):
+        return Documento.objects.create(
+            processo=self.processo, titulo="Documento de teste",
+            enviado_por=self.servidor, restricao_tipo=restricao,
+            arquivo=SimpleUploadedFile("documento-teste.txt", conteudo),
+        )
 
-        anonimo = self.client.get(url)
-        self.assertRedirects(anonimo, f"{reverse('login')}?next={url}")
+    def test_documento_livre_e_entregue_a_quem_esta_logado(self):
+        documento = self._documento(restricao=Documento.RestricaoAcesso.NAO)
+        self.client.force_login(self.aluno)
 
-        self.client.force_login(self.usuario)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(b"".join(response.streaming_content), b"%PDF-1.4 arquivo de teste")
+        resposta = self.client.get(documento.arquivo.url)
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(b"".join(resposta.streaming_content), b"conteudo confidencial")
+
+    def test_documento_restrito_nao_e_entregue_a_quem_nao_pode_ver(self):
+        """O caso que estava aberto."""
+        documento = self._documento(restricao=Documento.RestricaoAcesso.INFORMACAO_PESSOAL)
+        self.assertFalse(documento.pode_visualizar_arquivo(self.aluno))
+        self.client.force_login(self.aluno)
+
+        resposta = self.client.get(documento.arquivo.url)
+
+        # 404 e nao 403: um 403 confirmaria que existe arquivo naquele caminho,
+        # e estes documentos carregam classificacao de sigilo.
+        self.assertEqual(resposta.status_code, 404)
+
+    def test_documento_restrito_e_entregue_a_quem_pode_ver(self):
+        """A regra fecha o acesso indevido sem fechar o devido."""
+        documento = self._documento(restricao=Documento.RestricaoAcesso.INFORMACAO_PESSOAL)
+        self.assertTrue(documento.pode_visualizar_arquivo(self.servidor))
+        self.client.force_login(self.servidor)
+
+        self.assertEqual(self.client.get(documento.arquivo.url).status_code, 200)
+
+    def test_arquivo_sem_registro_nao_e_entregue(self):
+        """Sobra no disco nao e conteudo do sistema.
+
+        Antes, qualquer caminho existente sob MEDIA_ROOT era servido -- inclusive
+        arquivo de registro apagado, ou deixado ali por engano.
+        """
+        orfao = Path(settings.MEDIA_ROOT) / "documentos" / "processos" / "orfao.txt"
+        orfao.parent.mkdir(parents=True, exist_ok=True)
+        orfao.write_bytes(b"arquivo sem dono")
+        self.client.force_login(self.servidor)
+
+        resposta = self.client.get("/media/documentos/processos/orfao.txt")
+
+        self.assertEqual(resposta.status_code, 404)
+
+    def test_anonimo_vai_para_o_login(self):
+        """Comportamento preservado de quando a rota foi criada."""
+        documento = self._documento(restricao=Documento.RestricaoAcesso.NAO)
+        url = documento.arquivo.url
+
+        self.assertRedirects(self.client.get(url), f"{reverse('login')}?next={url}")
+
+    def test_o_link_da_tela_aponta_para_a_rota_com_verificacao(self):
+        """O template nao pode linkar o arquivo direto.
+
+        Enquanto o armazenamento e disco, ``arquivo.url`` produz "/media/..." --
+        que por acaso e a rota verificada. Com o S3, o mesmo ``.url`` passa a
+        devolver o endereco assinado do bucket, que abre sem passar por lugar
+        nenhum do sistema. O filtro url_protegida devolve sempre a rota interna.
+        """
+        from processos.templatetags.acadflow import url_protegida
+
+        documento = self._documento(restricao=Documento.RestricaoAcesso.NAO)
+
+        self.assertEqual(
+            url_protegida(documento.arquivo),
+            reverse("media_file", kwargs={"path": documento.arquivo.name}),
+        )
+
+    def test_sem_arquivo_o_filtro_nao_inventa_endereco(self):
+        self.assertEqual(url_protegida(None), "")
+
+    def test_todo_campo_de_arquivo_do_sistema_tem_regra_declarada(self):
+        """Campo novo nasce protegido, ou nao e servido.
+
+        O registro em _regras_de_arquivo e explicito. Este teste existe para que
+        um FileField acrescentado a qualquer modelo apareca aqui como falha, em
+        vez de ficar sem regra sem que ninguem note.
+        """
+        from django.apps import apps
+
+        from processos.views import _regras_de_arquivo
+
+        declarados = {(modelo, campo) for modelo, campo, _ in _regras_de_arquivo()}
+        no_sistema = {
+            (modelo, campo.name)
+            for modelo in apps.get_app_config("processos").get_models()
+            for campo in modelo._meta.get_fields()
+            if isinstance(campo, models.FileField)
+        }
+
+        faltando = sorted(f"{m.__name__}.{c}" for m, c in no_sistema - declarados)
+        self.assertEqual(faltando, [], f"campos de arquivo sem regra de acesso: {faltando}")
+
+
+class ArmazenamentoS3Tests(SimpleTestCase):
+    """Configuracao do bucket e entrega por URL assinada.
+
+    O bucket e privado: quem tem a chave e a aplicacao. A URL de leitura e
+    assinada e de vida curta, emitida so depois de a view conferir quem esta
+    pedindo -- e o que mantem a regra de sigilo valendo tambem do lado do S3.
+    """
+
+    PADRAO = dict(bucket="ppgec-documentos", regiao="us-east-1",
+                  chave="AKIAEXEMPLO", segredo="segredo", expiracao_da_url=300)
+
+    def _config(self, **ajustes):
+        from ppgec.storage import configuracao_s3
+
+        return configuracao_s3(**{**self.PADRAO, **ajustes})
+
+    def test_sem_credencial_a_aplicacao_nao_sobe(self):
+        """Falhar na subida, e nao no primeiro upload com o usuario esperando."""
+        for faltando in ("chave", "segredo"):
+            with self.subTest(vazio=faltando):
+                with self.assertRaises(ImproperlyConfigured):
+                    self._config(**{faltando: ""})
+
+    def test_toda_url_sai_assinada_e_expira(self):
+        """Sem assinatura nao ha leitura: e o que sustenta o bucket privado."""
+        opcoes = self._config()["OPTIONS"]
+
+        self.assertTrue(opcoes["querystring_auth"])
+        self.assertEqual(opcoes["querystring_expire"], 300)
+
+    def test_arquivo_de_mesmo_nome_nao_sobrescreve_o_anterior(self):
+        """"declaracao.pdf" enviado duas vezes sao dois documentos.
+
+        Com file_overwrite ligado -- o padrao da biblioteca -- o segundo envio
+        apagaria o primeiro em silencio, e o registro antigo passaria a apontar
+        para o arquivo novo.
+        """
+        self.assertFalse(self._config()["OPTIONS"]["file_overwrite"])
+
+    def test_nao_manda_acl_no_upload(self):
+        """Bucket novo vem com ACL desabilitada e recusa a chamada com ACL."""
+        self.assertIsNone(self._config()["OPTIONS"]["default_acl"])
+
+    def test_regiao_vem_de_fora(self):
+        self.assertEqual(self._config(regiao="sa-east-1")["OPTIONS"]["region_name"], "sa-east-1")
+
+    def test_a_view_redireciona_para_a_url_assinada(self):
+        """No S3 a view nao transmite o arquivo: assina e redireciona.
+
+        Baixar do bucket para reenviar faria todo o trafego passar pela
+        aplicacao. O redirecionamento so acontece depois da verificacao, entao
+        nao afrouxa a regra: sem passar pela view, nao ha endereco valido.
+        """
+        from processos.views import _entregar_arquivo
+
+        assinada = "https://ppgec-documentos.s3.amazonaws.com/doc.pdf?X-Amz-Signature=abc"
+        with override_settings(USA_S3=True):
+            with patch("processos.views.default_storage") as armazenamento:
+                armazenamento.url.return_value = assinada
+                resposta = _entregar_arquivo(None, "documentos/processos/doc.pdf")
+
+        self.assertEqual(resposta.status_code, 302)
+        self.assertEqual(resposta["Location"], assinada)
+        armazenamento.url.assert_called_once_with("documentos/processos/doc.pdf")
 
 
 def criar_trajetoria(aluno, **kwargs):
@@ -4354,6 +4536,57 @@ class TodasAsTelasRenderizamTests(TestCase):
         ("matriculas_ofertas", {"docente", "servidor"}),
     ]
 
+    def test_toda_tela_de_detalhe_responde_para_todo_perfil(self):
+        """As telas que precisam de um id, que a lista acima nao alcanca.
+
+        Existe pelo mesmo motivo da lista, e por uma falha concreta: o filtro
+        url_protegida foi acrescentado a processo_detalhe.html e a
+        solicitacao_assinatura_detalhe.html, e nenhum teste abria essas duas
+        telas -- elas exigem um objeto, entao ficaram de fora da lista de rotas
+        sem argumento. Um {% templatetag openblock %} load {% templatetag closeblock %} esquecido teria passado pela suite
+        inteira.
+
+        Filtro invalido estoura na compilacao do template, mesmo em ramo que nao
+        seja tomado; abrir a tela ja e suficiente para pegar esse caso.
+        """
+        setor = Setor.objects.create(nome="Setor das Telas", descricao="Teste")
+        processo = Processo.objects.create(
+            tipo=Processo.TipoProcesso.OUTRO, assunto="Processo das telas",
+            descricao="Teste de renderizacao", usuario_criado_por=self.aluno,
+            setor_atual=setor,
+        )
+        # Com arquivo: e o documento com arquivo que exercita o link protegido.
+        Documento.objects.create(
+            processo=processo, titulo="Anexo das telas", enviado_por=self.servidor,
+            restricao_tipo=Documento.RestricaoAcesso.NAO,
+            arquivo=SimpleUploadedFile("anexo-telas.txt", b"conteudo"),
+        )
+        assinatura = SolicitacaoAssinatura.objects.create(
+            criado_por=self.servidor,
+            destinatario_tipo=SolicitacaoAssinatura.DestinatarioTipo.DOCENTE,
+            docente=self.docente,
+            tipo_documento=SolicitacaoAssinatura.TipoDocumento.DOCUMENTO_SEI,
+            numero_documento_sei="SEI-0001",
+        )
+
+        telas = [
+            ("processo_detalhe", [processo.id], {"aluno", "docente", "servidor"}),
+            ("aluno_detalhe", [self.aluno.id], {"aluno", "docente", "servidor"}),
+            ("solicitacao_assinatura_detalhe", [assinatura.id], {"docente", "servidor"}),
+        ]
+        usuarios = {"aluno": self.aluno, "docente": self.docente, "servidor": self.servidor}
+
+        for nome_rota, argumentos, perfis_com_acesso in telas:
+            for perfil, usuario in usuarios.items():
+                with self.subTest(tela=nome_rota, perfil=perfil):
+                    self.client.force_login(usuario)
+                    resposta = self.client.get(reverse(nome_rota, args=argumentos))
+                    esperado = 200 if perfil in perfis_com_acesso else 403
+                    self.assertEqual(
+                        resposta.status_code, esperado,
+                        f"{nome_rota} devolveu {resposta.status_code} para {perfil}",
+                    )
+
     def test_toda_tela_responde_para_todo_perfil(self):
         usuarios = {"aluno": self.aluno, "docente": self.docente, "servidor": self.servidor}
 
@@ -4653,6 +4886,147 @@ class CampoDeDataEHoraTests(SimpleTestCase):
                 if 'type="text"' in campo and "dd/mm" not in campo:
                     suspeitos.append(f"{caminho.name}: {campo[:70]}")
         self.assertEqual(suspeitos, [], f"campo de data/hora como texto no template: {suspeitos}")
+class LayoutResponsivoTests(SimpleTestCase):
+    """As grades de cartoes colapsam para uma coluna em tela estreita.
+
+    .dashboard-grid ficou preso, por engano, na lista de seletores de uma regra
+    de "display: inline-flex" -- a que transforma o botao do menu em gaveta
+    abaixo de 920px. Como caixa inline-flex a grade passa a ter a largura do
+    proprio conteudo, e nao a do pai: em 412px de tela ela media 430px, e o
+    segundo cartao aparecia cortado na borda da tela.
+
+    O defeito e dificil de ver de outra forma: nao ha transbordo de pagina para
+    medir (o corte acontece dentro do container) e a tela so quebra em largura de
+    celular. Aqui a intencao fica escrita -- estas grades sao grade, e em tela
+    estreita sao de uma coluna so.
+    """
+
+    GRADES = (".dashboard-grid", ".metric-grid", ".grid-two")
+    LARGURA_DE_CELULAR = 920
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        css = (Path(settings.BASE_DIR) / "static" / "css" / "app.css").read_text(encoding="utf-8")
+        cls.css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+
+    def _regras(self, dentro_de_media=None):
+        """(seletores, declaracoes) das regras do arquivo.
+
+        dentro_de_media=None percorre o arquivo inteiro; um inteiro restringe aos
+        blocos @media (max-width: N) com N menor ou igual ao valor dado.
+        """
+        if dentro_de_media is None:
+            fonte = re.sub(r"@media[^{]*\{", "", self.css)
+        else:
+            fonte = ""
+            for largura, bloco in re.findall(r"@media\s*\(max-width:\s*(\d+)px\)\s*\{(.*?)\n\}", self.css, re.S):
+                if int(largura) <= dentro_de_media:
+                    fonte += bloco
+        for seletores, declaracoes in re.findall(r"([^{}]+)\{([^{}]*)\}", fonte):
+            yield [s.strip() for s in seletores.split(",") if s.strip()], declaracoes
+
+    def test_as_grades_nunca_deixam_de_ser_grade(self):
+        """Nenhuma regra pode dar a elas um display que nao seja grid.
+
+        E a asercao que teria pego o defeito: o seletor caiu numa regra de
+        display, e a grade virou flex.
+        """
+        culpados = []
+        for seletores, declaracoes in self._regras():
+            display = re.search(r"(?:^|;)\s*display\s*:\s*([^;]+)", declaracoes)
+            if not display or display.group(1).strip() == "grid":
+                continue
+            for grade in self.GRADES:
+                if grade in seletores:
+                    culpados.append(f"{grade} recebe display:{display.group(1).strip()}")
+        self.assertEqual(culpados, [], f"grade com display trocado: {culpados}")
+
+    def test_as_grades_viram_uma_coluna_em_tela_estreita(self):
+        de_uma_coluna = set()
+        for seletores, declaracoes in self._regras(dentro_de_media=self.LARGURA_DE_CELULAR):
+            colunas = re.search(r"grid-template-columns\s*:\s*([^;]+)", declaracoes)
+            if colunas and colunas.group(1).strip() == "1fr":
+                de_uma_coluna.update(seletores)
+
+        faltando = [g for g in self.GRADES if g not in de_uma_coluna]
+        self.assertEqual(
+            faltando, [],
+            f"grades sem colapso para uma coluna ate {self.LARGURA_DE_CELULAR}px: {faltando}",
+        )
+
+
+class VersaoExibidaTests(SimpleTestCase):
+    """A versao que aparece no rodape precisa ter forma de versao.
+
+    Em producao o rodape de todas as telas exibiu "vmain". A esteira passava
+    github.ref_name como APP_VERSION, o que so vira uma versao quando o build
+    sai de uma tag; disparada por push em main -- o caso de todo merge de PR --
+    ela entregava o nome do branch.
+
+    A esteira passou a ler o arquivo VERSION. Estes testes cobrem o outro lado:
+    que a aplicacao nao aceite no lugar da versao um valor que nao seja uma.
+    """
+
+    @property
+    def versao_do_arquivo(self):
+        """Lida do arquivo, nao fixada aqui.
+
+        Com o numero escrito no teste, subir a versao do projeto quebrava a
+        suite -- e o que se quer verificar e que o valor invalido cai para o
+        arquivo, nao que o arquivo diga 1.0.0.
+        """
+        return (Path(settings.BASE_DIR) / "VERSION").read_text(encoding="utf-8").strip()
+
+    def _resolver(self, valor):
+        from ppgec.settings import _versao_publicada
+
+        with patch.dict(os.environ, {"APP_VERSION": valor} if valor is not None else {}, clear=False):
+            if valor is None:
+                os.environ.pop("APP_VERSION", None)
+            return _versao_publicada()
+
+    def test_o_arquivo_version_tem_forma_de_versao(self):
+        """O arquivo e a fonte da verdade; se ele estiver errado, tudo esta."""
+        from ppgec.settings import _FORMATO_VERSAO
+
+        conteudo = (Path(settings.BASE_DIR) / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertTrue(
+            _FORMATO_VERSAO.match(conteudo),
+            f"VERSION contem {conteudo!r}, que nao tem forma de versao",
+        )
+
+    def test_nome_de_branch_no_ambiente_e_recusado(self):
+        """O caso exato que produziu o "vmain"."""
+        for nome in ("main", "master", "feature/melhorias-ux", "HEAD"):
+            with self.subTest(ref=nome):
+                with self.assertWarns(RuntimeWarning):
+                    resolvido = self._resolver(nome)
+                self.assertEqual(resolvido, self.versao_do_arquivo, "deve cair para a versao do arquivo")
+
+    def test_versao_valida_no_ambiente_e_usada(self):
+        """A esteira precisa conseguir sobrescrever com uma versao de verdade."""
+        for valor, esperado in (("1.2.3", "1.2.3"), ("2.0", "2.0"), ("1.2.0-rc.1", "1.2.0-rc.1")):
+            with self.subTest(valor=valor):
+                self.assertEqual(self._resolver(valor), esperado)
+
+    def test_prefixo_v_e_descartado(self):
+        """Quem exibe ja escreve o "v".
+
+        Se o build vier de uma tag "v1.0.0" e esse valor passar adiante inteiro,
+        o rodape renderiza "vv1.0.0".
+        """
+        self.assertEqual(self._resolver("v1.0.0"), "1.0.0")
+
+    def test_ambiente_vazio_usa_o_arquivo(self):
+        self.assertEqual(self._resolver(""), self.versao_do_arquivo)
+        self.assertEqual(self._resolver(None), self.versao_do_arquivo)
+
+    def test_o_rodape_mostra_a_versao_do_arquivo(self):
+        """Ponta a ponta: o que o usuario le na tela."""
+        resposta = self.client.get(reverse("login"))
+        self.assertContains(resposta, f"v{settings.APP_VERSION}")
+        self.assertNotContains(resposta, "vmain")
 
 
 class PadraoVisualDosTemplatesTests(SimpleTestCase):
@@ -4774,6 +5148,7 @@ class PadraoVisualDosTemplatesTests(SimpleTestCase):
             primeiro = abertura.match(conteudo)
             if not primeiro:
                 continue
+
             dentro = self._conteudo_do_elemento(conteudo, primeiro)
             classes = set(re.findall(r"[a-z0-9-]+", re.search(r'class="([^"]*)"', primeiro.group(2)).group(1))) \
                 if 'class="' in primeiro.group(2) else set()

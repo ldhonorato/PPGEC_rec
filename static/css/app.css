@@ -2318,8 +2318,6 @@ dialog::backdrop {
 }
 
 @media (max-width: 920px) {
-    .dashboard-grid,
-
     /* Abaixo de 920px a barra vira gaveta. Antes ela ficava estatica no topo,
        empilhada acima do conteudo: em toda pagina o usuario rolava ~470px de
        menu antes de ver qualquer coisa. */
@@ -2332,6 +2330,18 @@ dialog::backdrop {
         display: flex;
     }
 
+    /* A gaveta desliza nos dois sentidos.
+
+       O deslize de saida sempre existiu, mas ninguem o via: "visibility:
+       hidden" nao e animavel e valia no mesmo instante em que a classe saia do
+       body, entao a barra ficava invisivel enquanto percorria os 320px. Na tela
+       ela sumia de uma vez.
+
+       A visibilidade passa a esperar o fim do deslize para virar "hidden"
+       (delay de 0.24s ao fechar) e a mudar na hora ao abrir (delay 0), senao a
+       barra so apareceria depois de ja ter entrado. O elemento continua fora da
+       arvore de acessibilidade e do foco quando fechado, que e o motivo de o
+       visibility existir aqui. */
     .sidebar {
         position: fixed;
         top: 0;
@@ -2340,13 +2350,14 @@ dialog::backdrop {
         flex-basis: auto;
         width: min(86vw, 320px);
         transform: translateX(-100%);
-        transition: transform 0.24s ease;
         visibility: hidden;
+        transition: transform 0.24s ease, visibility 0s linear 0.24s;
     }
 
     .menu-aberto .sidebar {
         transform: translateX(0);
         visibility: visible;
+        transition: transform 0.24s ease, visibility 0s linear 0s;
     }
 
     .sidebar-overlay {
@@ -2369,6 +2380,11 @@ dialog::backdrop {
         overflow: hidden;
     }
 
+    /* .dashboard-grid estava, por engano, na lista da regra de display acima --
+       recebia "display: inline-flex" e deixava de ser grade. Como caixa
+       inline-flex ela passa a ter a largura do proprio conteudo, e nao a do pai:
+       em 412px de tela media 430px, e o segundo cartao aparecia cortado. */
+    .dashboard-grid,
     .metric-grid,
     .grid-two {
         grid-template-columns: 1fr;
@@ -2382,7 +2398,178 @@ dialog::backdrop {
 
 }
 
+/* Faixa de tablet: larga demais para a lista do celular, estreita demais para
+   os quatro cartoes lado a lado. A regra de 920px acima colapsa tudo para uma
+   coluna, e a Visao geral ficava com quatro cartoes de 128px empilhados --
+   641px de rolagem numa tela que comporta duas colunas. Vem depois daquela
+   regra de proposito: as duas tem o mesmo peso, e quem vence e a ultima. */
+@media (min-width: 641px) and (max-width: 920px) {
+    .metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 640px) {
+    /* ======================================================================
+       Visao geral vira lista de navegacao
+
+       Em tela larga sao quatro cartoes lado a lado, cada um com icone, valor
+       grande e rotulo -- uma fileira que se le de relance. Empilhados no
+       celular, os mesmos quatro cartoes viravam quatro blocos de 128px: mais de
+       600px de rolagem antes de chegar ao proximo bloco da tela, para quatro
+       itens.
+
+       Os cartoes ja sao links; no celular eles se apresentam como o que sao. O
+       formato e o de lista de aplicativo: icone, rotulo, valor a direita e a
+       seta indicando que leva a algum lugar. Os quatro cabem em ~230px, e o
+       valor continua visivel -- nao se troca informacao por espaco.
+       ====================================================================== */
+    .metric-grid {
+        gap: 0;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+    }
+
+    .metric-card {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto auto;
+        grid-template-rows: auto;
+        align-items: center;
+        gap: var(--espaco-3);
+        min-height: 0;
+        padding: var(--espaco-4);
+        border: 0;
+        border-bottom: 1px solid var(--color-border);
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .metric-card:last-child {
+        border-bottom: 0;
+    }
+
+    /* O realce de foco e o toque -- e o pressionar, nao o pairar: no celular
+       nao ha cursor, e o deslocamento de 2px do hover so faria a lista tremer
+       durante a rolagem. */
+    .metric-card:hover {
+        transform: none;
+        border-color: transparent;
+        border-bottom-color: var(--color-border);
+    }
+
+    .metric-card:active {
+        background: var(--color-surface-soft);
+    }
+
+    .metric-card:focus-visible {
+        border-color: transparent;
+        border-bottom-color: var(--color-border);
+    }
+
+    /* Todos na mesma linha, explicitamente. O valor vem antes do rotulo na
+       marcacao, e o posicionamento automatico do grid nao anda para tras: ao
+       colocar o valor na coluna 3, o rotulo -- que pede a coluna 2 -- era
+       jogado para uma segunda linha, e cada item da lista media 98px em vez de
+       57px. */
+    .metric-icon {
+        grid-column: 1;
+        grid-row: 1;
+        width: 30px;
+        height: 30px;
+        margin: 0;
+        padding: 6px;
+    }
+
+    /* O rotulo vem antes do valor: e ele que diz do que se trata, e numa lista
+       a leitura e da esquerda para a direita, nao de cima para baixo. */
+    .metric-label {
+        grid-column: 2;
+        grid-row: 1;
+        margin: 0;
+        color: var(--color-text);
+        /* Fluido em vez de mais um ponto de quebra: em 320px "Processos em
+           andamento" ainda pedia 183px numa faixa de 189, e quebrava. A 4.2vw a
+           fonte so encolhe abaixo de ~357px, onde a folga acaba -- de 360px
+           para cima fica nos 15px. */
+        font-size: clamp(0.875rem, 4.2vw, 0.9375rem);
+    }
+
+    /* O valor nao e maior que o rotulo: numa lista quem nomeia a linha e o
+       rotulo, e um valor com corpo maior invertia a hierarquia -- a linha era
+       lida pelo numero antes de se saber do que ele era. Mesmo tamanho do
+       rotulo; o que distingue o valor e a cor e o peso. */
+    .metric-value {
+        grid-column: 3;
+        grid-row: 1;
+        justify-content: flex-end;
+        min-height: 0;
+        font-size: 0.9375rem;
+        line-height: 1.35;
+        font-weight: 650;
+        text-align: right;
+    }
+
+    /* Valor que e palavra, nao numero ("Sem solicitação", "Emitir"): desce para
+       uma segunda linha, sob o rotulo.
+
+       Na mesma linha os dois disputam a largura, e quem perde e o rotulo: a
+       coluna do valor pega o que precisa e sobra o resto. Em 412px "Matrícula
+       do período" pedia 147px e recebia 141 -- quebrava por 6px; em 360px
+       recebia 89. Um numero cabe em 10px e nao cria essa disputa, entao so os
+       cartoes de palavra mudam de forma.
+
+       Empilhado, o rotulo usa a linha inteira e o valor deixa de competir --
+       vale para qualquer largura, inclusive 320px. E a forma de lista com
+       subtitulo, comum em aplicativo: o rotulo diz do que se trata, a linha de
+       baixo diz como esta. */
+    .metric-card-texto {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        row-gap: 1px;
+    }
+
+    .metric-card-texto .metric-icon,
+    .metric-card-texto::after {
+        grid-row: 1 / span 2;
+        align-self: center;
+    }
+
+    .metric-card-texto::after {
+        grid-column: 3;
+    }
+
+    .metric-card-texto .metric-value {
+        grid-column: 2;
+        grid-row: 2;
+        justify-content: flex-start;
+        min-height: 0;
+        /* Um ponto abaixo do rotulo: aqui o valor e a linha de apoio, e a
+           hierarquia tambem se le de cima para baixo. */
+        font-size: 0.875rem;
+        line-height: 1.35;
+        font-weight: 650;
+        text-align: left;
+    }
+
+    /* A seta e do CSS: a marcacao dos cartoes nao tem esse elemento, e ele so
+       faz sentido nesta forma de lista. */
+    .metric-card::after {
+        content: "";
+        grid-column: 4;
+        grid-row: 1;
+        width: 0.45rem;
+        height: 0.45rem;
+        border-right: 1.5px solid var(--color-muted);
+        border-top: 1.5px solid var(--color-muted);
+        transform: rotate(45deg);
+    }
+
+    .overview-title {
+        margin-bottom: var(--espaco-4);
+    }
+
     .brand-mobile img {
         width: 112px;
     }
@@ -3250,6 +3437,15 @@ dialog::backdrop {
     .content-area,
     .auth-cartao {
         animation: none !important;
+    }
+
+    /* A gaveta aparece e some sem deslizar. O delay da visibilidade cai junto:
+       mantido, ela continuaria visivel por 0.24s depois de fechada, sem
+       movimento nenhum -- o pior dos dois mundos. */
+    .sidebar,
+    .menu-aberto .sidebar,
+    .sidebar-overlay {
+        transition: none !important;
     }
 }
 

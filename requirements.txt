@@ -7,3 +7,8 @@ whitenoise==6.4.0
 psycopg2-binary==2.9.10
 openpyxl==3.1.5
 xlrd==2.0.1
+
+# Armazenamento dos documentos enviados em bucket S3. O extra [s3] traz o
+# boto3; sem AWS_STORAGE_BUCKET_NAME definido nada disso e carregado, e os
+# arquivos continuam em disco.
+django-storages[s3]==1.14.6

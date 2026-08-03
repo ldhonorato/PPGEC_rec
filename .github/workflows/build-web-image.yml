@@ -26,6 +26,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # A versao exibida vem do arquivo VERSION, versionado junto com o codigo.
+      #
+      # Antes esta esteira passava github.ref_name como APP_VERSION. Isso so
+      # produz uma versao quando o build vem de uma tag; disparado por push em
+      # main -- que e o caso de todo merge de PR -- o valor e o nome do branch, e
+      # o rodape de todas as telas exibia "vmain".
+      #
+      # A proveniencia do build continua no APP_REVISION (o SHA do commit), que
+      # e onde ela pertence: uma coisa e "que versao do produto e esta", outra e
+      # "de que commit saiu esta imagem".
+      - name: Ler a versao do repositorio
+        id: versao
+        run: |
+          versao="$(tr -d '[:space:]' < VERSION)"
+          if [ -z "$versao" ]; then
+            echo "::error file=VERSION::O arquivo VERSION esta vazio."
+            exit 1
+          fi
+          echo "valor=$versao" >> "$GITHUB_OUTPUT"
+          echo "Versao para esta imagem: $versao"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -56,7 +77,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            APP_VERSION=${{ github.ref_name }}
+            APP_VERSION=${{ steps.versao.outputs.valor }}
             APP_REVISION=${{ github.sha }}
             APP_BUILD_RUN_ID=${{ github.run_id }}
           cache-from: type=gha
