@@ -2112,6 +2112,16 @@ def processos_view(request):
             "filtro_setor": setor_id,
             "filtro_q": termo,
             "filtro_atrasados": somente_atrasados,
+            "filtros_ativos": _filtros_ativos(
+                request,
+                {
+                    "q": ("Busca", None),
+                    "status": ("Status", dict(Processo.StatusProcesso.choices).get),
+                    "setor": ("Setor", lambda v: _nome_do_setor(v)),
+                    "tipo": ("Tipo", dict(Processo.TipoProcesso.choices).get),
+                    "atrasados": ("", lambda _: "Somente atrasados"),
+                },
+            ),
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -2350,6 +2360,18 @@ def alunos_view(request):
             "total_alunos_filtrados": pagina.paginator.count,
             "status_list": Aluno.StatusAluno.choices,
             "nivel_list": Aluno.NivelCurso.choices,
+            "filtros_ativos": _filtros_ativos(
+                request,
+                {
+                    "nome": ("Nome", None),
+                    "status": ("Status", dict(Aluno.StatusAluno.choices).get),
+                    "nivel": ("Nível", dict(Aluno.NivelCurso.choices).get),
+                    "reingressante": ("Reingressante", lambda v: "Sim" if v == "1" else "Não"),
+                    "ingresso_inicio": ("Ingresso de", None),
+                    "ingresso_fim": ("Ingresso até", None),
+                    "sem_matricula_periodo": ("Sem matrícula em", _nome_do_periodo),
+                },
+            ),
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -4778,6 +4800,22 @@ def aluno_documento_historico_view(request):
         },
     )
 
+
+
+def _nome_do_setor(valor):
+    """Nome do setor a partir do id que veio no filtro.
+
+    O marcador precisa dizer "Secretaria PPGEC", nao "3": o numero e detalhe da
+    URL, e quem le a tela nao tem como saber a que setor ele corresponde.
+    """
+    setor = Setor.objects.filter(pk=valor).first()
+    return setor.nome if setor else valor
+
+
+def _nome_do_periodo(valor):
+    """Nome do periodo letivo a partir do id que veio no filtro."""
+    periodo = PeriodoLetivo.objects.filter(pk=valor).first()
+    return periodo.nome if periodo else valor
 
 
 def _filtros_ativos(request, rotulos):

@@ -7,18 +7,20 @@
         <strong>{{ total_pendentes }}</strong> aluno{{ total_pendentes|pluralize }} aguardando aprovação.
         {% if filtro_polo %}Exibindo {{ total_filtrado }} no polo selecionado.{% endif %}
     </p>
-    <form method="get" class="grid-two form-filtros">
-        <div class="field">
-            <label for="polo">Polo</label>
-            <select id="polo" name="polo">
-                <option value="">Todos os polos</option>
-                {% for polo in polos %}
-                    <option value="{{ polo.pk }}" {% if filtro_polo == polo.pk|stringformat:"s" %}selected{% endif %}>{{ polo.nome }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="field field-acao">
-            <button class="btn btn-secondary" type="submit">Filtrar</button>
+    <form method="get" class="filtros">
+        <div class="filtros-linha">
+            <div class="filtros-campo filtros-campo-escolha">
+                <label for="polo">Polo</label>
+                <select id="polo" name="polo">
+                    <option value="">Todos os polos</option>
+                    {% for polo in polos %}
+                        <option value="{{ polo.pk }}" {% if filtro_polo == polo.pk|stringformat:"s" %}selected{% endif %}>{{ polo.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filtros-acoes">
+                <button class="btn btn-secondary" type="submit">Filtrar</button>
+            </div>
         </div>
     </form>
     {% if alunos_pendentes %}

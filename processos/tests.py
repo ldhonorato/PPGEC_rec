@@ -1663,7 +1663,10 @@ class AlunosViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Sem matrícula no período")
+        # O rotulo encurtou junto com a barra de filtros: acima de um select que
+        # lista periodos, "Sem matrícula em" + "2026.2" diz o mesmo que "Sem
+        # matrícula no período" + "2026.2" sem repetir a palavra periodo.
+        self.assertContains(response, "Sem matrícula em")
         self.assertContains(response, "trajetória ativa e sem matrícula registrada em")
         self.assertContains(response, "Ativo Sem Matrícula 2026.2")
         self.assertNotContains(response, "Ativo Com Matrícula 2026.2")
