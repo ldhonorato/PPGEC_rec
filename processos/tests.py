@@ -1130,6 +1130,9 @@ class MatriculaViewsTests(TestCase):
         self.assertIn("Mestrado", sheet_xml)
 
     def test_exportacao_xlsx_de_todas_as_disciplinas_inclui_aba_de_vinculo(self):
+        polo = Polo.objects.create(nome="Polo Exportação")
+        self.aluno.polo_atuacao = polo
+        self.aluno.save(update_fields=["polo_atuacao"])
         solicitacao = SolicitacaoMatricula.objects.create(
             periodo=self.periodo,
             aluno=self.aluno,
@@ -1144,6 +1147,7 @@ class MatriculaViewsTests(TestCase):
             email="exportacao.vinculo@example.com",
             password="senha-segura-123",
             nome="Aluno Exportação Vínculo",
+            polo_atuacao=polo,
         )
         SolicitacaoMatricula.objects.create(
             periodo=self.periodo,
@@ -1169,8 +1173,11 @@ class MatriculaViewsTests(TestCase):
             ]
         self.assertIn(self.disciplina.nome, workbook)
         self.assertIn("Matrícula vínculo", workbook)
+        self.assertTrue(all("Polo" in planilha and "E-mail" in planilha for planilha in planilhas))
         self.assertTrue(any(self.aluno.nome in planilha for planilha in planilhas))
+        self.assertTrue(any(self.aluno.email in planilha and polo.nome in planilha for planilha in planilhas))
         self.assertTrue(any(aluno_vinculo.nome in planilha for planilha in planilhas))
+        self.assertTrue(any(aluno_vinculo.email in planilha and polo.nome in planilha for planilha in planilhas))
 
     @patch("processos.views.send_email_secretaria_planejamento_presencial.delay")
     def test_planejamento_presencial_cria_reserva_para_oferta_hibrida(self, mock_email):
@@ -1817,6 +1824,21 @@ class AlunosViewTests(TestCase):
 
         reservas = self.client.get(reverse("reservas_ambientes"))
         self.assertEqual(reservas.status_code, 200)
+
+        processo_de_outro_usuario = Processo.objects.create(
+            usuario_criado_por=self.aluno,
+            tipo=Processo.TipoProcesso.OUTRO,
+            assunto="Processo acessível pela Secretaria",
+            descricao="Criado por outro usuário",
+            setor_atual=secretaria,
+        )
+        processos = self.client.get(reverse("coordenacao_processos"))
+        self.assertEqual(processos.status_code, 200)
+        self.assertContains(processos, processo_de_outro_usuario.assunto)
+
+        detalhe = self.client.get(reverse("processo_detalhe", args=[processo_de_outro_usuario.id]))
+        self.assertEqual(detalhe.status_code, 200)
+        self.assertContains(detalhe, processo_de_outro_usuario.assunto)
 
     def test_aluno_membro_de_comissao_nao_recebe_acesso_global_de_secretaria(self):
         setor = Setor.objects.create(nome="Comissão Discente Sem Gestão", tipo=Setor.TipoSetor.COMISSAO)
@@ -3346,6 +3368,41 @@ class SolicitacaoBancaTests(TestCase):
         self.assertNotContains(response, "Formulários salvos")
         self.assertNotContains(response, str(propria))
         self.assertNotContains(response, str(outra))
+
+    @patch("processos.views.send_email_novo_processo_secretaria.delay")
+    @patch("processos.views.send_email_novo_processo_orientador.delay")
+    @patch("processos.views.send_email_novo_processo_aluno.delay")
+    def test_aluno_cria_novo_processo_com_documento_anexado(
+        self,
+        _email_aluno,
+        _email_orientador,
+        _email_secretaria,
+    ):
+        arquivo = SimpleUploadedFile("requerimento.pdf", b"conteudo-pdf", content_type="application/pdf")
+        self.client.force_login(self.aluno_mestrado)
+
+        with self.assertLogs("acadflow.processo_abertura", level="INFO") as logs:
+            response = self.client.post(
+                reverse("novo_processo"),
+                {
+                    "tipo": Processo.TipoProcesso.OUTRO,
+                    "assunto": "Processo com documento",
+                    "descricao": "Teste de abertura com arquivo anexado.",
+                    "doc_0_titulo": "Requerimento",
+                    "doc_0_tipo_documento": Documento.TipoDocumento.REQUERIMENTO,
+                    "doc_0_restricao_tipo": Documento.RestricaoAcesso.NAO,
+                    "doc_0_arquivo": arquivo,
+                },
+            )
+
+        self.assertRedirects(response, reverse("home"))
+        processo = Processo.objects.get(assunto="Processo com documento")
+        documento = processo.documentos.get()
+        self.assertEqual(documento.titulo, "Requerimento")
+        self.assertEqual(documento.enviado_por_id, self.aluno_mestrado.id)
+        self.assertEqual(Path(documento.arquivo.name).suffix, ".pdf")
+        self.assertTrue(any("processo_abertura_anexo_salvo" in mensagem for mensagem in logs.output))
+        self.assertTrue(any("processo_abertura_concluida" in mensagem for mensagem in logs.output))
 
     @patch("processos.views.send_email_novo_processo_secretaria.delay")
     @patch("processos.views.send_email_novo_processo_orientador.delay")

@@ -360,6 +360,11 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "acadflow.processo_abertura": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 
