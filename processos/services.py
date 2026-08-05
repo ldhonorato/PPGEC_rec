@@ -563,7 +563,7 @@ def _gerar_xlsx_multiplas_planilhas(planilhas):
 
 
 def gerar_xlsx_solicitacoes_periodo(periodo):
-    cabecalho = ["Matrícula", "Nome", "E-mail", "Tipo de aluno", "Status", "Solicitado em", "Observação"]
+    cabecalho = ["Matrícula", "Nome", "Polo", "E-mail", "Tipo de aluno", "Status", "Solicitado em", "Observação"]
     planilhas = []
     disciplinas = (
         OfertaDisciplina.objects.filter(periodo=periodo, itens_matricula__isnull=False)
@@ -579,7 +579,7 @@ def gerar_xlsx_solicitacoes_periodo(periodo):
                 oferta__periodo=periodo,
                 oferta__disciplina_id=disciplina_id,
             )
-            .select_related("solicitacao", "solicitacao__aluno")
+            .select_related("solicitacao", "solicitacao__aluno", "solicitacao__aluno__polo_atuacao")
             .order_by("solicitacao__aluno__nome")
         )
         for item in itens:
@@ -587,6 +587,7 @@ def gerar_xlsx_solicitacoes_periodo(periodo):
             linhas.append([
                 solicitacao.aluno.matricula,
                 solicitacao.aluno.nome,
+                solicitacao.aluno.polo_atuacao.nome if solicitacao.aluno.polo_atuacao else "",
                 solicitacao.aluno.email,
                 solicitacao.get_tipo_aluno_display(),
                 item.get_status_display(),
@@ -598,12 +599,13 @@ def gerar_xlsx_solicitacoes_periodo(periodo):
     vinculos = SolicitacaoMatricula.objects.filter(
         periodo=periodo,
         tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
-    ).select_related("aluno").order_by("aluno__nome")
+    ).select_related("aluno", "aluno__polo_atuacao").order_by("aluno__nome")
     linhas_vinculo = [cabecalho]
     for solicitacao in vinculos:
         linhas_vinculo.append([
             solicitacao.aluno.matricula,
             solicitacao.aluno.nome,
+            solicitacao.aluno.polo_atuacao.nome if solicitacao.aluno.polo_atuacao else "",
             solicitacao.aluno.email,
             solicitacao.get_tipo_aluno_display(),
             solicitacao.get_status_display(),

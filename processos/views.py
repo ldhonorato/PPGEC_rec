@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime, timedelta
 
@@ -130,6 +131,9 @@ from .services import (
 )
 
 
+processo_abertura_logger = logging.getLogger("acadflow.processo_abertura")
+
+
 def _parse_date_input(value):
     if not value:
         return None
@@ -237,10 +241,13 @@ def _can_view_processo_detalhe(user, processo):
         return False
     if processo.usuario_criado_por_id == user.id:
         return True
-    if user.tipo_usuario == User.TipoUsuario.ALUNO:
-        return False
+    # A participacao ativa na Secretaria concede acesso de gestao mesmo
+    # quando o cadastro-base do usuario e ALUNO (por exemplo, um bolsista).
+    # Esta verificacao precisa anteceder a restricao geral de alunos.
     if _can_view_processos(user):
         return True
+    if user.tipo_usuario == User.TipoUsuario.ALUNO:
+        return False
     if processo.setor_atual_id in {setor.id for setor in _setores_caixa(user)}:
         return True
     if _is_docente(user):
@@ -4000,6 +4007,11 @@ def novo_processo_view(request):
         raise PermissionDenied("Seu cadastro precisa estar aprovado para abrir processo.")
 
     if request.method == "POST":
+        processo_abertura_logger.info(
+            "processo_abertura_iniciada user_id=%s arquivos_recebidos=%s",
+            request.user.pk,
+            len(request.FILES),
+        )
         form = ProcessoAberturaForm(request.POST, request.FILES, user=request.user)
         doc_indices = set()
         for key in request.POST.keys():
@@ -4026,6 +4038,13 @@ def novo_processo_view(request):
                 {"arquivo": arquivo},
             )
             documentos_forms.append(documento_form)
+            processo_abertura_logger.info(
+                "processo_abertura_anexo_recebido user_id=%s indice=%s tamanho=%s content_type=%s",
+                request.user.pk,
+                idx,
+                arquivo.size,
+                getattr(arquivo, "content_type", ""),
+            )
 
         documentos_validos = True
         for documento_form in documentos_forms:
@@ -4040,32 +4059,72 @@ def novo_processo_view(request):
                     "Setor inicial 'Secretaria PPGEC' não encontrado. Contate o administrador.",
                 )
             else:
-                processo = form.save(commit=False)
-                processo.usuario_criado_por = request.user
-                processo.setor_atual = setor_secretaria
-                processo.status = Processo.StatusProcesso.EM_ANALISE
-                processo.save()
-
-                for documento_form in documentos_forms:
-                    processo.adicionar_documento(
-                        titulo=documento_form.cleaned_data["titulo"],
-                        arquivo=documento_form.cleaned_data["arquivo"],
-                        tipo_documento=documento_form.cleaned_data["tipo_documento"],
-                        restricao_tipo=documento_form.cleaned_data["restricao_tipo"],
-                        enviado_por=request.user,
+                processo = None
+                try:
+                    processo = form.save(commit=False)
+                    processo.usuario_criado_por = request.user
+                    processo.setor_atual = setor_secretaria
+                    processo.status = Processo.StatusProcesso.EM_ANALISE
+                    processo.save()
+                    processo_abertura_logger.info(
+                        "processo_abertura_processo_salvo user_id=%s processo_id=%s numero=%s anexos=%s",
+                        request.user.pk,
+                        processo.pk,
+                        processo.numero,
+                        len(documentos_forms),
                     )
 
-                send_email_novo_processo_aluno.delay(processo.id)
-                send_email_novo_processo_orientador.delay(processo.id)
-                send_email_novo_processo_secretaria.delay(processo.id)
+                    for indice, documento_form in enumerate(documentos_forms):
+                        documento = processo.adicionar_documento(
+                            titulo=documento_form.cleaned_data["titulo"],
+                            arquivo=documento_form.cleaned_data["arquivo"],
+                            tipo_documento=documento_form.cleaned_data["tipo_documento"],
+                            restricao_tipo=documento_form.cleaned_data["restricao_tipo"],
+                            enviado_por=request.user,
+                        )
+                        processo_abertura_logger.info(
+                            "processo_abertura_anexo_salvo user_id=%s processo_id=%s documento_id=%s indice=%s",
+                            request.user.pk,
+                            processo.pk,
+                            documento.pk,
+                            indice,
+                        )
+
+                    send_email_novo_processo_aluno.delay(processo.id)
+                    send_email_novo_processo_orientador.delay(processo.id)
+                    send_email_novo_processo_secretaria.delay(processo.id)
+                    processo_abertura_logger.info(
+                        "processo_abertura_concluida user_id=%s processo_id=%s notificacoes_enfileiradas=true",
+                        request.user.pk,
+                        processo.pk,
+                    )
+                except Exception:
+                    processo_abertura_logger.exception(
+                        "processo_abertura_falhou user_id=%s processo_id=%s anexos=%s",
+                        request.user.pk,
+                        processo.pk if processo and processo.pk else None,
+                        len(documentos_forms),
+                    )
+                    raise
 
                 messages.success(request, f"Processo {processo.numero} aberto com sucesso.")
                 return redirect("home")
         elif not documentos_validos:
+            processo_abertura_logger.warning(
+                "processo_abertura_anexo_invalido user_id=%s anexos=%s",
+                request.user.pk,
+                len(documentos_forms),
+            )
             for documento_form in documentos_forms:
                 for errors in documento_form.errors.values():
                     for error in errors:
                         messages.error(request, f"Documento inválido: {error}")
+        if form.errors:
+            processo_abertura_logger.warning(
+                "processo_abertura_formulario_invalido user_id=%s campos=%s",
+                request.user.pk,
+                sorted(form.errors.keys()),
+            )
     else:
         form = ProcessoAberturaForm(user=request.user)
 
