@@ -3407,6 +3407,41 @@ class SolicitacaoBancaTests(TestCase):
     @patch("processos.views.send_email_novo_processo_secretaria.delay")
     @patch("processos.views.send_email_novo_processo_orientador.delay")
     @patch("processos.views.send_email_novo_processo_aluno.delay")
+    def test_falha_ao_salvar_anexo_nao_deixa_processo_orfao(
+        self,
+        _email_aluno,
+        _email_orientador,
+        _email_secretaria,
+    ):
+        arquivo = SimpleUploadedFile("sem-permissao.pdf", b"conteudo-pdf", content_type="application/pdf")
+        armazenamento = Documento._meta.get_field("arquivo").storage
+        self.client.force_login(self.aluno_mestrado)
+        self.client.raise_request_exception = False
+
+        with (
+            patch.object(armazenamento, "save", side_effect=PermissionError("media sem permissao")),
+            self.assertLogs("acadflow.processo_abertura", level="ERROR") as logs,
+        ):
+            response = self.client.post(
+                reverse("novo_processo"),
+                {
+                    "tipo": Processo.TipoProcesso.OUTRO,
+                    "assunto": "Processo que deve ser revertido",
+                    "descricao": "Teste de falha no armazenamento.",
+                    "doc_0_titulo": "Requerimento",
+                    "doc_0_tipo_documento": Documento.TipoDocumento.REQUERIMENTO,
+                    "doc_0_restricao_tipo": Documento.RestricaoAcesso.NAO,
+                    "doc_0_arquivo": arquivo,
+                },
+            )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertFalse(Processo.objects.filter(assunto="Processo que deve ser revertido").exists())
+        self.assertTrue(any("processo_abertura_falhou" in mensagem for mensagem in logs.output))
+
+    @patch("processos.views.send_email_novo_processo_secretaria.delay")
+    @patch("processos.views.send_email_novo_processo_orientador.delay")
+    @patch("processos.views.send_email_novo_processo_aluno.delay")
     def test_solicitacao_finalizada_exibe_link_do_processo_na_listagem(
         self,
         _email_aluno,

@@ -4061,34 +4061,35 @@ def novo_processo_view(request):
             else:
                 processo = None
                 try:
-                    processo = form.save(commit=False)
-                    processo.usuario_criado_por = request.user
-                    processo.setor_atual = setor_secretaria
-                    processo.status = Processo.StatusProcesso.EM_ANALISE
-                    processo.save()
-                    processo_abertura_logger.info(
-                        "processo_abertura_processo_salvo user_id=%s processo_id=%s numero=%s anexos=%s",
-                        request.user.pk,
-                        processo.pk,
-                        processo.numero,
-                        len(documentos_forms),
-                    )
-
-                    for indice, documento_form in enumerate(documentos_forms):
-                        documento = processo.adicionar_documento(
-                            titulo=documento_form.cleaned_data["titulo"],
-                            arquivo=documento_form.cleaned_data["arquivo"],
-                            tipo_documento=documento_form.cleaned_data["tipo_documento"],
-                            restricao_tipo=documento_form.cleaned_data["restricao_tipo"],
-                            enviado_por=request.user,
-                        )
+                    with transaction.atomic():
+                        processo = form.save(commit=False)
+                        processo.usuario_criado_por = request.user
+                        processo.setor_atual = setor_secretaria
+                        processo.status = Processo.StatusProcesso.EM_ANALISE
+                        processo.save()
                         processo_abertura_logger.info(
-                            "processo_abertura_anexo_salvo user_id=%s processo_id=%s documento_id=%s indice=%s",
+                            "processo_abertura_processo_salvo user_id=%s processo_id=%s numero=%s anexos=%s",
                             request.user.pk,
                             processo.pk,
-                            documento.pk,
-                            indice,
+                            processo.numero,
+                            len(documentos_forms),
                         )
+
+                        for indice, documento_form in enumerate(documentos_forms):
+                            documento = processo.adicionar_documento(
+                                titulo=documento_form.cleaned_data["titulo"],
+                                arquivo=documento_form.cleaned_data["arquivo"],
+                                tipo_documento=documento_form.cleaned_data["tipo_documento"],
+                                restricao_tipo=documento_form.cleaned_data["restricao_tipo"],
+                                enviado_por=request.user,
+                            )
+                            processo_abertura_logger.info(
+                                "processo_abertura_anexo_salvo user_id=%s processo_id=%s documento_id=%s indice=%s",
+                                request.user.pk,
+                                processo.pk,
+                                documento.pk,
+                                indice,
+                            )
 
                     send_email_novo_processo_aluno.delay(processo.id)
                     send_email_novo_processo_orientador.delay(processo.id)

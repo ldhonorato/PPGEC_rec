@@ -15,7 +15,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # atualiza o sistema e instala as dependencias/compiladores necessarios, alem de limpar o cache do apt
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends build-essential gcc \
+	&& apt-get install -y --no-install-recommends build-essential gcc gosu \
 	&& rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -36,8 +36,6 @@ ENV HOME=/home/appuser
 COPY entrypoint.sh /entrypoint.sh
 RUN dos2unix /entrypoint.sh || sed -i 's/\r$//' /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-USER appuser
 
 EXPOSE 8001
 
