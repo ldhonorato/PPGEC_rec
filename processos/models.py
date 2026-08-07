@@ -2729,20 +2729,39 @@ class DeclaracaoDeVinculo(models.Model):
     def __str__(self) -> str:
         return f"Declaração de vínculo {self.periodo.nome} — {self.aluno.nome}"
 
-    def pode_visualizar(self, user) -> bool:
-        """O proprio aluno, e quem cuida da gestao academica.
+    # A declaracao comprova vinculo, e vinculo e o que a matricula efetivada
+    # estabelece. Pedido em analise nao basta, nem pedido indeferido ou
+    # cancelado: nenhum dos tres diz que houve vinculo naquele semestre.
+    STATUS_QUE_COMPROVAM_VINCULO = (
+        "HOMOLOGADA",
+        "PARCIALMENTE_HOMOLOGADA",
+    )
 
-        Semestres anteriores continuam abertos ao aluno: o documento foi
-        emitido para ele, e quem precisa comprovar vinculo passado -- um pedido
-        retroativo, uma bolsa -- nao teria outro caminho senao abrir processo.
-        Separar o vigente do antigo e papel da tela, nao da permissao.
+    @classmethod
+    def aluno_tem_vinculo_no_periodo(cls, aluno_id, periodo_id) -> bool:
+        return SolicitacaoMatricula.objects.filter(
+            aluno_id=aluno_id,
+            periodo_id=periodo_id,
+            status__in=cls.STATUS_QUE_COMPROVAM_VINCULO,
+        ).exists()
+
+    def pode_visualizar(self, user) -> bool:
+        """O aluno com matricula efetivada naquele semestre, e a gestao.
+
+        A condicao e do semestre da declaracao, e nao do semestre em curso: a de
+        2026.1 exige matricula efetivada em 2026.1. Cada documento carrega a sua
+        propria condicao, entao o historico nao se apaga quando o semestre vira
+        -- um recem-formado continua podendo comprovar os semestres que cursou.
+
+        A gestao ve tudo: e ela que emite, e precisa conferir o que enviou antes
+        de o aluno alcancar.
         """
         if not self.arquivo:
             return False
         if not user or not user.is_authenticated:
             return False
         if user.id == self.aluno_id:
-            return True
+            return self.aluno_tem_vinculo_no_periodo(self.aluno_id, self.periodo_id)
         if getattr(user, "tipo_usuario", None) == User.TipoUsuario.SERVIDOR:
             return True
         if getattr(user, "tipo_usuario", None) == User.TipoUsuario.DOCENTE:

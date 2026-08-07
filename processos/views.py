@@ -4938,6 +4938,12 @@ def aluno_documento_vinculo_view(request):
         for declaracao in declaracoes_do_aluno(request.user.aluno)
         if vigente is None or declaracao.pk != vigente.pk
     ]
+    # Faltar declaracao e faltar matricula sao coisas diferentes, e o aluno
+    # precisa saber qual das duas e a dele: uma se resolve esperando a
+    # secretaria emitir, a outra exige solicitar matricula.
+    tem_vinculo = bool(periodo) and DeclaracaoDeVinculo.aluno_tem_vinculo_no_periodo(
+        request.user.pk, periodo.pk
+    )
     return render(
         request,
         "processos/aluno_documento_vinculo.html",
@@ -4945,6 +4951,7 @@ def aluno_documento_vinculo_view(request):
             "periodo": periodo,
             "vigente": vigente,
             "anteriores": anteriores,
+            "tem_vinculo": tem_vinculo,
         },
     )
 

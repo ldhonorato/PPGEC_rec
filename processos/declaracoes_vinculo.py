@@ -8,7 +8,13 @@ documento -- o unico dado de ligacao que existe entre a pasta e o cadastro.
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Aluno, DeclaracaoDeVinculo, PeriodoLetivo, validar_cpf_brasileiro
+from .models import (
+    Aluno,
+    DeclaracaoDeVinculo,
+    PeriodoLetivo,
+    SolicitacaoMatricula,
+    validar_cpf_brasileiro,
+)
 
 
 EXTENSOES_ACEITAS = {".pdf"}
@@ -95,6 +101,14 @@ def importar_declaracoes_de_vinculo(*, periodo, arquivos, enviado_por, substitui
 
         resultado["importado"] = True
         resultado["substituiu"] = bool(existente)
+        # Nao impede o envio -- a secretaria sabe o que emitiu, e a matricula
+        # pode ser processada depois, quando a declaracao aparece sozinha. Mas
+        # nao pode passar calado: sem matricula efetivada o aluno nao alcanca o
+        # que acabou de ser enviado, e o relatorio e o unico lugar onde isso
+        # aparece.
+        resultado["invisivel_ao_aluno"] = not DeclaracaoDeVinculo.aluno_tem_vinculo_no_periodo(
+            aluno.pk, periodo.pk
+        )
         resultados.append(resultado)
 
     return resultados
@@ -137,9 +151,18 @@ def periodo_em_curso(data_base=None):
 
 
 def declaracoes_do_aluno(aluno):
-    """As declaracoes do aluno, da mais recente para a mais antiga."""
+    """As declaracoes que o aluno pode abrir, da mais recente para a mais antiga.
+
+    Filtra pela mesma regra que protege o arquivo: matricula efetivada no
+    semestre da declaracao. Se a tela listasse o que a permissao recusa, o aluno
+    veria o documento na lista e receberia 404 ao clicar -- pior do que nao ver.
+    """
+    periodos_com_vinculo = SolicitacaoMatricula.objects.filter(
+        aluno=aluno,
+        status__in=DeclaracaoDeVinculo.STATUS_QUE_COMPROVAM_VINCULO,
+    ).values("periodo_id")
     return (
-        DeclaracaoDeVinculo.objects.filter(aluno=aluno)
+        DeclaracaoDeVinculo.objects.filter(aluno=aluno, periodo_id__in=periodos_com_vinculo)
         .select_related("periodo")
         .order_by("-periodo__nome")
     )
@@ -153,5 +176,7 @@ def declaracao_vigente(aluno, periodo_em_curso):
     2026.2, vencida, sem nenhum aviso de que era a errada.
     """
     if periodo_em_curso is None:
+        return None
+    if not DeclaracaoDeVinculo.aluno_tem_vinculo_no_periodo(aluno.pk, periodo_em_curso.pk):
         return None
     return DeclaracaoDeVinculo.objects.filter(aluno=aluno, periodo=periodo_em_curso).first()
