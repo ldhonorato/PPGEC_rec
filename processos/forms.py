@@ -16,6 +16,8 @@ from .models import (
     Disciplina,
     DisponibilidadeSala,
     DisciplinaTrajetoria,
+    ComentarioProcesso,
+    DeliberacaoProcesso,
     Documento,
     EncontroOferta,
     EstagioDocencia,
@@ -907,10 +909,31 @@ class ManifestarCienteOrientadorForm(forms.Form):
 
 
 class ComentarioProcessoForm(forms.Form):
+    tipo = forms.ChoiceField(
+        choices=ComentarioProcesso.TipoComentario.choices,
+        label="Finalidade do comentário",
+        widget=forms.RadioSelect,
+    )
     anonimo = forms.BooleanField(required=False, label="Comentário anônimo")
     texto = forms.CharField(
-        label="Comentario",
+        label="Comentário",
         widget=forms.Textarea(attrs={"rows": 4}),
+    )
+
+    def __init__(self, *args, debate_aberto=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if debate_aberto:
+            self.fields["tipo"].choices = [
+                (ComentarioProcesso.TipoComentario.OBSERVACAO, "Registrar observação"),
+                (ComentarioProcesso.TipoComentario.DEBATE, "Responder ao debate"),
+            ]
+
+
+class DeliberacaoProcessoForm(forms.Form):
+    posicao = forms.ChoiceField(
+        choices=DeliberacaoProcesso.Posicao.choices,
+        label="Manifestação sobre o pleito",
+        widget=forms.RadioSelect,
     )
 
 

@@ -387,8 +387,8 @@ def send_email_movimentacao_pleno(self, processo_id: int):
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
-def send_email_processo_comentado_pleno(self, processo_id: int, comentario_id: int):
-    """Avisa a todos os integrantes do Pleno sobre comentário em um processo, cancelando sua aprovação automática e exigindo debate no Pleno"""
+def send_email_processo_comentado_pleno(self, processo_id: int, comentario_id: int, resposta: bool = False):
+    """Notifica uma única abertura de debate ou uma resposta posterior."""
     from .models import Processo, ComentarioProcesso, User
     try:
         processo = Processo.objects.select_related("usuario_criado_por", "setor_atual").get(pk=processo_id)
@@ -402,14 +402,20 @@ def send_email_processo_comentado_pleno(self, processo_id: int, comentario_id: i
     contexto={
         "processo": processo,
         "aluno": processo.usuario_criado_por,
-        "autor_comentario": comentario.autor
+        "autor_comentario": comentario.autor,
+        "comentario": comentario,
+        "resposta": resposta,
     }
 
     try:
         for docente in docentes:
             if docente.email:
                 _send_email(
-                    subject=f"[PPGEC] Intervenção — {processo.usuario_criado_por.nome} — Processo {processo.numero} — Aprovação automática cancelada",
+                    subject=(
+                        f"[PPGEC] Resposta no debate — Processo {processo.numero}"
+                        if resposta
+                        else f"[PPGEC] Debate aberto — {processo.usuario_criado_por.nome} — Processo {processo.numero}"
+                    ),
                     template_name="emails/pleno/processo_comentado_pleno.html",
                     contexto=contexto,
                     recipient=docente.email,

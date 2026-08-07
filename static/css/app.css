@@ -4543,6 +4543,94 @@ dialog::backdrop {
     border-color: var(--color-danger);
 }
 
+.opcoes-cartoes {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--espaco-3);
+    margin: 0 0 var(--espaco-4);
+    padding: 0;
+    border: 0;
+}
+
+.opcoes-cartoes legend {
+    grid-column: 1 / -1;
+    margin-bottom: var(--espaco-2);
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
+.opcoes-cartoes-comentario {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.opcao-cartao {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: var(--espaco-3);
+    min-height: 5.5rem;
+    padding: var(--espaco-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    cursor: pointer;
+    transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.opcao-cartao:hover {
+    border-color: var(--color-primary);
+}
+
+.opcao-cartao:has(input:checked) {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.opcao-cartao:has(input:focus-visible) {
+    outline: 3px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
+    outline-offset: 2px;
+}
+
+.opcao-cartao input {
+    position: absolute;
+    opacity: 0;
+}
+
+.opcao-cartao svg {
+    width: 1.75rem;
+    height: 1.75rem;
+    color: var(--color-primary);
+}
+
+.opcao-cartao-texto {
+    display: grid;
+    gap: 0.2rem;
+}
+
+.opcao-cartao-texto small {
+    color: var(--color-muted);
+    line-height: 1.35;
+}
+
+.votacao-total {
+    padding: 0.3rem 0.55rem;
+    border-radius: 999px;
+    background: var(--color-surface-soft);
+    color: var(--color-text);
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+    .opcoes-cartoes,
+    .opcoes-cartoes-comentario {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Bloco dentro do formulario que nao e um campo -- anexos, por exemplo. Tem
    titulo proprio para nao se confundir com os campos acima dele. */
 .formulario-secao {

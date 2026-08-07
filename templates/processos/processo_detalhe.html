@@ -62,8 +62,15 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
     </dl>
 
     <div class="processo-texto">
-        <h2 class="section-title">Descrição</h2>
-        <p>{{ processo.descricao }}</p>
+        {% if is_processo_no_pleno %}
+            <details>
+                <summary class="btn btn-secondary">Ver descrição</summary>
+                <p class="texto-preservado">{{ processo.descricao }}</p>
+            </details>
+        {% else %}
+            <h2 class="section-title">Descrição</h2>
+            <p class="texto-preservado">{{ processo.descricao }}</p>
+        {% endif %}
     </div>
 
     {% if processo.termo_finalizacao %}
@@ -84,6 +91,48 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         </div>
     {% endif %}
 </section>
+
+{% if is_processo_no_pleno %}
+<section class="card">
+    <h2 class="section-title">Histórico do processo</h2>
+    <ol class="linha-tempo">
+        {% for tramitacao in tramitacoes_historico %}
+            {% if forloop.first %}
+                <li>
+                    <div class="linha-tempo-marca" aria-hidden="true"></div>
+                    <div class="linha-tempo-conteudo">
+                        <p class="linha-tempo-titulo">{{ tramitacao.setor_origem.nome|default:"Requerente" }} → {{ tramitacao.setor_destino.nome }}</p>
+                        <p class="linha-tempo-meta">{{ tramitacao.data_encaminhamento|date:"d/m/Y H:i" }} · por {{ tramitacao.encaminhado_por.nome }}</p>
+                        {% if tramitacao.observacao %}<p class="linha-tempo-observacao">{{ tramitacao.observacao }}</p>{% endif %}
+                    </div>
+                </li>
+            {% endif %}
+        {% empty %}
+            <li><div class="linha-tempo-conteudo"><p class="linha-tempo-titulo">Processo aberto</p><p class="linha-tempo-meta">{{ processo.data_criacao|date:"d/m/Y H:i" }}</p></div></li>
+        {% endfor %}
+    </ol>
+    {% if tramitacoes_historico|length > 1 %}
+        <details>
+            <summary class="btn btn-secondary">Ver toda a tramitação</summary>
+            <ol class="linha-tempo">
+                {% for tramitacao in tramitacoes_historico %}
+                    {% if not forloop.first %}
+                        <li>
+                            <div class="linha-tempo-marca" aria-hidden="true"></div>
+                            <div class="linha-tempo-conteudo">
+                                <p class="linha-tempo-titulo">{{ tramitacao.setor_origem.nome|default:"Requerente" }} → {{ tramitacao.setor_destino.nome }}</p>
+                                <p class="linha-tempo-meta">{{ tramitacao.data_encaminhamento|date:"d/m/Y H:i" }} · por {{ tramitacao.encaminhado_por.nome }}</p>
+                                {% if tramitacao.observacao %}<p class="linha-tempo-observacao">{{ tramitacao.observacao }}</p>{% endif %}
+                            </div>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                <li><div class="linha-tempo-marca is-inicio" aria-hidden="true"></div><div class="linha-tempo-conteudo"><p class="linha-tempo-titulo">Processo aberto</p><p class="linha-tempo-meta">{{ processo.data_criacao|date:"d/m/Y H:i" }} · por {{ processo.usuario_criado_por.nome }}</p></div></li>
+            </ol>
+        </details>
+    {% endif %}
+</section>
+{% endif %}
 
 {% if solicitacoes_banca_display %}
 <section class="card">
@@ -562,16 +611,65 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
 
 {% if can_comment_pleno %}
 <section class="card">
+    <h2 class="section-title">Manifestação sobre o pleito</h2>
+    <p class="muted">Registre sua posição. Você pode alterá-la enquanto o processo permanecer no Pleno.</p>
+    <form method="post" class="form-filtros">
+        {% csrf_token %}
+        <input type="hidden" name="registrar_deliberacao" value="1">
+        <fieldset class="opcoes-cartoes">
+            <legend>Escolha sua posição</legend>
+            <label class="opcao-cartao opcao-favoravel">
+                <input type="radio" name="posicao" value="FAVORAVEL" required {% if deliberacao_form.posicao.value == "FAVORAVEL" %}checked{% endif %}>
+                <svg aria-hidden="true"><use href="#i-favoravel"></use></svg>
+                <span class="opcao-cartao-texto"><strong>Favorável</strong><small>Concordo com o pleito apresentado.</small></span>
+                <span class="votacao-total" aria-label="{{ resultado_deliberacao.favoraveis }} votos favoráveis">{{ resultado_deliberacao.favoraveis }} voto{{ resultado_deliberacao.favoraveis|pluralize }}</span>
+            </label>
+            <label class="opcao-cartao opcao-contraria">
+                <input type="radio" name="posicao" value="CONTRARIA" required {% if deliberacao_form.posicao.value == "CONTRARIA" %}checked{% endif %}>
+                <svg aria-hidden="true"><use href="#i-contrario"></use></svg>
+                <span class="opcao-cartao-texto"><strong>Contrário</strong><small>Não concordo com o pleito apresentado.</small></span>
+                <span class="votacao-total" aria-label="{{ resultado_deliberacao.contrarios }} votos contrários">{{ resultado_deliberacao.contrarios }} voto{{ resultado_deliberacao.contrarios|pluralize }}</span>
+            </label>
+            <label class="opcao-cartao opcao-abstencao">
+                <input type="radio" name="posicao" value="ABSTENCAO" required {% if deliberacao_form.posicao.value == "ABSTENCAO" %}checked{% endif %}>
+                <svg aria-hidden="true"><use href="#i-abstencao"></use></svg>
+                <span class="opcao-cartao-texto"><strong>Abstenção</strong><small>Prefiro não me posicionar sobre o pleito.</small></span>
+                <span class="votacao-total" aria-label="{{ resultado_deliberacao.abstencoes }} abstenções">{{ resultado_deliberacao.abstencoes }} voto{{ resultado_deliberacao.abstencoes|pluralize }}</span>
+            </label>
+            {{ deliberacao_form.posicao.errors }}
+        </fieldset>
+        <button type="submit" class="btn">{% if deliberacao_atual %}Atualizar manifestação{% else %}Registrar manifestação{% endif %}</button>
+    </form>
+</section>
+
+<section class="card">
     <h2 class="section-title">Comentários do Pleno</h2>
+    <p class="muted">Uma observação fica registrada sem alterar o andamento. “Abrir debate” muda o processo para Em debate e envia uma única notificação.</p>
     <form method="post" class="form-filtros">
         {% csrf_token %}
         <input type="hidden" name="adicionar_comentario" value="1">
+        <fieldset class="opcoes-cartoes opcoes-cartoes-comentario">
+            <legend>O que você deseja fazer?</legend>
+            <label class="opcao-cartao opcao-observacao">
+                <input type="radio" name="tipo" value="OBSERVACAO" required {% if comentario_form.tipo.value == "OBSERVACAO" %}checked{% endif %}>
+                <svg aria-hidden="true"><use href="#i-observacao"></use></svg>
+                <span class="opcao-cartao-texto"><strong>Registrar observação</strong><small>Guarda o apontamento sem mudar o andamento nem enviar e-mail.</small></span>
+            </label>
+            <label class="opcao-cartao opcao-debate">
+                <input type="radio" name="tipo" value="DEBATE" required {% if comentario_form.tipo.value == "DEBATE" %}checked{% endif %}>
+                <svg aria-hidden="true"><use href="#i-debate"></use></svg>
+                <span class="opcao-cartao-texto"><strong>{% if processo.status == "EM_DEBATE" %}Responder ao debate{% else %}Abrir debate{% endif %}</strong><small>{% if processo.status == "EM_DEBATE" %}Adiciona uma resposta e notifica os participantes.{% else %}Interrompe a análise comum e notifica o Pleno uma única vez.{% endif %}</small></span>
+            </label>
+            {{ comentario_form.tipo.errors }}
+        </fieldset>
         {% for field in comentario_form %}
+            {% if field.name != "tipo" %}
             <div class="formulario-campo">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {{ field.errors }}
             </div>
+            {% endif %}
         {% endfor %}
         <button type="submit" class="btn">Adicionar comentário</button>
     </form>
@@ -587,6 +685,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                             {{ comentario.autor.nome }}
                         {% endif %}
                         · {{ comentario.data_criacao|date:"d/m/Y H:i" }}
+                        · {{ comentario.get_tipo_display }}
                     </small>
                     <p class="item-observacao texto-preservado">{{ comentario.texto }}</p>
                 </li>
@@ -598,6 +697,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
 </section>
 {% endif %}
 
+{% if not is_processo_no_pleno %}
 <section class="card">
     <h2 class="section-title">Histórico do processo</h2>
     {% comment %}
@@ -641,6 +741,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         </li>
     </ol>
 </section>
+{% endif %}
 {% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo or can_registrar_horas_complementares %}
 <dialog id="modal-remocao-arquivo" class="modal-dialog">
     <div class="modal-cabecalho">

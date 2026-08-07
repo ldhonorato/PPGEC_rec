@@ -2272,6 +2272,10 @@ class ManifestacaoProcesso(models.Model):
 
 
 class ComentarioProcesso(models.Model):
+    class TipoComentario(models.TextChoices):
+        OBSERVACAO = "OBSERVACAO", "Registrar observação"
+        DEBATE = "DEBATE", "Abrir debate"
+
     processo = models.ForeignKey(
         Processo,
         on_delete=models.CASCADE,
@@ -2283,6 +2287,11 @@ class ComentarioProcesso(models.Model):
         related_name="comentarios_processo",
     )
     anonimo = models.BooleanField(default=False)
+    tipo = models.CharField(
+        max_length=20,
+        choices=TipoComentario.choices,
+        default=TipoComentario.OBSERVACAO,
+    )
     texto = models.TextField()
     data_criacao = models.DateTimeField(auto_now_add=True)
 
@@ -2291,6 +2300,38 @@ class ComentarioProcesso(models.Model):
 
     def __str__(self) -> str:
         return f"Comentário em {self.processo.numero}"
+
+
+class DeliberacaoProcesso(models.Model):
+    class Posicao(models.TextChoices):
+        FAVORAVEL = "FAVORAVEL", "Favorável"
+        CONTRARIA = "CONTRARIA", "Contrário"
+        ABSTENCAO = "ABSTENCAO", "Abstenção"
+
+    processo = models.ForeignKey(
+        Processo,
+        on_delete=models.CASCADE,
+        related_name="deliberacoes",
+    )
+    docente = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="deliberacoes_processos",
+    )
+    posicao = models.CharField(max_length=20, choices=Posicao.choices)
+    data_manifestacao = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-data_manifestacao"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["processo", "docente"],
+                name="unique_deliberacao_docente_processo",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.docente} - {self.get_posicao_display()} - {self.processo.numero}"
 
 
 class Polo(models.Model):
