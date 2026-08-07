@@ -9,7 +9,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('processos', '0066_rotulos_com_acento'),
+        ('processos', '0067_deliberacaoprocesso_comentarioprocesso_tipo'),
     ]
 
     operations = [
