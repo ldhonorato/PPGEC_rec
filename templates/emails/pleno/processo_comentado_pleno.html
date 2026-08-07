@@ -2,15 +2,23 @@
 <html>
 <body style="font-family: Arial, sans-serif; color: #004492; max-width: 600px; margin: 0 auto;">
   <div style="background:#1a3a5c; padding: 24px; border-radius: 8px 8px 0 0;">
-    <h2 style="color: white; margin: 0;">AcadFlow — Intervenção no Processo {{processo.numero}}</h2>
+    <h2 style="color: white; margin: 0;">AcadFlow — {% if resposta %}Resposta no debate{% else %}Debate aberto{% endif %} — Processo {{processo.numero}}</h2>
   </div>
   <div style="background: #f9f9f9; padding: 28px; border-radius: 0 0 8px 8px;">
     <p>Olá, Professor.</p>
-    <p>O processo abaixo recebeu um comentário, tornando sua aprovação necessariamente manual.</p>
+    {% if resposta %}
+      <p>O debate deste processo recebeu uma nova resposta.</p>
+    {% else %}
+      <p>Foi aberto um debate para este processo. Esta notificação de abertura é enviada uma única vez.</p>
+    {% endif %}
     <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
       <tr>
         <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Número</td>
         <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.numero}}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; font-weight:bold;">Comentário</td>
+        <td style="padding: 8px;">{{comentario.texto}}</td>
       </tr>
       <tr>
         <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Tipo</td>

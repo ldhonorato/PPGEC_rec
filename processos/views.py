@@ -37,6 +37,7 @@ from .forms import (
     AtenderSolicitacaoAssinaturaForm,
     ManifestarCienteOrientadorForm,
     ComentarioProcessoForm,
+    DeliberacaoProcessoForm,
     DisciplinaForm,
     DisciplinaTrajetoriaForm,
     DisponibilidadeSalaLoteForm,
@@ -69,6 +70,7 @@ from .models import (
     DisciplinaTrajetoria,
     DisponibilidadeSala,
     ComentarioProcesso,
+    DeliberacaoProcesso,
     Docente,
     Documento,
     EncontroOferta,
@@ -3441,12 +3443,12 @@ def caixa_processos_view(request):
         Processo.objects.select_related("usuario_criado_por", "setor_atual")
         .filter(setor_atual_id__in=selected_setor_ids)
         .filter(
-            status__in=[
-                Processo.StatusProcesso.EM_ANALISE,
-                Processo.StatusProcesso.AGUARDANDO_CIENCIA,
-            ]
+            status__in=(
+                [Processo.StatusProcesso.EM_ANALISE, Processo.StatusProcesso.EM_DEBATE]
+                if status_caixa == Processo.StatusProcesso.EM_ANALISE
+                else [Processo.StatusProcesso.AGUARDANDO_CIENCIA]
+            )
         )
-        .filter(status=status_caixa)
         .order_by("-data_criacao")
     )
     return render(
@@ -3486,6 +3488,7 @@ def processo_detalhe_view(request, processo_id):
             "solicitacoes_banca_anexadas__membros",
             "documentos__enviado_por",
             "comentarios__autor",
+            "deliberacoes__docente",
             "manifestacoes__responsavel",
             "manifestacoes__solicitado_por",
             Prefetch(
@@ -3527,6 +3530,18 @@ def processo_detalhe_view(request, processo_id):
         and request.user.tipo_usuario == User.TipoUsuario.DOCENTE
     )
     can_comment_pleno = _is_docente(request.user) and _is_processo_no_pleno(processo)
+    deliberacao_atual = next(
+        (item for item in processo.deliberacoes.all() if item.docente_id == request.user.id),
+        None,
+    )
+    deliberacao_form = DeliberacaoProcessoForm(
+        initial={"posicao": deliberacao_atual.posicao if deliberacao_atual else None}
+    )
+    resultado_deliberacao = processo.deliberacoes.aggregate(
+        favoraveis=Count("id", filter=Q(posicao=DeliberacaoProcesso.Posicao.FAVORAVEL)),
+        contrarios=Count("id", filter=Q(posicao=DeliberacaoProcesso.Posicao.CONTRARIA)),
+        abstencoes=Count("id", filter=Q(posicao=DeliberacaoProcesso.Posicao.ABSTENCAO)),
+    )
     can_add_documento = can_manage_in_caixa or can_manage_requerente
     can_encaminhar_processo = can_manage_in_caixa or (can_manage_requerente and setor_solicitante is not None)
     can_finalizar_processo = can_manage_in_caixa and not processo.esta_finalizado
@@ -3833,28 +3848,53 @@ def processo_detalhe_view(request, processo_id):
                 else:
                     messages.success(request, "Arquivo removido com sucesso.")
                     return redirect("processo_detalhe", processo_id=processo.id)
-# Implementada a transição de estado de "Em Análise" para "Em Debate"
+        elif "registrar_deliberacao" in request.POST:
+            if not can_comment_pleno:
+                raise PermissionDenied("Apenas docentes podem se manifestar em processos do Pleno.")
+            deliberacao_form = DeliberacaoProcessoForm(request.POST)
+            if deliberacao_form.is_valid():
+                DeliberacaoProcesso.objects.update_or_create(
+                    processo=processo,
+                    docente=request.user,
+                    defaults={"posicao": deliberacao_form.cleaned_data["posicao"]},
+                )
+                messages.success(request, "Manifestação registrada com sucesso.")
+                return redirect("processo_detalhe", processo_id=processo.id)
+
         elif "adicionar_comentario" in request.POST:
             if not can_comment_pleno:
                 raise PermissionDenied("Apenas docentes podem comentar processos do Pleno.")
-            comentario_form = ComentarioProcessoForm(request.POST)
+            debate_ja_aberto = processo.status == Processo.StatusProcesso.EM_DEBATE
+            comentario_form = ComentarioProcessoForm(request.POST, debate_aberto=debate_ja_aberto)
             if comentario_form.is_valid():
                 comentario_intervencao = ComentarioProcesso.objects.create(
                     processo=processo,
                     autor=request.user,
                     anonimo=comentario_form.cleaned_data["anonimo"],
+                    tipo=comentario_form.cleaned_data["tipo"],
                     texto=comentario_form.cleaned_data["texto"],
                 )
-                if _is_processo_no_pleno(processo):
-                    send_email_processo_comentado_pleno.delay(processo.id, comentario_intervencao.id)
-                    # Issue 2.2.2: interrompe aprovação automática e marca como EM_DEBATE
-                    if processo.status not in {
+                abriu_debate = (
+                    comentario_intervencao.tipo == ComentarioProcesso.TipoComentario.DEBATE
+                    and processo.status not in {
                         Processo.StatusProcesso.FINALIZADO,
                         Processo.StatusProcesso.EM_DEBATE,
-                    }:
-                        processo.status = Processo.StatusProcesso.EM_DEBATE
-                        processo.save(update_fields=["status", "atualizado_em"])
-                messages.success(request, "Comentário adicionado. Processo marcado como Em Debate.")
+                    }
+                )
+                if abriu_debate:
+                    send_email_processo_comentado_pleno.delay(processo.id, comentario_intervencao.id)
+                    processo.status = Processo.StatusProcesso.EM_DEBATE
+                    processo.save(update_fields=["status", "atualizado_em"])
+                elif debate_ja_aberto and comentario_intervencao.tipo == ComentarioProcesso.TipoComentario.DEBATE:
+                    send_email_processo_comentado_pleno.delay(
+                        processo.id, comentario_intervencao.id, resposta=True
+                    )
+                if abriu_debate:
+                    messages.success(request, "Comentário adicionado e debate aberto.")
+                elif debate_ja_aberto and comentario_intervencao.tipo == ComentarioProcesso.TipoComentario.DEBATE:
+                    messages.success(request, "Resposta ao debate registrada e notificada.")
+                else:
+                    messages.success(request, "Observação registrada sem abrir um novo debate.")
                 return redirect("processo_detalhe", processo_id=processo.id)
 
         else:
@@ -3880,7 +3920,9 @@ def processo_detalhe_view(request, processo_id):
         finalizar_form = FinalizarProcessoForm()
 
     if request.method != "POST" or "adicionar_comentario" not in request.POST:
-        comentario_form = ComentarioProcessoForm()
+        comentario_form = ComentarioProcessoForm(
+            debate_aberto=processo.status == Processo.StatusProcesso.EM_DEBATE
+        )
 
     documentos_exibicao = []
     for documento in processo.documentos.all():
@@ -3981,6 +4023,10 @@ def processo_detalhe_view(request, processo_id):
             "solicitar_ciente_form": solicitar_ciente_form,
             "manifestar_ciente_form": manifestar_ciente_form,
             "can_comment_pleno": can_comment_pleno,
+            "is_processo_no_pleno": _is_processo_no_pleno(processo),
+            "deliberacao_atual": deliberacao_atual,
+            "deliberacao_form": deliberacao_form,
+            "resultado_deliberacao": resultado_deliberacao,
             "comentario_form": comentario_form,
             "nomes_setores_caixa_texto": ", ".join(nomes_setores_caixa) if nomes_setores_caixa else "-",
             "documento_form": documento_form,

@@ -28,6 +28,8 @@ from .models import (
     AulaPresencialOferta,
     Disciplina,
     DisciplinaTrajetoria,
+    ComentarioProcesso,
+    DeliberacaoProcesso,
     DisponibilidadeSala,
     Docente,
     EncontroOferta,
@@ -58,6 +60,89 @@ from .services import (
     salvar_solicitacao_matricula,
 )
 from .tasks import atualizar_status_periodos_letivos
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class ProcessoPlenoDeliberacaoTests(TestCase):
+    def setUp(self):
+        self.docente = User.objects.create_user(
+            email="docente.deliberacao@example.com",
+            password="senha-segura-123",
+            nome="Docente Deliberação",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        self.aluno = User.objects.create_user(
+            email="aluno.deliberacao@example.com",
+            password="senha-segura-123",
+            nome="Aluno Deliberação",
+            tipo_usuario=User.TipoUsuario.ALUNO,
+        )
+        self.pleno, _ = Setor.objects.get_or_create(nome=Setor.NOME_PLENO)
+        SetorMembro.objects.get_or_create(setor=self.pleno, usuario=self.docente)
+        self.processo = Processo.objects.create(
+            usuario_criado_por=self.aluno,
+            tipo=Processo.TipoProcesso.OUTRO,
+            assunto="Pleito em deliberação",
+            descricao="Descrição extensa do pleito.",
+            setor_atual=self.pleno,
+            status=Processo.StatusProcesso.EM_DEBATE,
+        )
+        self.client.force_login(self.docente)
+
+    def test_caixa_inclui_processo_em_debate_no_filtro_em_analise(self):
+        response = self.client.get(
+            reverse("coordenacao_caixa_processos"),
+            {"caixa": self.pleno.id},
+        )
+
+        self.assertContains(response, self.processo.assunto)
+
+    def test_observacao_nao_abre_debate_nem_envia_email(self):
+        self.processo.status = Processo.StatusProcesso.EM_ANALISE
+        self.processo.save(update_fields=["status"])
+
+        with patch("processos.views.send_email_processo_comentado_pleno.delay") as enviar:
+            response = self.client.post(
+                reverse("processo_detalhe", args=[self.processo.id]),
+                {"adicionar_comentario": "1", "tipo": "OBSERVACAO", "texto": "Registro pontual."},
+            )
+
+        self.assertRedirects(response, reverse("processo_detalhe", args=[self.processo.id]))
+        self.processo.refresh_from_db()
+        self.assertEqual(self.processo.status, Processo.StatusProcesso.EM_ANALISE)
+        enviar.assert_not_called()
+
+    def test_abertura_e_resposta_usam_notificacoes_distintas(self):
+        self.processo.status = Processo.StatusProcesso.EM_ANALISE
+        self.processo.save(update_fields=["status"])
+        url = reverse("processo_detalhe", args=[self.processo.id])
+
+        with patch("processos.views.send_email_processo_comentado_pleno.delay") as enviar:
+            self.client.post(url, {"adicionar_comentario": "1", "tipo": "DEBATE", "texto": "Abro o debate."})
+            self.client.post(url, {"adicionar_comentario": "1", "tipo": "DEBATE", "texto": "Complemento."})
+
+        self.assertEqual(enviar.call_count, 2)
+        self.assertNotIn("resposta", enviar.call_args_list[0].kwargs)
+        self.assertTrue(enviar.call_args_list[1].kwargs["resposta"])
+
+    def test_docente_pode_registrar_e_atualizar_manifestacao(self):
+        url = reverse("processo_detalhe", args=[self.processo.id])
+        self.client.post(url, {"registrar_deliberacao": "1", "posicao": "FAVORAVEL"})
+        self.client.post(url, {"registrar_deliberacao": "1", "posicao": "ABSTENCAO"})
+
+        deliberacoes = DeliberacaoProcesso.objects.filter(processo=self.processo, docente=self.docente)
+        self.assertEqual(deliberacoes.count(), 1)
+        self.assertEqual(deliberacoes.get().posicao, DeliberacaoProcesso.Posicao.ABSTENCAO)
+
+    def test_detalhe_do_pleno_tem_descricao_e_historico_recolhiveis(self):
+        response = self.client.get(reverse("processo_detalhe", args=[self.processo.id]))
+
+        self.assertContains(response, "Ver descrição")
+        self.assertContains(response, "Histórico do processo")
+        self.assertContains(response, "Manifestação sobre o pleito")
+        self.assertContains(response, "0 votos favoráveis")
+        self.assertContains(response, "0 votos contrários")
+        self.assertContains(response, "0 abstenções")
 
 
 class VersionViewTests(SimpleTestCase):
