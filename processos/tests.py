@@ -6045,7 +6045,7 @@ class DeclaracaoDeVinculoTests(TestCase):
 
     def test_a_tela_do_aluno_mostra_a_do_semestre_em_curso(self):
         self._importar("52998224725.pdf")
-        self._matricular(self.aluno, self.periodo, SolicitacaoMatricula.Status.HOMOLOGADA)
+        self._matricular(self.aluno, self.periodo, SolicitacaoMatricula.Status.RASCUNHO)
         self.client.force_login(self.aluno)
 
         resposta = self.client.get(reverse("aluno_documento_vinculo"))
@@ -6058,8 +6058,8 @@ class DeclaracaoDeVinculoTests(TestCase):
     def test_sem_a_do_semestre_a_anterior_nao_ocupa_o_lugar(self):
         """Declaracao vencida e pior do que declaracao ausente."""
         self._importar("52998224725.pdf", periodo=self.periodo_anterior)
-        self._matricular(self.aluno, self.periodo_anterior, SolicitacaoMatricula.Status.HOMOLOGADA)
-        self._matricular(self.aluno, self.periodo, SolicitacaoMatricula.Status.HOMOLOGADA)
+        self._matricular(self.aluno, self.periodo_anterior, SolicitacaoMatricula.Status.RASCUNHO)
+        self._matricular(self.aluno, self.periodo, SolicitacaoMatricula.Status.RASCUNHO)
         self.client.force_login(self.aluno)
 
         resposta = self.client.get(reverse("aluno_documento_vinculo"))
@@ -6071,7 +6071,7 @@ class DeclaracaoDeVinculoTests(TestCase):
 
     def test_o_arquivo_so_abre_para_quem_pode(self):
         self._importar("52998224725.pdf")
-        self._matricular(self.aluno, self.periodo, SolicitacaoMatricula.Status.HOMOLOGADA)
+        self._matricular(self.aluno, self.periodo, SolicitacaoMatricula.Status.RASCUNHO)
         caminho = DeclaracaoDeVinculo.objects.get().arquivo.name
         url = reverse("media_file", kwargs={"path": caminho})
 
@@ -6118,23 +6118,22 @@ class DeclaracaoDeVinculoTests(TestCase):
     def _matricular(self, aluno, periodo, status):
         return SolicitacaoMatricula.objects.create(aluno=aluno, periodo=periodo, status=status)
 
-    def test_so_matricula_efetivada_abre_a_declaracao(self):
-        """Pedido em analise, indeferido ou cancelado nao comprova vinculo."""
+    def test_qualquer_estado_da_matricula_abre_a_declaracao(self):
+        """O status nao entra na conta, de proposito.
+
+        Os estados sao legado: nao foram mantidos de forma confiavel ao longo do
+        tempo, e filtrar por eles negaria a declaracao a alunos que cursaram o
+        semestre -- justamente quem precisa comprovar o vinculo. O que se afirma
+        e mais modesto: houve pedido de matricula naquele periodo.
+        """
         self._importar("52998224725.pdf")
         declaracao = DeclaracaoDeVinculo.objects.get()
-        libera = {
-            SolicitacaoMatricula.Status.HOMOLOGADA: True,
-            SolicitacaoMatricula.Status.PARCIALMENTE_HOMOLOGADA: True,
-            SolicitacaoMatricula.Status.SOLICITADA: False,
-            SolicitacaoMatricula.Status.INDEFERIDA: False,
-            SolicitacaoMatricula.Status.CANCELADA: False,
-            SolicitacaoMatricula.Status.RASCUNHO: False,
-        }
-        for status, esperado in libera.items():
+
+        for status in SolicitacaoMatricula.Status:
             with self.subTest(status=status):
                 SolicitacaoMatricula.objects.all().delete()
                 self._matricular(self.aluno, self.periodo, status)
-                self.assertEqual(declaracao.pode_visualizar(self.aluno), esperado)
+                self.assertTrue(declaracao.pode_visualizar(self.aluno))
 
     def test_sem_matricula_nenhuma_o_aluno_nao_alcanca(self):
         self._importar("52998224725.pdf")
@@ -6148,7 +6147,7 @@ class DeclaracaoDeVinculoTests(TestCase):
         antiga = DeclaracaoDeVinculo.objects.get(periodo=self.periodo_anterior)
         atual = DeclaracaoDeVinculo.objects.get(periodo=self.periodo)
 
-        self._matricular(self.aluno, self.periodo_anterior, SolicitacaoMatricula.Status.HOMOLOGADA)
+        self._matricular(self.aluno, self.periodo_anterior, SolicitacaoMatricula.Status.RASCUNHO)
 
         self.assertTrue(antiga.pode_visualizar(self.aluno))
         self.assertFalse(atual.pode_visualizar(self.aluno))
@@ -6166,14 +6165,14 @@ class DeclaracaoDeVinculoTests(TestCase):
 
         self.assertEqual(self.client.get(url).status_code, 404)
 
-        self._matricular(self.aluno, self.periodo, SolicitacaoMatricula.Status.HOMOLOGADA)
+        self._matricular(self.aluno, self.periodo, SolicitacaoMatricula.Status.RASCUNHO)
         self.assertEqual(self.client.get(url).status_code, 200)
 
     def test_a_tela_nao_lista_o_que_a_permissao_recusa(self):
         """Listar e depois recusar no clique e pior do que nao listar."""
         self._importar("52998224725.pdf", periodo=self.periodo_anterior)
         self._importar("52998224725.pdf", periodo=self.periodo)
-        self._matricular(self.aluno, self.periodo, SolicitacaoMatricula.Status.HOMOLOGADA)
+        self._matricular(self.aluno, self.periodo, SolicitacaoMatricula.Status.RASCUNHO)
         self.client.force_login(self.aluno)
 
         resposta = self.client.get(reverse("aluno_documento_vinculo"))
@@ -6189,7 +6188,7 @@ class DeclaracaoDeVinculoTests(TestCase):
         resposta = self.client.get(reverse("aluno_documento_vinculo"))
 
         self.assertFalse(resposta.context["tem_vinculo"])
-        self.assertContains(resposta, "Sem matrícula efetivada em 2026.2")
+        self.assertContains(resposta, "Sem matrícula em 2026.2")
         self.assertNotContains(resposta, "Ainda não há declaração para")
 
     def test_o_relatorio_avisa_quando_o_aluno_nao_vai_ver(self):
@@ -6199,6 +6198,6 @@ class DeclaracaoDeVinculoTests(TestCase):
         self.assertTrue(sem_matricula["invisivel_ao_aluno"])
 
         DeclaracaoDeVinculo.objects.all().delete()
-        self._matricular(self.aluno, self.periodo, SolicitacaoMatricula.Status.HOMOLOGADA)
+        self._matricular(self.aluno, self.periodo, SolicitacaoMatricula.Status.RASCUNHO)
         com_matricula = self._importar("52998224725.pdf")[0]
         self.assertFalse(com_matricula["invisivel_ao_aluno"])

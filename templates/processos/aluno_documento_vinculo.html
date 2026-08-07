@@ -31,16 +31,16 @@ explicito, nunca a anterior ocupando o lugar.
             <svg aria-hidden="true"><use href="#i-documento-vinculo"></use></svg>
             {% if periodo and not tem_vinculo %}
                 {% comment %}
-                A declaracao comprova vinculo, e vinculo e o que a matricula
-                efetivada estabelece. Dizer "ainda nao ha declaracao" aqui seria
-                mandar o aluno esperar por um documento que nao vai chegar --
-                falta a matricula, e e isso que ele precisa resolver.
+                A declaracao acompanha a matricula do semestre. Dizer "ainda nao
+                ha declaracao" aqui seria mandar o aluno esperar por um documento
+                que nao vai chegar -- falta a matricula, e e isso que ele precisa
+                resolver.
                 {% endcomment %}
-                <p class="estado-vazio-titulo">Sem matrícula efetivada em {{ periodo.nome }}</p>
+                <p class="estado-vazio-titulo">Sem matrícula em {{ periodo.nome }}</p>
                 <p>
                     A declaração de vínculo acompanha a matrícula do semestre. Ela
-                    fica disponível assim que a sua matrícula em {{ periodo.nome }}
-                    for processada pela secretaria.
+                    fica disponível assim que houver uma solicitação de matrícula
+                    sua em {{ periodo.nome }}.
                 </p>
                 <a class="btn btn-secondary" href="{% url 'matriculas_minhas' %}">Ver minha matrícula</a>
             {% else %}

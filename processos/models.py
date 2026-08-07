@@ -2729,27 +2729,29 @@ class DeclaracaoDeVinculo(models.Model):
     def __str__(self) -> str:
         return f"Declaração de vínculo {self.periodo.nome} — {self.aluno.nome}"
 
-    # A declaracao comprova vinculo, e vinculo e o que a matricula efetivada
-    # estabelece. Pedido em analise nao basta, nem pedido indeferido ou
-    # cancelado: nenhum dos tres diz que houve vinculo naquele semestre.
-    STATUS_QUE_COMPROVAM_VINCULO = (
-        "HOMOLOGADA",
-        "PARCIALMENTE_HOMOLOGADA",
-    )
-
     @classmethod
     def aluno_tem_vinculo_no_periodo(cls, aluno_id, periodo_id) -> bool:
+        """Basta ter solicitado matricula no periodo, em qualquer estado.
+
+        O status da solicitacao nao entra na conta de proposito. Os estados sao
+        legado: nao foram mantidos de forma confiavel ao longo do tempo, e
+        filtrar por eles negaria a declaracao a alunos que cursaram o semestre
+        -- justamente quem precisa comprovar o vinculo.
+
+        O que se afirma aqui e mais modesto e mais seguro: houve pedido de
+        matricula naquele periodo. Se um dia os estados voltarem a ser
+        confiaveis, este e o unico lugar a mudar.
+        """
         return SolicitacaoMatricula.objects.filter(
             aluno_id=aluno_id,
             periodo_id=periodo_id,
-            status__in=cls.STATUS_QUE_COMPROVAM_VINCULO,
         ).exists()
 
     def pode_visualizar(self, user) -> bool:
-        """O aluno com matricula efetivada naquele semestre, e a gestao.
+        """O aluno que solicitou matricula naquele semestre, e a gestao.
 
         A condicao e do semestre da declaracao, e nao do semestre em curso: a de
-        2026.1 exige matricula efetivada em 2026.1. Cada documento carrega a sua
+        2026.1 exige solicitacao de matricula em 2026.1. Cada documento carrega a sua
         propria condicao, entao o historico nao se apaga quando o semestre vira
         -- um recem-formado continua podendo comprovar os semestres que cursou.
 
