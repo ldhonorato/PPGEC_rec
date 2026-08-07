@@ -35,6 +35,7 @@ from processos.views import (
     aluno_informar_cpf_view,
     caixa_processos_view,
     cadastro_aluno_sucesso_view,
+    declaracoes_vinculo_view,
     cadastro_aluno_view,
     coordenacao_dashboard_view,
     criar_comissao_view,
@@ -97,6 +98,7 @@ urlpatterns = [
     path("logout/", SafeLogoutView.as_view(), name="logout"),
     path("cadastro/aluno/", cadastro_aluno_view, name="cadastro_aluno"),
     path("cadastro/aluno/sucesso/", cadastro_aluno_sucesso_view, name="cadastro_aluno_sucesso"),
+    path("gestao/declaracoes-vinculo/", declaracoes_vinculo_view, name="declaracoes_vinculo"),
     path("aluno/informar-cpf/", aluno_informar_cpf_view, name="aluno_informar_cpf"),
     path(
         "senha/esqueci/",

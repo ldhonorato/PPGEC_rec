@@ -132,6 +132,7 @@ DESCRICOES_MENU = {
     "Alunos": "Cadastro e trajetória dos alunos",
     "Validar Cadastros": "Cadastros aguardando aprovação",
     "Cadastro": "Inclusão e validação de pessoas",
+    "Declarações de vínculo": "Comprovantes do semestre",
     "Cadastro de ingressantes": "Importar novos alunos por planilha",
     "Setores e Comissões": "Estrutura de tramitação",
     "Criar Comissão": "Montar uma nova comissão",
@@ -345,6 +346,12 @@ def _menu_lateral_sections(user):
                         "/gestao/cadastro/ingressantes/",
                         ["importar_ingressantes"],
                         "novo-processo",
+                    ),
+                    _menu_item(
+                        "Declarações de vínculo",
+                        "/gestao/declaracoes-vinculo/",
+                        ["declaracoes_vinculo"],
+                        "documento-vinculo",
                     ),
                     _menu_item(
                         "Validar Cadastros",

@@ -21,6 +21,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_time
 
 from .forms import (
+    ImportacaoDeclaracoesVinculoForm,
     AlunoCadastroForm,
     ImportacaoIngressantesForm,
     AlunoComentarioForm,
@@ -62,9 +63,16 @@ from .forms import (
     TrajetoriaStatusForm,
     UserProfileForm,
 )
+from .declaracoes_vinculo import (
+    declaracao_vigente,
+    declaracoes_do_aluno,
+    importar_declaracoes_de_vinculo,
+    periodo_em_curso,
+)
 from .importacao_ingressantes import importar_ingressantes
 from .models import (
     AlteracaoAluno,
+    DeclaracaoDeVinculo,
     Aluno,
     Disciplina,
     DisciplinaTrajetoria,
@@ -2314,6 +2322,51 @@ def importar_ingressantes_view(request):
         request,
         "processos/importar_ingressantes.html",
         {"form": form, "resultados": resultados},
+    )
+
+
+@login_required
+def declaracoes_vinculo_view(request):
+    """A secretaria traz para o sistema os PDFs que emitiu a mao.
+
+    Enquanto a emissao automatica nao existe, este e o unico caminho pelo qual
+    uma declaracao chega ao aluno -- e o relatorio ao fim e o unico lugar onde
+    se descobre que alguem ficou sem a dele.
+    """
+    if not _has_gestao_access(request.user):
+        raise PermissionDenied("Acesso restrito à coordenação e secretaria.")
+
+    resultados = None
+    if request.method == "POST":
+        form = ImportacaoDeclaracoesVinculoForm(request.POST, request.FILES)
+        if form.is_valid():
+            resultados = importar_declaracoes_de_vinculo(
+                periodo=form.cleaned_data["periodo"],
+                arquivos=form.cleaned_data["arquivos"],
+                enviado_por=request.user,
+                substituir=form.cleaned_data["substituir"],
+            )
+            form = ImportacaoDeclaracoesVinculoForm()
+    else:
+        form = ImportacaoDeclaracoesVinculoForm()
+
+    periodo = periodo_em_curso()
+    enviadas = (
+        DeclaracaoDeVinculo.objects.filter(periodo=periodo).select_related("aluno", "periodo")
+        if periodo
+        else DeclaracaoDeVinculo.objects.none()
+    )
+    return render(
+        request,
+        "processos/declaracoes_vinculo.html",
+        {
+            "form": form,
+            "resultados": resultados,
+            "periodo": periodo,
+            "enviadas": enviadas,
+            "importados": [r for r in (resultados or []) if r["importado"]],
+            "recusados": [r for r in (resultados or []) if not r["importado"]],
+        },
     )
 
 
@@ -4877,20 +4930,21 @@ def solicitacao_banca_detalhe_view(request, solicitacao_id):
 def aluno_documento_vinculo_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
         raise PermissionDenied("Acesso restrito a alunos.")
+
+    periodo = periodo_em_curso()
+    vigente = declaracao_vigente(request.user.aluno, periodo)
+    anteriores = [
+        declaracao
+        for declaracao in declaracoes_do_aluno(request.user.aluno)
+        if vigente is None or declaracao.pk != vigente.pk
+    ]
     return render(
         request,
-        "processos/aluno_documento_todo.html",
+        "processos/aluno_documento_vinculo.html",
         {
-            "titulo": "Documento de vínculo",
-            "descricao": "A emissão automática do documento de vínculo ainda será construída. Enquanto isso, solicite o documento à secretaria abrindo um processo.",
-            "is_coordenador": _is_coordenador(request.user),
-            "has_gestao_access": _has_gestao_access(request.user),
-            "can_view_dashboard": _can_view_dashboard(request.user),
-            "can_view_processos": _can_view_processos(request.user),
-            "can_view_caixa": _can_view_caixa(request.user),
-            "show_side_menu": True,
-            "side_menu_title": "Menu",
-            "side_menu_items": _menu_lateral_home(request.user),
+            "periodo": periodo,
+            "vigente": vigente,
+            "anteriores": anteriores,
         },
     )
 
@@ -5216,6 +5270,7 @@ def _regras_de_arquivo():
         (Documento, "arquivo", lambda obj, user: obj.pode_visualizar_arquivo(user)),
         (SolicitacaoAssinatura, "documento_pdf", _can_view_solicitacao_assinatura_do_arquivo),
         (SolicitacaoAssinatura, "documento_assinado_pdf", _can_view_solicitacao_assinatura_do_arquivo),
+        (DeclaracaoDeVinculo, "arquivo", lambda obj, user: obj.pode_visualizar(user)),
     )
 
 

@@ -21,6 +21,12 @@ from django.utils import timezone
 
 from .templatetags.acadflow import url_protegida
 from .views import _linhas_trajetoria
+from django.db import IntegrityError
+
+from .declaracoes_vinculo import (
+    importar_declaracoes_de_vinculo,
+    periodo_em_curso,
+)
 from .models import (
     AlteracaoAluno,
     Aluno,
@@ -39,6 +45,7 @@ from .models import (
     ManifestacaoProcesso,
     MembroBanca,
     OfertaDisciplina,
+    DeclaracaoDeVinculo,
     PeriodoLetivo,
     Polo,
     PublicacaoTrajetoria,
@@ -5870,3 +5877,212 @@ class MenuMarcaItemAtivoTests(TestCase):
                         len(ativos), 1,
                         f"{nome_rota} acendeu {ativos or 'nenhum item'} para {perfil}",
                     )
+
+
+class DeclaracaoDeVinculoTests(TestCase):
+    """A declaracao de vinculo, do envio pela secretaria ate a tela do aluno.
+
+    Tres coisas que so aparecem ponta a ponta:
+
+    O arquivo so e alcancavel se algum modelo reivindicar o caminho em
+    _regras_de_arquivo. Sem essa linha, o PDF entra no bucket e responde 404
+    para todo mundo, inclusive para o dono -- e nada no envio acusa isso.
+
+    A declaracao vale por um semestre. Mostrar a do semestre passado quando
+    falta a atual e pior do que nao mostrar nada: o aluno a apresenta vencida
+    sem nenhum aviso de que era a errada.
+
+    O nome do arquivo carrega o CPF, e ele nao pode seguir para dentro do
+    bucket -- a chave do objeto viaja na URL assinada e nos logs.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        senha = "senha-segura-123"
+        cls.aluno = Aluno.objects.create_user(
+            email="aluno.vinculo@example.com", password=senha, nome="Aluno Vínculo",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026M0100", cpf="52998224725",
+        )
+        cls.outro_aluno = Aluno.objects.create_user(
+            email="outro.vinculo@example.com", password=senha, nome="Outro Vínculo",
+            tipo_usuario=User.TipoUsuario.ALUNO, matricula="2026M0101", cpf="16899535009",
+        )
+        cls.servidor = User.objects.create_user(
+            email="servidor.vinculo@example.com", password=senha, nome="Servidor Vínculo",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        hoje = timezone.localdate()
+        cls.periodo = PeriodoLetivo.objects.create(
+            criado_por=cls.servidor,
+            nome="2026.2",
+            data_inicio=hoje - timedelta(days=10),
+            data_fim=hoje + timedelta(days=80),
+            prazo_cadastro_disciplinas=hoje,
+            matricula_inicio=hoje, matricula_fim=hoje + timedelta(days=5),
+            modificacao_inicio=hoje + timedelta(days=6), modificacao_fim=hoje + timedelta(days=10),
+        )
+        cls.periodo_anterior = PeriodoLetivo.objects.create(
+            criado_por=cls.servidor,
+            nome="2026.1",
+            data_inicio=hoje - timedelta(days=200),
+            data_fim=hoje - timedelta(days=100),
+            prazo_cadastro_disciplinas=hoje - timedelta(days=200),
+            matricula_inicio=hoje - timedelta(days=200), matricula_fim=hoje - timedelta(days=195),
+            modificacao_inicio=hoje - timedelta(days=194), modificacao_fim=hoje - timedelta(days=190),
+        )
+
+    def _pdf(self, nome):
+        return SimpleUploadedFile(nome, b"%PDF-1.4 conteudo", content_type="application/pdf")
+
+    def _importar(self, nome, *, periodo=None, substituir=False):
+        return importar_declaracoes_de_vinculo(
+            periodo=periodo or self.periodo,
+            arquivos=[self._pdf(nome)],
+            enviado_por=self.servidor,
+            substituir=substituir,
+        )
+
+    def test_o_cpf_do_nome_encontra_o_aluno(self):
+        resultado = self._importar("52998224725.pdf")[0]
+
+        self.assertTrue(resultado["importado"], resultado.get("motivo"))
+        declaracao = DeclaracaoDeVinculo.objects.get(aluno=self.aluno, periodo=self.periodo)
+        self.assertEqual(declaracao.enviado_por, self.servidor)
+
+    def test_o_cpf_aceita_a_formatacao_da_pasta(self):
+        """A pasta vem de mais de uma maquina e a formatacao varia."""
+        self.assertTrue(self._importar("529.982.247-25.pdf")[0]["importado"])
+
+    def test_o_cpf_nao_vai_para_o_caminho_do_arquivo(self):
+        self._importar("52998224725.pdf")
+
+        caminho = DeclaracaoDeVinculo.objects.get().arquivo.name
+        self.assertNotIn("52998224725", caminho)
+        self.assertNotIn("529.982.247-25", caminho)
+        self.assertTrue(caminho.startswith("documentos/vinculo/"), caminho)
+
+    def test_o_que_nao_casa_vira_linha_do_relatorio(self):
+        casos = {
+            "11111111111.pdf": "O nome do arquivo não é um CPF válido.",
+            "16899535009.txt": "A declaração precisa ser um PDF.",
+            "11144477735.pdf": "Nenhum aluno cadastrado com este CPF.",
+        }
+        for nome, motivo in casos.items():
+            with self.subTest(arquivo=nome):
+                resultado = self._importar(nome)[0]
+                self.assertFalse(resultado["importado"])
+                self.assertEqual(resultado["motivo"], motivo)
+        self.assertFalse(DeclaracaoDeVinculo.objects.exists())
+
+    def test_um_arquivo_ruim_nao_derruba_os_demais(self):
+        resultados = importar_declaracoes_de_vinculo(
+            periodo=self.periodo,
+            arquivos=[self._pdf("11111111111.pdf"), self._pdf("52998224725.pdf")],
+            enviado_por=self.servidor,
+        )
+
+        self.assertEqual([r["importado"] for r in resultados], [False, True])
+        self.assertEqual(DeclaracaoDeVinculo.objects.count(), 1)
+
+    def test_reenviar_sem_pedir_nao_troca_o_que_existe(self):
+        """Reenviar a pasta inteira por engano nao pode substituir em silencio."""
+        self._importar("52998224725.pdf")
+        original = DeclaracaoDeVinculo.objects.get().arquivo.name
+
+        resultado = self._importar("52998224725.pdf")[0]
+
+        self.assertFalse(resultado["importado"])
+        self.assertIn("Já existe declaração", resultado["motivo"])
+        self.assertEqual(DeclaracaoDeVinculo.objects.get().arquivo.name, original)
+
+    def test_substituir_troca_o_arquivo_e_nao_duplica(self):
+        self._importar("52998224725.pdf")
+        original = DeclaracaoDeVinculo.objects.get().arquivo.name
+
+        resultado = self._importar("52998224725.pdf", substituir=True)[0]
+
+        self.assertTrue(resultado["importado"])
+        self.assertTrue(resultado["substituiu"])
+        self.assertEqual(DeclaracaoDeVinculo.objects.count(), 1)
+        self.assertNotEqual(DeclaracaoDeVinculo.objects.get().arquivo.name, original)
+
+    def test_o_mesmo_aluno_tem_uma_por_semestre(self):
+        self._importar("52998224725.pdf", periodo=self.periodo_anterior)
+        self._importar("52998224725.pdf", periodo=self.periodo)
+
+        self.assertEqual(DeclaracaoDeVinculo.objects.filter(aluno=self.aluno).count(), 2)
+
+    def test_o_banco_recusa_duas_declaracoes_do_mesmo_semestre(self):
+        """A restricao e o que da sentido a 'a declaracao vigente'."""
+        self._importar("52998224725.pdf")
+
+        with self.assertRaises(IntegrityError):
+            DeclaracaoDeVinculo.objects.create(
+                aluno=self.aluno, periodo=self.periodo, arquivo=self._pdf("outro.pdf"),
+            )
+
+    def test_a_tela_do_aluno_mostra_a_do_semestre_em_curso(self):
+        self._importar("52998224725.pdf")
+        self.client.force_login(self.aluno)
+
+        resposta = self.client.get(reverse("aluno_documento_vinculo"))
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.context["periodo"], self.periodo)
+        self.assertIsNotNone(resposta.context["vigente"])
+        self.assertContains(resposta, "Abrir declaração")
+
+    def test_sem_a_do_semestre_a_anterior_nao_ocupa_o_lugar(self):
+        """Declaracao vencida e pior do que declaracao ausente."""
+        self._importar("52998224725.pdf", periodo=self.periodo_anterior)
+        self.client.force_login(self.aluno)
+
+        resposta = self.client.get(reverse("aluno_documento_vinculo"))
+
+        self.assertIsNone(resposta.context["vigente"])
+        self.assertContains(resposta, "Ainda não há declaração para 2026.2")
+        # a anterior continua alcancavel, mas como anterior
+        self.assertEqual(len(resposta.context["anteriores"]), 1)
+
+    def test_o_arquivo_so_abre_para_quem_pode(self):
+        self._importar("52998224725.pdf")
+        caminho = DeclaracaoDeVinculo.objects.get().arquivo.name
+        url = reverse("media_file", kwargs={"path": caminho})
+
+        with self.subTest(quem="o proprio aluno"):
+            self.client.force_login(self.aluno)
+            self.assertEqual(self.client.get(url).status_code, 200)
+
+        with self.subTest(quem="a secretaria"):
+            self.client.force_login(self.servidor)
+            self.assertEqual(self.client.get(url).status_code, 200)
+
+        with self.subTest(quem="outro aluno"):
+            self.client.force_login(self.outro_aluno)
+            self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_a_tela_de_envio_e_restrita_a_gestao(self):
+        self.client.force_login(self.aluno)
+        self.assertEqual(self.client.get(reverse("declaracoes_vinculo")).status_code, 403)
+
+        self.client.force_login(self.servidor)
+        self.assertEqual(self.client.get(reverse("declaracoes_vinculo")).status_code, 200)
+
+    def test_o_envio_pela_tela_grava_e_relata(self):
+        self.client.force_login(self.servidor)
+
+        resposta = self.client.post(
+            reverse("declaracoes_vinculo"),
+            {
+                "periodo": self.periodo.pk,
+                "arquivos": [self._pdf("52998224725.pdf"), self._pdf("11111111111.pdf")],
+            },
+        )
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(len(resposta.context["importados"]), 1)
+        self.assertEqual(len(resposta.context["recusados"]), 1)
+        self.assertEqual(DeclaracaoDeVinculo.objects.count(), 1)
+
+    def test_o_periodo_em_curso_e_o_que_contem_hoje(self):
+        self.assertEqual(periodo_em_curso(), self.periodo)
