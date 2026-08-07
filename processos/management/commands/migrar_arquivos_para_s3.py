@@ -55,9 +55,20 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opcoes):
         if not settings.USA_S3:
+            # A causa mais comum nao e a variavel faltar no .env, e sim o
+            # conteiner ter nascido antes dela: env_file e lido na criacao, e
+            # um conteiner em execucao mantem o ambiente com que subiu. Por isso
+            # a mensagem cobra o "up -d" -- "restart" reinicia o processo com o
+            # ambiente antigo e o erro se repete, sem pista do motivo.
             raise CommandError(
-                "O S3 nao esta ligado. Defina AWS_STORAGE_BUCKET_NAME antes de migrar, "
-                "senao a copia teria origem e destino no mesmo lugar."
+                "O S3 nao esta ligado (AWS_STORAGE_BUCKET_NAME vazio neste processo), "
+                "e sem ele a copia teria origem e destino no mesmo lugar.\n\n"
+                "  1. confira o .env do host:   grep AWS .env\n"
+                "  2. confira o que o conteiner ve:   printenv | grep AWS\n"
+                "  3. se o .env tem e o conteiner nao, recrie o conteiner:\n"
+                "     docker compose -f docker-compose-prod.yml up -d\n\n"
+                "Recriar e necessario: o env_file e lido quando o conteiner nasce, "
+                "entao 'docker restart' mantem o ambiente antigo."
             )
 
         origem = Path(opcoes["media_root"] or settings.MEDIA_ROOT)
