@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% load acadflow %}
+{% block title %}Declarações de vínculo{% endblock %}
+{% block content %}
+<section class="card">
+    <div class="secao-cabecalho">
+        <h1 class="section-title">Declarações de vínculo</h1>
+        <a class="btn btn-secondary" href="{% url 'coordenacao_alunos' %}">Ver alunos</a>
+    </div>
+    <p class="muted">
+        Envie os PDFs emitidos para o semestre. Cada arquivo deve ser nomeado com o
+        CPF do aluno — é por ele que o sistema encontra o destinatário.
+    </p>
+
+    <p class="formulario-aviso">
+        <svg aria-hidden="true"><use href="#i-alerta"></use></svg>
+        <span>
+            A declaração vale apenas para o período escolhido abaixo. Ela aparece
+            para o aluno em <strong>Documento de Vínculo</strong> assim que o envio
+            terminar.
+        </span>
+    </p>
+
+    <form method="post" enctype="multipart/form-data" class="formulario">
+        {% csrf_token %}
+        {% include "includes/campo_formulario.html" with campo=form.periodo %}
+        {% include "includes/campo_formulario.html" with campo=form.arquivos %}
+
+        <label class="filtros-opcao">
+            {{ form.substituir }}
+            <span>
+                <svg aria-hidden="true"><use href="#i-alerta"></use></svg>
+                {{ form.substituir.label }}
+            </span>
+        </label>
+        <p class="formulario-ajuda">{{ form.substituir.help_text }}</p>
+
+        <div class="formulario-acoes">
+            <button type="submit" class="btn">Enviar declarações</button>
+        </div>
+    </form>
+</section>
+
+{% if resultados %}
+    <section class="card">
+        {% comment %}
+        O relatorio importa tanto quanto a importacao: e o unico lugar onde se
+        descobre que um aluno ficou sem a declaracao dele. Por isso o que foi
+        recusado vem primeiro -- e o que exige decisao de alguem.
+        {% endcomment %}
+        <h2 class="section-title">Resultado do envio</h2>
+        <dl class="dados-grid">
+            <div><dt>Enviadas</dt><dd>{{ importados|length }}</dd></div>
+            <div><dt>Não enviadas</dt><dd>{{ recusados|length }}</dd></div>
+        </dl>
+
+        {% if recusados %}
+            <h3 class="section-title">Precisam de atenção</h3>
+            <div class="tabela-envolvido">
+                <table class="tabela">
+                    <thead>
+                        <tr><th>Arquivo</th><th>Aluno</th><th>Motivo</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for item in recusados %}
+                            <tr>
+                                <td>{{ item.arquivo }}</td>
+                                <td>{{ item.aluno|default:"—" }}</td>
+                                <td>{{ item.motivo }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
+        {% if importados %}
+            <h3 class="section-title">Enviadas</h3>
+            <ul class="list">
+                {% for item in importados %}
+                    <li>
+                        <strong>{{ item.aluno }}</strong>
+                        <span class="meta-linha">
+                            <span>{{ item.arquivo }}</span>
+                            {% if item.substituiu %}<span>Substituiu a anterior</span>{% endif %}
+                        </span>
+                        {% if item.invisivel_ao_aluno %}
+                            <span class="badge badge-aviso">Sem matrícula no período — o aluno ainda não vê</span>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </section>
+{% endif %}
+
+<section class="card">
+    <div class="secao-cabecalho">
+        <h2 class="section-title">
+            Declarações do período{% if periodo %} — {{ periodo.nome }}{% endif %}
+        </h2>
+        <span class="badge badge-info">{{ enviadas|length }}</span>
+    </div>
+    {% if enviadas %}
+        <div class="tabela-envolvido">
+            <table class="tabela">
+                <thead>
+                    <tr><th>Aluno</th><th>Matrícula</th><th>Enviada em</th><th class="celula-acoes">Arquivo</th></tr>
+                </thead>
+                <tbody>
+                    {% for declaracao in enviadas %}
+                        <tr>
+                            <td>{{ declaracao.aluno.nome }}</td>
+                            <td>{{ declaracao.aluno.matricula|default:"—" }}</td>
+                            <td>{{ declaracao.enviado_em|date:"d/m/Y H:i" }}</td>
+                            <td class="celula-acoes">
+                                <a class="text-link" href="{{ declaracao.arquivo|url_protegida }}" target="_blank" rel="noopener">Abrir</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="estado-vazio">
+            <svg aria-hidden="true"><use href="#i-documento-vinculo"></use></svg>
+            <p class="estado-vazio-titulo">
+                {% if periodo %}
+                    Nenhuma declaração enviada para {{ periodo.nome }}
+                {% else %}
+                    Nenhum período letivo em curso
+                {% endif %}
+            </p>
+            <p>As declarações enviadas para o período em curso aparecem aqui.</p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

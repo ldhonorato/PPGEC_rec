@@ -3776,6 +3776,12 @@ dialog::backdrop {
     background: var(--color-surface-soft);
 }
 
+/* A faixa de acoes do cartao interno vinha colada na ultima linha de dado: o
+   botao parecia continuacao da informacao, e nao a acao sobre ela. */
+.cartao-interno > .grupo-acoes {
+    margin-top: var(--espaco-4);
+}
+
 /* Titulo de terceiro nivel, dentro de uma sub-secao. */
 .titulo-interno {
     margin-top: var(--espaco-5);

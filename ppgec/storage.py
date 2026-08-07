@@ -73,5 +73,17 @@ def configuracao_s3(*, bucket, regiao, chave, segredo, expiracao_da_url):
             # False, o Django acrescenta sufixo e os dois coexistem.
             "file_overwrite": False,
             "signature_version": "s3v4",
+            # O endereco assinado precisa apontar para o host DA REGIAO do
+            # bucket. Sem esta opcao o boto3 monta "bucket.s3.amazonaws.com" --
+            # o host global, que e us-east-1 -- e assina para a regiao
+            # configurada. A AWS recalcula a assinatura com us-east-1, os
+            # valores nao batem, e a leitura responde 403 SignatureDoesNotMatch.
+            #
+            # O defeito nao aparece em us-east-1, onde global e regional sao o
+            # mesmo host, e nao aparece na gravacao, que passa pela API e nao
+            # pelo endereco assinado. Ou seja: o arquivo sobe, aparece no
+            # console da AWS, e so quem clica em "Abrir" descobre. Medido em
+            # us-east-2: sem a opcao, 403; com ela, o arquivo abre.
+            "addressing_style": "virtual",
         },
     }

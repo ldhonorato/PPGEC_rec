@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load acadflow %}
+{% block title %}Documento de vínculo{% endblock %}
+{% block content %}
+{% comment %}
+A declaracao vale por um semestre, e essa e a informacao mais importante da
+tela. O pior resultado possivel aqui e o aluno baixar sem perceber a do semestre
+passado e apresenta-la vencida -- por isso a vigente vem sozinha no primeiro
+cartao, com o periodo dito por extenso, e a falta dela e um estado vazio
+explicito, nunca a anterior ocupando o lugar.
+{% endcomment %}
+<section class="card">
+    <div class="secao-cabecalho">
+        <h1 class="section-title">Documento de vínculo</h1>
+        {% if periodo %}<span class="badge badge-info">{{ periodo.nome }}</span>{% endif %}
+    </div>
+
+    {% if vigente %}
+        <p class="muted">Comprova seu vínculo com o programa no período {{ periodo.nome }}.</p>
+        <div class="cartao-interno">
+            <strong>Declaração de vínculo — {{ vigente.periodo.nome }}</strong>
+            <span class="meta-linha">
+                <span>Emitida em {{ vigente.enviado_em|date:"d/m/Y" }}</span>
+            </span>
+            <div class="grupo-acoes">
+                <a class="btn" href="{{ vigente.arquivo|url_protegida }}" target="_blank" rel="noopener">Abrir declaração</a>
+            </div>
+        </div>
+    {% else %}
+        <div class="estado-vazio">
+            <svg aria-hidden="true"><use href="#i-documento-vinculo"></use></svg>
+            {% if periodo and not tem_vinculo %}
+                {% comment %}
+                A declaracao acompanha a matricula do semestre. Dizer "ainda nao
+                ha declaracao" aqui seria mandar o aluno esperar por um documento
+                que nao vai chegar -- falta a matricula, e e isso que ele precisa
+                resolver.
+                {% endcomment %}
+                <p class="estado-vazio-titulo">Sem matrícula em {{ periodo.nome }}</p>
+                <p>
+                    A declaração de vínculo acompanha a matrícula do semestre. Ela
+                    fica disponível assim que houver uma solicitação de matrícula
+                    sua em {{ periodo.nome }}.
+                </p>
+                <a class="btn btn-secondary" href="{% url 'matriculas_minhas' %}">Ver minha matrícula</a>
+            {% else %}
+                <p class="estado-vazio-titulo">
+                    {% if periodo %}
+                        Ainda não há declaração para {{ periodo.nome }}
+                    {% else %}
+                        Ainda não há declaração disponível
+                    {% endif %}
+                </p>
+                <p>
+                    A secretaria emite as declarações a cada semestre. Se você precisa
+                    dela agora, abra um processo solicitando o documento.
+                </p>
+                <a class="btn btn-secondary" href="{% url 'novo_processo' %}">Solicitar à secretaria</a>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>
+
+{% if anteriores %}
+    <section class="card">
+        <h2 class="section-title">Semestres anteriores</h2>
+        {% comment %}
+        Continuam disponiveis: o documento foi emitido para o aluno, e quem
+        precisa comprovar vinculo passado -- um pedido retroativo, uma bolsa --
+        nao teria outro caminho senao abrir processo. O que muda e o peso: elas
+        ficam aqui embaixo, cada uma com o semestre a que se refere.
+        {% endcomment %}
+        <ul class="list">
+            {% for declaracao in anteriores %}
+                <li>
+                    <strong>{{ declaracao.periodo.nome }}</strong>
+                    <span class="meta-linha">
+                        <span>Emitida em {{ declaracao.enviado_em|date:"d/m/Y" }}</span>
+                        <a class="text-link" href="{{ declaracao.arquivo|url_protegida }}" target="_blank" rel="noopener">Abrir</a>
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+{% endif %}
+{% endblock %}

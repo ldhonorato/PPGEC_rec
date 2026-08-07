@@ -1452,6 +1452,51 @@ class AlunoCadastroForm(OpcoesVaziasNomeadas, forms.Form):
         return aluno
 
 
+class MultiploArquivoInput(forms.ClearableFileInput):
+    """Aceita mais de um arquivo na mesma escolha.
+
+    O Django recusa `multiple` no widget padrao desde a 4.2 -- e um erro de
+    configuracao, porque FileField so guarda um arquivo. Declarar a intencao no
+    widget e implementar a limpeza no campo abaixo e o caminho documentado.
+    """
+
+    allow_multiple_selected = True
+
+
+class MultiploArquivoField(forms.FileField):
+    def clean(self, data, initial=None):
+        limpar_um = super().clean
+        if isinstance(data, (list, tuple)):
+            return [limpar_um(arquivo, initial) for arquivo in data]
+        return [limpar_um(data, initial)]
+
+
+class ImportacaoDeclaracoesVinculoForm(OpcoesVaziasNomeadas, forms.Form):
+    """A secretaria traz a pasta de PDFs de um semestre.
+
+    O semestre e escolhido aqui, e nao deduzido: nada no nome do arquivo diz a
+    que periodo a declaracao se refere, e supor "o que esta em curso" quebraria
+    em silencio numa importacao feita na virada do semestre -- que e justamente
+    quando ela acontece.
+    """
+
+    periodo = forms.ModelChoiceField(
+        label="Período letivo da declaração",
+        queryset=PeriodoLetivo.objects.order_by("-nome"),
+        help_text="A declaração vale apenas para o semestre escolhido aqui.",
+    )
+    arquivos = MultiploArquivoField(
+        label="Declarações em PDF",
+        widget=MultiploArquivoInput(attrs={"accept": ".pdf", "multiple": True}),
+        help_text="Cada arquivo deve ser nomeado com o CPF do aluno. Selecione a pasta inteira de uma vez.",
+    )
+    substituir = forms.BooleanField(
+        label="Substituir declarações já existentes deste semestre",
+        required=False,
+        help_text="Sem isto, um aluno que já tem declaração neste período é pulado e aparece no relatório.",
+    )
+
+
 class ImportacaoIngressantesForm(forms.Form):
     arquivo = forms.FileField(
         label="Planilha de ingressantes",

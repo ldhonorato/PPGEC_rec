@@ -2654,3 +2654,121 @@ class EstagioDocencia(models.Model):
             return dias_restantes <= 30
             
         return False
+
+
+def caminho_da_declaracao_de_vinculo(instance, filename):
+    """Nome opaco, sob o prefixo das declaracoes.
+
+    O arquivo de origem chega nomeado pelo CPF -- e assim que a secretaria casa
+    cada PDF com o aluno certo na importacao. O CPF nao segue para dentro do
+    bucket: a chave do objeto viaja na URL assinada, nos logs de acesso do S3 e
+    no historico do navegador, e com CPF obrigatorio para todo aluno, listar o
+    bucket devolveria a relacao completa deles.
+
+    A data no caminho e a da gravacao, e existe para manter cada prefixo
+    pequeno. O semestre a que a declaracao se refere e outra coisa -- uma
+    declaracao de 2026.2 pode ser reemitida em janeiro de 2027 -- e vive na
+    coluna periodo.
+    """
+    extensao = (filename or "").rsplit(".", 1)
+    extensao = f".{extensao[-1].lower()}" if len(extensao) == 2 else ".pdf"
+    agora = timezone.now()
+    return f"documentos/vinculo/{agora:%Y/%m}/{uuid.uuid4().hex}{extensao}"
+
+
+class DeclaracaoDeVinculo(models.Model):
+    """Comprovante de vinculo de um aluno, valido por um semestre letivo.
+
+    Hoje o documento e emitido a mao pela secretaria e trazido para o sistema
+    em lote. Quando a emissao automatica existir, o documento gerado entra
+    aqui, com enviado_por vazio: duas fontes para a mesma declaracao obrigariam
+    a tela a escolher entre elas.
+    """
+
+    aluno = models.ForeignKey(
+        Aluno,
+        on_delete=models.CASCADE,
+        related_name="declaracoes_de_vinculo",
+        verbose_name="Aluno",
+    )
+    periodo = models.ForeignKey(
+        PeriodoLetivo,
+        on_delete=models.PROTECT,
+        related_name="declaracoes_de_vinculo",
+        verbose_name="Período letivo",
+    )
+    arquivo = models.FileField(upload_to=caminho_da_declaracao_de_vinculo, verbose_name="Arquivo")
+    # Vazio quando o documento vier da emissao automatica, que ainda sera
+    # construida: ali nao ha pessoa que enviou.
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="declaracoes_de_vinculo_enviadas",
+        verbose_name="Enviado por",
+    )
+    enviado_em = models.DateTimeField(auto_now_add=True, verbose_name="Enviado em")
+
+    class Meta:
+        verbose_name = "Declaração de vínculo"
+        verbose_name_plural = "Declarações de vínculo"
+        ordering = ["-periodo__nome", "aluno__nome"]
+        constraints = [
+            # E esta restricao que da sentido a "a declaracao vigente". Sem ela,
+            # dois envios do mesmo semestre criariam duas declaracoes validas e a
+            # tela teria de desempatar por criterio arbitrario -- a mais recente,
+            # a de maior id --, sem que ninguem tivesse decidido isso. Com ela,
+            # reenviar e uma decisao explicita: substituir a que existe.
+            models.UniqueConstraint(
+                fields=["aluno", "periodo"],
+                name="declaracao_vinculo_unica_por_periodo",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Declaração de vínculo {self.periodo.nome} — {self.aluno.nome}"
+
+    @classmethod
+    def aluno_tem_vinculo_no_periodo(cls, aluno_id, periodo_id) -> bool:
+        """Basta ter solicitado matricula no periodo, em qualquer estado.
+
+        O status da solicitacao nao entra na conta de proposito. Os estados sao
+        legado: nao foram mantidos de forma confiavel ao longo do tempo, e
+        filtrar por eles negaria a declaracao a alunos que cursaram o semestre
+        -- justamente quem precisa comprovar o vinculo.
+
+        O que se afirma aqui e mais modesto e mais seguro: houve pedido de
+        matricula naquele periodo. Se um dia os estados voltarem a ser
+        confiaveis, este e o unico lugar a mudar.
+        """
+        return SolicitacaoMatricula.objects.filter(
+            aluno_id=aluno_id,
+            periodo_id=periodo_id,
+        ).exists()
+
+    def pode_visualizar(self, user) -> bool:
+        """O aluno que solicitou matricula naquele semestre, e a gestao.
+
+        A condicao e do semestre da declaracao, e nao do semestre em curso: a de
+        2026.1 exige solicitacao de matricula em 2026.1. Cada documento carrega a sua
+        propria condicao, entao o historico nao se apaga quando o semestre vira
+        -- um recem-formado continua podendo comprovar os semestres que cursou.
+
+        A gestao ve tudo: e ela que emite, e precisa conferir o que enviou antes
+        de o aluno alcancar.
+        """
+        if not self.arquivo:
+            return False
+        if not user or not user.is_authenticated:
+            return False
+        if user.id == self.aluno_id:
+            return self.aluno_tem_vinculo_no_periodo(self.aluno_id, self.periodo_id)
+        if getattr(user, "tipo_usuario", None) == User.TipoUsuario.SERVIDOR:
+            return True
+        if getattr(user, "tipo_usuario", None) == User.TipoUsuario.DOCENTE:
+            try:
+                return bool(user.docente.coordenador)
+            except Docente.DoesNotExist:
+                return False
+        return False
