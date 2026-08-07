@@ -469,6 +469,28 @@ class ArmazenamentoS3Tests(SimpleTestCase):
         self.assertTrue(opcoes["querystring_auth"])
         self.assertEqual(opcoes["querystring_expire"], 300)
 
+    def test_o_endereco_assinado_aponta_para_o_host_da_regiao(self):
+        """Sem isto, a leitura responde 403 fora de us-east-1.
+
+        O padrao do boto3 monta "bucket.s3.amazonaws.com" -- o host global, que
+        e us-east-1 -- e assina para a regiao configurada. A AWS recalcula a
+        assinatura com us-east-1, os valores nao batem, e vem
+        SignatureDoesNotMatch.
+
+        O defeito e traicoeiro por dois motivos: nao aparece em us-east-1, onde
+        global e regional sao o mesmo host, e nao aparece na gravacao, que passa
+        pela API e nao pelo endereco assinado. O arquivo sobe, aparece no console
+        da AWS, e so quem clica em "Abrir" descobre.
+
+        Medido contra um bucket real em us-east-2: sem a opcao, 403; com ela, o
+        arquivo abre.
+        """
+        for regiao in ("us-east-1", "us-east-2", "sa-east-1"):
+            with self.subTest(regiao=regiao):
+                opcoes = self._config(regiao=regiao)["OPTIONS"]
+                self.assertEqual(opcoes["addressing_style"], "virtual")
+                self.assertEqual(opcoes["region_name"], regiao)
+
     def test_arquivo_de_mesmo_nome_nao_sobrescreve_o_anterior(self):
         """"declaracao.pdf" enviado duas vezes sao dois documentos.
 
