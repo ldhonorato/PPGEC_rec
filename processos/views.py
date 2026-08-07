@@ -4953,21 +4953,17 @@ def aluno_documento_vinculo_view(request):
 def aluno_documento_historico_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
         raise PermissionDenied("Acesso restrito a alunos.")
+    # A tela entrou no menu: ate agora so se chegava a ela por endereco direto.
+    # O contexto de menu que a view montava a mao saiu junto -- nenhum template
+    # le show_side_menu nem side_menu_items desde que a barra lateral passou a
+    # vir do processador de contexto.
     return render(
         request,
         "processos/aluno_documento_todo.html",
         {
-            "titulo": "Documento de histórico",
+            "titulo": "Histórico escolar",
             "descricao": "A emissão do histórico escolar ainda será construída. "
             "Enquanto isso, solicite o documento à secretaria abrindo um processo.",
-            "is_coordenador": _is_coordenador(request.user),
-            "has_gestao_access": _has_gestao_access(request.user),
-            "can_view_dashboard": _can_view_dashboard(request.user),
-            "can_view_processos": _can_view_processos(request.user),
-            "can_view_caixa": _can_view_caixa(request.user),
-            "show_side_menu": True,
-            "side_menu_title": "Menu",
-            "side_menu_items": _menu_lateral_home(request.user),
         },
     )
 

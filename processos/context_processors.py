@@ -109,6 +109,7 @@ DESCRICOES_MENU = {
     "Processos dos Orientandos": "Acompanhar seus orientandos",
     # Aluno
     "Matrícula": "Suas solicitações do período",
+    "Histórico Escolar": "Emissão em construção",
     "Documento de Vínculo": "Comprovante de vínculo",
     "Minha Trajetória": "Créditos, prazos e integralização",
     # Ambientes
@@ -193,6 +194,18 @@ def _menu_lateral_sections(user):
         )
         principal_items.append(
             _menu_item("Documento de Vínculo", "/aluno/documento-vinculo/", ["aluno_documento_vinculo"], "documento-vinculo")
+        )
+        # Em construcao, e ainda assim no menu: so se chegava a ela por endereco
+        # direto, o que na pratica e nao existir. A descricao diz o estado antes
+        # do toque -- ela aparece tanto na barra lateral quanto na folha --, e a
+        # tela repete com todas as letras e oferece o caminho que hoje resolve.
+        principal_items.append(
+            _menu_item(
+                "Histórico Escolar",
+                "/aluno/documento-historico/",
+                ["aluno_documento_historico"],
+                "disciplinas",
+            )
         )
         principal_items.append(
             _menu_item("Minha Trajetória", f"/coordenacao/alunos/{user.id}/", ["aluno_detalhe"], "trajetoria")

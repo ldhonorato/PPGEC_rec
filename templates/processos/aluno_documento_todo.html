@@ -11,11 +11,15 @@ anotacao de desenvolvimento exibida ao aluno como se fosse conteudo da tela.
 Enquanto a emissao nao existe, a tela diz com todas as letras que ela nao esta
 disponivel e oferece o caminho que hoje resolve (abrir um processo), em vez de
 parecer uma pagina quebrada.
+
+Servia a duas telas -- vinculo e historico -- e o icone era o do vinculo. O
+vinculo ganhou tela propria; sobrou o historico, e o icone passa a ser o dele,
+o mesmo que o menu mostra ao lado do nome.
 {% endcomment %}
 <section class="card">
     <h1 class="section-title">{{ titulo }}</h1>
     <div class="estado-vazio">
-        <svg aria-hidden="true"><use href="#i-documento-vinculo"></use></svg>
+        <svg aria-hidden="true"><use href="#i-disciplinas"></use></svg>
         <p class="estado-vazio-titulo">Emissão ainda não disponível</p>
         <p>{{ descricao }}</p>
         <a class="btn btn-secondary" href="{% url 'novo_processo' %}">Abrir um processo</a>
