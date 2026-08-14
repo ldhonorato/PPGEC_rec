@@ -4,16 +4,31 @@
 <section class="card">
     <h1 class="section-title">Caixa de processos</h1>
     {% if opcoes_caixa %}
-        <form method="get" class="form-busca">
-            <div class="formulario-campo">
-                <label for="id_caixa">Visualizar caixa</label>
-                <select id="id_caixa" name="caixa" onchange="this.form.submit()">
-                    {% for opcao in opcoes_caixa %}
-                        <option value="{{ opcao.value }}" {% if selected_caixa == opcao.value %}selected{% endif %}>
-                            {{ opcao.label }}
-                        </option>
-                    {% endfor %}
-                </select>
+        <form method="get" class="filtros">
+            <input type="hidden" name="status_caixa" value="{{ status_caixa }}">
+            <div class="filtros-linha">
+                <div class="filtros-campo filtros-campo-escolha">
+                    <label for="id_caixa">Visualizar caixa</label>
+                    <select id="id_caixa" name="caixa">
+                        {% for opcao in opcoes_caixa %}
+                            <option value="{{ opcao.value }}" {% if selected_caixa == opcao.value %}selected{% endif %}>
+                                {{ opcao.label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filtros-campo filtros-campo-escolha">
+                    <label for="id_tipo">Tipo de processo</label>
+                    <select id="id_tipo" name="tipo">
+                        <option value="">Todos</option>
+                        {% for value, label in tipos %}
+                            <option value="{{ value }}" {% if tipo_caixa == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filtros-acoes">
+                    <button class="btn btn-secondary" type="submit">Filtrar</button>
+                </div>
             </div>
         </form>
     {% endif %}
@@ -21,26 +36,38 @@
     <div class="filtros-chips">
         <a
             class="btn {% if status_caixa == 'EM_ANALISE' %}{% else %}btn-secondary{% endif %}"
-            href="?{% if selected_caixa %}caixa={{ selected_caixa }}&{% endif %}status_caixa=EM_ANALISE"
+            href="{% querystring caixa=selected_caixa status_caixa='EM_ANALISE' tipo=tipo_caixa %}"
         >
             Em análise
         </a>
         <a
             class="btn {% if status_caixa == 'AGUARDANDO_CIENCIA' %}{% else %}btn-secondary{% endif %}"
-            href="?{% if selected_caixa %}caixa={{ selected_caixa }}&{% endif %}status_caixa=AGUARDANDO_CIENCIA"
+            href="{% querystring caixa=selected_caixa status_caixa='AGUARDANDO_CIENCIA' tipo=tipo_caixa %}"
         >
             Aguardando ciência
         </a>
     </div>
 
-    {% if processos %}
-        {% include "includes/tabela_processos.html" with coluna_pessoa="Requerente" mostrar_setor=True mostrar_prazo=True vazio_titulo="Nada aguardando neste setor" vazio_texto="Quando um processo for encaminhado para cá, ele aparece nesta lista." %}
+    <h2 class="overview-title">Resumo da caixa</h2>
+    <div class="metric-grid" aria-label="Distribuição dos processos da caixa">
+        <a class="card metric-card" href="{% querystring tipo='' %}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-caixa"></use></svg>
+            <p class="metric-value">{{ total_processos_caixa }}</p>
+            <p class="metric-label">Total na caixa</p>
+        </a>
+        {% for item in distribuicao_tipos %}
+            <a class="card metric-card {% cycle 'is-green' 'is-purple' 'is-orange' %}" href="{% querystring tipo=item.value %}">
+                <svg class="metric-icon" aria-hidden="true"><use href="#i-todos-processos"></use></svg>
+                <p class="metric-value">{{ item.total }}</p>
+                <p class="metric-label">{{ item.label }}</p>
+            </a>
+        {% endfor %}
+    </div>
+
+    {% if tipo_caixa %}
+        {% include "includes/tabela_processos.html" with coluna_pessoa="Requerente" mostrar_tipo=True mostrar_setor=True mostrar_prazo=True vazio_titulo="Nenhum processo deste tipo" vazio_texto="A caixa selecionada não possui processos deste tipo no status atual." %}
     {% else %}
-        <div class="estado-vazio">
-    <svg aria-hidden="true"><use href="#i-caixa"></use></svg>
-    <p class="estado-vazio-titulo">Caixa vazia</p>
-    <p>Nenhum processo aguarda análise dos seus setores agora.</p>
-</div>
+        {% include "includes/tabela_processos.html" with coluna_pessoa="Requerente" mostrar_tipo=True mostrar_setor=True mostrar_prazo=True vazio_titulo="Caixa vazia" vazio_texto="Nenhum processo aguarda atendimento nesta caixa no status atual." %}
     {% endif %}
 </section>
 {% endblock %}

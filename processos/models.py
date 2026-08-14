@@ -49,6 +49,7 @@ class User(AbstractUser):
         ALUNO = "ALUNO", "Aluno"
         DOCENTE = "DOCENTE", "Docente"
         SERVIDOR = "SERVIDOR", "Servidor"
+        BOLSISTA_VOLUNTARIO = "BOLSISTA_VOLUNTARIO", "Bolsista/Voluntário"
 
     username = None
     first_name = None
@@ -79,6 +80,11 @@ class User(AbstractUser):
 
     def __str__(self) -> str:
         return self.nome or self.email
+
+    @classmethod
+    def tipos_com_acesso_servidor(cls):
+        """Perfis distintos que compartilham integralmente as regras de servidor."""
+        return (cls.TipoUsuario.SERVIDOR, cls.TipoUsuario.BOLSISTA_VOLUNTARIO)
 
 
 class Aluno(User):
@@ -1566,11 +1572,11 @@ class Setor(models.Model):
         SETOR = "SETOR", "Setor"
         COMISSAO = "COMISSAO", "Comissao"
 
-    # O colegiado pleno e o unico setor que o codigo precisa reconhecer pelo
-    # nome: e ele que define quem ve "Processos no Pleno" e quem pode deliberar
-    # ali. O nome estava escrito a mao em quatro lugares, o que fez com que um
-    # erro de digitacao -- "Colegiando" -- se espalhasse e ficasse dificil de
-    # corrigir sem quebrar as comparacoes. Como constante, o nome tem um lugar so.
+    # Os setores oficiais concedem permissoes especificas, por isso seus nomes
+    # precisam ter uma unica fonte. Setores e comissoes comuns continuam
+    # concedendo somente acesso a propria caixa e as assinaturas destinadas.
+    NOME_SECRETARIA = "Secretaria PPGEC"
+    NOME_COORDENACAO = "Coordenação PPG"
     NOME_PLENO = "Colegiado PPGEC (Pleno)"
 
     nome = models.CharField(max_length=120, unique=True)
@@ -2136,7 +2142,7 @@ class Documento(models.Model):
         if user.id == self.enviado_por_id:
             return True
 
-        if getattr(user, "tipo_usuario", None) == User.TipoUsuario.SERVIDOR:
+        if getattr(user, "tipo_usuario", None) in User.tipos_com_acesso_servidor():
             return True
 
         if getattr(user, "tipo_usuario", None) == User.TipoUsuario.DOCENTE:
@@ -2764,7 +2770,7 @@ class DeclaracaoDeVinculo(models.Model):
             return False
         if user.id == self.aluno_id:
             return self.aluno_tem_vinculo_no_periodo(self.aluno_id, self.periodo_id)
-        if getattr(user, "tipo_usuario", None) == User.TipoUsuario.SERVIDOR:
+        if getattr(user, "tipo_usuario", None) in User.tipos_com_acesso_servidor():
             return True
         if getattr(user, "tipo_usuario", None) == User.TipoUsuario.DOCENTE:
             try:

@@ -18,6 +18,15 @@
                     {% endfor %}
                 </select>
             </div>
+            <div class="filtros-campo filtros-campo-escolha">
+                <label for="id_polo">Polo</label>
+                <select id="id_polo" name="polo">
+                    <option value="">Todos</option>
+                    {% for polo in polos %}
+                        <option value="{{ polo.pk }}" {% if filtro_polo == polo.pk|stringformat:"s" %}selected{% endif %}>{{ polo.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
             <div class="filtros-acoes">
                 <button class="btn btn-secondary" type="submit">Filtrar</button>
             </div>
@@ -101,6 +110,7 @@
                     <tr>
                         <th scope="col">Aluno</th>
                         <th scope="col">Matrícula</th>
+                        <th scope="col">Polo</th>
                         <th scope="col">Nível</th>
                         <th scope="col">Ingresso</th>
                         <th scope="col">Orientador</th>
@@ -115,6 +125,7 @@
                                 <span class="celula-secundaria">{{ aluno.email }}</span>
                             </td>
                             <td class="celula-numero celula-apoio">{{ aluno.matricula|default:"—" }}</td>
+                            <td class="celula-apoio">{{ aluno.polo_atuacao.nome|default:"—" }}</td>
                             <td class="celula-apoio">{{ aluno.trajetoria_atual.get_nivel_curso_display|default:"—" }}</td>
                             <td class="celula-numero celula-apoio">{{ aluno.trajetoria_atual.ingresso|default:"—" }}</td>
                             <td class="celula-apoio">{{ aluno.trajetoria_atual.orientador.nome|default:"—" }}</td>

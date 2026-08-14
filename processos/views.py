@@ -202,7 +202,7 @@ def _e_orientador_do_aluno(user, aluno_id):
 
 
 def _is_servidor(user):
-    return user.is_authenticated and user.tipo_usuario == User.TipoUsuario.SERVIDOR
+    return user.is_authenticated and user.tipo_usuario in User.tipos_com_acesso_servidor()
 
 
 def _is_secretaria_member(user):
@@ -210,7 +210,16 @@ def _is_secretaria_member(user):
         usuario=user,
         data_saida__isnull=True,
         setor__ativo=True,
-        setor__nome="Secretaria PPGEC",
+        setor__nome=Setor.NOME_SECRETARIA,
+    ).exists()
+
+
+def _is_coordenacao_member(user):
+    return user.is_authenticated and SetorMembro.objects.filter(
+        usuario=user,
+        data_saida__isnull=True,
+        setor__ativo=True,
+        setor__nome=Setor.NOME_COORDENACAO,
     ).exists()
 
 
@@ -224,7 +233,12 @@ def _is_coordenador(user):
 
 
 def _has_gestao_access(user):
-    return _is_coordenador(user) or _is_servidor(user) or _is_secretaria_member(user)
+    return (
+        _is_coordenador(user)
+        or _is_servidor(user)
+        or _is_secretaria_member(user)
+        or _is_coordenacao_member(user)
+    )
 
 
 def _can_view_dashboard(user):
@@ -287,9 +301,9 @@ def _is_membro_setor_nome(user, nome):
 def _setores_caixa(user):
     setores = []
     if _is_servidor(user):
-        setores.extend(Setor.objects.filter(nome="Secretaria PPGEC", ativo=True))
+        setores.extend(Setor.objects.filter(nome=Setor.NOME_SECRETARIA, ativo=True))
     if _is_coordenador(user):
-        setores.extend(Setor.objects.filter(nome="Coordenação PPG", ativo=True))
+        setores.extend(Setor.objects.filter(nome=Setor.NOME_COORDENACAO, ativo=True))
     setores.extend(_setores_membro_queryset(user))
 
     unique = {}
@@ -1889,7 +1903,7 @@ def me_view(request):
 @login_required
 def setores_comissoes_view(request):
     can_edit_setores = _is_coordenador(request.user)
-    if not (can_edit_setores or _is_servidor(request.user) or _is_secretaria_member(request.user)):
+    if not _has_gestao_access(request.user):
         raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
 
     setor_editado = None
@@ -1948,7 +1962,7 @@ def setores_comissoes_view(request):
             initial["servidores"] = [
                 membro.usuario_id
                 for membro in membros_ativos
-                if membro.usuario.tipo_usuario == User.TipoUsuario.SERVIDOR
+                if membro.usuario.tipo_usuario in User.tipos_com_acesso_servidor()
             ]
             initial["alunos"] = [
                 membro.usuario_id
@@ -2375,12 +2389,13 @@ def alunos_view(request):
     if not _has_gestao_access(request.user):
         raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
 
-    queryset = Aluno.objects.prefetch_related("trajetorias__orientador").order_by("nome")
+    queryset = Aluno.objects.select_related("polo_atuacao").prefetch_related("trajetorias__orientador").order_by("nome")
     nome = request.GET.get("nome", "").strip()
     nivel = request.GET.get("nivel", "").strip().upper()
     ingresso_inicio_raw = request.GET.get("ingresso_inicio", "").strip()
     ingresso_fim_raw = request.GET.get("ingresso_fim", "").strip()
     status = request.GET.get("status", "").strip().upper()
+    polo_id = request.GET.get("polo", "").strip()
     periodo_sem_matricula_id = request.GET.get("sem_matricula_periodo", "").strip()
     periodo_sem_matricula = None
 
@@ -2399,6 +2414,8 @@ def alunos_view(request):
 
     if status:
         queryset = queryset.filter(status_aluno=status)
+    if polo_id:
+        queryset = queryset.filter(polo_atuacao_id=polo_id)
 
     if periodo_sem_matricula_id:
         periodo_sem_matricula = get_object_or_404(PeriodoLetivo, pk=periodo_sem_matricula_id)
@@ -2427,6 +2444,8 @@ def alunos_view(request):
             "filtro_ingresso_inicio": ingresso_inicio_raw,
             "filtro_ingresso_fim": ingresso_fim_raw,
             "filtro_status": status,
+            "polos": Polo.objects.filter(ativo=True).order_by("nome"),
+            "filtro_polo": polo_id,
             "periodos_letivos": PeriodoLetivo.objects.order_by("-nome"),
             "filtro_sem_matricula_periodo": periodo_sem_matricula_id,
             "periodo_sem_matricula": periodo_sem_matricula,
@@ -2438,6 +2457,7 @@ def alunos_view(request):
                 {
                     "nome": ("Nome", None),
                     "status": ("Status", dict(Aluno.StatusAluno.choices).get),
+                    "polo": ("Polo", lambda v: Polo.objects.filter(pk=v).values_list("nome", flat=True).first()),
                     "nivel": ("Nível", dict(Aluno.NivelCurso.choices).get),
                     "reingressante": ("Reingressante", lambda v: "Sim" if v == "1" else "Não"),
                     "ingresso_inicio": ("Ingresso de", None),
@@ -3476,23 +3496,35 @@ def caixa_processos_view(request):
 
     setores_caixa = _setores_caixa(request.user)
     selected_caixa = request.GET.get("caixa", "").strip()
+    tipo_caixa = request.GET.get("tipo", "").strip().upper()
+    tipos_validos = dict(Processo.TipoProcesso.choices)
+    if tipo_caixa not in tipos_validos:
+        tipo_caixa = ""
     status_caixa = request.GET.get("status_caixa", "").strip().upper()
     if status_caixa not in {"AGUARDANDO_CIENCIA", "EM_ANALISE"}:
         status_caixa = "EM_ANALISE"
 
     opcoes_caixa = [{"value": str(setor.id), "label": setor.nome} for setor in setores_caixa]
-    selected_setor_ids = [setor.id for setor in setores_caixa]
+    selected_setor_ids = []
+    ids_disponiveis = [setor.id for setor in setores_caixa]
     if selected_caixa:
         try:
             selected_id = int(selected_caixa)
         except ValueError:
             selected_id = None
-        if selected_id in selected_setor_ids:
+        if selected_id in ids_disponiveis:
             selected_setor_ids = [selected_id]
         else:
             selected_caixa = ""
 
-    processos_caixa = (
+    # Sem filtro explicito, a interface ja exibia a primeira opcao no select,
+    # mas a consulta misturava todas as caixas. O estado visual e a consulta
+    # agora partem da mesma caixa.
+    if not selected_setor_ids and setores_caixa:
+        selected_setor_ids = [setores_caixa[0].id]
+        selected_caixa = str(setores_caixa[0].id)
+
+    processos_base = (
         Processo.objects.select_related("usuario_criado_por", "setor_atual")
         .filter(setor_atual_id__in=selected_setor_ids)
         .filter(
@@ -3502,8 +3534,21 @@ def caixa_processos_view(request):
                 else [Processo.StatusProcesso.AGUARDANDO_CIENCIA]
             )
         )
-        .order_by("-data_criacao")
     )
+    distribuicao_contagens = {
+        item["tipo"]: item["total"]
+        for item in processos_base.values("tipo").annotate(total=Count("id"))
+    }
+    distribuicao_tipos = [
+        {"value": value, "label": label, "total": distribuicao_contagens[value]}
+        for value, label in Processo.TipoProcesso.choices
+        if distribuicao_contagens.get(value)
+    ]
+    total_processos_caixa = sum(distribuicao_contagens.values())
+    processos_caixa = processos_base
+    if tipo_caixa:
+        processos_caixa = processos_caixa.filter(tipo=tipo_caixa)
+    processos_caixa = processos_caixa.order_by("-data_criacao")
     return render(
         request,
         "processos/caixa_processos.html",
@@ -3516,6 +3561,10 @@ def caixa_processos_view(request):
             "opcoes_caixa": opcoes_caixa,
             "selected_caixa": selected_caixa,
             "status_caixa": status_caixa,
+            "tipos": Processo.TipoProcesso.choices,
+            "tipo_caixa": tipo_caixa,
+            "total_processos_caixa": total_processos_caixa,
+            "distribuicao_tipos": distribuicao_tipos,
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -4246,9 +4295,10 @@ def _can_use_reservas(user):
     return user.is_authenticated and (
         user.tipo_usuario in {
             User.TipoUsuario.DOCENTE,
-            User.TipoUsuario.SERVIDOR,
+            *User.tipos_com_acesso_servidor(),
         }
         or _is_secretaria_member(user)
+        or _is_coordenacao_member(user)
     )
 
 
@@ -4410,7 +4460,7 @@ def reservas_ambientes_view(request):
     if not _can_use_reservas(request.user):
         raise PermissionDenied("Acesso restrito a docentes e servidores.")
 
-    polo_servidor = request.user.polo_atuacao if request.user.tipo_usuario == User.TipoUsuario.SERVIDOR else None
+    polo_servidor = request.user.polo_atuacao if _is_servidor(request.user) else None
     form = ReservaAmbienteForm(request.POST or None, user=request.user)
     if request.method == "POST":
         if form.is_valid():
@@ -5028,7 +5078,7 @@ def _filtros_ativos(request, rotulos):
 
 @login_required
 def menu_meus_processos_view(request):
-    if request.user.tipo_usuario == User.TipoUsuario.SERVIDOR:
+    if _is_servidor(request.user):
         raise PermissionDenied("Perfil SERVIDOR não possui meus processos.")
 
     meus_processos = (

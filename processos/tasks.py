@@ -60,7 +60,10 @@ def send_email_secretaria_planejamento_presencial(oferta_id: int, usuario_id: in
         return {"enviados": 0}
     usuario = User.objects.filter(pk=usuario_id).first()
     enviados = 0
-    for servidor in User.objects.filter(tipo_usuario=User.TipoUsuario.SERVIDOR, is_active=True).exclude(email=""):
+    for servidor in User.objects.filter(
+        tipo_usuario__in=User.tipos_com_acesso_servidor(),
+        is_active=True,
+    ).exclude(email=""):
         _send_email(
             subject=f"[PPGEC] Planejamento presencial alterado - {oferta.disciplina}",
             template_name="emails/secretaria/planejamento_presencial_alterado.html",

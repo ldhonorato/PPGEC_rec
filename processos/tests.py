@@ -27,6 +27,7 @@ from .declaracoes_vinculo import (
     importar_declaracoes_de_vinculo,
     periodo_em_curso,
 )
+from .forms import SetorComissaoForm
 from .models import (
     AlteracaoAluno,
     Aluno,
@@ -150,6 +151,61 @@ class ProcessoPlenoDeliberacaoTests(TestCase):
         self.assertContains(response, "0 votos favoráveis")
         self.assertContains(response, "0 votos contrários")
         self.assertContains(response, "0 abstenções")
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class CaixaProcessosFiltrosResumoTests(TestCase):
+    def setUp(self):
+        self.servidor = User.objects.create_user(
+            email="servidor.caixas@example.com", password="senha-segura-123",
+            nome="Servidor Caixas", tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.aluno = Aluno.objects.create_user(
+            email="aluno.caixas@example.com", password="senha-segura-123", nome="Aluno Caixas",
+        )
+        self.secretaria = Setor.objects.get(nome=Setor.NOME_SECRETARIA)
+        self.outra_caixa = Setor.objects.create(nome="Comissão Caixa Secundária")
+        SetorMembro.objects.create(setor=self.outra_caixa, usuario=self.servidor)
+        self.creditos = Processo.objects.create(
+            usuario_criado_por=self.aluno, tipo=Processo.TipoProcesso.APROVEITAMENTO_DISPENSA_CREDITOS,
+            assunto="Créditos na Secretaria", descricao="Processo da caixa padrão",
+            setor_atual=self.secretaria, status=Processo.StatusProcesso.EM_ANALISE,
+        )
+        self.outro = Processo.objects.create(
+            usuario_criado_por=self.aluno, tipo=Processo.TipoProcesso.OUTRO,
+            assunto="Outro na Secretaria", descricao="Outro tipo da caixa padrão",
+            setor_atual=self.secretaria, status=Processo.StatusProcesso.EM_ANALISE,
+        )
+        self.processo_outra_caixa = Processo.objects.create(
+            usuario_criado_por=self.aluno, tipo=Processo.TipoProcesso.OUTRO,
+            assunto="Processo da outra caixa", descricao="Não deve aparecer inicialmente",
+            setor_atual=self.outra_caixa, status=Processo.StatusProcesso.EM_ANALISE,
+        )
+        self.client.force_login(self.servidor)
+
+    def test_abertura_exibe_somente_a_primeira_caixa(self):
+        response = self.client.get(reverse("coordenacao_caixa_processos"))
+
+        self.assertEqual(response.context["selected_caixa"], str(self.secretaria.pk))
+        self.assertContains(response, self.creditos.assunto)
+        self.assertContains(response, self.outro.assunto)
+        self.assertNotContains(response, self.processo_outra_caixa.assunto)
+
+    def test_filtro_de_tipo_e_resumo_usam_a_caixa_selecionada(self):
+        response = self.client.get(
+            reverse("coordenacao_caixa_processos"),
+            {"caixa": self.secretaria.pk, "tipo": Processo.TipoProcesso.OUTRO},
+        )
+
+        self.assertEqual(response.context["total_processos_caixa"], 2)
+        self.assertEqual(
+            {item["value"]: item["total"] for item in response.context["distribuicao_tipos"]},
+            {Processo.TipoProcesso.APROVEITAMENTO_DISPENSA_CREDITOS: 1, Processo.TipoProcesso.OUTRO: 1},
+        )
+        self.assertContains(response, self.outro.assunto)
+        self.assertNotContains(response, self.creditos.assunto)
+        self.assertContains(response, "Tipo de processo")
+        self.assertContains(response, "Total na caixa")
 
 
 class VersionViewTests(SimpleTestCase):
@@ -1902,7 +1958,7 @@ class AlunosViewTests(TestCase):
 
     def test_aluno_membro_da_secretaria_tem_acesso_de_gestao(self):
         secretaria, _ = Setor.objects.get_or_create(
-            nome="Secretaria PPGEC",
+            nome=Setor.NOME_SECRETARIA,
             defaults={"tipo": Setor.TipoSetor.SETOR},
         )
         bolsista = Aluno.objects.create(
@@ -1953,6 +2009,54 @@ class AlunosViewTests(TestCase):
         detalhe = self.client.get(reverse("processo_detalhe", args=[processo_de_outro_usuario.id]))
         self.assertEqual(detalhe.status_code, 200)
         self.assertContains(detalhe, processo_de_outro_usuario.assunto)
+
+    def test_todo_membro_ativo_da_coordenacao_tem_menu_e_acesso_de_gestao(self):
+        coordenacao, _ = Setor.objects.get_or_create(
+            nome=Setor.NOME_COORDENACAO,
+            defaults={"tipo": Setor.TipoSetor.SETOR},
+        )
+        membro = Aluno.objects.create(
+            email="membro.coordenacao@example.com",
+            password="senha-segura-123",
+            nome="Membro Coordenação",
+        )
+        criar_trajetoria(membro)
+        SetorMembro.objects.create(setor=coordenacao, usuario=membro, designado_por=self.coordenador)
+
+        self.client.force_login(membro)
+
+        home = self.client.get(reverse("home"))
+        self.assertEqual(home.status_code, 200)
+        self.assertContains(home, "Dashboard")
+        self.assertContains(home, "Validar Cadastros")
+        self.assertContains(home, "Períodos letivos")
+        self.assertContains(home, "Cadastro de Salas")
+        self.assertContains(home, "Reserva de Ambiente")
+
+        for rota in (
+            "coordenacao_dashboard",
+            "coordenacao_alunos",
+            "coordenacao_processos",
+            "matriculas_periodos",
+            "setores_comissoes",
+            "reservas_ambientes",
+        ):
+            with self.subTest(rota=rota):
+                self.assertEqual(self.client.get(reverse(rota)).status_code, 200)
+
+    def test_vinculo_encerrado_com_coordenacao_nao_concede_acesso_de_gestao(self):
+        coordenacao, _ = Setor.objects.get_or_create(nome=Setor.NOME_COORDENACAO)
+        SetorMembro.objects.create(
+            setor=coordenacao,
+            usuario=self.aluno,
+            designado_por=self.coordenador,
+            data_saida=timezone.localdate(),
+        )
+
+        self.client.force_login(self.aluno)
+        home = self.client.get(reverse("home"))
+        self.assertNotContains(home, "Dashboard")
+        self.assertEqual(self.client.get(reverse("coordenacao_dashboard")).status_code, 403)
 
     def test_aluno_membro_de_comissao_nao_recebe_acesso_global_de_secretaria(self):
         setor = Setor.objects.create(nome="Comissão Discente Sem Gestão", tipo=Setor.TipoSetor.COMISSAO)
@@ -2252,6 +2356,28 @@ class AlunosViewTests(TestCase):
         alunos = list(response.context["alunos"])
         self.assertEqual(len(alunos), 1)
         self.assertEqual(alunos[0].trajetoria_atual.nivel_curso, Aluno.NivelCurso.DOUTORADO)
+
+    def test_lista_alunos_filtra_por_polo(self):
+        polo_alvo = Polo.objects.create(nome="Polo da listagem")
+        polo_outro = Polo.objects.create(nome="Outro polo da listagem")
+        self.aluno.polo_atuacao = polo_alvo
+        self.aluno.save(update_fields=["polo_atuacao"])
+        aluno_outro = Aluno.objects.create_user(
+            email="aluno.outro.polo@example.com",
+            password="senha-segura-123",
+            nome="Aluno de Outro Polo",
+            polo_atuacao=polo_outro,
+        )
+        criar_trajetoria(aluno_outro)
+
+        self.client.force_login(self.servidor)
+        response = self.client.get(reverse("coordenacao_alunos"), {"polo": polo_alvo.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.aluno.nome)
+        self.assertContains(response, polo_alvo.nome)
+        self.assertNotContains(response, aluno_outro.nome)
+        self.assertEqual(response.context["filtro_polo"], str(polo_alvo.pk))
 
     def test_lista_alunos_usa_ultima_conclusao_sem_trajetoria_ativa(self):
         aluno_concluido = Aluno.objects.create(
@@ -4464,6 +4590,47 @@ class ReservaAmbienteTests(TestCase):
         )
 
         self.assertEqual(ReservaAmbiente.objects.count(), 2)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class BolsistaVoluntarioAccessTests(TestCase):
+    def setUp(self):
+        self.usuario = User.objects.create_user(
+            email="bolsista.voluntario@example.com",
+            password="senha-segura-123",
+            nome="Bolsista Voluntário",
+            tipo_usuario=User.TipoUsuario.BOLSISTA_VOLUNTARIO,
+        )
+        self.client.force_login(self.usuario)
+
+    def test_recebe_menu_e_telas_de_gestao_do_servidor(self):
+        home = self.client.get(reverse("home"))
+
+        self.assertEqual(home.status_code, 200)
+        self.assertContains(home, "Caixa de Processos")
+        self.assertContains(home, "Dashboard")
+        self.assertContains(home, "Alunos")
+        self.assertContains(home, "Cadastro de Salas")
+        self.assertNotContains(home, "Novo Processo")
+
+        for rota in (
+            "coordenacao_dashboard",
+            "coordenacao_alunos",
+            "coordenacao_processos",
+            "coordenacao_caixa_processos",
+            "matriculas_periodos",
+            "reservas_ambientes",
+            "salas_ambientes",
+        ):
+            with self.subTest(rota=rota):
+                self.assertEqual(self.client.get(reverse(rota)).status_code, 200)
+
+        self.assertEqual(self.client.get(reverse("menu_meus_processos")).status_code, 403)
+
+    def test_pode_ser_selecionado_como_membro_de_setor(self):
+        form = SetorComissaoForm()
+
+        self.assertIn(self.usuario, form.fields["servidores"].queryset)
 
 
 class MenuLateralIconesTests(SimpleTestCase):

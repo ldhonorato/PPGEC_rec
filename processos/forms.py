@@ -357,9 +357,12 @@ class SetorComissaoForm(forms.ModelForm):
         widget=forms.CheckboxSelectMultiple,
     )
     servidores = forms.ModelMultipleChoiceField(
-        queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.SERVIDOR, is_active=True).order_by("nome", "email"),
+        queryset=User.objects.filter(
+            tipo_usuario__in=User.tipos_com_acesso_servidor(),
+            is_active=True,
+        ).order_by("nome", "email"),
         required=False,
-        label="Servidores",
+        label="Servidores e bolsistas/voluntários",
         widget=forms.CheckboxSelectMultiple,
     )
     alunos = forms.ModelMultipleChoiceField(

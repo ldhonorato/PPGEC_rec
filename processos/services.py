@@ -44,7 +44,7 @@ def processos_atrasados_queryset(user):
     if not user.is_authenticated:
         return queryset.none()
 
-    if user.tipo_usuario == User.TipoUsuario.SERVIDOR or _is_secretaria_member(user):
+    if user.tipo_usuario in User.tipos_com_acesso_servidor() or _is_secretaria_member(user):
         return queryset
 
     if user.tipo_usuario == User.TipoUsuario.DOCENTE:
@@ -68,9 +68,11 @@ def processos_atrasados_queryset(user):
 
 def processos_atrasados_url(user):
     if user.is_authenticated and (
-        user.tipo_usuario in {User.TipoUsuario.SERVIDOR, User.TipoUsuario.DOCENTE} or _is_secretaria_member(user)
+        user.tipo_usuario == User.TipoUsuario.DOCENTE
+        or user.tipo_usuario in User.tipos_com_acesso_servidor()
+        or _is_secretaria_member(user)
     ):
-        if user.tipo_usuario == User.TipoUsuario.SERVIDOR or Docente.objects.filter(
+        if user.tipo_usuario in User.tipos_com_acesso_servidor() or Docente.objects.filter(
             pk=user.pk,
             coordenador=True,
         ).exists() or _is_secretaria_member(user):

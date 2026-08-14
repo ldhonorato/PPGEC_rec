@@ -19,7 +19,7 @@ def _is_docente(user):
 
 
 def _is_servidor(user):
-    return user.is_authenticated and user.tipo_usuario == User.TipoUsuario.SERVIDOR
+    return user.is_authenticated and user.tipo_usuario in User.tipos_com_acesso_servidor()
 
 
 def _is_secretaria_member(user):
@@ -27,7 +27,16 @@ def _is_secretaria_member(user):
         usuario=user,
         data_saida__isnull=True,
         setor__ativo=True,
-        setor__nome="Secretaria PPGEC",
+        setor__nome=Setor.NOME_SECRETARIA,
+    ).exists()
+
+
+def _is_coordenacao_member(user):
+    return user.is_authenticated and SetorMembro.objects.filter(
+        usuario=user,
+        data_saida__isnull=True,
+        setor__ativo=True,
+        setor__nome=Setor.NOME_COORDENACAO,
     ).exists()
 
 
@@ -42,7 +51,12 @@ def _is_coordenador(user):
 
 
 def _has_gestao_access(user):
-    return _is_coordenador(user) or _is_servidor(user) or _is_secretaria_member(user)
+    return (
+        _is_coordenador(user)
+        or _is_servidor(user)
+        or _is_secretaria_member(user)
+        or _is_coordenacao_member(user)
+    )
 
 
 def _can_view_processos(user):
@@ -172,7 +186,7 @@ def _menu_lateral_sections(user):
     # Inicio abre a secao em todos os perfis. Antes so se chegava a tela inicial
     # clicando na logo da barra superior, o que nao e um destino obvio.
     principal_items = [_menu_item("Início", "/", ["home"], "inicio")]
-    if user.tipo_usuario != User.TipoUsuario.SERVIDOR:
+    if not _is_servidor(user):
         principal_items.append(
             _menu_item(
                 "Meus Processos",
@@ -210,7 +224,12 @@ def _menu_lateral_sections(user):
         principal_items.append(
             _menu_item("Minha Trajetória", f"/coordenacao/alunos/{user.id}/", ["aluno_detalhe"], "trajetoria")
         )
-    if user.tipo_usuario in {User.TipoUsuario.DOCENTE, User.TipoUsuario.SERVIDOR} or _is_secretaria_member(user):
+    if (
+        user.tipo_usuario == User.TipoUsuario.DOCENTE
+        or _is_servidor(user)
+        or _is_secretaria_member(user)
+        or _is_coordenacao_member(user)
+    ):
         principal_items.append(
             _menu_item(
                 "Reserva de Ambiente",
@@ -450,6 +469,7 @@ BARRA_FLUTUANTE = {
     User.TipoUsuario.ALUNO: ("Início", "Meus Processos", "Matrícula"),
     User.TipoUsuario.DOCENTE: ("Início", "Meus Processos", "Meus Orientandos"),
     User.TipoUsuario.SERVIDOR: ("Início", "Caixa de Processos", "Alunos"),
+    User.TipoUsuario.BOLSISTA_VOLUNTARIO: ("Início", "Caixa de Processos", "Alunos"),
 }
 
 # O circulo de destaque e uma acao, nao um destino: abre um processo. Quem nao
