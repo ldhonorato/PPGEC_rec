@@ -186,6 +186,13 @@ def tipo_aluno_matricula_por_trajetoria(trajetoria):
     return SolicitacaoMatricula.TipoAluno.REGULAR
 
 
+def solicitacao_matricula_feita_no_prazo(solicitacao):
+    if not solicitacao.solicitada_em:
+        return False
+    data_solicitacao = timezone.localtime(solicitacao.solicitada_em).date()
+    return solicitacao.periodo.matricula_inicio <= data_solicitacao <= solicitacao.periodo.matricula_fim
+
+
 def datas_encontro_no_periodo(encontro):
     periodo = encontro.oferta.periodo
     if not periodo.data_inicio or not periodo.data_fim:
@@ -328,16 +335,41 @@ def salvar_solicitacao_matricula(
     if not periodo.aceita_solicitacao_matricula:
         raise ValidationError("O período não está aberto para matrícula ou modificação.")
 
-    if tipo_matricula == SolicitacaoMatricula.TipoMatricula.VINCULO:
-        solicitacao, criada = SolicitacaoMatricula.objects.select_for_update().get_or_create(
-            periodo=periodo,
-            aluno=aluno,
-            defaults={"tipo_aluno": tipo_aluno, "status": SolicitacaoMatricula.Status.RASCUNHO},
+    em_modificacao = periodo.status == periodo.Status.MODIFICACAO_MATRICULA
+    solicitacao_existente = (
+        SolicitacaoMatricula.objects.select_for_update()
+        .select_related("periodo")
+        .filter(periodo=periodo, aluno=aluno)
+        .first()
+    )
+    if em_modificacao and (
+        not solicitacao_existente or not solicitacao_matricula_feita_no_prazo(solicitacao_existente)
+    ):
+        raise ValidationError(
+            "A modificação de matrícula está disponível apenas para quem enviou a solicitação no prazo de matrícula."
         )
+
+    if tipo_matricula == SolicitacaoMatricula.TipoMatricula.VINCULO:
+        solicitacao = solicitacao_existente
+        criada = solicitacao is None
+        if criada:
+            solicitacao = SolicitacaoMatricula.objects.create(
+                periodo=periodo,
+                aluno=aluno,
+                tipo_aluno=tipo_aluno,
+                status=SolicitacaoMatricula.Status.RASCUNHO,
+            )
         if solicitacao.status == SolicitacaoMatricula.Status.CANCELADA:
             raise ValidationError("A solicitação deste período está cancelada.")
-        if solicitacao.itens.exclude(status=ItemSolicitacaoMatricula.Status.CANCELADO).exists():
+        itens_ativos = list(solicitacao.itens.filter(status__in=[
+            ItemSolicitacaoMatricula.Status.SOLICITADO,
+            ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+            ItemSolicitacaoMatricula.Status.EM_LISTA_ESPERA,
+        ]))
+        if itens_ativos and not em_modificacao:
             raise ValidationError("Não é possível solicitar matrícula vínculo com disciplinas ativas neste período.")
+        for item in itens_ativos:
+            cancelar_item_matricula(item=item, usuario=aluno)
         tipo_anterior = solicitacao.tipo_matricula
         solicitacao.tipo_matricula = SolicitacaoMatricula.TipoMatricula.VINCULO
         solicitacao.tipo_aluno = tipo_aluno
@@ -379,12 +411,21 @@ def salvar_solicitacao_matricula(
     if not ofertas:
         raise ValidationError("Selecione ao menos uma disciplina ofertada.")
 
-    validar_choque_ofertas(ofertas, aluno=aluno, periodo=periodo)
+    solicitacao = solicitacao_existente
+    criada = solicitacao is None
+    if criada:
+        solicitacao = SolicitacaoMatricula.objects.create(
+            periodo=periodo,
+            aluno=aluno,
+            tipo_aluno=tipo_aluno,
+            status=SolicitacaoMatricula.Status.RASCUNHO,
+        )
 
-    solicitacao, criada = SolicitacaoMatricula.objects.select_for_update().get_or_create(
-        periodo=periodo,
+    validar_choque_ofertas(
+        ofertas,
         aluno=aluno,
-        defaults={"tipo_aluno": tipo_aluno, "status": SolicitacaoMatricula.Status.RASCUNHO},
+        periodo=periodo,
+        ignorar_solicitacao=solicitacao if em_modificacao else None,
     )
     if (
         solicitacao.status == SolicitacaoMatricula.Status.CANCELADA
@@ -417,6 +458,20 @@ def salvar_solicitacao_matricula(
             estado_anterior={"tipo_matricula": tipo_anterior},
             estado_novo={"tipo_matricula": solicitacao.tipo_matricula},
         )
+
+    if em_modificacao:
+        ofertas_selecionadas = {oferta.pk for oferta in ofertas}
+        itens_removidos = list(
+            solicitacao.itens.select_for_update()
+            .filter(status__in=[
+                ItemSolicitacaoMatricula.Status.SOLICITADO,
+                ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+                ItemSolicitacaoMatricula.Status.EM_LISTA_ESPERA,
+            ])
+            .exclude(oferta_id__in=ofertas_selecionadas)
+        )
+        for item in itens_removidos:
+            cancelar_item_matricula(item=item, usuario=aluno)
 
     for oferta in ofertas:
         item_existente = solicitacao.itens.select_for_update().filter(oferta=oferta).first()
@@ -759,16 +814,33 @@ def _gerar_xlsx_multiplas_planilhas(planilhas):
     return buffer.getvalue()
 
 
+def _nivel_aluno_matricula(solicitacao):
+    trajetoria = next(
+        (
+            trajetoria
+            for trajetoria in solicitacao.aluno.trajetorias.all()
+            if trajetoria.status == TrajetoriaAcademica.Status.ATIVA
+        ),
+        None,
+    )
+    if trajetoria:
+        return trajetoria.get_nivel_curso_display()
+    if solicitacao.tipo_aluno == SolicitacaoMatricula.TipoAluno.ESPECIAL:
+        return Aluno.NivelCurso.ALUNO_ESPECIAL.label
+    return ""
+
+
 def gerar_xlsx_solicitacoes_periodo(periodo, estado="consolidada"):
     if estado not in {"originais", "modificacoes", "consolidada"}:
         raise ValidationError("Tipo de planilha de matrícula inválido.")
 
-    cabecalho = ["Matrícula", "Nome", "Polo", "E-mail", "Tipo de aluno", "Status", "Solicitado em", "Observação"]
+    cabecalho = ["Matrícula", "Nome", "Polo", "E-mail", "Tipo de aluno", "Nível", "Status", "Solicitado em", "Observação"]
     if estado == "modificacoes":
         linhas = [[
             "Data e hora",
             "Matrícula",
             "Nome",
+            "Nível",
             "Disciplina",
             "Ação",
             "Estado anterior",
@@ -782,6 +854,7 @@ def gerar_xlsx_solicitacoes_periodo(periodo, estado="consolidada"):
                 fase=AlteracaoMatricula.Fase.MODIFICACAO,
             )
             .select_related("solicitacao__aluno", "oferta__disciplina", "realizado_por")
+            .prefetch_related("solicitacao__aluno__trajetorias")
             .order_by("criado_em", "id")
         )
         for alteracao in alteracoes:
@@ -791,6 +864,7 @@ def gerar_xlsx_solicitacoes_periodo(periodo, estado="consolidada"):
                 timezone.localtime(alteracao.criado_em).strftime("%d/%m/%Y %H:%M"),
                 alteracao.solicitacao.aluno.matricula,
                 alteracao.solicitacao.aluno.nome,
+                _nivel_aluno_matricula(alteracao.solicitacao),
                 (
                     f"{alteracao.oferta.disciplina.codigo} - {alteracao.oferta.disciplina.nome}"
                     if alteracao.oferta_id else "Matrícula vínculo"
@@ -819,6 +893,7 @@ def gerar_xlsx_solicitacoes_periodo(periodo, estado="consolidada"):
                 oferta__disciplina_id=disciplina_id,
             )
             .select_related("solicitacao", "solicitacao__aluno", "solicitacao__aluno__polo_atuacao")
+            .prefetch_related("solicitacao__aluno__trajetorias")
             .order_by("solicitacao__aluno__nome")
         )
         if estado == "originais":
@@ -847,6 +922,7 @@ def gerar_xlsx_solicitacoes_periodo(periodo, estado="consolidada"):
                 solicitacao.aluno.polo_atuacao.nome if solicitacao.aluno.polo_atuacao else "",
                 solicitacao.aluno.email,
                 solicitacao.get_tipo_aluno_display(),
+                _nivel_aluno_matricula(solicitacao),
                 status,
                 timezone.localtime(item.solicitado_em).strftime("%d/%m/%Y %H:%M") if item.solicitado_em else "",
                 solicitacao.observacao_aluno,
@@ -856,7 +932,7 @@ def gerar_xlsx_solicitacoes_periodo(periodo, estado="consolidada"):
     vinculos = SolicitacaoMatricula.objects.filter(
         periodo=periodo,
         tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
-    ).select_related("aluno", "aluno__polo_atuacao").order_by("aluno__nome")
+    ).select_related("aluno", "aluno__polo_atuacao").prefetch_related("aluno__trajetorias").order_by("aluno__nome")
     if estado == "originais":
         vinculos = vinculos.filter(
             Q(
@@ -878,6 +954,7 @@ def gerar_xlsx_solicitacoes_periodo(periodo, estado="consolidada"):
             solicitacao.aluno.polo_atuacao.nome if solicitacao.aluno.polo_atuacao else "",
             solicitacao.aluno.email,
             solicitacao.get_tipo_aluno_display(),
+            _nivel_aluno_matricula(solicitacao),
             solicitacao.get_status_display(),
             timezone.localtime(solicitacao.solicitada_em).strftime("%d/%m/%Y %H:%M") if solicitacao.solicitada_em else "",
             solicitacao.observacao_aluno,
