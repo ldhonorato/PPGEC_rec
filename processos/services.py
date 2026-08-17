@@ -579,6 +579,10 @@ def _xlsx_planilha_xml(linhas):
     for indice in range(total_colunas):
         maior = max((len(str(linha[indice])) for linha in linhas if indice < len(linha) and linha[indice] is not None), default=10)
         larguras.append(min(max(maior + 2, 12), 45))
+    colunas_xml = "".join(
+        f'<col min="{indice}" max="{indice}" width="{largura}" customWidth="1"/>'
+        for indice, largura in enumerate(larguras, start=1)
+    )
     rows = []
     for row_idx, linha in enumerate(linhas, start=1):
         cells = []
@@ -595,7 +599,7 @@ def _xlsx_planilha_xml(linhas):
         '<sheetViews><sheetView workbookViewId="0" showGridLines="0">'
         '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
         '</sheetView></sheetViews>'
-        f'<cols>{"".join(f"<col min=\"{i}\" max=\"{i}\" width=\"{largura}\" customWidth=\"1\"/>" for i, largura in enumerate(larguras, start=1))}</cols>'
+        f'<cols>{colunas_xml}</cols>'
         f'<sheetData>{"".join(rows)}</sheetData>'
         f'<autoFilter ref="A1:{ultima_coluna}{max(len(linhas), 1)}"/>'
         "</worksheet>"
