@@ -137,6 +137,7 @@ from .services import (
     percentual_presencial_oferta,
     salvar_planejamento_presencial_oferta,
     salvar_solicitacao_matricula,
+    solicitacao_matricula_feita_no_prazo,
     tipo_aluno_matricula_por_trajetoria,
 )
 
@@ -1224,7 +1225,7 @@ def matricula_solicitar_view(request, periodo_id=None):
 
     trajetoria_ativa = request.user.aluno.trajetoria_ativa()
     tipo_aluno = tipo_aluno_matricula_por_trajetoria(trajetoria_ativa) if trajetoria_ativa else None
-    pode_solicitar_matricula = bool(trajetoria_ativa and tipo_aluno)
+    aluno_apto_matricula = bool(trajetoria_ativa and tipo_aluno)
     hoje_servidor = timezone.localdate()
     periodos_abertos = [periodo for periodo in PeriodoLetivo.objects.order_by("-nome") if periodo.aceita_solicitacao_matricula]
     proximo_periodo = (
@@ -1241,13 +1242,57 @@ def matricula_solicitar_view(request, periodo_id=None):
             proximo_periodo = periodo_selecionado if periodo_selecionado.matricula_inicio > hoje_servidor else proximo_periodo
     else:
         periodo = periodos_abertos[0] if periodos_abertos else None
-    form = SolicitacaoMatriculaForm(periodo=periodo) if pode_solicitar_matricula else None
+    solicitacao_atual = None
+    if periodo:
+        solicitacao_atual = (
+            SolicitacaoMatricula.objects.filter(periodo=periodo, aluno=request.user.aluno)
+            .select_related("periodo")
+            .prefetch_related("alteracoes")
+            .first()
+        )
+    em_modificacao = bool(periodo and periodo.status == PeriodoLetivo.Status.MODIFICACAO_MATRICULA)
+    pode_modificar_matricula = bool(
+        solicitacao_atual and solicitacao_matricula_feita_no_prazo(solicitacao_atual)
+    )
+    pode_solicitar_matricula = aluno_apto_matricula and (not em_modificacao or pode_modificar_matricula)
+    ofertas_selecionadas_ids = []
+    form = None
+    if pode_solicitar_matricula:
+        itens_ativos = solicitacao_atual.itens.filter(status__in=[
+            ItemSolicitacaoMatricula.Status.SOLICITADO,
+            ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+            ItemSolicitacaoMatricula.Status.EM_LISTA_ESPERA,
+        ]) if solicitacao_atual else ItemSolicitacaoMatricula.objects.none()
+        ofertas_selecionadas_ids = list(itens_ativos.values_list("oferta_id", flat=True))
+        form = SolicitacaoMatriculaForm(
+            periodo=periodo,
+            initial={
+                "ofertas": ofertas_selecionadas_ids,
+                "matricula_vinculo": bool(
+                    solicitacao_atual
+                    and solicitacao_atual.tipo_matricula == SolicitacaoMatricula.TipoMatricula.VINCULO
+                ),
+                "observacao": solicitacao_atual.observacao_aluno if solicitacao_atual else "",
+            },
+        )
 
     if request.method == "POST":
+        periodo = get_object_or_404(PeriodoLetivo, pk=request.POST.get("periodo_id"))
+        solicitacao_atual = (
+            SolicitacaoMatricula.objects.filter(periodo=periodo, aluno=request.user.aluno)
+            .select_related("periodo")
+            .prefetch_related("alteracoes")
+            .first()
+        )
+        em_modificacao = periodo.status == PeriodoLetivo.Status.MODIFICACAO_MATRICULA
+        pode_modificar_matricula = bool(
+            solicitacao_atual and solicitacao_matricula_feita_no_prazo(solicitacao_atual)
+        )
+        pode_solicitar_matricula = aluno_apto_matricula and (not em_modificacao or pode_modificar_matricula)
         if not pode_solicitar_matricula:
             raise PermissionDenied("Você não está apto a solicitar matrícula.")
-        periodo = get_object_or_404(PeriodoLetivo, pk=request.POST.get("periodo_id"))
         form = SolicitacaoMatriculaForm(request.POST, periodo=periodo)
+        ofertas_selecionadas_ids = [int(pk) for pk in request.POST.getlist("ofertas") if pk.isdigit()]
         if form.is_valid():
             try:
                 solicitacao = salvar_solicitacao_matricula(
@@ -1290,6 +1335,9 @@ def matricula_solicitar_view(request, periodo_id=None):
             "form": form,
             "trajetoria_ativa": trajetoria_ativa,
             "pode_solicitar_matricula": pode_solicitar_matricula,
+            "em_modificacao": em_modificacao,
+            "pode_modificar_matricula": pode_modificar_matricula,
+            "ofertas_selecionadas_ids": ofertas_selecionadas_ids,
             "nivel_trajetoria_display": trajetoria_ativa.get_nivel_curso_display() if trajetoria_ativa else "",
             "tipo_aluno_display": dict(SolicitacaoMatricula.TipoAluno.choices).get(tipo_aluno),
         },

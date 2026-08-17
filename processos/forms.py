@@ -343,9 +343,14 @@ class SolicitacaoMatriculaForm(forms.Form):
         ofertas = cleaned_data.get("ofertas")
         if not cleaned_data.get("aceitar_lista_espera"):
             self.add_error("aceitar_lista_espera", "Confirme a ciência para enviar a solicitação.")
-        if matricula_vinculo or not ofertas:
+        if matricula_vinculo:
             cleaned_data["matricula_vinculo"] = True
             cleaned_data["ofertas"] = []
+        elif not ofertas:
+            self.add_error(
+                "matricula_vinculo",
+                "Selecione ao menos uma disciplina ou marque matrícula vínculo.",
+            )
         return cleaned_data
 
 
