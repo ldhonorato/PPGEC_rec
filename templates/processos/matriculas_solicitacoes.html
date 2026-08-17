@@ -9,7 +9,9 @@
         </div>
         <div class="calendar-nav">
             {% if periodo %}
-                <a class="btn" href="{% url 'matriculas_solicitacoes_exportar' %}?periodo={{ periodo.pk }}">Baixar todas as planilhas</a>
+                <a class="btn btn-secondary" href="{% url 'matriculas_solicitacoes_exportar' %}?periodo={{ periodo.pk }}&amp;estado=originais">Solicitações originais</a>
+                <a class="btn btn-secondary" href="{% url 'matriculas_solicitacoes_exportar' %}?periodo={{ periodo.pk }}&amp;estado=modificacoes">Modificações realizadas</a>
+                <a class="btn" href="{% url 'matriculas_solicitacoes_exportar' %}?periodo={{ periodo.pk }}&amp;estado=consolidada">Lista consolidada</a>
                 <a class="btn btn-secondary" href="{% url 'matriculas_ofertas' %}?periodo={{ periodo.pk }}">Ver ofertas</a>
             {% else %}
                 <a class="btn btn-secondary" href="{% url 'matriculas_ofertas' %}">Ver ofertas</a>

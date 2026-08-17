@@ -30,6 +30,7 @@ from .declaracoes_vinculo import (
 from .forms import SetorComissaoForm
 from .models import (
     AlteracaoAluno,
+    AlteracaoMatricula,
     Aluno,
     Documento,
     AulaPresencialOferta,
@@ -686,6 +687,40 @@ class MatriculaDomainTests(TestCase):
         cancelar_item_matricula(item=item_solicitado, usuario=self.secretaria)
         item_espera.refresh_from_db()
         self.assertEqual(item_espera.status, ItemSolicitacaoMatricula.Status.SOLICITADO)
+
+    def test_modificacao_registra_eventos_e_reinclui_item_cancelado(self):
+        oferta = self.criar_oferta("MAT004", "Auditoria")
+        solicitacao = salvar_solicitacao_matricula(
+            aluno=self.aluno,
+            periodo=self.periodo,
+            tipo_aluno=SolicitacaoMatricula.TipoAluno.REGULAR,
+            ofertas=[oferta],
+        )
+        item = solicitacao.itens.get(oferta=oferta)
+        self.assertEqual(item.incluido_na_fase, ItemSolicitacaoMatricula.FaseInclusao.MATRICULA)
+
+        self.periodo.status = PeriodoLetivo.Status.MODIFICACAO_MATRICULA
+        self.periodo.save(update_fields=["status"])
+        cancelar_item_matricula(item=item, usuario=self.secretaria)
+        salvar_solicitacao_matricula(
+            aluno=self.aluno,
+            periodo=self.periodo,
+            tipo_aluno=SolicitacaoMatricula.TipoAluno.REGULAR,
+            ofertas=[oferta],
+        )
+
+        item.refresh_from_db()
+        self.assertEqual(item.status, ItemSolicitacaoMatricula.Status.SOLICITADO)
+        self.assertEqual(item.incluido_na_fase, ItemSolicitacaoMatricula.FaseInclusao.MATRICULA)
+        eventos = list(solicitacao.alteracoes.values_list("acao", "fase", flat=False))
+        self.assertIn(
+            (AlteracaoMatricula.Acao.DISCIPLINA_CANCELADA, AlteracaoMatricula.Fase.MODIFICACAO),
+            eventos,
+        )
+        self.assertIn(
+            (AlteracaoMatricula.Acao.DISCIPLINA_REINCLUIDA, AlteracaoMatricula.Fase.MODIFICACAO),
+            eventos,
+        )
 
     def test_task_atualiza_status_do_periodo_letivo(self):
         self.periodo.status = PeriodoLetivo.Status.PLANEJAMENTO
@@ -1348,6 +1383,43 @@ class MatriculaViewsTests(TestCase):
         self.assertTrue(any(self.aluno.email in planilha and polo.nome in planilha for planilha in planilhas))
         self.assertTrue(any(aluno_vinculo.nome in planilha for planilha in planilhas))
         self.assertTrue(any(aluno_vinculo.email in planilha and polo.nome in planilha for planilha in planilhas))
+
+    def test_exportacoes_separam_originais_modificacoes_e_consolidada(self):
+        solicitacao = salvar_solicitacao_matricula(
+            aluno=self.aluno,
+            periodo=self.periodo,
+            tipo_aluno=SolicitacaoMatricula.TipoAluno.REGULAR,
+            ofertas=[self.oferta],
+        )
+        self.periodo.status = PeriodoLetivo.Status.MODIFICACAO_MATRICULA
+        self.periodo.save(update_fields=["status"])
+        cancelar_item_matricula(item=solicitacao.itens.get(), usuario=self.secretaria)
+        self.client.force_login(self.secretaria)
+
+        originais = self.client.get(
+            reverse("matriculas_solicitacoes_exportar"),
+            {"periodo": self.periodo.pk, "estado": "originais"},
+        )
+        modificacoes = self.client.get(
+            reverse("matriculas_solicitacoes_exportar"),
+            {"periodo": self.periodo.pk, "estado": "modificacoes"},
+        )
+        consolidada = self.client.get(
+            reverse("matriculas_solicitacoes_exportar"),
+            {"periodo": self.periodo.pk, "estado": "consolidada"},
+        )
+
+        def xml_planilhas(response):
+            with ZipFile(BytesIO(response.content)) as xlsx:
+                return "".join(
+                    xlsx.read(nome).decode()
+                    for nome in xlsx.namelist()
+                    if nome.startswith("xl/worksheets/sheet")
+                )
+
+        self.assertIn(self.aluno.nome, xml_planilhas(originais))
+        self.assertIn("Disciplina cancelada", xml_planilhas(modificacoes))
+        self.assertNotIn(self.aluno.nome, xml_planilhas(consolidada))
 
     @patch("processos.views.send_email_secretaria_planejamento_presencial.delay")
     def test_planejamento_presencial_cria_reserva_para_oferta_hibrida(self, mock_email):

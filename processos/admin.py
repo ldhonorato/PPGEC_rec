@@ -3,6 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.hashers import identify_hasher
 
 from .models import (
+    AlteracaoMatricula,
     AlteracaoAluno,
     Aluno,
     AulaPresencialOferta,
@@ -177,11 +178,37 @@ class SolicitacaoMatriculaAdmin(admin.ModelAdmin):
 
 @admin.register(ItemSolicitacaoMatricula)
 class ItemSolicitacaoMatriculaAdmin(admin.ModelAdmin):
-    list_display = ("solicitacao", "oferta", "status", "solicitado_em", "indeferido_em")
-    list_filter = ("status", "oferta__periodo")
+    list_display = ("solicitacao", "oferta", "status", "incluido_na_fase", "solicitado_em", "indeferido_em")
+    list_filter = ("status", "incluido_na_fase", "oferta__periodo")
     search_fields = ("solicitacao__aluno__nome", "oferta__disciplina__nome", "oferta__disciplina__codigo")
     autocomplete_fields = ("solicitacao", "oferta", "indeferido_por")
     readonly_fields = ("solicitado_em", "atualizado_em")
+
+
+@admin.register(AlteracaoMatricula)
+class AlteracaoMatriculaAdmin(admin.ModelAdmin):
+    list_display = ("solicitacao", "acao", "fase", "oferta", "realizado_por", "criado_em")
+    list_filter = ("acao", "fase", "solicitacao__periodo")
+    search_fields = (
+        "solicitacao__aluno__nome",
+        "solicitacao__aluno__matricula",
+        "oferta__disciplina__codigo",
+        "oferta__disciplina__nome",
+        "realizado_por__nome",
+    )
+    readonly_fields = (
+        "solicitacao", "item", "oferta", "acao", "fase", "realizado_por",
+        "estado_anterior", "estado_novo", "justificativa", "criado_em",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Setor)

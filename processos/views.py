@@ -1438,12 +1438,20 @@ def matriculas_solicitacoes_exportar_view(request):
     if not _can_manage_matriculas(request.user):
         raise PermissionDenied("Apenas secretaria e coordenação podem exportar solicitações de matrícula.")
     periodo = get_object_or_404(PeriodoLetivo, pk=request.GET.get("periodo"))
-    conteudo = gerar_xlsx_solicitacoes_periodo(periodo)
+    estado = request.GET.get("estado", "consolidada")
+    rotulos = {
+        "originais": "solicitacoes_originais",
+        "modificacoes": "modificacoes",
+        "consolidada": "lista_consolidada",
+    }
+    if estado not in rotulos:
+        raise Http404("Tipo de planilha de matrícula inválido.")
+    conteudo = gerar_xlsx_solicitacoes_periodo(periodo, estado=estado)
     response = HttpResponse(
         conteudo,
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    response["Content-Disposition"] = f'attachment; filename="solicitacoes_matricula_{periodo.nome}.xlsx"'
+    response["Content-Disposition"] = f'attachment; filename="{rotulos[estado]}_{periodo.nome}.xlsx"'
     return response
 
 
@@ -1455,6 +1463,8 @@ def matricula_minha_solicitacao_view(request, solicitacao_id):
             "itens__oferta__docente_responsavel",
             "itens__oferta__docente_colaborador",
             "itens__oferta__encontros",
+            "alteracoes__oferta__disciplina",
+            "alteracoes__realizado_por",
         ),
         pk=solicitacao_id,
     )
