@@ -907,6 +907,10 @@ class SolicitacaoMatricula(models.Model):
 
 
 class ItemSolicitacaoMatricula(models.Model):
+    class FaseInclusao(models.TextChoices):
+        MATRICULA = "MATRICULA", "Matrícula"
+        MODIFICACAO = "MODIFICACAO", "Modificação de matrícula"
+
     class Status(models.TextChoices):
         SOLICITADO = "SOLICITADO", "Matrícula solicitada"
         HOMOLOGADO = "HOMOLOGADO", "Matrícula solicitada"
@@ -917,6 +921,11 @@ class ItemSolicitacaoMatricula(models.Model):
     solicitacao = models.ForeignKey(SolicitacaoMatricula, on_delete=models.CASCADE, related_name="itens")
     oferta = models.ForeignKey(OfertaDisciplina, on_delete=models.PROTECT, related_name="itens_matricula")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.SOLICITADO)
+    incluido_na_fase = models.CharField(
+        max_length=12,
+        choices=FaseInclusao.choices,
+        default=FaseInclusao.MATRICULA,
+    )
     solicitado_em = models.DateTimeField(auto_now_add=True)
     homologado_em = models.DateTimeField(null=True, blank=True)
     homologado_por = models.ForeignKey(
@@ -966,6 +975,70 @@ class ItemSolicitacaoMatricula(models.Model):
             self.indeferido_em = None
             self.indeferido_por = None
             self.motivo_indeferimento = ""
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class AlteracaoMatricula(models.Model):
+    class Acao(models.TextChoices):
+        SOLICITACAO_CRIADA = "SOLICITACAO_CRIADA", "Solicitação criada"
+        MATRICULA_VINCULO_SOLICITADA = "MATRICULA_VINCULO_SOLICITADA", "Matrícula vínculo solicitada"
+        MATRICULA_VINCULO_INDEFERIDA = "MATRICULA_VINCULO_INDEFERIDA", "Matrícula vínculo indeferida"
+        TIPO_MATRICULA_ALTERADO = "TIPO_MATRICULA_ALTERADO", "Tipo de matrícula alterado"
+        DISCIPLINA_INCLUIDA = "DISCIPLINA_INCLUIDA", "Disciplina incluída"
+        DISCIPLINA_REINCLUIDA = "DISCIPLINA_REINCLUIDA", "Disciplina reincluída"
+        DISCIPLINA_CANCELADA = "DISCIPLINA_CANCELADA", "Disciplina cancelada"
+        DISCIPLINA_INDEFERIDA = "DISCIPLINA_INDEFERIDA", "Disciplina indeferida"
+        LISTA_ESPERA_PROMOVIDA = "LISTA_ESPERA_PROMOVIDA", "Promoção da lista de espera"
+
+    class Fase(models.TextChoices):
+        MATRICULA = "MATRICULA", "Matrícula"
+        MODIFICACAO = "MODIFICACAO", "Modificação de matrícula"
+        ADMINISTRATIVA = "ADMINISTRATIVA", "Ação administrativa"
+
+    solicitacao = models.ForeignKey(
+        SolicitacaoMatricula,
+        on_delete=models.CASCADE,
+        related_name="alteracoes",
+    )
+    item = models.ForeignKey(
+        ItemSolicitacaoMatricula,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="alteracoes",
+    )
+    oferta = models.ForeignKey(
+        OfertaDisciplina,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="alteracoes_matricula",
+    )
+    acao = models.CharField(max_length=35, choices=Acao.choices)
+    fase = models.CharField(max_length=15, choices=Fase.choices)
+    realizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="alteracoes_matricula_realizadas",
+    )
+    estado_anterior = models.JSONField(default=dict, blank=True)
+    estado_novo = models.JSONField(default=dict, blank=True)
+    justificativa = models.TextField(blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["criado_em", "id"]
+        indexes = [
+            models.Index(fields=["solicitacao", "fase", "criado_em"]),
+            models.Index(fields=["oferta", "fase", "criado_em"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.solicitacao} - {self.get_acao_display()}"
+
+    def save(self, *args, **kwargs):
+        self.justificativa = (self.justificativa or "").strip()
         self.full_clean()
         return super().save(*args, **kwargs)
 

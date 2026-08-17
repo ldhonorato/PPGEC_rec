@@ -60,4 +60,29 @@
         {% endif %}
     {% endif %}
 </section>
+
+{% if solicitacao.alteracoes.all %}
+<section class="card">
+    <h2 class="section-title">Histórico da matrícula</h2>
+    <ul class="list">
+        {% for alteracao in solicitacao.alteracoes.all %}
+            <li>
+                <div class="actions-row">
+                    <div>
+                        <strong>{{ alteracao.get_acao_display }}</strong>
+                        <span class="badge badge-info">{{ alteracao.get_fase_display }}</span>
+                        {% if alteracao.oferta %}
+                            <p class="muted">{{ alteracao.oferta.disciplina.codigo }} — {{ alteracao.oferta.disciplina.nome }}</p>
+                        {% endif %}
+                        {% if alteracao.justificativa %}<p class="item-observacao">{{ alteracao.justificativa }}</p>{% endif %}
+                    </div>
+                    <small class="muted">
+                        {{ alteracao.criado_em|date:"d/m/Y H:i" }} · {{ alteracao.realizado_por.nome }}
+                    </small>
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
 {% endblock %}
