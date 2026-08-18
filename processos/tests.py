@@ -32,6 +32,7 @@ from .models import (
     AlteracaoAluno,
     AlteracaoMatricula,
     Aluno,
+    ApresentacaoQualificacao,
     Documento,
     AulaPresencialOferta,
     Disciplina,
@@ -52,6 +53,7 @@ from .models import (
     Polo,
     PublicacaoTrajetoria,
     Processo,
+    ProrrogacaoTrajetoria,
     ReservaAmbiente,
     Sala,
     Setor,
@@ -60,9 +62,118 @@ from .models import (
     SolicitacaoAssinatura,
     SolicitacaoBanca,
     TrajetoriaAcademica,
+    TrancamentoTrajetoria,
     TramitacaoProcesso,
     User,
 )
+
+
+class PrazosTrajetoriaTests(TestCase):
+    def setUp(self):
+        self.servidor = User.objects.create_user(
+            email="prazos.servidor@example.com", password="senha", nome="Servidor",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.aluno = Aluno.objects.create_user(
+            email="prazos.aluno@example.com", password="senha", nome="Aluno",
+        )
+
+    def criar_trajetoria(self, nivel):
+        return TrajetoriaAcademica.objects.create(
+            aluno=self.aluno, nivel_curso=nivel, ingresso="2025.1",
+            data_ingresso=date(2025, 2, 1), status=TrajetoriaAcademica.Status.ATIVA,
+        )
+
+    def test_limites_regimentais_sao_calculados_da_data_de_ingresso(self):
+        mestrado = self.criar_trajetoria(Aluno.NivelCurso.MESTRADO)
+        doutorado = self.criar_trajetoria(Aluno.NivelCurso.DOUTORADO)
+        self.assertEqual(mestrado.data_minima_defesa, date(2026, 2, 1))
+        self.assertEqual(mestrado.prazo_limite_regimental, date(2027, 2, 28))
+        self.assertEqual(doutorado.data_minima_defesa, date(2027, 2, 1))
+        self.assertEqual(doutorado.prazo_limite_regimental, date(2029, 2, 28))
+
+    def test_doutorado_de_agosto_2022_tem_prazo_em_agosto_2026(self):
+        trajetoria = TrajetoriaAcademica.objects.create(
+            aluno=self.aluno, nivel_curso=Aluno.NivelCurso.DOUTORADO,
+            ingresso="2022.2", data_ingresso=date(2022, 8, 1),
+            status=TrajetoriaAcademica.Status.ATIVA,
+        )
+        self.assertEqual(trajetoria.prazo_limite_regimental, date(2026, 8, 31))
+
+    def test_prorrogacao_nao_altera_limite_regimental(self):
+        trajetoria = self.criar_trajetoria(Aluno.NivelCurso.MESTRADO)
+        original = trajetoria.prazo_limite_regimental
+        ProrrogacaoTrajetoria.objects.create(
+            trajetoria=trajetoria, meses=3, registrado_por=self.servidor,
+        )
+        self.assertEqual(trajetoria.prazo_limite_regimental, original)
+        self.assertEqual(trajetoria.meses_prorrogados, 3)
+
+    def test_prorrogacoes_respeitam_o_total_regimental(self):
+        trajetoria = self.criar_trajetoria(Aluno.NivelCurso.MESTRADO)
+        ProrrogacaoTrajetoria.objects.create(trajetoria=trajetoria, meses=3, registrado_por=self.servidor)
+        ProrrogacaoTrajetoria.objects.create(
+            trajetoria=trajetoria, meses=3, registrado_por=self.servidor,
+        )
+        with self.assertRaises(ValidationError):
+            ProrrogacaoTrajetoria.objects.create(
+                trajetoria=trajetoria, meses=1, registrado_por=self.servidor,
+            )
+
+    def test_trancamento_desloca_apenas_limite_efetivo(self):
+        trajetoria = self.criar_trajetoria(Aluno.NivelCurso.MESTRADO)
+        TrancamentoTrajetoria.objects.create(
+            trajetoria=trajetoria, data_inicio=date(2025, 6, 1), data_fim=date(2025, 6, 30),
+            registrado_por=self.servidor,
+        )
+        self.assertEqual(trajetoria.prazo_limite_regimental, date(2027, 2, 28))
+        self.assertEqual(trajetoria.prazo_limite_efetivo, date(2027, 3, 30))
+
+    def test_qualificacao_doutorado_vence_no_quinto_semestre(self):
+        trajetoria = TrajetoriaAcademica.objects.create(
+            aluno=self.aluno, nivel_curso=Aluno.NivelCurso.DOUTORADO,
+            ingresso="2022.2", data_ingresso=date(2022, 8, 1),
+            status=TrajetoriaAcademica.Status.ATIVA,
+        )
+        self.assertEqual(trajetoria.prazo_qualificacao, "2024.2")
+        linha = next(item for item in _linhas_trajetoria(trajetoria) if item["rotulo"] == "Prazo qualificação")
+        self.assertEqual(linha["valor"], "2024.2")
+
+    def test_projeto_mestrado_exige_metade_dos_creditos(self):
+        trajetoria = self.criar_trajetoria(Aluno.NivelCurso.MESTRADO)
+        with self.assertRaises(ValidationError):
+            ApresentacaoQualificacao.objects.create(
+                trajetoria=trajetoria, data_apresentacao=date(2025, 8, 1), conceito="A",
+                registrado_por=self.servidor,
+            )
+        DisciplinaTrajetoria.objects.create(
+            trajetoria=trajetoria, nome="Créditos aprovados", creditos=12,
+            situacao=DisciplinaTrajetoria.Situacao.APROVADA,
+        )
+        ApresentacaoQualificacao.objects.create(
+            trajetoria=trajetoria, data_apresentacao=date(2025, 8, 1), conceito="A",
+            registrado_por=self.servidor,
+        )
+        trajetoria.refresh_from_db()
+        self.assertTrue(trajetoria.isQualificado)
+
+    def test_conceito_c_permite_uma_repeticao_em_ate_seis_meses_no_doutorado(self):
+        trajetoria = self.criar_trajetoria(Aluno.NivelCurso.DOUTORADO)
+        ApresentacaoQualificacao.objects.create(
+            trajetoria=trajetoria, data_apresentacao=date(2026, 1, 10), conceito="C",
+            registrado_por=self.servidor,
+        )
+        ApresentacaoQualificacao.objects.create(
+            trajetoria=trajetoria, data_apresentacao=date(2026, 7, 10), conceito="B",
+            registrado_por=self.servidor,
+        )
+        trajetoria.refresh_from_db()
+        self.assertTrue(trajetoria.isQualificado)
+        with self.assertRaises(ValidationError):
+            ApresentacaoQualificacao.objects.create(
+                trajetoria=trajetoria, data_apresentacao=date(2026, 7, 11), conceito="A",
+                registrado_por=self.servidor,
+            )
 from .services import (
     alunos_ativos_sem_matricula,
     cancelar_item_matricula,
@@ -2825,6 +2936,7 @@ class AlunosViewTests(TestCase):
                 "nivel_curso": trajetoria.nivel_curso,
                 "status": trajetoria.status,
                 "ingresso": "2027.1",
+                "data_ingresso": "2027-03",
                 "prazo_qualificacao": "2027.2",
                 "prazo_defesa": "2028.1",
                 "reingressante": "on",
@@ -2877,7 +2989,7 @@ class AlunosViewTests(TestCase):
         doutorado = self.aluno.trajetorias.get(status=TrajetoriaAcademica.Status.ATIVA)
         self.assertEqual(doutorado.nivel_curso, Aluno.NivelCurso.DOUTORADO)
         self.assertEqual(doutorado.ingresso, "2028.1")
-        self.assertEqual(doutorado.prazo_qualificacao, "2029.1")
+        self.assertEqual(doutorado.prazo_qualificacao, "2030.1")
         self.assertEqual(doutorado.prazo_defesa, "2031.1")
         self.assertEqual(doutorado.orientador_id, novo_orientador.id)
         self.assertFalse(doutorado.isQualificado)
@@ -3040,7 +3152,7 @@ class AlunosViewTests(TestCase):
                 "coorientador": self.coorientador.id,
                 "isQualificado": "on",
                 "numero_defesa": "ATA-2026-33",
-                "data_defesa": "2026-12-20",
+                "data_defesa": "2027-12-20",
                 "comentario": "Defesa homologada.",
             },
         )
@@ -3048,7 +3160,7 @@ class AlunosViewTests(TestCase):
         trajetoria.refresh_from_db()
         self.assertEqual(trajetoria.status, TrajetoriaAcademica.Status.CONCLUIDA)
         self.assertEqual(trajetoria.numero_defesa, "ATA-2026-33")
-        self.assertEqual(str(trajetoria.data_defesa), "2026-12-20")
+        self.assertEqual(str(trajetoria.data_defesa), "2027-12-20")
 
 
 class FrontendIdentityTests(TestCase):

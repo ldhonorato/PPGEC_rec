@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from .models import (
     Aluno,
+    ApresentacaoQualificacao,
     Disciplina,
     DisponibilidadeSala,
     DisciplinaTrajetoria,
@@ -28,6 +29,7 @@ from .models import (
     Polo,
     PublicacaoTrajetoria,
     Processo,
+    ProrrogacaoTrajetoria,
     ReservaAmbiente,
     Sala,
     SolicitacaoAssinatura,
@@ -36,6 +38,7 @@ from .models import (
     Setor,
     TipoAtividadeHorasComplementares,
     TrajetoriaAcademica,
+    TrancamentoTrajetoria,
     validar_cpf_brasileiro,
 )
 
@@ -1659,6 +1662,16 @@ class AlunoCoorientadorForm(AlunoComentarioForm):
 
 
 class TrajetoriaAcademicaForm(AlunoComentarioForm):
+    DATAS_INGRESSO_CONHECIDAS = {
+        "2022.2": datetime(2022, 8, 1).date(),
+        "2023.2": datetime(2023, 10, 1).date(),
+        "2024.1": datetime(2024, 4, 1).date(),
+        "2024.2": datetime(2024, 8, 1).date(),
+        "2025.1": datetime(2025, 2, 1).date(),
+        "2025.2": datetime(2025, 8, 1).date(),
+        "2026.1": datetime(2026, 3, 1).date(),
+        "2026.2": datetime(2026, 8, 1).date(),
+    }
     class TipoCoorientador:
         NENHUM = "NENHUM"
         CADASTRADO = "CADASTRADO"
@@ -1674,7 +1687,18 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
     nivel_curso = forms.ChoiceField(choices=Aluno.NivelCurso.choices, label="Nivel")
     status = forms.ChoiceField(choices=TrajetoriaAcademica.Status.choices, label="Status da trajetória")
     ingresso = forms.CharField(label="Ingresso (YYYY.1 ou YYYY.2)", max_length=6)
+    data_ingresso = forms.DateField(
+        required=False,
+        label="Mês de ingresso",
+        input_formats=["%Y-%m"],
+        widget=forms.DateInput(format="%Y-%m", attrs={"type": "month"}),
+    )
     prazo_qualificacao = forms.CharField(label="Prazo", max_length=6, required=False)
+    data_limite_qualificacao = forms.DateField(
+        required=False,
+        label="Data limite dentro do semestre",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
     prazo_defesa = forms.CharField(label="Prazo de defesa", max_length=6, required=False)
     reingressante = forms.BooleanField(required=False, label="Reingressante")
     isQualificado = forms.BooleanField(required=False, label="Projeto/qualificação concluído")
@@ -1721,8 +1745,14 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
         }
         conclusao_label = "relatório final" if nivel_curso == Aluno.NivelCurso.POSDOUTORADO else "defesa"
 
+        if usa_orientacao and not cleaned_data.get("data_ingresso"):
+            cleaned_data["data_ingresso"] = self.DATAS_INGRESSO_CONHECIDAS.get(cleaned_data.get("ingresso"))
+            if not cleaned_data["data_ingresso"]:
+                self.add_error("data_ingresso", "Informe a data de ingresso para calcular os prazos regimentais.")
+
         if not usa_orientacao:
             cleaned_data["prazo_qualificacao"] = ""
+            cleaned_data["data_limite_qualificacao"] = None
             cleaned_data["prazo_defesa"] = ""
             cleaned_data["reingressante"] = False
             cleaned_data["isQualificado"] = False
@@ -1753,8 +1783,41 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
                 self.add_error("numero_defesa", f"Informe o número do {conclusao_label}.")
             if not data_defesa:
                 self.add_error("data_defesa", f"Informe a data do {conclusao_label}.")
+            elif cleaned_data.get("data_ingresso"):
+                meses_minimos = 12 if nivel_curso == Aluno.NivelCurso.MESTRADO else 24
+                minima = TrajetoriaAcademica._somar_meses(cleaned_data["data_ingresso"].replace(day=1), meses_minimos)
+                if data_defesa < minima:
+                    self.add_error("data_defesa", f"A defesa só pode ocorrer a partir de {minima:%d/%m/%Y}.")
 
         return cleaned_data
+
+
+class ApresentacaoQualificacaoForm(forms.ModelForm):
+    class Meta:
+        model = ApresentacaoQualificacao
+        fields = ("data_apresentacao", "conceito", "observacao")
+        widgets = {
+            "data_apresentacao": forms.DateInput(attrs={"type": "date"}),
+            "observacao": forms.Textarea(attrs={"rows": 3}),
+        }
+
+
+class ProrrogacaoTrajetoriaForm(forms.ModelForm):
+    class Meta:
+        model = ProrrogacaoTrajetoria
+        fields = ("meses", "data_concessao", "justificativa")
+        widgets = {"data_concessao": forms.DateInput(attrs={"type": "date"}), "justificativa": forms.Textarea(attrs={"rows": 3})}
+
+
+class TrancamentoTrajetoriaForm(forms.ModelForm):
+    class Meta:
+        model = TrancamentoTrajetoria
+        fields = ("data_inicio", "data_fim", "motivo")
+        widgets = {
+            "data_inicio": forms.DateInput(attrs={"type": "date"}),
+            "data_fim": forms.DateInput(attrs={"type": "date"}),
+            "motivo": forms.Textarea(attrs={"rows": 3}),
+        }
 
 
 class TrajetoriaStatusForm(AlunoComentarioForm):

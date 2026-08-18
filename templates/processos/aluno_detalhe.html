@@ -116,6 +116,9 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
                             </span>
                             <span class="meta-linha">
                                 {% if trajetoria.ingresso %}<span>Ingresso {{ trajetoria.ingresso }}</span>{% endif %}
+                                {% if trajetoria.usa_prazos_academicos %}
+                                    <span>{{ trajetoria.qualificacao_label }}: {% if trajetoria.nivel_curso == "DOUTORADO" %}{{ trajetoria.prazo_qualificacao_regimental|default:"—" }}{% else %}{{ trajetoria.prazo_qualificacao|default:"—" }}{% if trajetoria.data_limite_qualificacao %} · {{ trajetoria.data_limite_qualificacao|date:"d/m/Y" }}{% endif %}{% endif %}</span>
+                                {% endif %}
                                 {% if trajetoria.orientador %}<span>{{ trajetoria.orientador.nome }}</span>{% endif %}
                             </span>
                         </summary>
@@ -125,6 +128,11 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
                             <div class="grupo-acoes">
                                 <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-status-{{ trajetoria.id }}">Alterar status</button>
                                 <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-nivel-{{ trajetoria.id }}">Alterar nível</button>
+                                {% if trajetoria.usa_prazos_academicos %}
+                                <button type="button" class="btn btn-secondary" data-modal-open="modal-prorrogacao-{{ trajetoria.id }}">Registrar prorrogação</button>
+                                <button type="button" class="btn btn-secondary" data-modal-open="modal-trancamento-{{ trajetoria.id }}">Registrar trancamento</button>
+                                <button type="button" class="btn btn-secondary" data-modal-open="modal-apresentacao-qualificacao-{{ trajetoria.id }}">Registrar {{ trajetoria.qualificacao_label_lower }}</button>
+                                {% endif %}
                             </div>
                         {% endif %}
                         {% comment %}
@@ -150,6 +158,11 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
                                     {% endif %}
                                 </li>
                             {% endfor %}
+                            {% if trajetoria.usa_prazos_academicos %}
+                            <li><span class="info-label">Histórico de prorrogações</span><span>{% for item in trajetoria.prorrogacoes.all %}{{ item.meses }} mês(es) em {{ item.data_concessao|date:"d/m/Y" }}{% if not forloop.last %}; {% endif %}{% empty %}Nenhuma{% endfor %}</span><span></span></li>
+                            <li><span class="info-label">Períodos trancados</span><span>{% for item in trajetoria.trancamentos.all %}{{ item.data_inicio|date:"d/m/Y" }} a {{ item.data_fim|date:"d/m/Y" }}{% if not forloop.last %}; {% endif %}{% empty %}Nenhum{% endfor %}</span><span></span></li>
+                            <li><span class="info-label">Apresentações</span><span>{% for item in trajetoria.apresentacoes_qualificacao.all %}{{ item.tentativa }}ª: conceito {{ item.conceito }} em {{ item.data_apresentacao|date:"d/m/Y" }}{% if not forloop.last %}; {% endif %}{% empty %}Nenhuma{% endfor %}</span><span></span></li>
+                            {% endif %}
                             <li>
                                 <span class="info-label">Estágios de docência</span>
                                 <span>
@@ -489,7 +502,9 @@ faltava a da coordenacao.
                 <div class="formulario-campo"><label>Nível</label>{{ nova_trajetoria_form.nivel_curso }}</div>
                 <div class="formulario-campo"><label>Status</label>{{ nova_trajetoria_form.status }}</div>
                 <div class="formulario-campo"><label>Ingresso</label>{{ nova_trajetoria_form.ingresso }}</div>
+                <div class="formulario-campo" data-nivel-section="PRAZOS"><label>Mês de ingresso</label>{{ nova_trajetoria_form.data_ingresso }}</div>
                 <div class="formulario-campo" data-nivel-section="PRAZOS"><label>Prazo de qualificação/projeto</label>{{ nova_trajetoria_form.prazo_qualificacao }}</div>
+                <div class="formulario-campo" data-nivel-section="PRAZOS"><label>Data limite do projeto (mestrado)</label>{{ nova_trajetoria_form.data_limite_qualificacao }}</div>
                 <div class="formulario-campo" data-nivel-section="PRAZOS"><label>Prazo defesa</label>{{ nova_trajetoria_form.prazo_defesa }}</div>
                 <div class="formulario-campo" data-nivel-section="VINCULO_DOCENTE"><label data-vinculo-docente-label>Orientador</label>{{ nova_trajetoria_form.orientador }}</div>
             </div>
@@ -537,6 +552,35 @@ faltava a da coordenacao.
 {% with trajetoria=card.obj form=card.form horas_form=card.horas_form %}
 {% if can_manage_aluno %}
 {% if trajetoria.nivel_curso != "POSDOUTORADO" %}
+<dialog id="modal-prorrogacao-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
+        <div class="modal-head"><h3 class="section-title">Registrar prorrogação</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">{% csrf_token %}<input type="hidden" name="acao" value="registrar_prorrogacao"><input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            {% for field in card.prorrogacao_form %}<div class="formulario-campo"><label>{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
+            <p class="muted">O limite regimental original não será alterado.</p>
+            <div class="formulario-acoes"><button class="btn" type="submit">Registrar prorrogação</button></div>
+        </form>
+    </div>
+</dialog>
+<dialog id="modal-apresentacao-qualificacao-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
+        <div class="modal-head"><h3 class="section-title">Registrar {{ trajetoria.qualificacao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">{% csrf_token %}<input type="hidden" name="acao" value="registrar_apresentacao_qualificacao"><input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            {% for field in card.apresentacao_qualificacao_form %}<div class="formulario-campo"><label>{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
+            <div class="formulario-acoes"><button class="btn" type="submit">Registrar resultado</button></div>
+        </form>
+    </div>
+</dialog>
+<dialog id="modal-trancamento-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
+        <div class="modal-head"><h3 class="section-title">Registrar trancamento</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">{% csrf_token %}<input type="hidden" name="acao" value="registrar_trancamento"><input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
+            {% for field in card.trancamento_form %}<div class="formulario-campo"><label>{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
+            <p class="muted">Os dias trancados serão acrescentados somente ao limite efetivo.</p>
+            <div class="formulario-acoes"><button class="btn" type="submit">Registrar trancamento</button></div>
+        </form>
+    </div>
+</dialog>
 <dialog id="modal-horas-complementares-{{ trajetoria.id }}" class="modal-dialog">
     <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Adicionar horas complementares</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
@@ -606,6 +650,17 @@ faltava a da coordenacao.
     </div>
 </dialog>
 
+<dialog id="modal-trajetoria-data-ingresso-{{ trajetoria.id }}" class="modal-dialog">
+    <div class="modal-body">
+        <div class="modal-head"><h3 class="section-title">Alterar mês de ingresso</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <form method="post">{% csrf_token %}<input type="hidden" name="acao" value="alterar_trajetoria_campo"><input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}"><input type="hidden" name="campo" value="data_ingresso">
+            <label>Mês de ingresso</label><input type="month" name="data_ingresso" value="{{ trajetoria.data_ingresso|date:'Y-m' }}" required>
+            <label>Comentário</label><textarea name="comentario" rows="3" required></textarea>
+            <div class="formulario-acoes"><button class="btn" type="submit">Salvar data</button></div>
+        </form>
+    </div>
+</dialog>
+
 <dialog id="modal-trajetoria-prazo-qualificacao-{{ trajetoria.id }}" class="modal-dialog">
     <div class="modal-body">
         <div class="modal-head"><h3 class="section-title">Alterar prazo {{ trajetoria.qualificacao_label_lower }}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
@@ -616,6 +671,12 @@ faltava a da coordenacao.
             <input type="hidden" name="campo" value="prazo_qualificacao">
             <label>Prazo {{ trajetoria.qualificacao_label_lower }} (YYYY.1 ou YYYY.2)</label>
             <input name="prazo_qualificacao" value="{{ trajetoria.prazo_qualificacao }}" placeholder="YYYY.1 ou YYYY.2">
+            {% if trajetoria.nivel_curso == "MESTRADO" %}
+            <label>Data limite dentro do semestre (opcional)</label>
+            <input type="date" name="data_limite_qualificacao" value="{{ trajetoria.data_limite_qualificacao|date:'Y-m-d' }}">
+            {% else %}
+            <p class="muted">No doutorado, o prazo é calculado automaticamente como o final do quinto semestre.</p>
+            {% endif %}
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
             <div class="formulario-acoes">

@@ -1,5 +1,5 @@
 import calendar
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 import uuid
 
@@ -224,7 +224,11 @@ class TrajetoriaAcademica(models.Model):
     nivel_curso = models.CharField(max_length=20, choices=Aluno.NivelCurso.choices)
     status = models.CharField(max_length=15, choices=Status.choices, default=Status.ATIVA)
     ingresso = models.CharField(max_length=6, validators=[Aluno.semestre_validator])
+    data_ingresso = models.DateField(null=True, blank=True, verbose_name="Data de ingresso")
     prazo_qualificacao = models.CharField(max_length=6, blank=True, validators=[Aluno.semestre_validator])
+    data_limite_qualificacao = models.DateField(
+        null=True, blank=True, verbose_name="Data limite do projeto de dissertação"
+    )
     prazo_defesa = models.CharField(max_length=6, blank=True, validators=[Aluno.semestre_validator])
     orientador = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -258,6 +262,67 @@ class TrajetoriaAcademica(models.Model):
 
     def __str__(self) -> str:
         return f"{self.aluno.nome} - {self.get_nivel_curso_display()} - {self.get_status_display()}"
+
+    @staticmethod
+    def _somar_meses(valor: date, meses: int) -> date:
+        indice = valor.month - 1 + meses
+        ano, mes = valor.year + indice // 12, indice % 12 + 1
+        dia = min(valor.day, calendar.monthrange(ano, mes)[1])
+        return valor.replace(year=ano, month=mes, day=dia)
+
+    @property
+    def meses_minimos_defesa(self):
+        return {Aluno.NivelCurso.MESTRADO: 12, Aluno.NivelCurso.DOUTORADO: 24}.get(self.nivel_curso)
+
+    @property
+    def meses_maximos_defesa(self):
+        return {Aluno.NivelCurso.MESTRADO: 24, Aluno.NivelCurso.DOUTORADO: 48}.get(self.nivel_curso)
+
+    @property
+    def data_minima_defesa(self):
+        if not self.data_ingresso or not self.meses_minimos_defesa:
+            return None
+        inicio_mes = self.data_ingresso.replace(day=1)
+        return self._somar_meses(inicio_mes, self.meses_minimos_defesa)
+
+    @property
+    def prazo_limite_regimental(self):
+        """Limite original, que nunca incorpora prorrogações ou trancamentos."""
+        if not self.data_ingresso or not self.meses_maximos_defesa:
+            return None
+        inicio_mes = self.data_ingresso.replace(day=1)
+        mes_limite = self._somar_meses(inicio_mes, self.meses_maximos_defesa)
+        return self._somar_meses(mes_limite, 1) - timedelta(days=1)
+
+    @property
+    def dias_trancados(self):
+        return sum((item.data_fim - item.data_inicio).days + 1 for item in self.trancamentos.all())
+
+    @property
+    def prazo_limite_efetivo(self):
+        limite = self.prazo_limite_regimental
+        return limite + timedelta(days=self.dias_trancados) if limite else None
+
+    @property
+    def meses_prorrogados(self):
+        return sum(item.meses for item in self.prorrogacoes.all())
+
+    @property
+    def limite_prorrogacao_meses(self):
+        return {Aluno.NivelCurso.MESTRADO: 6, Aluno.NivelCurso.DOUTORADO: 12}.get(self.nivel_curso, 0)
+
+    @staticmethod
+    def _somar_semestres(semestre: str, quantidade: int) -> str:
+        ano, periodo = (int(parte) for parte in semestre.split("."))
+        indice = ano * 2 + (periodo - 1) + quantidade
+        return f"{indice // 2}.{indice % 2 + 1}"
+
+    @property
+    def prazo_qualificacao_regimental(self):
+        if self.nivel_curso != Aluno.NivelCurso.DOUTORADO or not self.ingresso:
+            return ""
+        # O semestre de ingresso é o primeiro; portanto, o quinto fica quatro semestres depois.
+        return self._somar_semestres(self.ingresso, 4)
 
     @property
     def usa_prazos_academicos(self) -> bool:
@@ -320,6 +385,7 @@ class TrajetoriaAcademica(models.Model):
             self.status = self.Status.CONCLUIDA
         if not self.usa_prazos_academicos:
             self.prazo_qualificacao = ""
+            self.data_limite_qualificacao = None
             self.prazo_defesa = ""
             self.reingressante = False
             self.isQualificado = False
@@ -355,6 +421,13 @@ class TrajetoriaAcademica(models.Model):
             self.coorientador_externo_email = ""
             self.coorientador_externo_instituicao = ""
 
+        if self.nivel_curso == Aluno.NivelCurso.MESTRADO and self.data_limite_qualificacao:
+            semestre_data = f"{self.data_limite_qualificacao.year}.{'1' if self.data_limite_qualificacao.month <= 6 else '2'}"
+            if not self.prazo_qualificacao:
+                errors["prazo_qualificacao"] = "Informe o semestre do projeto de dissertação."
+            elif semestre_data != self.prazo_qualificacao:
+                errors["data_limite_qualificacao"] = "A data limite deve estar dentro do semestre informado."
+
         if self.status == self.Status.CONCLUIDA and self.usa_conclusao:
             # Usa os rotulos proprios de cada campo. Com conclusao_label_lower
             # a mensagem saia como "Informe o defesa" -- genero errado e
@@ -367,6 +440,14 @@ class TrajetoriaAcademica(models.Model):
                 errors["data_defesa"] = (
                     f"Informe a {self.data_conclusao_label.lower()} para concluir a trajetória."
                 )
+            if self.usa_prazos_academicos and self.data_ingresso and not self.isQualificado:
+                errors["isQualificado"] = (
+                    f"A aprovação no {self.qualificacao_label_lower} é obrigatória antes da defesa."
+                )
+            elif self.data_minima_defesa and self.data_defesa < self.data_minima_defesa:
+                errors["data_defesa"] = (
+                    f"A defesa só pode ocorrer a partir de {self.data_minima_defesa:%d/%m/%Y}."
+                )
         elif self.deposito_versao_final:
             errors["deposito_versao_final"] = "Depósito da versão final só pode ser marcado após conclusão."
 
@@ -375,6 +456,13 @@ class TrajetoriaAcademica(models.Model):
 
     def save(self, *args, **kwargs):
         self.numero_defesa = (self.numero_defesa or "").strip()
+        if self.data_ingresso:
+            if isinstance(self.data_ingresso, str):
+                self.data_ingresso = datetime.strptime(self.data_ingresso, "%Y-%m-%d").date()
+            self.data_ingresso = self.data_ingresso.replace(day=1)
+        if self.nivel_curso == Aluno.NivelCurso.DOUTORADO and self.ingresso:
+            self.prazo_qualificacao = self.prazo_qualificacao_regimental
+            self.data_limite_qualificacao = None
         self._normalizar_campos_por_nivel()
         self.full_clean()
         return super().save(*args, **kwargs)
@@ -397,6 +485,130 @@ class TrajetoriaAcademica(models.Model):
             return self.coorientador.nome
         return self.coorientador_externo_nome.strip()
 
+
+class ProrrogacaoTrajetoria(models.Model):
+    trajetoria = models.ForeignKey(TrajetoriaAcademica, on_delete=models.CASCADE, related_name="prorrogacoes")
+    meses = models.PositiveSmallIntegerField()
+    data_concessao = models.DateField(default=timezone.localdate)
+    justificativa = models.TextField(blank=True)
+    registrado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["data_concessao", "id"]
+
+    def clean(self):
+        super().clean()
+        if not self.trajetoria_id:
+            return
+        limite = self.trajetoria.limite_prorrogacao_meses
+        recomendado = 3 if self.trajetoria.nivel_curso == Aluno.NivelCurso.MESTRADO else 6
+        errors = {}
+        if not limite:
+            errors["trajetoria"] = "Prorrogação disponível apenas para mestrado e doutorado."
+        if self.meses < 1 or self.meses > recomendado:
+            errors["meses"] = f"Cada concessão pode ter de 1 a {recomendado} meses."
+        anteriores = self.trajetoria.prorrogacoes.exclude(pk=self.pk)
+        if sum(item.meses for item in anteriores) + self.meses > limite:
+            errors["meses"] = f"O total de prorrogações não pode ultrapassar {limite} meses."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class TrancamentoTrajetoria(models.Model):
+    trajetoria = models.ForeignKey(TrajetoriaAcademica, on_delete=models.CASCADE, related_name="trancamentos")
+    data_inicio = models.DateField()
+    data_fim = models.DateField()
+    motivo = models.TextField(blank=True)
+    registrado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["data_inicio", "id"]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.data_inicio and self.data_fim and self.data_fim < self.data_inicio:
+            errors["data_fim"] = "A data final deve ser igual ou posterior à inicial."
+        if self.trajetoria_id and self.data_inicio and self.data_fim:
+            sobreposto = self.trajetoria.trancamentos.exclude(pk=self.pk).filter(
+                data_inicio__lte=self.data_fim, data_fim__gte=self.data_inicio
+            ).exists()
+            if sobreposto:
+                errors["data_inicio"] = "Este período se sobrepõe a outro trancamento."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class ApresentacaoQualificacao(models.Model):
+    class Conceito(models.TextChoices):
+        A = "A", "A"
+        B = "B", "B"
+        C = "C", "C"
+
+    trajetoria = models.ForeignKey(
+        TrajetoriaAcademica, on_delete=models.CASCADE, related_name="apresentacoes_qualificacao"
+    )
+    tentativa = models.PositiveSmallIntegerField(default=1)
+    data_apresentacao = models.DateField()
+    conceito = models.CharField(max_length=1, choices=Conceito.choices)
+    observacao = models.TextField(blank=True)
+    registrado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["tentativa"]
+        constraints = [
+            models.UniqueConstraint(fields=("trajetoria", "tentativa"), name="qualificacao_tentativa_unica")
+        ]
+
+    @property
+    def aprovado(self):
+        return self.conceito in {self.Conceito.A, self.Conceito.B}
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if not self.trajetoria_id:
+            return
+        existentes = self.trajetoria.apresentacoes_qualificacao.exclude(pk=self.pk).order_by("tentativa")
+        primeira = existentes.first()
+        self.tentativa = 2 if primeira else 1
+        if self.tentativa == 2:
+            if primeira.conceito != self.Conceito.C:
+                errors["conceito"] = "Só é possível repetir uma apresentação que recebeu conceito C."
+            meses = 3 if self.trajetoria.nivel_curso == Aluno.NivelCurso.MESTRADO else 6
+            limite = TrajetoriaAcademica._somar_meses(primeira.data_apresentacao, meses)
+            if self.data_apresentacao > limite:
+                errors["data_apresentacao"] = f"A repetição deve ocorrer até {limite:%d/%m/%Y}."
+        if existentes.count() >= 2:
+            errors["tentativa"] = "É permitida apenas uma repetição."
+        if self.trajetoria.nivel_curso == Aluno.NivelCurso.MESTRADO and self.tentativa == 1:
+            creditos = self.trajetoria.disciplinas.filter(
+                situacao=DisciplinaTrajetoria.Situacao.APROVADA
+            ).aggregate(total=models.Sum("creditos"))["total"] or 0
+            if creditos < 12:
+                errors["trajetoria"] = "O projeto exige pelo menos 12 créditos aprovados em disciplinas (50%)."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        resultado = super().save(*args, **kwargs)
+        aprovado = self.trajetoria.apresentacoes_qualificacao.filter(conceito__in=[self.Conceito.A, self.Conceito.B]).exists()
+        if self.trajetoria.isQualificado != aprovado:
+            TrajetoriaAcademica.objects.filter(pk=self.trajetoria_id).update(isQualificado=aprovado)
+            self.trajetoria.isQualificado = aprovado
+        return resultado
 
 class PublicacaoTrajetoria(models.Model):
     class TipoPublicacao(models.TextChoices):
