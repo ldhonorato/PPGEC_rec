@@ -21,6 +21,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_time
 
 from .forms import (
+    ApresentacaoQualificacaoForm,
     ImportacaoDeclaracoesVinculoForm,
     AlunoCadastroForm,
     ImportacaoIngressantesForm,
@@ -51,6 +52,7 @@ from .forms import (
     PeriodoLetivoForm,
     ProcessoAberturaForm,
     PublicacaoTrajetoriaForm,
+    ProrrogacaoTrajetoriaForm,
     ReservaAmbienteExclusaoForm,
     ReservaAmbienteForm,
     SalaForm,
@@ -61,6 +63,7 @@ from .forms import (
     SetorComissaoForm,
     TrajetoriaAcademicaForm,
     TrajetoriaStatusForm,
+    TrancamentoTrajetoriaForm,
     UserProfileForm,
 )
 from .declaracoes_vinculo import (
@@ -72,6 +75,7 @@ from .declaracoes_vinculo import (
 from .importacao_ingressantes import importar_ingressantes
 from .models import (
     AlteracaoAluno,
+    ApresentacaoQualificacao,
     DeclaracaoDeVinculo,
     Aluno,
     Disciplina,
@@ -92,6 +96,7 @@ from .models import (
     Polo,
     Processo,
     PublicacaoTrajetoria,
+    ProrrogacaoTrajetoria,
     ReservaAmbiente,
     Sala,
     Setor,
@@ -100,6 +105,7 @@ from .models import (
     SolicitacaoAssinatura,
     SolicitacaoBanca,
     TrajetoriaAcademica,
+    TrancamentoTrajetoria,
     TramitacaoProcesso,
     User,
 )
@@ -523,7 +529,9 @@ def _trajetoria_form_initial(trajetoria):
         "nivel_curso": trajetoria.nivel_curso,
         "status": trajetoria.status,
         "ingresso": trajetoria.ingresso,
+        "data_ingresso": trajetoria.data_ingresso,
         "prazo_qualificacao": trajetoria.prazo_qualificacao,
+        "data_limite_qualificacao": trajetoria.data_limite_qualificacao,
         "prazo_defesa": trajetoria.prazo_defesa,
         "reingressante": trajetoria.reingressante,
         "isQualificado": trajetoria.isQualificado,
@@ -624,6 +632,8 @@ def _trajetoria_campo_historico(trajetoria: TrajetoriaAcademica, campo: str) -> 
         return "Status", trajetoria.get_status_display()
     if campo == "nivel_curso":
         return "Nivel", trajetoria.get_nivel_curso_display()
+    if campo == "data_ingresso":
+        return "Mês de ingresso", trajetoria.data_ingresso.strftime("%m/%Y") if trajetoria.data_ingresso else "-"
     if campo == "prazo_qualificacao":
         return f"Prazo {trajetoria.qualificacao_label_lower}", trajetoria.prazo_qualificacao or "-"
     if campo == "prazo_defesa":
@@ -2547,16 +2557,43 @@ def _linhas_trajetoria(trajetoria):
     significa que o campo nao e editavel isoladamente.
     """
     sim_nao = lambda valor: "Sim" if valor else "Não"
-    linhas = [{"rotulo": "Ingresso", "valor": trajetoria.ingresso or "—", "campo": ""}]
+    linhas = [
+        {"rotulo": "Semestre de ingresso", "valor": trajetoria.ingresso or "—", "campo": ""},
+        {
+            "rotulo": "Mês de ingresso",
+            "valor": trajetoria.data_ingresso.strftime("%m/%Y") if trajetoria.data_ingresso else "—",
+            "campo": "data-ingresso",
+        },
+    ]
 
     if trajetoria.usa_prazos_academicos:
+        prazo_qualificacao = (
+            trajetoria.prazo_qualificacao_regimental
+            if trajetoria.nivel_curso == Aluno.NivelCurso.DOUTORADO
+            else trajetoria.prazo_qualificacao
+        )
         linhas += [
             {
                 "rotulo": f"Prazo {trajetoria.qualificacao_label_lower}",
-                "valor": trajetoria.prazo_qualificacao or "—",
+                "valor": prazo_qualificacao or "—",
                 "campo": "prazo-qualificacao",
             },
-            {"rotulo": "Prazo defesa", "valor": trajetoria.prazo_defesa or "—", "campo": "prazo-defesa"},
+            {
+                "rotulo": "Data mínima para defesa",
+                "valor": trajetoria.data_minima_defesa.strftime("%d/%m/%Y") if trajetoria.data_minima_defesa else "—",
+                "campo": "",
+            },
+            {
+                "rotulo": "Prazo defesa",
+                "valor": trajetoria.prazo_limite_regimental.strftime("%d/%m/%Y") if trajetoria.prazo_limite_regimental else "—",
+                "campo": "",
+            },
+            {
+                "rotulo": "Limite efetivo (com trancamentos)",
+                "valor": trajetoria.prazo_limite_efetivo.strftime("%d/%m/%Y") if trajetoria.prazo_limite_efetivo else "—",
+                "campo": "",
+            },
+            {"rotulo": "Prorrogações", "valor": f"{trajetoria.meses_prorrogados} mês(es)", "campo": ""},
             {"rotulo": "Reingressante", "valor": sim_nao(trajetoria.reingressante), "campo": "reingressante"},
             {
                 "rotulo": trajetoria.qualificacao_label,
@@ -2570,6 +2607,15 @@ def _linhas_trajetoria(trajetoria):
             },
             {"rotulo": "Coorientador", "valor": trajetoria.coorientador_display or "—", "campo": "coorientador"},
         ]
+        if trajetoria.nivel_curso == Aluno.NivelCurso.MESTRADO:
+            linhas.insert(
+                3,
+                {
+                    "rotulo": "Data limite do projeto",
+                    "valor": trajetoria.data_limite_qualificacao.strftime("%d/%m/%Y") if trajetoria.data_limite_qualificacao else "—",
+                    "campo": "prazo-qualificacao",
+                },
+            )
 
     if trajetoria.usa_supervisao:
         linhas.append(
@@ -2682,7 +2728,9 @@ def aluno_detalhe_view(request, aluno_id):
                     nivel_curso=dados["nivel_curso"],
                     status=dados["status"],
                     ingresso=dados["ingresso"],
+                    data_ingresso=dados["data_ingresso"],
                     prazo_qualificacao=dados["prazo_qualificacao"],
+                    data_limite_qualificacao=dados["data_limite_qualificacao"],
                     prazo_defesa=dados["prazo_defesa"],
                     reingressante=dados["reingressante"],
                     isQualificado=dados["isQualificado"],
@@ -2730,7 +2778,9 @@ def aluno_detalhe_view(request, aluno_id):
                 trajetoria.nivel_curso = dados["nivel_curso"]
                 trajetoria.status = dados["status"]
                 trajetoria.ingresso = dados["ingresso"]
+                trajetoria.data_ingresso = dados["data_ingresso"]
                 trajetoria.prazo_qualificacao = dados["prazo_qualificacao"]
+                trajetoria.data_limite_qualificacao = dados["data_limite_qualificacao"]
                 trajetoria.prazo_defesa = dados["prazo_defesa"]
                 trajetoria.reingressante = dados["reingressante"]
                 trajetoria.isQualificado = dados["isQualificado"]
@@ -2973,7 +3023,9 @@ def aluno_detalhe_view(request, aluno_id):
                 trajetoria.nivel_curso = form.cleaned_data["nivel_curso"]
                 trajetoria.status = form.cleaned_data["status"]
                 trajetoria.ingresso = form.cleaned_data["ingresso"].strip()
+                trajetoria.data_ingresso = form.cleaned_data["data_ingresso"]
                 trajetoria.prazo_qualificacao = form.cleaned_data["prazo_qualificacao"].strip()
+                trajetoria.data_limite_qualificacao = form.cleaned_data["data_limite_qualificacao"]
                 trajetoria.prazo_defesa = form.cleaned_data["prazo_defesa"].strip()
                 trajetoria.reingressante = form.cleaned_data["reingressante"]
                 trajetoria.isQualificado = form.cleaned_data["isQualificado"]
@@ -3023,7 +3075,9 @@ def aluno_detalhe_view(request, aluno_id):
                     nivel_curso=form.cleaned_data["nivel_curso"],
                     status=form.cleaned_data["status"],
                     ingresso=form.cleaned_data["ingresso"].strip(),
+                    data_ingresso=form.cleaned_data["data_ingresso"],
                     prazo_qualificacao=form.cleaned_data["prazo_qualificacao"].strip(),
+                    data_limite_qualificacao=form.cleaned_data["data_limite_qualificacao"],
                     prazo_defesa=form.cleaned_data["prazo_defesa"].strip(),
                     reingressante=form.cleaned_data["reingressante"],
                     isQualificado=form.cleaned_data["isQualificado"],
@@ -3084,11 +3138,18 @@ def aluno_detalhe_view(request, aluno_id):
                         if nivel not in niveis_validos:
                             raise ValidationError("Nível de curso inválido.")
                         trajetoria.nivel_curso = nivel
+                    elif campo == "data_ingresso":
+                        valor = request.POST.get("data_ingresso", "").strip()
+                        if not valor:
+                            raise ValidationError("Informe o mês de ingresso.")
+                        trajetoria.data_ingresso = f"{valor}-01"
                     elif campo == "prazo_qualificacao":
                         valor = request.POST.get("prazo_qualificacao", "").strip()
                         if valor and not _semestre_valido(valor):
                             raise ValidationError("Informe o prazo no formato YYYY.1 ou YYYY.2.")
                         trajetoria.prazo_qualificacao = valor
+                        data_limite = request.POST.get("data_limite_qualificacao", "").strip()
+                        trajetoria.data_limite_qualificacao = data_limite or None
                     elif campo == "prazo_defesa":
                         valor = request.POST.get("prazo_defesa", "").strip()
                         if valor and not _semestre_valido(valor):
@@ -3346,6 +3407,63 @@ def aluno_detalhe_view(request, aluno_id):
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
             messages.error(request, "Não foi possível atualizar o depósito da versão final.")
 
+        elif acao == "registrar_prorrogacao":
+            if not can_manage_aluno:
+                raise PermissionDenied("Apenas coordenação e secretaria podem registrar prorrogações.")
+            trajetoria = get_object_or_404(TrajetoriaAcademica, pk=request.POST.get("trajetoria_id"), aluno=aluno)
+            form = ProrrogacaoTrajetoriaForm(request.POST)
+            if form.is_valid():
+                prorrogacao = form.save(commit=False)
+                prorrogacao.trajetoria = trajetoria
+                prorrogacao.registrado_por = request.user
+                try:
+                    prorrogacao.save()
+                except ValidationError as exc:
+                    messages.error(request, exc.message_dict if hasattr(exc, "message_dict") else str(exc))
+                else:
+                    messages.success(request, "Prorrogação adicionada à trajetória acadêmica.")
+                    return redirect("aluno_detalhe", aluno_id=aluno.id)
+            else:
+                messages.error(request, form.errors)
+
+        elif acao == "registrar_apresentacao_qualificacao":
+            if not can_manage_aluno:
+                raise PermissionDenied("Apenas coordenação e secretaria podem registrar apresentações.")
+            trajetoria = get_object_or_404(TrajetoriaAcademica, pk=request.POST.get("trajetoria_id"), aluno=aluno)
+            form = ApresentacaoQualificacaoForm(request.POST)
+            if form.is_valid():
+                apresentacao = form.save(commit=False)
+                apresentacao.trajetoria = trajetoria
+                apresentacao.registrado_por = request.user
+                try:
+                    apresentacao.save()
+                except ValidationError as exc:
+                    messages.error(request, exc.message_dict if hasattr(exc, "message_dict") else str(exc))
+                else:
+                    messages.success(request, f"{trajetoria.qualificacao_label} registrado com sucesso.")
+                    return redirect("aluno_detalhe", aluno_id=aluno.id)
+            else:
+                messages.error(request, form.errors)
+
+        elif acao == "registrar_trancamento":
+            if not can_manage_aluno:
+                raise PermissionDenied("Apenas coordenação e secretaria podem registrar trancamentos.")
+            trajetoria = get_object_or_404(TrajetoriaAcademica, pk=request.POST.get("trajetoria_id"), aluno=aluno)
+            form = TrancamentoTrajetoriaForm(request.POST)
+            if form.is_valid():
+                trancamento = form.save(commit=False)
+                trancamento.trajetoria = trajetoria
+                trancamento.registrado_por = request.user
+                try:
+                    trancamento.save()
+                except ValidationError as exc:
+                    messages.error(request, exc.message_dict if hasattr(exc, "message_dict") else str(exc))
+                else:
+                    messages.success(request, "Trancamento adicionado à trajetória acadêmica.")
+                    return redirect("aluno_detalhe", aluno_id=aluno.id)
+            else:
+                messages.error(request, form.errors)
+
         elif acao == "salvar_publicacao":
             if not can_edit_publicacoes:
                 raise PermissionDenied("Você não pode alterar publicações desta trajetória.")
@@ -3427,7 +3545,9 @@ def aluno_detalhe_view(request, aluno_id):
     # trajetoria em curso e a que se abre ao entrar na tela, e um aluno pode ter
     # varias (mestrado concluido, doutorado em andamento, um trancamento).
     trajetorias = sorted(
-        aluno.trajetorias.select_related("orientador", "coorientador").all(),
+        aluno.trajetorias.select_related("orientador", "coorientador").prefetch_related(
+            "prorrogacoes", "trancamentos", "apresentacoes_qualificacao"
+        ).all(),
         key=lambda t: (t.status != TrajetoriaAcademica.Status.ATIVA, -t.criado_em.timestamp()),
     )
     trajetoria_cards = []
@@ -3466,6 +3586,9 @@ def aluno_detalhe_view(request, aluno_id):
                 "novo_estagio_form": NovoEstagioDocenciaForm(
                     initial={"trajetoria_id": trajetoria.id}
                 ),
+                "prorrogacao_form": ProrrogacaoTrajetoriaForm(),
+                "trancamento_form": TrancamentoTrajetoriaForm(),
+                "apresentacao_qualificacao_form": ApresentacaoQualificacaoForm(),
             }
         )
     dados_form = AlunoDadosForm(
