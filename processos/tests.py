@@ -992,6 +992,29 @@ class MatriculaDomainTests(TestCase):
                 ofertas=[oferta],
             )
 
+    def test_modificacao_permite_matricula_vinculo_sem_solicitacao_no_prazo(self):
+        self.periodo.status = PeriodoLetivo.Status.MODIFICACAO_MATRICULA
+        self.periodo.save(update_fields=["status"])
+
+        solicitacao = salvar_solicitacao_matricula(
+            aluno=self.aluno,
+            periodo=self.periodo,
+            tipo_aluno=SolicitacaoMatricula.TipoAluno.REGULAR,
+            ofertas=[],
+            tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
+            observacao="Manter vínculo durante a modificação.",
+        )
+
+        self.assertEqual(solicitacao.tipo_matricula, SolicitacaoMatricula.TipoMatricula.VINCULO)
+        self.assertEqual(solicitacao.status, SolicitacaoMatricula.Status.SOLICITADA)
+        self.assertEqual(solicitacao.itens.count(), 0)
+        self.assertTrue(
+            solicitacao.alteracoes.filter(
+                acao=AlteracaoMatricula.Acao.MATRICULA_VINCULO_SOLICITADA,
+                fase=AlteracaoMatricula.Fase.MODIFICACAO,
+            ).exists()
+        )
+
     def test_task_atualiza_status_do_periodo_letivo(self):
         self.periodo.status = PeriodoLetivo.Status.PLANEJAMENTO
         self.periodo.save(update_fields=["status"])
@@ -1857,7 +1880,7 @@ class MatriculaViewsTests(TestCase):
         )
         self.assertContains(response, "checked", html=False)
 
-    def test_modificacao_nao_exibe_formulario_para_aluno_sem_solicitacao_original(self):
+    def test_modificacao_exibe_apenas_matricula_vinculo_para_aluno_sem_solicitacao_original(self):
         self.periodo.status = PeriodoLetivo.Status.MODIFICACAO_MATRICULA
         self.periodo.save(update_fields=["status"])
         self.client.force_login(self.aluno)
@@ -1865,8 +1888,29 @@ class MatriculaViewsTests(TestCase):
         response = self.client.get(reverse("matricula_solicitar_periodo", args=[self.periodo.pk]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "enviaram a solicitação no prazo")
-        self.assertNotContains(response, "Salvar modificação")
+        self.assertContains(response, "Solicitar matrícula vínculo")
+        self.assertContains(response, "não houve solicitação no prazo regular")
+        self.assertNotContains(
+            response,
+            f'name="ofertas" value="{self.oferta.pk}"',
+            html=False,
+        )
+        self.assertContains(response, 'name="matricula_vinculo"', html=False)
+        self.assertContains(response, "checked", html=False)
+
+        post = self.client.post(
+            reverse("matricula_solicitar_periodo", args=[self.periodo.pk]),
+            {
+                "periodo_id": self.periodo.pk,
+                "matricula_vinculo": "on",
+                "aceitar_lista_espera": "on",
+                "observacao": "Solicitação feita na modificação.",
+            },
+        )
+
+        self.assertEqual(post.status_code, 302)
+        solicitacao = SolicitacaoMatricula.objects.get(aluno=self.aluno, periodo=self.periodo)
+        self.assertEqual(solicitacao.tipo_matricula, SolicitacaoMatricula.TipoMatricula.VINCULO)
 
     def test_aluno_nao_consegue_solicitar_disciplinas_com_choque_de_horario(self):
         disciplina = Disciplina.objects.create(codigo="VIS002", nome="Visualização Avançada")

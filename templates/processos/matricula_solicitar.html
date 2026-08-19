@@ -55,8 +55,10 @@ nenhum para mostrar.
 
 {% if periodo and pode_solicitar_matricula %}
 <section class="card">
-    <h2 class="section-title">{% if em_modificacao %}Modificar matrícula{% else %}Disciplinas disponíveis{% endif %}</h2>
-    {% if em_modificacao %}
+    <h2 class="section-title">{% if somente_matricula_vinculo %}Solicitar matrícula vínculo{% elif em_modificacao %}Modificar matrícula{% else %}Disciplinas disponíveis{% endif %}</h2>
+    {% if somente_matricula_vinculo %}
+        <p class="muted">Como não houve solicitação no prazo regular, durante a modificação você pode solicitar matrícula vínculo para manter seu vínculo com o programa.</p>
+    {% elif em_modificacao %}
         <p class="muted">Mantenha marcadas as disciplinas que deseja cursar, desmarque as que deseja remover e marque novas disciplinas para adicioná-las. Se remover todas, selecione matrícula vínculo.</p>
     {% endif %}
     <form method="post" data-matricula-form>
@@ -79,7 +81,7 @@ nenhum para mostrar.
         </div>
         <p class="errorlist" data-selecao-error hidden>Selecione ao menos uma disciplina ou marque matrícula vínculo.</p>
 
-        <div class="formulario-campo" data-disciplinas-field>
+        {% if not somente_matricula_vinculo %}<div class="formulario-campo" data-disciplinas-field>
             <label>{{ form.ofertas.label }}</label>
             {{ form.ofertas.errors }}
             {% if form.fields.ofertas.queryset %}
@@ -140,7 +142,7 @@ nenhum para mostrar.
             {% else %}
                 <p class="estado-vazio-inline">Nenhuma disciplina ofertada para este período.</p>
             {% endif %}
-        </div>
+        </div>{% endif %}
 
         <div class="formulario-campo">
             {{ form.aceitar_lista_espera.errors }}
@@ -148,7 +150,7 @@ nenhum para mostrar.
 
         {% include "includes/campo_formulario.html" with campo=form.observacao %}
         <div class="formulario-acoes">
-            <button class="btn" type="button" data-open-confirmacao>{% if em_modificacao %}Salvar modificação{% else %}Enviar solicitação{% endif %}</button>
+            <button class="btn" type="button" data-open-confirmacao>{% if somente_matricula_vinculo %}Solicitar matrícula vínculo{% elif em_modificacao %}Salvar modificação{% else %}Enviar solicitação{% endif %}</button>
         </div>
     </form>
 </section>

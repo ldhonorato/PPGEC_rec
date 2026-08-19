@@ -342,11 +342,11 @@ def salvar_solicitacao_matricula(
         .filter(periodo=periodo, aluno=aluno)
         .first()
     )
-    if em_modificacao and (
+    if em_modificacao and tipo_matricula != SolicitacaoMatricula.TipoMatricula.VINCULO and (
         not solicitacao_existente or not solicitacao_matricula_feita_no_prazo(solicitacao_existente)
     ):
         raise ValidationError(
-            "A modificação de matrícula está disponível apenas para quem enviou a solicitação no prazo de matrícula."
+            "A matrícula em disciplinas durante a modificação está disponível apenas para quem enviou a solicitação no prazo regular."
         )
 
     if tipo_matricula == SolicitacaoMatricula.TipoMatricula.VINCULO:

@@ -1266,7 +1266,12 @@ def matricula_solicitar_view(request, periodo_id=None):
     pode_modificar_matricula = bool(
         solicitacao_atual and solicitacao_matricula_feita_no_prazo(solicitacao_atual)
     )
-    pode_solicitar_matricula = aluno_apto_matricula and (not em_modificacao or pode_modificar_matricula)
+    somente_matricula_vinculo = bool(
+        aluno_apto_matricula and em_modificacao and not pode_modificar_matricula
+    )
+    pode_solicitar_matricula = aluno_apto_matricula and (
+        not em_modificacao or pode_modificar_matricula or somente_matricula_vinculo
+    )
     ofertas_selecionadas_ids = []
     form = None
     if pode_solicitar_matricula:
@@ -1281,8 +1286,11 @@ def matricula_solicitar_view(request, periodo_id=None):
             initial={
                 "ofertas": ofertas_selecionadas_ids,
                 "matricula_vinculo": bool(
-                    solicitacao_atual
-                    and solicitacao_atual.tipo_matricula == SolicitacaoMatricula.TipoMatricula.VINCULO
+                    somente_matricula_vinculo
+                    or (
+                        solicitacao_atual
+                        and solicitacao_atual.tipo_matricula == SolicitacaoMatricula.TipoMatricula.VINCULO
+                    )
                 ),
                 "observacao": solicitacao_atual.observacao_aluno if solicitacao_atual else "",
             },
@@ -1300,7 +1308,12 @@ def matricula_solicitar_view(request, periodo_id=None):
         pode_modificar_matricula = bool(
             solicitacao_atual and solicitacao_matricula_feita_no_prazo(solicitacao_atual)
         )
-        pode_solicitar_matricula = aluno_apto_matricula and (not em_modificacao or pode_modificar_matricula)
+        somente_matricula_vinculo = bool(
+            aluno_apto_matricula and em_modificacao and not pode_modificar_matricula
+        )
+        pode_solicitar_matricula = aluno_apto_matricula and (
+            not em_modificacao or pode_modificar_matricula or somente_matricula_vinculo
+        )
         if not pode_solicitar_matricula:
             raise PermissionDenied("Você não está apto a solicitar matrícula.")
         form = SolicitacaoMatriculaForm(request.POST, periodo=periodo)
@@ -1349,6 +1362,7 @@ def matricula_solicitar_view(request, periodo_id=None):
             "pode_solicitar_matricula": pode_solicitar_matricula,
             "em_modificacao": em_modificacao,
             "pode_modificar_matricula": pode_modificar_matricula,
+            "somente_matricula_vinculo": somente_matricula_vinculo,
             "ofertas_selecionadas_ids": ofertas_selecionadas_ids,
             "nivel_trajetoria_display": trajetoria_ativa.get_nivel_curso_display() if trajetoria_ativa else "",
             "tipo_aluno_display": dict(SolicitacaoMatricula.TipoAluno.choices).get(tipo_aluno),
