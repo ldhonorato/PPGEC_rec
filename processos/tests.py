@@ -266,6 +266,100 @@ class ProcessoPlenoDeliberacaoTests(TestCase):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
+class CienciaAntecipadaOrientadorTests(TestCase):
+    def setUp(self):
+        self.orientador = Docente.objects.create_user(
+            email="orientador.ciencia@example.com",
+            password="senha-segura-123",
+            nome="Orientador Ciência",
+        )
+        self.outro_docente = Docente.objects.create_user(
+            email="outro.ciencia@example.com",
+            password="senha-segura-123",
+            nome="Outro Docente",
+        )
+        self.aluno = Aluno.objects.create_user(
+            email="aluno.ciencia@example.com",
+            password="senha-segura-123",
+            nome="Aluno Ciência",
+        )
+        self.setor = Setor.objects.create(nome="Secretaria Ciência")
+        self.trajetoria = TrajetoriaAcademica.objects.create(
+            aluno=self.aluno,
+            nivel_curso=Aluno.NivelCurso.MESTRADO,
+            status=TrajetoriaAcademica.Status.ATIVA,
+            ingresso="2026.1",
+            orientador=self.orientador,
+        )
+        self.processo = Processo.objects.create(
+            usuario_criado_por=self.aluno,
+            tipo=Processo.TipoProcesso.OUTRO,
+            assunto="Pedido com ciência antecipada",
+            descricao="Descrição do pedido.",
+            setor_atual=self.setor,
+        )
+        self.url = reverse("processo_detalhe", args=[self.processo.id])
+
+    def test_orientador_pode_dar_ciencia_antes_de_solicitacao(self):
+        self.client.force_login(self.orientador)
+
+        detalhe = self.client.get(self.url)
+        self.assertContains(detalhe, "Dar ciência antecipadamente")
+
+        response = self.client.post(
+            self.url,
+            {
+                "manifestar_ciencia_espontanea": "1",
+                "mensagem_manifestacao": "Estou ciente.",
+            },
+        )
+
+        self.assertRedirects(response, self.url)
+        manifestacao = self.processo.manifestacoes.get()
+        self.assertEqual(manifestacao.status, ManifestacaoProcesso.StatusManifestacao.CIENTE)
+        self.assertEqual(manifestacao.responsavel_id, self.orientador.id)
+        self.assertEqual(manifestacao.solicitado_por_id, self.orientador.id)
+        self.assertEqual(manifestacao.mensagem_manifestacao, "Estou ciente.")
+        self.processo.refresh_from_db()
+        self.assertEqual(self.processo.status, Processo.StatusProcesso.EM_ANALISE)
+        self.assertEqual(self.processo.setor_atual_id, self.setor.id)
+
+    def test_outro_docente_nao_pode_dar_ciencia_antecipada(self):
+        self.client.force_login(self.outro_docente)
+        response = self.client.post(
+            self.url,
+            {"manifestar_ciencia_espontanea": "1", "mensagem_manifestacao": "Ciente."},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(self.processo.manifestacoes.exists())
+
+    def test_ciencia_antecipada_impede_solicitacao_posterior(self):
+        self.processo.registrar_ciencia_espontanea_orientador(orientador=self.orientador)
+
+        with self.assertRaisesMessage(ValidationError, "já manifestou ciência"):
+            self.processo.solicitar_ciente_orientador(solicitado_por=self.outro_docente)
+
+        self.assertEqual(self.processo.manifestacoes.count(), 1)
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_email_de_abertura_deixa_claro_que_e_apenas_notificacao(self):
+        from .tasks import send_email_novo_processo_orientador
+
+        send_email_novo_processo_orientador.run(self.processo.id)
+
+        self.assertEqual(len(mail.outbox), 1)
+        mensagem = mail.outbox[0]
+        self.assertIn("Notificação de novo processo", mensagem.subject)
+        html, content_type = mensagem.alternatives[0]
+        self.assertEqual(content_type, "text/html")
+        self.assertIn("apenas uma notificação de abertura", html)
+        self.assertIn("pode não ser necessária nenhuma ação", html)
+        self.assertIn("manifestar sua ciência antecipadamente", html)
+        self.assertIn("Acessar processo", html)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
 class CaixaProcessosFiltrosResumoTests(TestCase):
     def setUp(self):
         self.servidor = User.objects.create_user(
@@ -897,6 +991,29 @@ class MatriculaDomainTests(TestCase):
                 tipo_aluno=SolicitacaoMatricula.TipoAluno.REGULAR,
                 ofertas=[oferta],
             )
+
+    def test_modificacao_permite_matricula_vinculo_sem_solicitacao_no_prazo(self):
+        self.periodo.status = PeriodoLetivo.Status.MODIFICACAO_MATRICULA
+        self.periodo.save(update_fields=["status"])
+
+        solicitacao = salvar_solicitacao_matricula(
+            aluno=self.aluno,
+            periodo=self.periodo,
+            tipo_aluno=SolicitacaoMatricula.TipoAluno.REGULAR,
+            ofertas=[],
+            tipo_matricula=SolicitacaoMatricula.TipoMatricula.VINCULO,
+            observacao="Manter vínculo durante a modificação.",
+        )
+
+        self.assertEqual(solicitacao.tipo_matricula, SolicitacaoMatricula.TipoMatricula.VINCULO)
+        self.assertEqual(solicitacao.status, SolicitacaoMatricula.Status.SOLICITADA)
+        self.assertEqual(solicitacao.itens.count(), 0)
+        self.assertTrue(
+            solicitacao.alteracoes.filter(
+                acao=AlteracaoMatricula.Acao.MATRICULA_VINCULO_SOLICITADA,
+                fase=AlteracaoMatricula.Fase.MODIFICACAO,
+            ).exists()
+        )
 
     def test_task_atualiza_status_do_periodo_letivo(self):
         self.periodo.status = PeriodoLetivo.Status.PLANEJAMENTO
@@ -1763,7 +1880,7 @@ class MatriculaViewsTests(TestCase):
         )
         self.assertContains(response, "checked", html=False)
 
-    def test_modificacao_nao_exibe_formulario_para_aluno_sem_solicitacao_original(self):
+    def test_modificacao_exibe_apenas_matricula_vinculo_para_aluno_sem_solicitacao_original(self):
         self.periodo.status = PeriodoLetivo.Status.MODIFICACAO_MATRICULA
         self.periodo.save(update_fields=["status"])
         self.client.force_login(self.aluno)
@@ -1771,8 +1888,29 @@ class MatriculaViewsTests(TestCase):
         response = self.client.get(reverse("matricula_solicitar_periodo", args=[self.periodo.pk]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "enviaram a solicitação no prazo")
-        self.assertNotContains(response, "Salvar modificação")
+        self.assertContains(response, "Solicitar matrícula vínculo")
+        self.assertContains(response, "não houve solicitação no prazo regular")
+        self.assertNotContains(
+            response,
+            f'name="ofertas" value="{self.oferta.pk}"',
+            html=False,
+        )
+        self.assertContains(response, 'name="matricula_vinculo"', html=False)
+        self.assertContains(response, "checked", html=False)
+
+        post = self.client.post(
+            reverse("matricula_solicitar_periodo", args=[self.periodo.pk]),
+            {
+                "periodo_id": self.periodo.pk,
+                "matricula_vinculo": "on",
+                "aceitar_lista_espera": "on",
+                "observacao": "Solicitação feita na modificação.",
+            },
+        )
+
+        self.assertEqual(post.status_code, 302)
+        solicitacao = SolicitacaoMatricula.objects.get(aluno=self.aluno, periodo=self.periodo)
+        self.assertEqual(solicitacao.tipo_matricula, SolicitacaoMatricula.TipoMatricula.VINCULO)
 
     def test_aluno_nao_consegue_solicitar_disciplinas_com_choque_de_horario(self):
         disciplina = Disciplina.objects.create(codigo="VIS002", nome="Visualização Avançada")
@@ -3830,6 +3968,7 @@ class SolicitacaoBancaTests(TestCase):
         self.assertIsNotNone(solicitacao.processo_id)
         self.assertEqual(solicitacao.processo.tipo, Processo.TipoProcesso.DEFESA_MESTRADO)
         self.assertEqual(solicitacao.processo.usuario_criado_por_id, self.docente.id)
+        self.assertEqual(solicitacao.processo.aluno_interessado_id, self.aluno_mestrado.id)
         email_aluno.assert_called_once_with(solicitacao.processo_id)
         email_orientador.assert_called_once_with(solicitacao.processo_id)
         email_secretaria.assert_called_once_with(solicitacao.processo_id)
@@ -3897,6 +4036,76 @@ class SolicitacaoBancaTests(TestCase):
     @patch("processos.views.send_email_novo_processo_secretaria.delay")
     @patch("processos.views.send_email_novo_processo_orientador.delay")
     @patch("processos.views.send_email_novo_processo_aluno.delay")
+    def test_docente_abre_processo_normal_para_orientando(
+        self,
+        _email_aluno,
+        _email_orientador,
+        _email_secretaria,
+    ):
+        self.client.force_login(self.docente)
+
+        response = self.client.post(
+            reverse("novo_processo"),
+            {
+                "aluno_interessado": self.aluno_mestrado.id,
+                "tipo": Processo.TipoProcesso.DEFESA_MESTRADO,
+                "assunto": "Documentação da banca do orientando",
+                "descricao": "Processo normal aberto pelo orientador.",
+            },
+        )
+
+        self.assertRedirects(response, reverse("home"))
+        processo = Processo.objects.get(assunto="Documentação da banca do orientando")
+        self.assertEqual(processo.usuario_criado_por_id, self.docente.id)
+        self.assertEqual(processo.aluno_interessado_id, self.aluno_mestrado.id)
+        self.assertEqual(processo.obter_orientador_responsavel().id, self.docente.id)
+
+    def test_docente_nao_pode_selecionar_aluno_sem_vinculo(self):
+        aluno_sem_vinculo = Aluno.objects.create_user(
+            email="sem.vinculo.processo@example.com",
+            password="senha-segura-123",
+            nome="Aluno sem vínculo para processo",
+        )
+        self.client.force_login(self.docente)
+
+        response = self.client.post(
+            reverse("novo_processo"),
+            {
+                "aluno_interessado": aluno_sem_vinculo.id,
+                "tipo": Processo.TipoProcesso.OUTRO,
+                "assunto": "Processo inválido",
+                "descricao": "Não deve ser criado.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Faça uma escolha válida")
+        self.assertFalse(Processo.objects.filter(assunto="Processo inválido").exists())
+
+    @patch("processos.tasks._send_email")
+    def test_email_do_pleno_usa_aluno_interessado_e_orientador(self, enviar_email):
+        from .tasks import send_email_movimentacao_pleno
+
+        processo = Processo.objects.create(
+            usuario_criado_por=self.docente,
+            aluno_interessado=self.aluno_mestrado,
+            tipo=Processo.TipoProcesso.DEFESA_MESTRADO,
+            assunto="Banca encaminhada ao Pleno",
+            descricao="Documentação anexada.",
+            setor_atual=self.setor_secretaria,
+        )
+
+        send_email_movimentacao_pleno.run(processo.id)
+
+        self.assertTrue(enviar_email.called)
+        contexto = enviar_email.call_args.kwargs["contexto"]
+        self.assertEqual(contexto["aluno"].id, self.aluno_mestrado.id)
+        self.assertEqual(contexto["orientador"].id, self.docente.id)
+        self.assertIn(self.aluno_mestrado.nome, enviar_email.call_args.kwargs["subject"])
+
+    @patch("processos.views.send_email_novo_processo_secretaria.delay")
+    @patch("processos.views.send_email_novo_processo_orientador.delay")
+    @patch("processos.views.send_email_novo_processo_aluno.delay")
     def test_aluno_cria_novo_processo_com_documento_anexado(
         self,
         _email_aluno,
@@ -3922,6 +4131,7 @@ class SolicitacaoBancaTests(TestCase):
 
         self.assertRedirects(response, reverse("home"))
         processo = Processo.objects.get(assunto="Processo com documento")
+        self.assertEqual(processo.aluno_interessado_id, self.aluno_mestrado.id)
         documento = processo.documentos.get()
         self.assertEqual(documento.titulo, "Requerimento")
         self.assertEqual(documento.enviado_por_id, self.aluno_mestrado.id)

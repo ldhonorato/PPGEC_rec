@@ -1527,7 +1527,7 @@ class LancamentoHorasComplementares(models.Model):
             )
         if not self.processo_origem_id and not self.origem_migracao and not self.justificativa_sem_processo:
             errors["processo_origem"] = "Informe o processo de origem ou justifique o lançamento sem processo."
-        if self.processo_origem_id and self.processo_origem.usuario_criado_por_id != self.trajetoria.aluno_id:
+        if self.processo_origem_id and self.processo_origem.aluno_interessado_id != self.trajetoria.aluno_id:
             errors["processo_origem"] = "O processo de origem deve pertencer ao discente informado."
         if self.horas_aprovadas is not None and self.horas_calculadas and self.horas_aprovadas != self.horas_calculadas:
             if not (self.observacoes_secretaria or "").strip():
@@ -2095,6 +2095,14 @@ class Processo(models.Model):
         on_delete=models.PROTECT,
         related_name="processos_criados",
     )
+    aluno_interessado = models.ForeignKey(
+        Aluno,
+        on_delete=models.PROTECT,
+        related_name="processos",
+        null=True,
+        blank=True,
+        help_text="Discente a quem o processo se refere, independentemente de quem realizou a abertura.",
+    )
     tipo = models.CharField(max_length=40, choices=TipoProcesso.choices)
     assunto = models.CharField(max_length=255)
     descricao = models.TextField(verbose_name="Descrição")
@@ -2170,6 +2178,10 @@ class Processo(models.Model):
             )
 
     def save(self, *args, **kwargs):
+        if self._state.adding and not self.aluno_interessado_id and self.usuario_criado_por_id:
+            if Aluno.objects.filter(pk=self.usuario_criado_por_id).exists():
+                self.aluno_interessado_id = self.usuario_criado_por_id
+
         if self._state.adding and not self.status_inicial:
             self.status_inicial = self.status
 
@@ -2209,9 +2221,12 @@ class Processo(models.Model):
         )
 
     def obter_orientador_responsavel(self):
+        aluno = self.obter_aluno_interessado()
+        if not aluno:
+            return None
         trajetoria = (
             TrajetoriaAcademica.objects.filter(
-                aluno_id=self.usuario_criado_por_id,
+                aluno_id=aluno.id,
                 status=TrajetoriaAcademica.Status.ATIVA,
             )
             .select_related("orientador")
@@ -2222,10 +2237,22 @@ class Processo(models.Model):
             return None
         return trajetoria.orientador
 
+    def obter_aluno_interessado(self):
+        if self.aluno_interessado_id:
+            return self.aluno_interessado
+        return Aluno.objects.filter(pk=self.usuario_criado_por_id).first()
+
     def solicitar_ciente_orientador(self, *, solicitado_por, mensagem_solicitacao: str = ""):
         orientador = self.obter_orientador_responsavel()
         if not orientador:
             raise ValidationError("Processo sem orientador definido para solicitar ciente.")
+
+        ciente_registrado = self.manifestacoes.filter(
+            tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
+            status=ManifestacaoProcesso.StatusManifestacao.CIENTE,
+        ).exists()
+        if ciente_registrado:
+            raise ValidationError("O orientador já manifestou ciência neste processo.")
 
         pendente = self.manifestacoes.filter(
             tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
@@ -2246,6 +2273,30 @@ class Processo(models.Model):
             self.status = self.StatusProcesso.AGUARDANDO_CIENCIA
             self.save(update_fields=["status", "atualizado_em"])
         return manifestacao
+
+    def registrar_ciencia_espontanea_orientador(self, *, orientador, mensagem: str = ""):
+        orientador_responsavel = self.obter_orientador_responsavel()
+        if not orientador_responsavel or orientador.id != orientador_responsavel.id:
+            raise ValidationError("Apenas o orientador responsável pode manifestar ciência.")
+
+        if self.manifestacoes.filter(
+            tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
+            status__in=(
+                ManifestacaoProcesso.StatusManifestacao.PENDENTE,
+                ManifestacaoProcesso.StatusManifestacao.CIENTE,
+            ),
+        ).exists():
+            raise ValidationError("Já existe ciência ou solicitação de ciência neste processo.")
+
+        return ManifestacaoProcesso.objects.create(
+            processo=self,
+            tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
+            status=ManifestacaoProcesso.StatusManifestacao.CIENTE,
+            responsavel=orientador,
+            solicitado_por=orientador,
+            mensagem_manifestacao=(mensagem or "").strip(),
+            data_manifestacao=timezone.now(),
+        )
 
     def encaminhar(
         self,

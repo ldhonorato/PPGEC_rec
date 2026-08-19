@@ -96,11 +96,11 @@ def processos_atrasados_queryset(user):
         ).values("id")
         return queryset.filter(
             Q(usuario_criado_por=user)
-            | Q(usuario_criado_por__in=orientandos)
+            | Q(aluno_interessado__in=orientandos)
             | Q(setor_atual__nome__icontains="pleno")
         )
 
-    return queryset.filter(usuario_criado_por=user)
+    return queryset.filter(aluno_interessado_id=user.id)
 
 
 def processos_atrasados_url(user):
@@ -342,11 +342,11 @@ def salvar_solicitacao_matricula(
         .filter(periodo=periodo, aluno=aluno)
         .first()
     )
-    if em_modificacao and (
+    if em_modificacao and tipo_matricula != SolicitacaoMatricula.TipoMatricula.VINCULO and (
         not solicitacao_existente or not solicitacao_matricula_feita_no_prazo(solicitacao_existente)
     ):
         raise ValidationError(
-            "A modificação de matrícula está disponível apenas para quem enviou a solicitação no prazo de matrícula."
+            "A matrícula em disciplinas durante a modificação está disponível apenas para quem enviou a solicitação no prazo regular."
         )
 
     if tipo_matricula == SolicitacaoMatricula.TipoMatricula.VINCULO:

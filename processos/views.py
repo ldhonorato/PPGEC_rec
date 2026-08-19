@@ -272,6 +272,8 @@ def _can_view_processo_detalhe(user, processo):
         return False
     if processo.usuario_criado_por_id == user.id:
         return True
+    if processo.aluno_interessado_id == user.id:
+        return True
     # A participacao ativa na Secretaria concede acesso de gestao mesmo
     # quando o cadastro-base do usuario e ALUNO (por exemplo, um bolsista).
     # Esta verificacao precisa anteceder a restricao geral de alunos.
@@ -286,13 +288,13 @@ def _can_view_processo_detalhe(user, processo):
             return True
         return Aluno.objects.filter(
             Q(trajetorias__orientador=user) | Q(trajetorias__coorientador=user),
-            pk=processo.usuario_criado_por_id,
+            pk=processo.aluno_interessado_id,
         ).exists()
     return False
 
 
 def _is_requerente_do_processo(user, processo):
-    return user.is_authenticated and processo.usuario_criado_por_id == user.id
+    return user.is_authenticated and processo.aluno_interessado_id == user.id
 
 
 def _setores_membro_queryset(user):
@@ -1264,7 +1266,12 @@ def matricula_solicitar_view(request, periodo_id=None):
     pode_modificar_matricula = bool(
         solicitacao_atual and solicitacao_matricula_feita_no_prazo(solicitacao_atual)
     )
-    pode_solicitar_matricula = aluno_apto_matricula and (not em_modificacao or pode_modificar_matricula)
+    somente_matricula_vinculo = bool(
+        aluno_apto_matricula and em_modificacao and not pode_modificar_matricula
+    )
+    pode_solicitar_matricula = aluno_apto_matricula and (
+        not em_modificacao or pode_modificar_matricula or somente_matricula_vinculo
+    )
     ofertas_selecionadas_ids = []
     form = None
     if pode_solicitar_matricula:
@@ -1279,8 +1286,11 @@ def matricula_solicitar_view(request, periodo_id=None):
             initial={
                 "ofertas": ofertas_selecionadas_ids,
                 "matricula_vinculo": bool(
-                    solicitacao_atual
-                    and solicitacao_atual.tipo_matricula == SolicitacaoMatricula.TipoMatricula.VINCULO
+                    somente_matricula_vinculo
+                    or (
+                        solicitacao_atual
+                        and solicitacao_atual.tipo_matricula == SolicitacaoMatricula.TipoMatricula.VINCULO
+                    )
                 ),
                 "observacao": solicitacao_atual.observacao_aluno if solicitacao_atual else "",
             },
@@ -1298,7 +1308,12 @@ def matricula_solicitar_view(request, periodo_id=None):
         pode_modificar_matricula = bool(
             solicitacao_atual and solicitacao_matricula_feita_no_prazo(solicitacao_atual)
         )
-        pode_solicitar_matricula = aluno_apto_matricula and (not em_modificacao or pode_modificar_matricula)
+        somente_matricula_vinculo = bool(
+            aluno_apto_matricula and em_modificacao and not pode_modificar_matricula
+        )
+        pode_solicitar_matricula = aluno_apto_matricula and (
+            not em_modificacao or pode_modificar_matricula or somente_matricula_vinculo
+        )
         if not pode_solicitar_matricula:
             raise PermissionDenied("Você não está apto a solicitar matrícula.")
         form = SolicitacaoMatriculaForm(request.POST, periodo=periodo)
@@ -1347,6 +1362,7 @@ def matricula_solicitar_view(request, periodo_id=None):
             "pode_solicitar_matricula": pode_solicitar_matricula,
             "em_modificacao": em_modificacao,
             "pode_modificar_matricula": pode_modificar_matricula,
+            "somente_matricula_vinculo": somente_matricula_vinculo,
             "ofertas_selecionadas_ids": ofertas_selecionadas_ids,
             "nivel_trajetoria_display": trajetoria_ativa.get_nivel_curso_display() if trajetoria_ativa else "",
             "tipo_aluno_display": dict(SolicitacaoMatricula.TipoAluno.choices).get(tipo_aluno),
@@ -1814,7 +1830,11 @@ def home_view(request):
     can_view_dashboard = _can_view_dashboard(request.user)
     can_view_processos = _can_view_processos(request.user)
     can_view_caixa = _can_view_caixa(request.user)
-    meus_processos_base = Processo.objects.filter(usuario_criado_por=request.user)
+    meus_processos_base = (
+        Processo.objects.filter(aluno_interessado_id=request.user.id)
+        if request.user.tipo_usuario == User.TipoUsuario.ALUNO
+        else Processo.objects.filter(usuario_criado_por=request.user)
+    )
     meus_processos_requerente = meus_processos_base.filter(setor_atual__nome="Requerente")
     assinaturas_pendentes = _assinaturas_pendentes_queryset(request.user)
     context = {
@@ -1841,8 +1861,8 @@ def home_view(request):
             .order_by("nome")
         )
         processos_orientandos = (
-            Processo.objects.select_related("usuario_criado_por", "setor_atual")
-            .filter(usuario_criado_por__in=orientandos.values("id"))
+            Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual")
+            .filter(aluno_interessado__in=orientandos.values("id"))
             .order_by("-data_criacao")
         )
         cientes_pendentes_orientador = (
@@ -2183,7 +2203,7 @@ def processos_view(request):
     if not _can_view_processos(request.user):
         raise PermissionDenied("Acesso restrito a docentes e servidores.")
 
-    queryset = Processo.objects.select_related("usuario_criado_por", "setor_atual").order_by("-data_criacao")
+    queryset = Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual").order_by("-data_criacao")
     tipo = request.GET.get("tipo", "").strip()
     status = request.GET.get("status", "").strip()
     setor_id = request.GET.get("setor", "").strip()
@@ -2206,6 +2226,7 @@ def processos_view(request):
             | Q(assunto__icontains=termo)
             | Q(descricao__icontains=termo)
             | Q(usuario_criado_por__nome__icontains=termo)
+            | Q(aluno_interessado__nome__icontains=termo)
         )
     pagina = _paginar(request, queryset)
     return render(
@@ -3538,7 +3559,7 @@ def aluno_detalhe_view(request, aluno_id):
 
     processos_aluno = (
         Processo.objects.select_related("setor_atual")
-        .filter(usuario_criado_por=aluno)
+        .filter(aluno_interessado=aluno)
         .order_by("-data_criacao")
     )
     # Ativa primeiro, depois as demais da mais recente para a mais antiga: a
@@ -3706,7 +3727,7 @@ def caixa_processos_view(request):
         selected_caixa = str(setores_caixa[0].id)
 
     processos_base = (
-        Processo.objects.select_related("usuario_criado_por", "setor_atual")
+        Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual")
         .filter(setor_atual_id__in=selected_setor_ids)
         .filter(
             status__in=(
@@ -3758,7 +3779,7 @@ def caixa_processos_view(request):
 @login_required
 def processo_detalhe_view(request, processo_id):
     processo = get_object_or_404(
-        Processo.objects.select_related("usuario_criado_por", "setor_atual")
+        Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual")
         .prefetch_related(
             "solicitacoes_banca_anexadas__aluno",
             "solicitacoes_banca_anexadas__trajetoria",
@@ -3806,11 +3827,27 @@ def processo_detalhe_view(request, processo_id):
         tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
         status=ManifestacaoProcesso.StatusManifestacao.PENDENTE,
     ).first()
-    can_solicitar_ciente = can_manage_in_caixa and orientador_responsavel is not None and not pendente_ciente
+    ciente_registrado = processo.manifestacoes.filter(
+        tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
+        status=ManifestacaoProcesso.StatusManifestacao.CIENTE,
+    ).exists()
+    can_solicitar_ciente = (
+        can_manage_in_caixa
+        and orientador_responsavel is not None
+        and not pendente_ciente
+        and not ciente_registrado
+    )
     can_manifestar_ciente = bool(
         pendente_ciente
         and request.user.id == pendente_ciente.responsavel_id
         and request.user.tipo_usuario == User.TipoUsuario.DOCENTE
+    )
+    can_manifestar_ciencia_espontanea = bool(
+        orientador_responsavel
+        and request.user.id == orientador_responsavel.id
+        and request.user.tipo_usuario == User.TipoUsuario.DOCENTE
+        and not pendente_ciente
+        and not ciente_registrado
     )
     can_comment_pleno = _is_docente(request.user) and _is_processo_no_pleno(processo)
     deliberacao_atual = next(
@@ -3833,7 +3870,7 @@ def processo_detalhe_view(request, processo_id):
     trajetoria_horas_complementares = None
     if processo.tipo == Processo.TipoProcesso.HORAS_COMPLEMENTARES:
         aluno_horas_complementares = (
-            Aluno.objects.prefetch_related("trajetorias").filter(pk=processo.usuario_criado_por_id).first()
+            Aluno.objects.prefetch_related("trajetorias").filter(pk=processo.aluno_interessado_id).first()
         )
         if aluno_horas_complementares:
             trajetoria_horas_complementares = (
@@ -4017,6 +4054,23 @@ def processo_detalhe_view(request, processo_id):
                             status_atual_texto
                         )
 
+                    return redirect("processo_detalhe", processo_id=processo.id)
+            open_ciente_modal = True
+
+        elif "manifestar_ciencia_espontanea" in request.POST:
+            if not can_manifestar_ciencia_espontanea:
+                raise PermissionDenied("Você não pode manifestar ciência antecipada neste processo.")
+            manifestar_ciente_form = ManifestarCienteOrientadorForm(request.POST)
+            if manifestar_ciente_form.is_valid():
+                try:
+                    processo.registrar_ciencia_espontanea_orientador(
+                        orientador=request.user,
+                        mensagem=manifestar_ciente_form.cleaned_data["mensagem_manifestacao"],
+                    )
+                except ValidationError as exc:
+                    messages.error(request, str(exc))
+                else:
+                    messages.success(request, "Ciência antecipada registrada com sucesso.")
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_ciente_modal = True
 
@@ -4303,6 +4357,7 @@ def processo_detalhe_view(request, processo_id):
             "pendente_ciente": pendente_ciente,
             "can_solicitar_ciente": can_solicitar_ciente,
             "can_manifestar_ciente": can_manifestar_ciente,
+            "can_manifestar_ciencia_espontanea": can_manifestar_ciencia_espontanea,
             "solicitar_ciente_form": solicitar_ciente_form,
             "manifestar_ciente_form": manifestar_ciente_form,
             "can_comment_pleno": can_comment_pleno,
@@ -4393,6 +4448,8 @@ def novo_processo_view(request):
                     with transaction.atomic():
                         processo = form.save(commit=False)
                         processo.usuario_criado_por = request.user
+                        if request.user.tipo_usuario == User.TipoUsuario.ALUNO:
+                            processo.aluno_interessado = Aluno.objects.get(pk=request.user.pk)
                         processo.setor_atual = setor_secretaria
                         processo.status = Processo.StatusProcesso.EM_ANALISE
                         processo.save()
@@ -4856,6 +4913,7 @@ def _criar_processo_para_solicitacao_banca(solicitacao):
 
     processo = Processo.objects.create(
         usuario_criado_por=solicitacao.docente,
+        aluno_interessado=solicitacao.aluno,
         tipo=solicitacao.tipo_defesa,
         assunto=f"{solicitacao.get_tipo_defesa_display()} - {solicitacao.aluno.nome}",
         descricao=(
@@ -5262,11 +5320,12 @@ def menu_meus_processos_view(request):
     if _is_servidor(request.user):
         raise PermissionDenied("Perfil SERVIDOR não possui meus processos.")
 
-    meus_processos = (
-        Processo.objects.select_related("setor_atual")
-        .filter(usuario_criado_por=request.user)
-        .order_by("-data_criacao")
-    )
+    meus_processos = Processo.objects.select_related("aluno_interessado", "setor_atual")
+    if request.user.tipo_usuario == User.TipoUsuario.ALUNO:
+        meus_processos = meus_processos.filter(aluno_interessado_id=request.user.id)
+    else:
+        meus_processos = meus_processos.filter(usuario_criado_por=request.user)
+    meus_processos = meus_processos.order_by("-data_criacao")
 
     filtro_q = request.GET.get("my_q", "").strip()
     filtro_tipo = request.GET.get("my_tipo", "").strip()
@@ -5346,8 +5405,8 @@ def menu_processos_orientandos_view(request):
         .distinct()
     )
     processos_orientandos = (
-        Processo.objects.select_related("usuario_criado_por", "setor_atual")
-        .filter(usuario_criado_por__in=orientandos.values("id"))
+        Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual")
+        .filter(aluno_interessado__in=orientandos.values("id"))
         .order_by("-data_criacao")
     )
     return render(
@@ -5418,7 +5477,7 @@ def menu_processos_pleno_view(request):
         raise PermissionDenied("Acesso restrito a membros do Colegiado PPGEC (Pleno).")
 
     processos_pleno = (
-        Processo.objects.select_related("usuario_criado_por", "setor_atual")
+        Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual")
         .filter(setor_atual__nome__icontains="Pleno")
         .order_by("-data_criacao")
     )

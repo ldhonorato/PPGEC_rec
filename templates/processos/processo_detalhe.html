@@ -39,11 +39,15 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
             </dd>
         </div>
         <div>
-            <dt>Requerente</dt>
+            <dt>Aluno interessado</dt>
             <dd>
-                {{ processo.usuario_criado_por.nome }}
-                <span class="dado-nota">{{ processo.usuario_criado_por.email }}</span>
+                {{ processo.aluno_interessado.nome|default:"—" }}
+                {% if processo.aluno_interessado %}<span class="dado-nota">{{ processo.aluno_interessado.email }}</span>{% endif %}
             </dd>
+        </div>
+        <div>
+            <dt>Aberto por</dt>
+            <dd>{{ processo.usuario_criado_por.nome }}<span class="dado-nota">{{ processo.usuario_criado_por.email }}</span></dd>
         </div>
         <div>
             <dt>Aberto em</dt>
@@ -270,7 +274,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
 {% endfor %}
 {% endif %}
 
-{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo or can_registrar_horas_complementares %}
+{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_manifestar_ciencia_espontanea or can_finalizar_processo or can_registrar_horas_complementares %}
 <section class="card">
     <h2 class="section-title">Ações</h2>
     {% comment %}
@@ -290,6 +294,9 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% endif %}
         {% if can_manifestar_ciente %}
             <button type="button" class="btn" id="btn-abrir-modal-ciente">Manifestar ciente do orientador</button>
+        {% endif %}
+        {% if can_manifestar_ciencia_espontanea %}
+            <button type="button" class="btn" id="btn-abrir-modal-ciente">Dar ciência antecipadamente</button>
         {% endif %}
         {% if can_solicitar_ciente %}
             <button type="button" class="btn btn-secondary" id="btn-abrir-modal-ciente">Solicitar ciente do orientador</button>
@@ -381,8 +388,12 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                     <strong>{{ manifestacao.get_tipo_display }}</strong> - {{ manifestacao.get_status_display }}<br>
                     <span class="meta-linha">
                         <span>Responsável: {{ manifestacao.responsavel.nome }}</span>
-                        <span>Solicitado por: {{ manifestacao.solicitado_por.nome }}</span>
-                        <span>Solicitado em {{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}</span>
+                        {% if manifestacao.status == "CIENTE" and manifestacao.solicitado_por_id == manifestacao.responsavel_id %}
+                            <span>Ciência manifestada espontaneamente</span>
+                        {% else %}
+                            <span>Solicitado por: {{ manifestacao.solicitado_por.nome }}</span>
+                            <span>Solicitado em {{ manifestacao.data_solicitacao|date:"d/m/Y H:i" }}</span>
+                        {% endif %}
                         {% if manifestacao.data_manifestacao %}<span>Manifestado em {{ manifestacao.data_manifestacao|date:"d/m/Y H:i" }}</span>{% endif %}
                     </span>
                     {% if manifestacao.mensagem_solicitacao %}
@@ -399,7 +410,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
     {% endif %}
 </section>
 
-{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_finalizar_processo or can_registrar_horas_complementares %}
+{% if can_manage_processo_actions or can_solicitar_ciente or can_manifestar_ciente or can_manifestar_ciencia_espontanea or can_finalizar_processo or can_registrar_horas_complementares %}
 {% if can_registrar_horas_complementares %}
 <dialog id="modal-horas-complementares" class="modal-dialog">
     <div class="modal-cabecalho">
@@ -488,7 +499,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
 
 <dialog id="modal-ciente" class="modal-dialog">
     <div class="modal-cabecalho">
-        {% if can_manifestar_ciente %}
+        {% if can_manifestar_ciente or can_manifestar_ciencia_espontanea %}
             <h2 class="section-title">Manifestar ciente do orientador</h2>
         {% else %}
             <h2 class="section-title">Solicitar ciente do orientador</h2>
@@ -496,8 +507,13 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
     </div>
     <form method="post" class="modal-formulario">
         {% csrf_token %}
-        {% if can_manifestar_ciente %}
-            <input type="hidden" name="manifestar_ciente_orientador" value="1">
+        {% if can_manifestar_ciente or can_manifestar_ciencia_espontanea %}
+            {% if can_manifestar_ciente %}
+                <input type="hidden" name="manifestar_ciente_orientador" value="1">
+            {% else %}
+                <input type="hidden" name="manifestar_ciencia_espontanea" value="1">
+                <p class="muted">Esta ciência será registrada antecipadamente, sem alterar o andamento do processo.</p>
+            {% endif %}
             {% for field in manifestar_ciente_form %}
                 <div class="formulario-campo">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
@@ -507,7 +523,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
             {% endfor %}
             <div class="formulario-acoes">
                 <button type="button" class="btn btn-secondary" id="btn-fechar-modal-ciente">Cancelar</button>
-                <button type="submit" class="btn btn-secondary" name="acao_ciente" value="recusar">Recusar</button>
+                {% if can_manifestar_ciente %}<button type="submit" class="btn btn-secondary" name="acao_ciente" value="recusar">Recusar</button>{% endif %}
                 <button type="submit" class="btn" name="acao_ciente" value="ciente">Dar ciente</button>
             </div>
         {% else %}

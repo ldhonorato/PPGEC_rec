@@ -127,13 +127,16 @@ def send_email_novo_processo_aluno(self, processo_id: int):
         logger.error("Processo %s não encontrado", processo_id)
         return
 
-    contexto = {"processo": processo, "aluno": processo.usuario_criado_por, "orientador": processo.obter_orientador_responsavel()}
+    aluno = processo.obter_aluno_interessado()
+    if not aluno or not aluno.email:
+        return
+    contexto = {"processo": processo, "aluno": aluno, "orientador": processo.obter_orientador_responsavel()}
     try:
         _send_email(
-            subject=f"[PPGEC] Processo {processo.numero} — {processo.usuario_criado_por.nome} — aberto com sucesso",
+            subject=f"[PPGEC] Processo {processo.numero} — {aluno.nome} — aberto com sucesso",
             template_name="emails/aluno/novo_processo_aluno.html",
             contexto=contexto,
-            recipient=processo.usuario_criado_por.email,
+            recipient=aluno.email,
         )
     except Exception as exc:
         logger.exception("Falha ao enviar e-mail para aluno")
@@ -150,13 +153,14 @@ def send_email_novo_processo_orientador(self, processo_id: int):
         return
 
     orientador = processo.obter_orientador_responsavel()
-    if not orientador:
+    aluno = processo.obter_aluno_interessado()
+    if not orientador or not aluno:
         return
 
-    contexto = {"processo": processo, "aluno": processo.usuario_criado_por, "orientador": orientador}
+    contexto = {"processo": processo, "aluno": aluno, "orientador": orientador}
     try:
         _send_email(
-            subject=f"[PPGEC] Novo processo do orientando {processo.usuario_criado_por.nome}",
+            subject=f"[PPGEC] Notificação de novo processo — {aluno.nome} — Processo {processo.numero}",
             template_name="emails/orientador/novo_processo_orientador.html",
             contexto=contexto,
             recipient=orientador.email,
@@ -173,16 +177,17 @@ def send_email_solicitacao_ciencia(self, manifestacao_id):
         manifestacao = ManifestacaoProcesso.objects.select_related('processo', 'responsavel').get(id=manifestacao_id)
         processo = manifestacao.processo
         orientador = manifestacao.responsavel
+        aluno = processo.obter_aluno_interessado()
 
         contexto = {
             "processo": processo,
             "manifestacao": manifestacao,
-            "aluno": processo.usuario_criado_por,
+            "aluno": aluno,
             "orientador": orientador,
         }
 
         _send_email(
-            subject=f"[PPGEC] Solicitação de Ciência — {processo.usuario_criado_por.nome} — Processo {processo.numero}",
+            subject=f"[PPGEC] Solicitação de Ciência — {aluno.nome if aluno else processo.numero} — Processo {processo.numero}",
             template_name="emails/aluno/solicitacao_ciencia.html",
             contexto=contexto,
             recipient=orientador.email,
@@ -197,19 +202,22 @@ def send_email_devolucao_requerente(self, processo_id, observacao):
     from django.utils import timezone
     try:
         processo = Processo.objects.select_related("usuario_criado_por").get(pk=processo_id)
+        aluno = processo.obter_aluno_interessado()
+        if not aluno or not aluno.email:
+            return
         
         contexto = {
             "processo": processo,
-            "aluno": processo.usuario_criado_por,
+            "aluno": aluno,
             "observacao": observacao,
             "data_devolucao": timezone.now(),
         }
 
         _send_email(
-            subject=f"[PPGEC] Ajustes necessários — {processo.usuario_criado_por.nome} — Processo {processo.numero}",
+            subject=f"[PPGEC] Ajustes necessários — {aluno.nome} — Processo {processo.numero}",
             template_name="emails/orientador/devolucao_processo.html",
             contexto=contexto,
-            recipient=processo.usuario_criado_por.email,
+            recipient=aluno.email,
         )
     except Exception as exc:
         logger.exception("Falha ao enviar e-mail de devolução")
@@ -251,19 +259,23 @@ def send_email_movimentacao_aluno(self, processo_id: int, mensagem_status: str):
         logger.error("Processo %s não encontrado", processo_id)
         return
 
+    aluno = processo.obter_aluno_interessado()
+    if not aluno or not aluno.email:
+        return
+
     contexto = {
         "processo": processo,
         "mensagem_status": mensagem_status,
-        "aluno": processo.usuario_criado_por,
+        "aluno": aluno,
         "orientador": processo.obter_orientador_responsavel()
     }
     
     try:
         _send_email(
-            subject=f"[PPGEC] Movimentação — {processo.usuario_criado_por.nome} — Processo {processo.numero}",
+            subject=f"[PPGEC] Movimentação — {aluno.nome} — Processo {processo.numero}",
             template_name="emails/aluno/movimentacao_processo_aluno.html",
             contexto=contexto,
-            recipient=processo.usuario_criado_por.email,
+            recipient=aluno.email,
         )
     except Exception as exc:
         logger.exception("Falha ao enviar e-mail de movimentação para aluno")
@@ -279,19 +291,20 @@ def send_email_movimentacao_orientador(self, processo_id: int, mensagem_status: 
         return
 
     orientador = processo.obter_orientador_responsavel()
-    if not orientador:
+    aluno = processo.obter_aluno_interessado()
+    if not orientador or not aluno:
         return
 
     contexto = {
         "processo": processo,
         "mensagem_status": mensagem_status,
-        "aluno": processo.usuario_criado_por,
+        "aluno": aluno,
         "orientador": orientador
     }
     
     try:
         _send_email(
-            subject=f"[PPGEC] Movimentação no Processo do Orientando {processo.usuario_criado_por.nome}",
+            subject=f"[PPGEC] Movimentação no Processo do Orientando {aluno.nome}",
             template_name="emails/orientador/movimentacao_processo_orientador.html",
             contexto=contexto,
             recipient=orientador.email,
@@ -310,17 +323,21 @@ def send_email_conclusao_aluno(self, processo_id: int):
         logger.error("Processo %s não encontrado", processo_id)
         return
 
+    aluno = processo.obter_aluno_interessado()
+    if not aluno or not aluno.email:
+        return
+
     contexto = {
         "processo": processo,
-        "aluno": processo.usuario_criado_por,
+        "aluno": aluno,
         "orientador": processo.obter_orientador_responsavel(),
     }
     try:
         _send_email(
-            subject=f"[PPGEC] Processo {processo.numero} — {processo.usuario_criado_por.nome} — finalizado",
+            subject=f"[PPGEC] Processo {processo.numero} — {aluno.nome} — finalizado",
             template_name="emails/aluno/conclusao_processo_aluno.html",
             contexto=contexto,
-            recipient=processo.usuario_criado_por.email,
+            recipient=aluno.email,
         )
     except Exception as exc:
         logger.exception("Falha ao enviar e-mail de conclusão para aluno")
@@ -337,17 +354,18 @@ def send_email_conclusao_orientador(self, processo_id: int):
         return
 
     orientador = processo.obter_orientador_responsavel()
-    if not orientador:
+    aluno = processo.obter_aluno_interessado()
+    if not orientador or not aluno:
         return
 
     contexto = {
         "processo": processo,
-        "aluno": processo.usuario_criado_por,
+        "aluno": aluno,
         "orientador": orientador,
     }
     try:
         _send_email(
-            subject=f"[PPGEC] Processo do orientando {processo.usuario_criado_por.nome} finalizado",
+            subject=f"[PPGEC] Processo do orientando {aluno.nome} finalizado",
             template_name="emails/orientador/conclusao_processo_orientador.html",
             contexto=contexto,
             recipient=orientador.email,
@@ -368,10 +386,11 @@ def send_email_movimentacao_pleno(self, processo_id: int):
         return
 
     docentes = User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE)#pega todos os usuários do tipo docente
+    aluno = processo.obter_aluno_interessado()
 
     contexto={
         "processo": processo,
-        "aluno": processo.usuario_criado_por,
+        "aluno": aluno,
         "orientador": processo.obter_orientador_responsavel()
     }
 
@@ -379,7 +398,7 @@ def send_email_movimentacao_pleno(self, processo_id: int):
         for docente in docentes:
             if docente.email:
                 _send_email(
-                    subject=f"[PPGEC] Novo processo em pauta no Pleno — {processo.usuario_criado_por.nome} ({processo.numero})",
+                    subject=f"[PPGEC] Novo processo em pauta no Pleno — {aluno.nome if aluno else processo.numero} ({processo.numero})",
                     template_name="emails/pleno/novo_processo_pleno.html",
                     contexto=contexto,
                     recipient=docente.email,
@@ -401,10 +420,11 @@ def send_email_processo_comentado_pleno(self, processo_id: int, comentario_id: i
         return
 
     docentes = User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE)#pega todos os usuários do tipo docente
+    aluno = processo.obter_aluno_interessado()
     
     contexto={
         "processo": processo,
-        "aluno": processo.usuario_criado_por,
+        "aluno": aluno,
         "autor_comentario": comentario.autor,
         "comentario": comentario,
         "resposta": resposta,
@@ -417,7 +437,7 @@ def send_email_processo_comentado_pleno(self, processo_id: int, comentario_id: i
                     subject=(
                         f"[PPGEC] Resposta no debate — Processo {processo.numero}"
                         if resposta
-                        else f"[PPGEC] Debate aberto — {processo.usuario_criado_por.nome} — Processo {processo.numero}"
+                        else f"[PPGEC] Debate aberto — {aluno.nome if aluno else processo.numero} — Processo {processo.numero}"
                     ),
                     template_name="emails/pleno/processo_comentado_pleno.html",
                     contexto=contexto,
@@ -442,7 +462,8 @@ def send_email_novo_processo_secretaria(processo_id: int):
     if setor_secretaria and setor_secretaria.email: #segurança: se o setor existe E tem email cadastrado
         contexto = {
             "processo": processo,
-            "aluno": processo.usuario_criado_por
+            "aluno": processo.obter_aluno_interessado(),
+            "aberto_por": processo.usuario_criado_por,
         }
         _send_email(
             subject=f"[PPGEC] Novo Processo Aguardando Análise ({processo.numero})",

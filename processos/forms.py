@@ -876,11 +876,12 @@ class ProcessoAberturaForm(forms.ModelForm):
 
     class Meta:
         model = Processo
-        fields = ["tipo", "assunto", "descricao"]
+        fields = ["aluno_interessado", "tipo", "assunto", "descricao"]
         widgets = {
             "descricao": forms.Textarea(attrs={"rows": 6}),
         }
         help_texts = {
+            "aluno_interessado": "Selecione o discente a quem este processo se refere.",
             "tipo": "Define para onde o processo vai e que documentos serão exigidos.",
             "assunto": "Uma linha que identifique o pedido. É o que aparece na listagem.",
             "descricao": "Explique o que está pedindo e por quê. Inclua datas, disciplinas "
@@ -890,6 +891,19 @@ class ProcessoAberturaForm(forms.ModelForm):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
+        if user and user.tipo_usuario == User.TipoUsuario.ALUNO:
+            self.fields.pop("aluno_interessado")
+        elif user and user.tipo_usuario == User.TipoUsuario.DOCENTE:
+            self.fields["aluno_interessado"].queryset = (
+                Aluno.objects.filter(
+                    Q(trajetorias__orientador=user) | Q(trajetorias__coorientador=user),
+                    trajetorias__status=TrajetoriaAcademica.Status.ATIVA,
+                )
+                .distinct()
+                .order_by("nome")
+            )
+            self.fields["aluno_interessado"].required = True
+            self.fields["aluno_interessado"].label = "Aluno interessado"
         # O padrao do Django e "---------", que ocupa a primeira posicao da lista
         # sem dizer o que fazer com ela. Como "tipo" tem choices e nao e chave
         # estrangeira, o campo e um TypedChoiceField -- que nao tem empty_label;
@@ -1032,7 +1046,7 @@ class LancamentoHorasComplementaresForm(OpcoesVaziasNomeadas, forms.ModelForm):
         self.fields["processo_origem"].queryset = Processo.objects.none()
         if aluno:
             self.fields["processo_origem"].queryset = Processo.objects.filter(
-                usuario_criado_por=aluno,
+                aluno_interessado=aluno,
                 tipo=Processo.TipoProcesso.HORAS_COMPLEMENTARES,
             ).order_by("-data_criacao")
         if processo:
@@ -1062,7 +1076,7 @@ class LancamentoHorasComplementaresForm(OpcoesVaziasNomeadas, forms.ModelForm):
             raise forms.ValidationError("Não há norma vigente de horas complementares para o nível do discente.")
         if not processo_origem and not (cleaned_data.get("justificativa_sem_processo") or "").strip():
             self.add_error("processo_origem", "Informe o processo de origem ou justifique o lançamento sem processo.")
-        if processo_origem and processo_origem.usuario_criado_por_id != trajetoria.aluno_id:
+        if processo_origem and processo_origem.aluno_interessado_id != trajetoria.aluno_id:
             self.add_error("processo_origem", "O processo de origem deve pertencer ao discente da trajetória.")
         if tipo and tipo.norma_id != norma.id:
             self.add_error("tipo_atividade", "Selecione uma atividade da norma vigente da trajetória.")
