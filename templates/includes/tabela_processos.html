@@ -39,7 +39,7 @@ Parametros (todos opcionais, exceto processos):
                             <span class="celula-secundaria celula-numero">{{ processo.numero }}</span>
                         </td>
                         {% if coluna_pessoa %}
-                            <td class="celula-apoio">{{ processo.usuario_criado_por.nome }}</td>
+                            <td class="celula-apoio">{{ processo.aluno_interessado.nome|default:"—" }}</td>
                         {% endif %}
                         {% if mostrar_tipo %}
                             <td class="celula-apoio">{{ processo.get_tipo_display }}</td>

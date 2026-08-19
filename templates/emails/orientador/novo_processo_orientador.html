@@ -7,9 +7,13 @@
   <div style="background: #f9f9f9; padding: 28px; border-radius: 0 0 8px 8px;">
     <p>Olá, Prof. <strong>{{ orientador.nome }}</strong>,</p>
     <p>
-      O aluno <strong>{{ aluno.nome }}</strong> iniciou o processo
-      <strong>{{ processo.numero }}</strong> — {{ processo.get_tipo_display }}.
-      Clique abaixo para revisar os detalhes no sistema.
+      Informamos que o(a) aluno(a) <strong>{{ aluno.nome }}</strong> abriu o processo
+      <strong>{{ processo.numero }}</strong> — {{ processo.get_tipo_display }} no AcadFlow.
+    </p>
+    <p><strong>Este e-mail é apenas uma notificação de abertura. Neste momento, pode não ser necessária nenhuma ação de sua parte.</strong></p>
+    <p>
+      Caso deseje, você já pode acessar o processo para consultar os documentos e manifestar sua ciência antecipadamente.
+      Se a ciência for necessária para a tramitação, ela também poderá ser solicitada formalmente pela unidade responsável.
     </p>
     <table style="width:100%; background:#fff; border-radius:8px; padding:16px; margin: 16px 0;">
       <tr><td style="color:#666; padding:4px 0;">Número:</td>
@@ -25,7 +29,7 @@
       <a href="{{ site_url }}/processos/{{ processo.id }}/"
          style="background:#1a3a5c; color:white; padding:12px 28px;
                 border-radius:6px; text-decoration:none; font-weight:bold;">
-        Revisar Processo
+        Acessar processo
       </a>
     </p>
     <p style="color:#999; font-size:12px; margin-top:32px;">

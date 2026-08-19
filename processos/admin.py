@@ -228,10 +228,10 @@ class SetorMembroAdmin(admin.ModelAdmin):
 
 @admin.register(Processo)
 class ProcessoAdmin(admin.ModelAdmin):
-    list_display = ("numero", "assunto", "tipo", "status", "setor_atual", "data_criacao")
+    list_display = ("numero", "assunto", "aluno_interessado", "usuario_criado_por", "tipo", "status", "setor_atual", "data_criacao")
     list_filter = ("tipo", "status", "setor_atual")
-    search_fields = ("numero", "assunto", "descricao")
-    autocomplete_fields = ("usuario_criado_por", "setor_atual")
+    search_fields = ("numero", "assunto", "descricao", "aluno_interessado__nome", "usuario_criado_por__nome")
+    autocomplete_fields = ("aluno_interessado", "usuario_criado_por", "setor_atual")
     readonly_fields = ("numero", "data_criacao", "atualizado_em", "finalizado_em")
 
 

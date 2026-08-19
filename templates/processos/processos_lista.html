@@ -88,7 +88,7 @@
                 <thead>
                     <tr>
                         <th scope="col">Processo</th>
-                        <th scope="col">Requerente</th>
+                        <th scope="col">Aluno interessado</th>
                         <th scope="col">Tipo</th>
                         <th scope="col">Setor atual</th>
                         <th scope="col">Prazo</th>
@@ -102,7 +102,7 @@
                                 <a href="{% url 'processo_detalhe' processo.id %}">{{ processo.assunto }}</a>
                                 <span class="celula-secundaria celula-numero">{{ processo.numero }}</span>
                             </td>
-                            <td class="celula-apoio">{{ processo.usuario_criado_por.nome }}</td>
+                            <td class="celula-apoio">{{ processo.aluno_interessado.nome|default:"—" }}</td>
                             <td class="celula-apoio">{{ processo.get_tipo_display }}</td>
                             <td class="celula-apoio">{{ processo.setor_atual.nome|default:"—" }}</td>
                             <td class="celula-numero {% if processo.esta_atrasado %}celula-atrasada{% else %}celula-apoio{% endif %}">

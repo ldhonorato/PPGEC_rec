@@ -96,11 +96,11 @@ def processos_atrasados_queryset(user):
         ).values("id")
         return queryset.filter(
             Q(usuario_criado_por=user)
-            | Q(usuario_criado_por__in=orientandos)
+            | Q(aluno_interessado__in=orientandos)
             | Q(setor_atual__nome__icontains="pleno")
         )
 
-    return queryset.filter(usuario_criado_por=user)
+    return queryset.filter(aluno_interessado_id=user.id)
 
 
 def processos_atrasados_url(user):
