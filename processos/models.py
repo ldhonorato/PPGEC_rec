@@ -1856,6 +1856,7 @@ class Setor(models.Model):
     class TipoSetor(models.TextChoices):
         SETOR = "SETOR", "Setor"
         COMISSAO = "COMISSAO", "Comissao"
+        ESTRATEGICO = "ESTRATEGICO", "Planejamento Estratégico"
 
     # Os setores oficiais concedem permissoes especificas, por isso seus nomes
     # precisam ter uma unica fonte. Setores e comissoes comuns continuam
@@ -1875,6 +1876,47 @@ class Setor(models.Model):
 
     def __str__(self) -> str:
         return self.nome
+
+class MetaPlanejamentoEstrategico(models.Model):
+
+    class PeriodoVigente(models.TextChoices):
+        PLANEJAMENTO_2025 = "Planejamento 2025", "2025"
+        
+
+    categoria = models.CharField(max_length=120)
+    fragilidade = models.TextField(blank=True, verbose_name="Fragilidade")
+    indicador = models.TextField(blank=True, verbose_name="Indicador")
+    setor = models.ForeignKey(Setor, on_delete=models.PROTECT, related_name="metas_planejamento_estrategico")
+    periodo_vigente = models.CharField(max_length=20, choices=PeriodoVigente.choices, verbose_name="Período vigente", default=PeriodoVigente.PLANEJAMENTO_2025)
+
+    class Meta:
+        ordering = ["periodo_vigente", "categoria"]
+
+class AcoesPlanejamentoEstrategico(models.Model):
+
+    class StatusAcoes(models.TextChoices):
+            NAO_INICIADA = "Não iniciada", "Não iniciada"
+            EM_ANDAMENTO = "Em andamento", "Em andamento"
+            CONCLUIDA_PARCIALMENTE = "Concluída parcialmente", "Concluída parcialmente"
+            CONCLUIDA_TOTALMENTE = "Concluída totalmente", "Concluída totalmente"
+            CANCELADA = "Cancelada", "Cancelada"
+
+    meta_planejamento_estrategico = models.ForeignKey(MetaPlanejamentoEstrategico, on_delete=models.CASCADE, related_name="acoes_planejamento_estrategico")
+    acao = models.TextField(blank=True, verbose_name="Ação")
+    status = models.CharField(max_length=30, choices=StatusAcoes.choices, verbose_name="Status", default=StatusAcoes.NAO_INICIADA)
+    
+    data_inicio_planejado = models.DateField(null=True, blank=True, verbose_name="Data inicio planejada")
+    data_termino_planejado = models.DateField(null=True, blank=True, verbose_name="Data término planejada")
+    resultados_esperados = models.TextField(blank=True, verbose_name="Resultados esperados")
+
+    data_inicio_executado = models.DateField(null=True, blank=True, verbose_name="Data inicio executada")
+    data_termino_executado = models.DateField(null=True, blank=True, verbose_name="Data término executada")
+    resultados_atingidos = models.TextField(blank=True, verbose_name="Resultados atingidos")
+    observacoes = models.TextField(blank=True, verbose_name="Observações")
+
+
+    class Meta:
+        ordering = ["meta_planejamento_estrategico", "acao"]
 
 
 class SetorMembro(models.Model):
