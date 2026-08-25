@@ -4033,6 +4033,40 @@ class SolicitacaoBancaTests(TestCase):
         self.assertNotContains(response, str(propria))
         self.assertNotContains(response, str(outra))
 
+    def test_detalhe_do_processo_exibe_aluno_interessado_com_link_para_ficha(self):
+        processo = Processo.objects.create(
+            usuario_criado_por=self.docente,
+            aluno_interessado=self.aluno_mestrado,
+            tipo=Processo.TipoProcesso.OUTRO,
+            assunto="Processo com aluno interessado",
+            descricao="Teste do vínculo para a ficha do aluno.",
+            setor_atual=self.setor_secretaria,
+        )
+        self.client.force_login(self.docente)
+
+        response = self.client.get(reverse("processo_detalhe", args=[processo.id]))
+
+        self.assertContains(
+            response,
+            f'href="{reverse("aluno_detalhe", args=[self.aluno_mestrado.id])}"',
+        )
+        self.assertContains(response, self.aluno_mestrado.nome)
+
+    def test_novo_processo_orienta_docente_sobre_formulario_de_banca(self):
+        self.client.force_login(self.docente)
+
+        response = self.client.get(reverse("novo_processo"))
+
+        self.assertContains(response, "Solicitações de banca podem ser realizadas")
+        self.assertContains(response, f'href="{reverse("solicitacoes_banca")}"')
+
+    def test_novo_processo_nao_exibe_orientacao_de_banca_para_aluno(self):
+        self.client.force_login(self.aluno_mestrado)
+
+        response = self.client.get(reverse("novo_processo"))
+
+        self.assertNotContains(response, "Solicitações de banca podem ser realizadas")
+
     @patch("processos.views.send_email_novo_processo_secretaria.delay")
     @patch("processos.views.send_email_novo_processo_orientador.delay")
     @patch("processos.views.send_email_novo_processo_aluno.delay")
@@ -4083,7 +4117,9 @@ class SolicitacaoBancaTests(TestCase):
         self.assertFalse(Processo.objects.filter(assunto="Processo inválido").exists())
 
     @patch("processos.tasks._send_email")
-    def test_email_do_pleno_usa_aluno_interessado_e_orientador(self, enviar_email):
+    def test_email_do_pleno_inclui_dados_do_processo_e_ultimo_encaminhamento(self, enviar_email):
+        from django.template.loader import render_to_string
+
         from .tasks import send_email_movimentacao_pleno
 
         processo = Processo.objects.create(
@@ -4094,6 +4130,13 @@ class SolicitacaoBancaTests(TestCase):
             descricao="Documentação anexada.",
             setor_atual=self.setor_secretaria,
         )
+        pleno, _ = Setor.objects.get_or_create(nome=Setor.NOME_PLENO)
+        encaminhamento = processo.encaminhar(
+            setor_destino=pleno,
+            encaminhado_por=self.servidor,
+            observacao="Favor incluir o processo na próxima pauta.",
+            prazo_limite=timezone.localdate() + timedelta(days=7),
+        )
 
         send_email_movimentacao_pleno.run(processo.id)
 
@@ -4101,7 +4144,13 @@ class SolicitacaoBancaTests(TestCase):
         contexto = enviar_email.call_args.kwargs["contexto"]
         self.assertEqual(contexto["aluno"].id, self.aluno_mestrado.id)
         self.assertEqual(contexto["orientador"].id, self.docente.id)
+        self.assertEqual(contexto["ultimo_encaminhamento"].id, encaminhamento.id)
         self.assertIn(self.aluno_mestrado.nome, enviar_email.call_args.kwargs["subject"])
+        corpo = render_to_string("emails/pleno/novo_processo_pleno.html", contexto)
+        self.assertIn("Banca encaminhada ao Pleno", corpo)
+        self.assertIn("Documentação anexada.", corpo)
+        self.assertIn("Último encaminhamento", corpo)
+        self.assertIn("Favor incluir o processo na próxima pauta.", corpo)
 
     @patch("processos.views.send_email_novo_processo_secretaria.delay")
     @patch("processos.views.send_email_novo_processo_orientador.delay")
@@ -5205,6 +5254,11 @@ class TemplatesSintaxeTests(SimpleTestCase):
     @staticmethod
     def _templates():
         return sorted(Path(settings.BASE_DIR).joinpath("templates").rglob("*.html"))
+
+    def test_detalhe_do_processo_nao_oferece_botao_para_registrar_horas(self):
+        template = Path(settings.BASE_DIR, "templates", "processos", "processo_detalhe.html")
+
+        self.assertNotIn("btn-abrir-modal-horas", template.read_text(encoding="utf-8"))
 
     def test_comentario_de_uma_linha_nao_abre_sem_fechar(self):
         """{# ... #} e sempre de uma linha so.

@@ -14,6 +14,13 @@
         <span>Ao enviar, o processo segue para a <strong>Secretaria PPGEC</strong>,
         que faz a triagem e o encaminha ao setor responsável.</span>
     </p>
+    {% if user.tipo_usuario == "DOCENTE" %}
+    <p class="formulario-aviso">
+        <svg aria-hidden="true"><use href="#i-caixa"></use></svg>
+        <span>Solicitações de banca podem ser realizadas preenchendo o
+        <a href="{% url 'solicitacoes_banca' %}">formulário em /bancas/</a>.</span>
+    </p>
+    {% endif %}
 
     {% comment %}
     Formulario de entrada, nao de filtro.
