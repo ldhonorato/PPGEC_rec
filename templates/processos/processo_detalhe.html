@@ -41,7 +41,11 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         <div>
             <dt>Aluno interessado</dt>
             <dd>
-                {{ processo.aluno_interessado.nome|default:"—" }}
+                {% if processo.aluno_interessado %}
+                    <a href="{% url 'aluno_detalhe' processo.aluno_interessado.id %}">{{ processo.aluno_interessado.nome }}</a>
+                {% else %}
+                    —
+                {% endif %}
                 {% if processo.aluno_interessado %}<span class="dado-nota">{{ processo.aluno_interessado.email }}</span>{% endif %}
             </dd>
         </div>
@@ -303,9 +307,6 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% endif %}
         {% if can_add_documento %}
             <button type="button" class="btn btn-secondary" id="btn-abrir-modal-documento">Adicionar documento</button>
-        {% endif %}
-        {% if can_registrar_horas_complementares %}
-            <button type="button" class="btn btn-secondary" id="btn-abrir-modal-horas">Registrar horas complementares</button>
         {% endif %}
         {% if can_finalizar_processo %}
             <span class="acoes-divisoria" aria-hidden="true"></span>
@@ -788,7 +789,6 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         const modalRemocao = document.getElementById("modal-remocao-arquivo");
         const modalCiente = document.getElementById("modal-ciente");
         const modalFinalizacao = document.getElementById("modal-finalizacao");
-        const btnAbrirHoras = document.getElementById("btn-abrir-modal-horas");
         const btnAbrirDocumento = document.getElementById("btn-abrir-modal-documento");
         const btnAbrirEncaminhar = document.getElementById("btn-abrir-modal-encaminhar");
         const btnAbrirCiente = document.getElementById("btn-abrir-modal-ciente");
@@ -836,9 +836,6 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
             horasMaximoPreview.textContent = regra.maximo ? regra.maximo + "h" : "Sem limite específico";
         }
 
-        if (btnAbrirHoras && modalHoras) {
-            btnAbrirHoras.addEventListener("click", () => modalHoras.showModal());
-        }
         if (tipoHoras) tipoHoras.addEventListener("change", atualizarPreviewHoras);
         if (quantidadeHoras) quantidadeHoras.addEventListener("input", atualizarPreviewHoras);
         if (trajetoriaHoras) trajetoriaHoras.addEventListener("change", atualizarPreviewHoras);
