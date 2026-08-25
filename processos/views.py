@@ -2610,9 +2610,10 @@ def _linhas_trajetoria(trajetoria):
                 "campo": "",
             },
             {
-                "rotulo": "Limite efetivo (com trancamentos)",
+                "rotulo": "Limite efetivo para defesa",
                 "valor": trajetoria.prazo_limite_efetivo.strftime("%d/%m/%Y") if trajetoria.prazo_limite_efetivo else "—",
                 "campo": "",
+                "ajuda": "O limite efetivo para defesa é calculado considerando os períodos de trancamento e as prorrogações concedidas.",
             },
             {"rotulo": "Prorrogações", "valor": f"{trajetoria.meses_prorrogados} mês(es)", "campo": ""},
             {"rotulo": "Reingressante", "valor": sim_nao(trajetoria.reingressante), "campo": "reingressante"},

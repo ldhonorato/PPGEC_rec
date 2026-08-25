@@ -301,7 +301,10 @@ class TrajetoriaAcademica(models.Model):
     @property
     def prazo_limite_efetivo(self):
         limite = self.prazo_limite_regimental
-        return limite + timedelta(days=self.dias_trancados) if limite else None
+        if not limite:
+            return None
+        limite_com_prorrogacoes = self._somar_meses(limite, self.meses_prorrogados)
+        return limite_com_prorrogacoes + timedelta(days=self.dias_trancados)
 
     @property
     def meses_prorrogados(self):
