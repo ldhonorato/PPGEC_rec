@@ -108,6 +108,7 @@ class PrazosTrajetoriaTests(TestCase):
         )
         self.assertEqual(trajetoria.prazo_limite_regimental, original)
         self.assertEqual(trajetoria.meses_prorrogados, 3)
+        self.assertEqual(trajetoria.prazo_limite_efetivo, date(2027, 5, 28))
 
     def test_prorrogacoes_respeitam_o_total_regimental(self):
         trajetoria = self.criar_trajetoria(Aluno.NivelCurso.MESTRADO)
@@ -128,6 +129,18 @@ class PrazosTrajetoriaTests(TestCase):
         )
         self.assertEqual(trajetoria.prazo_limite_regimental, date(2027, 2, 28))
         self.assertEqual(trajetoria.prazo_limite_efetivo, date(2027, 3, 30))
+
+    def test_limite_efetivo_combina_prorrogacoes_e_trancamentos(self):
+        trajetoria = self.criar_trajetoria(Aluno.NivelCurso.MESTRADO)
+        ProrrogacaoTrajetoria.objects.create(
+            trajetoria=trajetoria, meses=3, registrado_por=self.servidor,
+        )
+        TrancamentoTrajetoria.objects.create(
+            trajetoria=trajetoria, data_inicio=date(2025, 6, 1), data_fim=date(2025, 6, 30),
+            registrado_por=self.servidor,
+        )
+
+        self.assertEqual(trajetoria.prazo_limite_efetivo, date(2027, 6, 27))
 
     def test_qualificacao_doutorado_vence_no_quinto_semestre(self):
         trajetoria = TrajetoriaAcademica.objects.create(
@@ -5766,8 +5779,21 @@ class TrajetoriasNaFichaDoAlunoTests(TestCase):
         rotulos_doutorado = {linha["rotulo"] for linha in _linhas_trajetoria(self.ativa)}
         self.assertIn("Orientador", rotulos_doutorado)
         self.assertIn("Prazo defesa", rotulos_doutorado)
+        self.assertIn("Limite efetivo para defesa", rotulos_doutorado)
         # "Nivel" saiu: o titulo do bloco ja e o nivel do curso.
         self.assertNotIn("Nível", rotulos_doutorado)
+
+    def test_limite_efetivo_exibe_tooltip_sobre_trancamentos_e_prorrogacoes(self):
+        self.client.force_login(self.aluno)
+
+        response = self.client.get(self.url)
+
+        self.assertContains(response, "Limite efetivo para defesa")
+        self.assertContains(
+            response,
+            "calculado considerando os períodos de trancamento e as prorrogações concedidas",
+        )
+        self.assertContains(response, 'class="field-tooltip"')
 
     def test_conclusao_junta_numero_e_data_da_ata(self):
         linhas = {linha["rotulo"]: linha["valor"] for linha in _linhas_trajetoria(self.concluida)}
