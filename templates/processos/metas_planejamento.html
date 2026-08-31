@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Metas do Planejamento Estratégico | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <div class="actions-row">
+        <div>
+            <h1 class="section-title">Metas do Planejamento Estratégico</h1>
+            <p class="muted">Objetivos, fragilidades e indicadores acompanhados pelos setores do programa.</p>
+        </div>
+        {% if pode_criar_meta %}<button class="btn" type="button" data-open-dialog="nova-meta">Nova meta</button>{% endif %}
+    </div>
+</section>
+
+{% if pode_criar_meta %}
+<dialog id="nova-meta" class="modal-dialog" {% if form.errors %}data-open-on-load{% endif %}>
+    <div class="modal-body">
+        <div class="actions-row">
+            <h2 class="section-title">Nova meta</h2>
+            <button class="btn btn-secondary" type="button" data-close-dialog>Fechar</button>
+        </div>
+        <form method="post" class="formulario">
+            {% csrf_token %}
+            <div class="grid-two">
+                {% for field in form %}
+                    <div class="formulario-campo">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}{{ field.errors }}
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="formulario-acoes"><button class="btn" type="submit">Criar meta</button></div>
+        </form>
+    </div>
+</dialog>
+{% endif %}
+
+<section class="card">
+    <h2 class="section-title">Metas cadastradas</h2>
+    {% if metas %}
+        <ul class="list">
+            {% for meta in metas %}
+                <li>
+                    <div class="secao-cabecalho">
+                        <strong>{{ meta.categoria }}</strong>
+                        <span class="badge badge-info">{{ meta.get_periodo_vigente_display }}</span>
+                    </div>
+                    <span class="meta-linha"><span>{{ meta.setor.nome }}</span></span>
+                    {% if meta.fragilidade %}<dl class="dados-grid dados-grid-texto"><div><dt>Fragilidade</dt><dd>{{ meta.fragilidade }}</dd></div></dl>{% endif %}
+                    {% if meta.indicador %}<dl class="dados-grid dados-grid-texto"><div><dt>Indicador</dt><dd>{{ meta.indicador }}</dd></div></dl>{% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="estado-vazio">
+            <svg aria-hidden="true"><use href="#i-metas"></use></svg>
+            <p class="estado-vazio-titulo">Nenhuma meta cadastrada</p>
+            <p>As metas estratégicas aparecerão aqui quando forem registradas.</p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-open-dialog]").forEach((button) => {
+    button.addEventListener("click", () => document.getElementById(button.dataset.openDialog)?.showModal());
+});
+document.querySelectorAll("[data-close-dialog]").forEach((button) => {
+    button.addEventListener("click", () => button.closest("dialog")?.close());
+});
+document.querySelectorAll("dialog[data-open-on-load]").forEach((dialog) => dialog.showModal());
+</script>
+{% endblock %}

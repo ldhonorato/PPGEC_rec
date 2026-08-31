@@ -46,6 +46,7 @@ from .models import (
     LancamentoHorasComplementares,
     LoginThrottle,
     ManifestacaoProcesso,
+    MetaPlanejamentoEstrategico,
     MembroBanca,
     OfertaDisciplina,
     DeclaracaoDeVinculo,
@@ -66,6 +67,88 @@ from .models import (
     TramitacaoProcesso,
     User,
 )
+
+
+class MetasPlanejamentoTests(TestCase):
+    def setUp(self):
+        self.aluno = Aluno.objects.create_user(
+            email="metas.aluno@example.com", password="senha", nome="Aluno",
+        )
+        self.docente = User.objects.create_user(
+            email="metas.docente@example.com", password="senha", nome="Docente",
+            tipo_usuario=User.TipoUsuario.DOCENTE,
+        )
+        self.servidor = User.objects.create_user(
+            email="metas.servidor@example.com", password="senha", nome="Servidor",
+            tipo_usuario=User.TipoUsuario.SERVIDOR,
+        )
+        self.setor_comum = Setor.objects.create(nome="Setor comum")
+        self.setor_estrategico = Setor.objects.create(
+            nome="Setor estratégico", tipo=Setor.TipoSetor.ESTRATEGICO,
+        )
+        self.outro_estrategico = Setor.objects.create(
+            nome="Outro estratégico", tipo=Setor.TipoSetor.ESTRATEGICO,
+        )
+
+    def test_aluno_sem_setor_nao_tem_acesso_nem_item_de_menu(self):
+        self.client.force_login(self.aluno)
+        response = self.client.get(reverse("metas_planejamento"))
+        self.assertEqual(response.status_code, 403)
+
+        home = self.client.get(reverse("home"))
+        self.assertNotContains(home, "Metas do Planejamento")
+
+    def test_docente_servidor_e_aluno_vinculado_visualizam_html(self):
+        SetorMembro.objects.create(setor=self.setor_comum, usuario=self.aluno)
+        for usuario in (self.docente, self.servidor, self.aluno):
+            self.client.force_login(usuario)
+            response = self.client.get(reverse("metas_planejamento"))
+            self.assertEqual(response.status_code, 200)
+            self.assertTemplateUsed(response, "processos/metas_planejamento.html")
+            self.assertContains(response, "Metas do Planejamento Estratégico")
+            self.assertContains(response, reverse("metas_planejamento"))
+
+    def test_apenas_membro_de_setor_estrategico_pode_criar_para_seu_setor(self):
+        SetorMembro.objects.create(setor=self.setor_estrategico, usuario=self.docente)
+        self.client.force_login(self.docente)
+        dados = {
+            "categoria": "Internacionalização",
+            "fragilidade": "Baixa cooperação",
+            "indicador": "Número de convênios",
+            "setor": self.setor_estrategico.pk,
+            "periodo_vigente": MetaPlanejamentoEstrategico.PeriodoVigente.PLANEJAMENTO_2025,
+        }
+        response = self.client.post(reverse("metas_planejamento"), dados)
+        self.assertRedirects(response, reverse("metas_planejamento"))
+        self.assertTrue(MetaPlanejamentoEstrategico.objects.filter(
+            categoria="Internacionalização", setor=self.setor_estrategico,
+        ).exists())
+
+        dados["setor"] = self.outro_estrategico.pk
+        response = self.client.post(reverse("metas_planejamento"), dados)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Faça uma escolha válida")
+        self.assertFalse(MetaPlanejamentoEstrategico.objects.filter(setor=self.outro_estrategico).exists())
+
+    def test_botao_nova_meta_tem_script_para_abrir_e_fechar_dialogo(self):
+        SetorMembro.objects.create(setor=self.setor_estrategico, usuario=self.docente)
+        self.client.force_login(self.docente)
+        response = self.client.get(reverse("metas_planejamento"))
+        self.assertContains(response, 'data-open-dialog="nova-meta"')
+        self.assertContains(response, 'id="nova-meta"')
+        self.assertContains(response, ".showModal()")
+        self.assertContains(response, 'button.closest("dialog")?.close()')
+
+    def test_membro_apenas_de_setor_comum_nao_pode_criar(self):
+        SetorMembro.objects.create(setor=self.setor_comum, usuario=self.aluno)
+        self.client.force_login(self.aluno)
+        response = self.client.post(reverse("metas_planejamento"), {
+            "categoria": "Meta indevida",
+            "setor": self.setor_estrategico.pk,
+            "periodo_vigente": MetaPlanejamentoEstrategico.PeriodoVigente.PLANEJAMENTO_2025,
+        })
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(MetaPlanejamentoEstrategico.objects.exists())
 
 
 class PrazosTrajetoriaTests(TestCase):

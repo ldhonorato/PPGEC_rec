@@ -2,6 +2,7 @@ from django.db.models import Q
 
 from .services import processos_atrasados_queryset, processos_atrasados_url
 from .models import Aluno, Docente, Setor, SetorMembro, SolicitacaoAssinatura, User
+from .views_planejamento import pode_visualizar_metas_planejamento
 
 
 def processos_atrasados(request):
@@ -150,6 +151,7 @@ DESCRICOES_MENU = {
     "Declarações de vínculo": "Comprovantes do semestre",
     "Cadastro de ingressantes": "Importar novos alunos por planilha",
     "Setores e Comissões": "Estrutura de tramitação",
+    "Metas do Planejamento": "Objetivos e indicadores estratégicos",
     "Criar Comissão": "Montar uma nova comissão",
     # Assinaturas
     "Assinaturas": "Solicitações de assinatura",
@@ -262,6 +264,10 @@ def _menu_lateral_sections(user):
                 ["coordenacao_caixa_processos"],
                 "caixa",
             )
+        )
+    if pode_visualizar_metas_planejamento(user):
+        principal_items.append(
+            _menu_item("Metas do Planejamento", "/metas/", ["metas_planejamento"], "metas")
         )
     if _has_assinaturas_access(user) and not _has_gestao_access(user):
         principal_items.append(

@@ -24,6 +24,7 @@ from .models import (
     EstagioDocencia,
     MembroBanca,
     LancamentoHorasComplementares,
+    MetaPlanejamentoEstrategico,
     OfertaDisciplina,
     PeriodoLetivo,
     Polo,
@@ -44,6 +45,21 @@ from .models import (
 
 
 User = get_user_model()
+
+
+class MetaPlanejamentoEstrategicoForm(forms.ModelForm):
+    class Meta:
+        model = MetaPlanejamentoEstrategico
+        fields = ("categoria", "fragilidade", "indicador", "setor", "periodo_vigente")
+        widgets = {
+            "fragilidade": forms.Textarea(attrs={"rows": 3}),
+            "indicador": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, setores=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["setor"].queryset = setores if setores is not None else Setor.objects.none()
+        self.fields["setor"].empty_label = "Selecione"
 
 
 MAX_DOCUMENTO_UPLOAD_SIZE = 5 * 1024 * 1024

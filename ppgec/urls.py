@@ -77,6 +77,8 @@ from processos.views import (
     validar_cadastros_alunos_view,
 )
 
+from processos.views_planejamento import MetasPlanejamentoListView
+
 urlpatterns = [
     re_path(r"^media/(?P<path>.+)$", arquivo_enviado_view, name="media_file"),
     path("", home_view, name="home"),
@@ -187,6 +189,7 @@ urlpatterns = [
     path("matriculas/minhas/<int:solicitacao_id>/", matricula_minha_solicitacao_view, name="matricula_minha_solicitacao"),
     path('admin/', admin.site.urls),
     path("teste-email/", teste_email),
+    path("metas/", MetasPlanejamentoListView.as_view(), name="metas_planejamento")
 ]
 
 if settings.DEBUG:
