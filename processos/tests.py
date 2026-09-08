@@ -1802,10 +1802,9 @@ class MatriculaViewsTests(TestCase):
         aula = AulaPresencialOferta.objects.get(oferta=self.oferta)
         self.assertEqual(aula.polo_solicitado, polo)
         self.assertEqual(aula.status_agendamento, AulaPresencialOferta.StatusAgendamento.PENDENTE)
-        self.assertIsNone(aula.sala)
+        self.assertFalse(aula.ambientes_reservados.exists())
         self.assertEqual(aula.hora_inicio, encontro.hora_inicio)
         self.assertEqual(aula.hora_fim, encontro.hora_fim)
-        self.assertIsNone(aula.reserva)
         mock_email.assert_called_once_with(self.oferta.pk, self.docente.pk)
 
     def test_filtro_exibe_oferta_hibrida_nao_conforme(self):
@@ -1852,7 +1851,7 @@ class MatriculaViewsTests(TestCase):
         self.assertEqual(aula.carga_horaria_minutos, 150)
         self.assertEqual(aula.polo_solicitado, polo)
         self.assertEqual(aula.status_agendamento, AulaPresencialOferta.StatusAgendamento.PENDENTE)
-        self.assertIsNone(aula.reserva)
+        self.assertFalse(aula.ambientes_reservados.exists())
         mock_email.assert_called_once_with(self.oferta.pk, self.docente.pk)
 
     def test_secretaria_atende_solicitacao_e_docente_acompanha_status(self):
@@ -1871,15 +1870,16 @@ class MatriculaViewsTests(TestCase):
         self.client.force_login(self.secretaria)
 
         response = self.client.post(reverse("agendamentos_aulas_presenciais"), {
-            "acao": "atender", "aula_id": aula.pk, "sala": sala.pk,
+            "acao": "atender", "aula_id": aula.pk, "salas": [sala.pk],
             "observacao": "Sala preparada.",
         })
 
         self.assertEqual(response.status_code, 302)
         aula.refresh_from_db()
         self.assertEqual(aula.status_agendamento, AulaPresencialOferta.StatusAgendamento.ATENDIDA)
-        self.assertEqual(aula.sala, sala)
-        self.assertEqual(aula.reserva.sala, sala)
+        ambiente = aula.ambientes_reservados.get()
+        self.assertEqual(ambiente.sala, sala)
+        self.assertEqual(ambiente.reserva.sala, sala)
         self.client.force_login(self.docente)
         acompanhamento = self.client.get(reverse("matricula_oferta_planejamento_presencial", args=[self.oferta.pk]))
         self.assertContains(acompanhamento, "Atendida")
@@ -1899,6 +1899,80 @@ class MatriculaViewsTests(TestCase):
         response = self.client.get(reverse("matriculas_ofertas"))
         conteudo = response.content.decode()
         self.assertLess(conteudo.index("Minhas disciplinas ofertadas"), conteudo.index("Demais disciplinas ofertadas"))
+
+    def test_agendamentos_abre_com_pendentes_e_paginacao(self):
+        self.oferta.modalidade = OfertaDisciplina.Modalidade.HIBRIDA
+        self.oferta.save(update_fields=["modalidade"])
+        polo = Polo.objects.create(nome="Polo Fila")
+        aulas = [
+            AulaPresencialOferta(
+                oferta=self.oferta, data=self.periodo.data_inicio + timedelta(days=indice),
+                hora_inicio=time(8), hora_fim=time(9), polo_solicitado=polo, criado_por=self.docente,
+            ) for indice in range(21)
+        ]
+        AulaPresencialOferta.objects.bulk_create(aulas)
+        atendida = AulaPresencialOferta.objects.create(
+            oferta=self.oferta, data=self.periodo.data_inicio, hora_inicio=time(9), hora_fim=time(10),
+            polo_solicitado=polo, criado_por=self.docente,
+            status_agendamento=AulaPresencialOferta.StatusAgendamento.NAO_ATENDIDA,
+            observacao_atendimento="Sem disponibilidade.",
+        )
+        self.client.force_login(self.secretaria)
+
+        response = self.client.get(reverse("agendamentos_aulas_presenciais"))
+
+        self.assertEqual(response.context["pagina"].paginator.per_page, 20)
+        self.assertEqual(response.context["pagina"].paginator.count, 21)
+        self.assertNotContains(response, atendida.observacao_atendimento)
+
+    def test_demanda_de_alunos_por_polo_e_carregada_em_rota_separada(self):
+        self.oferta.modalidade = OfertaDisciplina.Modalidade.HIBRIDA
+        self.oferta.save(update_fields=["modalidade"])
+        polo = Polo.objects.create(nome="Polo Demanda Assíncrona")
+        self.aluno.polo_atuacao = polo
+        self.aluno.save(update_fields=["polo_atuacao"])
+        salvar_solicitacao_matricula(
+            aluno=self.aluno, periodo=self.periodo,
+            tipo_aluno=SolicitacaoMatricula.TipoAluno.REGULAR, ofertas=[self.oferta],
+        )
+        aula = AulaPresencialOferta.objects.create(
+            oferta=self.oferta, data=self.periodo.data_inicio, hora_inicio=time(10), hora_fim=time(11),
+            polo_solicitado=polo, criado_por=self.docente,
+        )
+        self.client.force_login(self.secretaria)
+
+        lista = self.client.get(reverse("agendamentos_aulas_presenciais"))
+        detalhe = self.client.get(reverse("agendamento_aula_presencial_alunos_polos", args=[aula.pk]))
+
+        self.assertNotContains(lista, "Polo Demanda Assíncrona</span><strong>1")
+        self.assertContains(detalhe, "Polo Demanda Assíncrona")
+        self.assertContains(detalhe, "1")
+
+    def test_secretaria_reserva_uma_sala_em_cada_polo(self):
+        self.oferta.modalidade = OfertaDisciplina.Modalidade.HIBRIDA
+        self.oferta.save(update_fields=["modalidade"])
+        polos = [Polo.objects.create(nome=f"Polo Transmissão {indice}") for indice in range(2)]
+        salas = [Sala.objects.create(polo=polo, nome="Sala de transmissão", capacidade=20) for polo in polos]
+        data_aula = self.periodo.data_inicio
+        for sala in salas:
+            DisponibilidadeSala.objects.create(
+                sala=sala, dia_semana=data_aula.weekday(), hora_inicio=time(8), hora_fim=time(18)
+            )
+        aula = AulaPresencialOferta.objects.create(
+            oferta=self.oferta, data=data_aula, hora_inicio=time(14), hora_fim=time(16),
+            polo_solicitado=polos[0], criado_por=self.docente,
+        )
+        self.client.force_login(self.secretaria)
+
+        response = self.client.post(reverse("agendamentos_aulas_presenciais"), {
+            "acao": "atender", "aula_id": aula.pk, "salas": [sala.pk for sala in salas],
+        })
+
+        self.assertEqual(response.status_code, 302)
+        aula.refresh_from_db()
+        self.assertEqual(aula.status_agendamento, AulaPresencialOferta.StatusAgendamento.ATENDIDA)
+        self.assertEqual(aula.ambientes_reservados.count(), 2)
+        self.assertEqual({item.sala.polo_id for item in aula.ambientes_reservados.select_related("sala")}, {polo.pk for polo in polos})
 
     @patch("processos.views.send_email_alunos_sem_matricula.delay")
     def test_gestao_lista_alunos_sem_matricula_e_envia_email(self, mock_email):
@@ -4801,6 +4875,31 @@ class ReservaAmbienteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Defesa no polo norte")
         self.assertNotContains(response, "Aula de algoritmos")
+
+    def test_reservas_feitas_sao_paginadas_preservando_filtros(self):
+        ReservaAmbiente.objects.bulk_create([
+            ReservaAmbiente(
+                sala=self.sala,
+                docente=self.docente,
+                criado_por=self.servidor,
+                tipo=ReservaAmbiente.TipoReserva.AULA,
+                titulo=f"Reserva paginada {indice:02d}",
+                inicio=self._dt(indice, 9),
+                fim=self._dt(indice, 10),
+            )
+            for indice in range(1, 22)
+        ])
+        self.client.force_login(self.servidor)
+
+        primeira = self.client.get(reverse("reservas_ambientes_feitas"), {"tipo": ReservaAmbiente.TipoReserva.AULA})
+        segunda = self.client.get(reverse("reservas_ambientes_feitas"), {"tipo": ReservaAmbiente.TipoReserva.AULA, "page": 2})
+
+        self.assertEqual(primeira.context["pagina"].paginator.per_page, 20)
+        self.assertEqual(primeira.context["pagina"].paginator.count, 21)
+        self.assertContains(primeira, "Página")
+        self.assertContains(primeira, "de 2")
+        self.assertContains(primeira, "tipo=AULA")
+        self.assertEqual(len(segunda.context["reservas"]), 1)
 
     def test_docente_visualiza_apenas_suas_reservas(self):
         outro_docente = Docente.objects.create(

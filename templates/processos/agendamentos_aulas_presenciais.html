@@ -6,7 +6,7 @@
     <p class="muted">Acompanhe e atenda as solicitações de ambientes para as ofertas híbridas.</p>
     <form method="get" class="filtros"><div class="filtros-linha">
         <div class="filtros-campo"><label for="periodo">Período</label><select id="periodo" name="periodo"><option value="">Todos</option>{% for periodo in periodos %}<option value="{{ periodo.pk }}" {% if filtros.periodo == periodo.pk|stringformat:'s' %}selected{% endif %}>{{ periodo.nome }}</option>{% endfor %}</select></div>
-        <div class="filtros-campo"><label for="polo">Polo</label><select id="polo" name="polo"><option value="">Todos</option>{% for polo in polos %}<option value="{{ polo.pk }}" {% if filtros.polo == polo.pk|stringformat:'s' %}selected{% endif %}>{{ polo.nome }}</option>{% endfor %}</select></div>
+        <div class="filtros-campo"><label for="polo">Polo solicitado</label><select id="polo" name="polo"><option value="">Todos</option>{% for polo in polos %}<option value="{{ polo.pk }}" {% if filtros.polo == polo.pk|stringformat:'s' %}selected{% endif %}>{{ polo.nome }}</option>{% endfor %}</select></div>
         <div class="filtros-campo"><label for="status">Situação</label><select id="status" name="status"><option value="">Todas</option>{% for valor, rotulo in status_agendamento %}<option value="{{ valor }}" {% if filtros.status == valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}</select></div>
         <div class="filtros-campo"><label for="busca">Disciplina ou docente</label><input id="busca" name="busca" value="{{ filtros.busca }}"></div>
         <button class="btn" type="submit">Filtrar</button>
@@ -14,15 +14,30 @@
 </section>
 <section class="card">
 {% if solicitacoes %}<ul class="list">{% for aula in solicitacoes %}<li>
-    <strong>{{ aula.oferta.disciplina.codigo }} — {{ aula.oferta.disciplina.nome }}</strong>
-    <span class="meta-linha"><span>{{ aula.oferta.periodo.nome }}</span><span>{{ aula.oferta.docentes_display }}</span><span>{{ aula.data|date:'d/m/Y' }}, {{ aula.hora_inicio|time:'H:i' }}–{{ aula.hora_fim|time:'H:i' }}</span><span>{{ aula.polo_solicitado }}</span><span>{{ aula.total_alunos }} aluno{{ aula.total_alunos|pluralize }}</span></span>
-    <p><span class="badge {% if aula.status_agendamento == 'ATENDIDA' %}badge-ok{% elif aula.status_agendamento == 'NAO_ATENDIDA' %}badge-no{% else %}badge-info{% endif %}">{{ aula.get_status_agendamento_display }}</span>{% if aula.sala %} {{ aula.sala }}{% endif %}</p>
-    {% if aula.observacao_atendimento %}<p class="item-observacao">{{ aula.observacao_atendimento }}</p>{% endif %}
-    <form method="post" class="filtros panel">{% csrf_token %}<input type="hidden" name="aula_id" value="{{ aula.pk }}"><div class="filtros-linha">
-        <div class="filtros-campo"><label>Sala no polo solicitado</label><select name="sala"><option value="">Selecione</option>{% for sala in aula.salas_disponiveis %}<option value="{{ sala.pk }}" {% if aula.sala_id == sala.pk %}selected{% endif %}>{{ sala.nome }}{% if sala.capacidade %} — capacidade {{ sala.capacidade }}{% endif %}</option>{% endfor %}</select></div>
-        <div class="filtros-campo"><label>Observação/justificativa</label><input name="observacao" value="{{ aula.observacao_atendimento }}"></div>
-        <button class="btn" type="submit" name="acao" value="atender">Reservar ambiente</button><button class="btn btn-secondary" type="submit" name="acao" value="nao_atender">Não atender</button>
-    </div></form>
+    <div class="actions-row"><div>
+        <strong>{{ aula.oferta.disciplina.codigo }} — {{ aula.oferta.disciplina.nome }}</strong>
+        <span class="meta-linha"><span>{{ aula.oferta.periodo.nome }}</span><span>{{ aula.oferta.docentes_display }}</span><span>{{ aula.data|date:'d/m/Y' }}, {{ aula.hora_inicio|time:'H:i' }}–{{ aula.hora_fim|time:'H:i' }}</span><span>Polo do docente: {{ aula.polo_solicitado }}</span></span>
+        <p><span class="badge {% if aula.status_agendamento == 'ATENDIDA' %}badge-ok{% elif aula.status_agendamento == 'NAO_ATENDIDA' %}badge-no{% else %}badge-info{% endif %}">{{ aula.get_status_agendamento_display }}</span></p>
+        {% if aula.ambientes_reservados.all %}<ul class="availability-list">{% for ambiente in aula.ambientes_reservados.all %}<li>{{ ambiente.sala }}</li>{% endfor %}</ul>{% endif %}
+        {% if aula.observacao_atendimento %}<p class="item-observacao">{{ aula.observacao_atendimento }}</p>{% endif %}
+    </div><button class="btn btn-secondary" type="button" data-demanda-url="{% url 'agendamento_aula_presencial_alunos_polos' aula.pk %}">Alunos por polo</button></div>
+    <form method="post" class="filtros panel" data-reservas-form>{% csrf_token %}<input type="hidden" name="aula_id" value="{{ aula.pk }}">
+        <div data-salas-list>
+            {% for ambiente in aula.ambientes_reservados.all %}<div class="filtros-linha" data-sala-row><div class="filtros-campo"><label>Ambiente</label><select name="salas" required><option value="">Selecione</option>{% for sala in aula.salas_disponiveis %}<option value="{{ sala.pk }}" {% if ambiente.sala_id == sala.pk %}selected{% endif %}>{{ sala.polo.nome }} — {{ sala.nome }}{% if sala.capacidade %} ({{ sala.capacidade }} lugares){% endif %}</option>{% endfor %}</select></div><button class="btn btn-secondary" type="button" data-remove-sala>Remover</button></div>{% empty %}<div class="filtros-linha" data-sala-row><div class="filtros-campo"><label>Ambiente</label><select name="salas" required><option value="">Selecione</option>{% for sala in aula.salas_disponiveis %}<option value="{{ sala.pk }}">{{ sala.polo.nome }} — {{ sala.nome }}{% if sala.capacidade %} ({{ sala.capacidade }} lugares){% endif %}</option>{% endfor %}</select></div><button class="btn btn-secondary" type="button" data-remove-sala>Remover</button></div>{% endfor %}
+        </div>
+        <div class="formulario-acoes"><button class="btn btn-secondary" type="button" data-add-sala>+ Adicionar sala</button></div>
+        <div class="filtros-linha"><div class="filtros-campo"><label>Observação/justificativa</label><input name="observacao" value="{{ aula.observacao_atendimento }}"></div><button class="btn" type="submit" name="acao" value="atender">Reservar ambientes</button><button class="btn btn-secondary" type="submit" name="acao" value="nao_atender" formnovalidate>Não atender</button></div>
+    </form>
 </li>{% endfor %}</ul>{% else %}<div class="estado-vazio"><p class="estado-vazio-titulo">Nenhuma solicitação encontrada</p></div>{% endif %}
+{% include "includes/paginacao.html" %}
 </section>
+<dialog id="demanda-polos" class="modal-dialog"><div class="modal-body"><div class="actions-row"><h2 class="section-title">Alunos por polo</h2><button class="btn btn-secondary" type="button" data-close-demanda>Fechar</button></div><div data-demanda-content><p class="muted">Carregando…</p></div></div></dialog>
 {% endblock %}
+{% block scripts %}<script>
+function bindRemove(row) { row.querySelector('[data-remove-sala]')?.addEventListener('click', () => { if (row.parentElement.querySelectorAll('[data-sala-row]').length > 1) row.remove(); }); }
+document.querySelectorAll('[data-sala-row]').forEach(bindRemove);
+document.querySelectorAll('[data-add-sala]').forEach((button) => button.addEventListener('click', () => { const list = button.closest('[data-reservas-form]').querySelector('[data-salas-list]'); const row = list.querySelector('[data-sala-row]').cloneNode(true); row.querySelector('select').value = ''; list.appendChild(row); bindRemove(row); }));
+const demandaDialog = document.getElementById('demanda-polos'); const demandaContent = document.querySelector('[data-demanda-content]');
+document.querySelectorAll('[data-demanda-url]').forEach((button) => button.addEventListener('click', async () => { demandaContent.innerHTML = '<p class="muted">Carregando…</p>'; demandaDialog.showModal(); const response = await fetch(button.dataset.demandaUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}}); demandaContent.innerHTML = response.ok ? await response.text() : '<p class="alert-danger">Não foi possível carregar a demanda.</p>'; }));
+document.querySelector('[data-close-demanda]')?.addEventListener('click', () => demandaDialog.close());
+</script>{% endblock %}

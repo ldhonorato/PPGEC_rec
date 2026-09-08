@@ -1156,7 +1156,7 @@ def matriculas_ofertas_view(request):
 def matricula_oferta_planejamento_presencial_view(request, oferta_id):
     oferta = get_object_or_404(
         OfertaDisciplina.objects.select_related("periodo", "disciplina", "docente_responsavel", "docente_colaborador")
-        .prefetch_related("encontros", "aulas_presenciais__encontro", "aulas_presenciais__sala", "aulas_presenciais__polo_solicitado"),
+        .prefetch_related("encontros", "aulas_presenciais__encontro", "aulas_presenciais__polo_solicitado", "aulas_presenciais__ambientes_reservados__sala__polo"),
         pk=oferta_id,
     )
     if not (
@@ -1227,7 +1227,7 @@ def matricula_oferta_planejamento_presencial_view(request, oferta_id):
             "polo_id": aula.polo_solicitado_id,
             "status": aula.get_status_agendamento_display(),
             "status_codigo": aula.status_agendamento,
-            "sala": aula.sala,
+            "ambientes": list(aula.ambientes_reservados.all()),
             "observacao_atendimento": aula.observacao_atendimento,
         }
         for aula in oferta.aulas_presenciais.all()
@@ -1257,24 +1257,16 @@ def agendamentos_aulas_presenciais_view(request):
     if not _can_manage_matriculas(request.user):
         raise PermissionDenied("Apenas secretaria e coordenação podem atender solicitações de aulas presenciais.")
 
+    status_informado = "status" in request.GET
+    status = request.GET.get("status") if status_informado else AulaPresencialOferta.StatusAgendamento.PENDENTE
     solicitacoes = (
         AulaPresencialOferta.objects.select_related(
             "oferta__periodo", "oferta__disciplina", "oferta__docente_responsavel",
-            "oferta__docente_colaborador", "polo_solicitado", "sala", "reserva", "atendida_por",
-        ).annotate(
-            total_alunos=Count(
-                "oferta__itens_matricula",
-                filter=Q(oferta__itens_matricula__status__in=[
-                    ItemSolicitacaoMatricula.Status.SOLICITADO,
-                    ItemSolicitacaoMatricula.Status.HOMOLOGADO,
-                ]),
-                distinct=True,
-            )
-        ).order_by("data", "hora_inicio", "oferta__disciplina__nome")
+            "oferta__docente_colaborador", "polo_solicitado", "atendida_por",
+        ).prefetch_related("ambientes_reservados__sala__polo").order_by("data", "hora_inicio", "oferta__disciplina__nome")
     )
     periodo_id = request.GET.get("periodo")
     polo_id = request.GET.get("polo")
-    status = request.GET.get("status")
     busca = (request.GET.get("busca") or "").strip()
     if periodo_id:
         solicitacoes = solicitacoes.filter(oferta__periodo_id=periodo_id)
@@ -1293,14 +1285,18 @@ def agendamentos_aulas_presenciais_view(request):
     if request.method == "POST":
         aula = get_object_or_404(AulaPresencialOferta.objects.select_related("polo_solicitado"), pk=request.POST.get("aula_id"))
         acao = request.POST.get("acao")
-        sala = None
+        salas = []
         if acao == "atender":
-            sala = get_object_or_404(Sala.objects.select_related("polo"), pk=request.POST.get("sala"))
+            sala_ids = [valor for valor in request.POST.getlist("salas") if valor]
+            salas = list(Sala.objects.select_related("polo").filter(pk__in=sala_ids))
+            if len(salas) != len(set(sala_ids)):
+                messages.error(request, "Uma ou mais salas selecionadas são inválidas.")
+                return redirect("agendamentos_aulas_presenciais")
         try:
             atender_solicitacao_aula_presencial(
                 aula=aula,
                 usuario=request.user,
-                sala=sala,
+                salas=salas,
                 observacao=request.POST.get("observacao", ""),
             )
             messages.success(request, "Solicitação de aula presencial atualizada.")
@@ -1310,18 +1306,39 @@ def agendamentos_aulas_presenciais_view(request):
         destino = reverse("agendamentos_aulas_presenciais")
         return redirect(f"{destino}?{query_string}" if query_string else destino)
 
-    salas_por_polo = {}
-    for sala in Sala.objects.filter(ativa=True, polo__ativo=True).select_related("polo").order_by("nome"):
-        salas_por_polo.setdefault(sala.polo_id, []).append(sala)
-    for solicitacao in solicitacoes:
-        solicitacao.salas_disponiveis = salas_por_polo.get(solicitacao.polo_solicitado_id, [])
+    salas_ativas = list(Sala.objects.filter(ativa=True, polo__ativo=True).select_related("polo").order_by("polo__nome", "nome"))
+    pagina = Paginator(solicitacoes, 20).get_page(request.GET.get("page"))
+    for solicitacao in pagina:
+        solicitacao.salas_disponiveis = salas_ativas
 
     return render(request, "processos/agendamentos_aulas_presenciais.html", {
-        "solicitacoes": solicitacoes,
+        "solicitacoes": pagina,
+        "pagina": pagina,
         "periodos": PeriodoLetivo.objects.order_by("-nome"),
         "polos": Polo.objects.filter(ativo=True).order_by("nome"),
         "status_agendamento": AulaPresencialOferta.StatusAgendamento.choices,
         "filtros": {"periodo": periodo_id or "", "polo": polo_id or "", "status": status or "", "busca": busca},
+    })
+
+
+@login_required
+def agendamento_aula_presencial_alunos_polos_view(request, aula_id):
+    if not _can_manage_matriculas(request.user):
+        raise PermissionDenied("Apenas secretaria e coordenação podem consultar esta demanda.")
+    aula = get_object_or_404(
+        AulaPresencialOferta.objects.select_related("oferta__disciplina"), pk=aula_id
+    )
+    alunos_por_polo = (
+        ItemSolicitacaoMatricula.objects.filter(
+            oferta=aula.oferta,
+            status__in=[ItemSolicitacaoMatricula.Status.SOLICITADO, ItemSolicitacaoMatricula.Status.HOMOLOGADO],
+        )
+        .values("solicitacao__aluno__polo_atuacao__nome")
+        .annotate(total=Count("solicitacao__aluno_id", distinct=True))
+        .order_by("solicitacao__aluno__polo_atuacao__nome")
+    )
+    return render(request, "processos/includes/alunos_polos_agendamento.html", {
+        "aula": aula, "alunos_por_polo": alunos_por_polo,
     })
 
 
@@ -4858,7 +4875,8 @@ def reservas_ambientes_feitas_view(request):
         messages.error(request, "Informe a justificativa para excluir a reserva.")
 
     reservas, filtros_reservas = _reservas_filtradas(request)
-    reservas = list(reservas)
+    pagina = Paginator(reservas, 20).get_page(request.GET.get("page"))
+    reservas = list(pagina)
     for reserva in reservas:
         reserva.can_excluir = _can_excluir_reserva_ambiente(request.user, reserva)
     context = _reservas_base_context()
@@ -4867,6 +4885,7 @@ def reservas_ambientes_feitas_view(request):
             "reservas": reservas,
             "filtros_reservas": filtros_reservas,
             "exclusao_form": exclusao_form,
+            "pagina": pagina,
         }
     )
     return render(request, "processos/reservas_ambientes_feitas.html", context)

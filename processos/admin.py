@@ -147,7 +147,7 @@ class EncontroOfertaInline(admin.TabularInline):
 class AulaPresencialOfertaInline(admin.TabularInline):
     model = AulaPresencialOferta
     extra = 0
-    autocomplete_fields = ("polo_solicitado", "sala", "reserva", "criado_por", "atendida_por")
+    autocomplete_fields = ("polo_solicitado", "criado_por", "atendida_por")
 
 
 @admin.register(PeriodoLetivo)

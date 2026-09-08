@@ -1,0 +1,2 @@
+<p><strong>{{ aula.oferta.disciplina }}</strong></p>
+{% if alunos_por_polo %}<ul class="list">{% for item in alunos_por_polo %}<li><span class="actions-row"><span>{{ item.solicitacao__aluno__polo_atuacao__nome|default:"Polo não informado" }}</span><strong>{{ item.total }}</strong></span></li>{% endfor %}</ul>{% else %}<p class="muted">Nenhum aluno com matrícula solicitada ou homologada.</p>{% endif %}

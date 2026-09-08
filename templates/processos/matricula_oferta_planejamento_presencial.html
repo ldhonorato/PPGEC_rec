@@ -81,7 +81,7 @@
                     </div>
                     <p class="item-observacao">Agendamento:
                         <span class="badge {% if aula.status_codigo == 'ATENDIDA' %}badge-ok{% elif aula.status_codigo == 'NAO_ATENDIDA' %}badge-no{% else %}badge-info{% endif %}">{{ aula.status }}</span>
-                        {% if aula.sala %} Ambiente reservado: {{ aula.sala }}.{% endif %}
+                        {% if aula.ambientes %} Ambientes reservados: {% for ambiente in aula.ambientes %}{{ ambiente.sala }}{% if not forloop.last %}; {% endif %}{% endfor %}.{% endif %}
                         {% if aula.observacao_atendimento %} {{ aula.observacao_atendimento }}{% endif %}
                     </p>
                     <div class="formulario-acoes">
@@ -130,7 +130,7 @@
                 <input type="hidden" name="aula_encontro" data-aula-encontro>
             </div>
             <div class="formulario-campo">
-                <label>Polo presencial</label>
+                <label>Polo onde o(a) professor(a) estará</label>
                 <select name="aula_polo" required>
                     <option value="">Selecione</option>
                     {% for polo in polos %}
