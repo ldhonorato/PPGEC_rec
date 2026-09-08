@@ -47,6 +47,7 @@ User = get_user_model()
 
 
 MAX_DOCUMENTO_UPLOAD_SIZE = 5 * 1024 * 1024
+MAX_DOCUMENTO_FILENAME_LENGTH = 230
 ALLOWED_DOCUMENTO_EXTENSIONS = {
     ".pdf",
     ".doc",
@@ -803,7 +804,10 @@ class DocumentoCadastroForm(forms.Form):
     arquivo = forms.FileField(
         required=True,
         label="Arquivo do documento",
-        help_text="PDF, Office ou imagem. Tamanho máximo: 5 MB.",
+        help_text=(
+            "PDF, Office ou imagem. Tamanho máximo: 5 MB. "
+            f"Nome do arquivo: até {MAX_DOCUMENTO_FILENAME_LENGTH} caracteres."
+        ),
         widget=forms.ClearableFileInput(attrs={"accept": DOCUMENTO_UPLOAD_ACCEPT}),
     )
     restricao_tipo = forms.ChoiceField(
@@ -814,6 +818,11 @@ class DocumentoCadastroForm(forms.Form):
 
     def clean_arquivo(self):
         arquivo = self.cleaned_data["arquivo"]
+        if len(arquivo.name) > MAX_DOCUMENTO_FILENAME_LENGTH:
+            raise forms.ValidationError(
+                "O nome do arquivo é maior que o permitido. "
+                f"Use no máximo {MAX_DOCUMENTO_FILENAME_LENGTH} caracteres, incluindo a extensão."
+            )
         if arquivo.size > MAX_DOCUMENTO_UPLOAD_SIZE:
             raise forms.ValidationError("O arquivo deve ter no máximo 5 MB.")
 

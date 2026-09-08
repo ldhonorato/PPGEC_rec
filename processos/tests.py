@@ -27,7 +27,7 @@ from .declaracoes_vinculo import (
     importar_declaracoes_de_vinculo,
     periodo_em_curso,
 )
-from .forms import SetorComissaoForm
+from .forms import DocumentoCadastroForm, SetorComissaoForm
 from .models import (
     AlteracaoAluno,
     AlteracaoMatricula,
@@ -66,6 +66,44 @@ from .models import (
     TramitacaoProcesso,
     User,
 )
+
+
+class DocumentoUploadValidationTests(SimpleTestCase):
+    def _form_com_arquivo(self, nome):
+        return DocumentoCadastroForm(
+            {
+                "titulo": "Documento",
+                "tipo_documento": Documento.TipoDocumento.REQUERIMENTO,
+                "restricao_tipo": Documento.RestricaoAcesso.NAO,
+            },
+            {
+                "arquivo": SimpleUploadedFile(
+                    nome,
+                    b"conteudo-pdf",
+                    content_type="application/pdf",
+                )
+            },
+        )
+
+    def test_aceita_nome_maior_que_o_antigo_limite_do_caminho(self):
+        nome = f"{'a' * 145}.pdf"
+
+        form = self._form_com_arquivo(nome)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(Documento._meta.get_field("arquivo").max_length, 255)
+
+    def test_informa_quando_nome_do_arquivo_excede_limite(self):
+        nome = f"{'a' * 227}.pdf"
+
+        form = self._form_com_arquivo(nome)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn(
+            "O nome do arquivo é maior que o permitido",
+            form.errors["arquivo"][0],
+        )
+        self.assertIn("230 caracteres", form.errors["arquivo"][0])
 
 
 class PrazosTrajetoriaTests(TestCase):
