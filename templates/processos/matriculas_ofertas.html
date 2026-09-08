@@ -100,6 +100,7 @@ tinha um unico filho e os cartoes encostavam um no outro.
         <ul class="list">
             {% for oferta in ofertas %}
                 <li>
+                    {% if oferta.cabecalho_grupo %}<h3 class="section-title">{{ oferta.cabecalho_grupo }}</h3>{% endif %}
                     <div class="actions-row">
                         <div>
                             <strong>{{ oferta.disciplina.codigo }} — {{ oferta.disciplina.nome }}</strong>
