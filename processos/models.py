@@ -971,6 +971,11 @@ class EncontroOferta(models.Model):
 
 
 class AulaPresencialOferta(models.Model):
+    class StatusAgendamento(models.TextChoices):
+        PENDENTE = "PENDENTE", "Pendente"
+        ATENDIDA = "ATENDIDA", "Atendida"
+        NAO_ATENDIDA = "NAO_ATENDIDA", "Não atendida"
+
     oferta = models.ForeignKey(OfertaDisciplina, on_delete=models.CASCADE, related_name="aulas_presenciais")
     encontro = models.ForeignKey(
         EncontroOferta,
@@ -982,7 +987,18 @@ class AulaPresencialOferta(models.Model):
     data = models.DateField()
     hora_inicio = models.TimeField(verbose_name="Hora de início")
     hora_fim = models.TimeField()
-    sala = models.ForeignKey("Sala", on_delete=models.PROTECT, related_name="aulas_presenciais_ofertas")
+    polo_solicitado = models.ForeignKey(
+        "Polo",
+        on_delete=models.PROTECT,
+        related_name="solicitacoes_aulas_presenciais",
+    )
+    sala = models.ForeignKey(
+        "Sala",
+        on_delete=models.PROTECT,
+        related_name="aulas_presenciais_ofertas",
+        null=True,
+        blank=True,
+    )
     reserva = models.OneToOneField(
         "ReservaAmbiente",
         on_delete=models.PROTECT,
@@ -990,6 +1006,20 @@ class AulaPresencialOferta(models.Model):
         null=True,
         blank=True,
     )
+    status_agendamento = models.CharField(
+        max_length=15,
+        choices=StatusAgendamento.choices,
+        default=StatusAgendamento.PENDENTE,
+    )
+    observacao_atendimento = models.TextField(blank=True)
+    atendida_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="aulas_presenciais_atendidas",
+        null=True,
+        blank=True,
+    )
+    atendida_em = models.DateTimeField(null=True, blank=True)
     criado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -1019,6 +1049,14 @@ class AulaPresencialOferta(models.Model):
             errors["oferta"] = "O planejamento presencial é exigido apenas para ofertas híbridas."
         if self.oferta_id and self.encontro_id and self.encontro.oferta_id != self.oferta_id:
             errors["encontro"] = "O encontro deve pertencer à oferta."
+        if self.polo_solicitado_id and not self.polo_solicitado.ativo:
+            errors["polo_solicitado"] = "Selecione um polo ativo."
+        if self.sala_id and self.sala.polo_id != self.polo_solicitado_id:
+            errors["sala"] = "A sala reservada deve pertencer ao polo solicitado."
+        if self.status_agendamento == self.StatusAgendamento.ATENDIDA and not (self.sala_id and self.reserva_id):
+            errors["status_agendamento"] = "Uma solicitação atendida deve possuir sala e reserva."
+        if self.status_agendamento == self.StatusAgendamento.NAO_ATENDIDA and not self.observacao_atendimento.strip():
+            errors["observacao_atendimento"] = "Informe o motivo do não atendimento."
         if self.hora_inicio and self.hora_fim and self.hora_fim <= self.hora_inicio:
             errors["hora_fim"] = "O horário final deve ser posterior ao horário inicial."
         if self.oferta_id and self.oferta.periodo.data_inicio and self.data and self.data < self.oferta.periodo.data_inicio:

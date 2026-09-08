@@ -78,6 +78,7 @@ from .models import (
     ApresentacaoQualificacao,
     DeclaracaoDeVinculo,
     Aluno,
+    AulaPresencialOferta,
     Disciplina,
     DisciplinaTrajetoria,
     DisponibilidadeSala,
@@ -129,6 +130,7 @@ from .tasks import (
     send_email_secretaria_planejamento_presencial,
 )
 from .services import (
+    atender_solicitacao_aula_presencial,
     alunos_ativos_sem_matricula,
     cancelar_item_matricula,
     carga_horaria_presencial_oferta_minutos,
@@ -1114,6 +1116,19 @@ def matriculas_ofertas_view(request):
     if filtro_nao_conformes:
         ofertas = [oferta for oferta in ofertas if oferta.modalidade == OfertaDisciplina.Modalidade.HIBRIDA and not oferta.presencial_conforme]
     horarios_semanais_periodos, dias_horarios = _montar_horarios_semanais_ofertas(ofertas)
+    minhas_ofertas = []
+    demais_ofertas = []
+    if _is_docente(request.user):
+        minhas_ofertas = [
+            oferta for oferta in ofertas
+            if oferta.docente_responsavel_id == request.user.id or oferta.docente_colaborador_id == request.user.id
+        ]
+        demais_ofertas = [oferta for oferta in ofertas if oferta not in minhas_ofertas]
+        if minhas_ofertas:
+            minhas_ofertas[0].cabecalho_grupo = "Minhas disciplinas ofertadas"
+        if demais_ofertas:
+            demais_ofertas[0].cabecalho_grupo = "Demais disciplinas ofertadas"
+        ofertas = minhas_ofertas + demais_ofertas
 
     return render(
         request,
@@ -1130,6 +1145,9 @@ def matriculas_ofertas_view(request):
             "modal_aberto": modal_aberto,
             "filtro_nao_conformes": filtro_nao_conformes,
             "total_nao_conformes": total_nao_conformes,
+            "separar_ofertas_docente": _is_docente(request.user),
+            "minhas_ofertas": minhas_ofertas,
+            "demais_ofertas": demais_ofertas,
         },
     )
 
@@ -1138,7 +1156,7 @@ def matriculas_ofertas_view(request):
 def matricula_oferta_planejamento_presencial_view(request, oferta_id):
     oferta = get_object_or_404(
         OfertaDisciplina.objects.select_related("periodo", "disciplina", "docente_responsavel", "docente_colaborador")
-        .prefetch_related("encontros", "aulas_presenciais__encontro", "aulas_presenciais__sala"),
+        .prefetch_related("encontros", "aulas_presenciais__encontro", "aulas_presenciais__sala", "aulas_presenciais__polo_solicitado"),
         pk=oferta_id,
     )
     if not (
@@ -1157,16 +1175,16 @@ def matricula_oferta_planejamento_presencial_view(request, oferta_id):
         encontros = request.POST.getlist("aula_encontro")
         horas_inicio = request.POST.getlist("aula_hora_inicio")
         horas_fim = request.POST.getlist("aula_hora_fim")
-        salas = request.POST.getlist("aula_sala")
-        total_linhas = max(len(datas), len(encontros), len(horas_inicio), len(horas_fim), len(salas))
+        polos = request.POST.getlist("aula_polo")
+        total_linhas = max(len(datas), len(encontros), len(horas_inicio), len(horas_fim), len(polos))
         for index in range(total_linhas):
             data = _parse_date_input(datas[index]) if index < len(datas) and datas[index] else None
             if not data:
                 continue
-            sala_id = salas[index] if index < len(salas) else ""
-            sala = Sala.objects.filter(pk=sala_id, ativa=True).first()
-            if not sala:
-                messages.error(request, "Informe um ambiente para todas as aulas presenciais.")
+            polo_id = polos[index] if index < len(polos) else ""
+            polo = Polo.objects.filter(pk=polo_id, ativo=True).first()
+            if not polo:
+                messages.error(request, "Informe um polo para todas as aulas presenciais.")
                 return redirect("matricula_oferta_planejamento_presencial", oferta_id=oferta.pk)
             encontro_id = encontros[index] if index < len(encontros) and encontros[index] else None
             selecoes.append(
@@ -1175,7 +1193,7 @@ def matricula_oferta_planejamento_presencial_view(request, oferta_id):
                     "data": data,
                     "hora_inicio": parse_time(horas_inicio[index]) if index < len(horas_inicio) else None,
                     "hora_fim": parse_time(horas_fim[index]) if index < len(horas_fim) else None,
-                    "sala": sala,
+                    "polo": polo,
                 }
             )
         try:
@@ -1206,7 +1224,11 @@ def matricula_oferta_planejamento_presencial_view(request, oferta_id):
             "encontro_id": aula.encontro_id or "",
             "hora_inicio": aula.hora_inicio.strftime("%H:%M"),
             "hora_fim": aula.hora_fim.strftime("%H:%M"),
-            "sala_id": aula.sala_id,
+            "polo_id": aula.polo_solicitado_id,
+            "status": aula.get_status_agendamento_display(),
+            "status_codigo": aula.status_agendamento,
+            "sala": aula.sala,
+            "observacao_atendimento": aula.observacao_atendimento,
         }
         for aula in oferta.aulas_presenciais.all()
     ]
@@ -1218,7 +1240,7 @@ def matricula_oferta_planejamento_presencial_view(request, oferta_id):
         "processos/matricula_oferta_planejamento_presencial.html",
         {
             "oferta": oferta,
-            "salas": Sala.objects.filter(ativa=True, polo__ativo=True).select_related("polo").order_by("polo__nome", "nome"),
+            "polos": Polo.objects.filter(ativo=True).order_by("nome"),
             "datas_planejamento": datas_planejamento,
             "aulas_form_rows": aulas_form_rows,
             "carga_total_horas": round(carga_total_minutos / 60, 1),
@@ -1228,6 +1250,79 @@ def matricula_oferta_planejamento_presencial_view(request, oferta_id):
             "conforme": oferta_hibrida_conforme(oferta),
         },
     )
+
+
+@login_required
+def agendamentos_aulas_presenciais_view(request):
+    if not _can_manage_matriculas(request.user):
+        raise PermissionDenied("Apenas secretaria e coordenação podem atender solicitações de aulas presenciais.")
+
+    solicitacoes = (
+        AulaPresencialOferta.objects.select_related(
+            "oferta__periodo", "oferta__disciplina", "oferta__docente_responsavel",
+            "oferta__docente_colaborador", "polo_solicitado", "sala", "reserva", "atendida_por",
+        ).annotate(
+            total_alunos=Count(
+                "oferta__itens_matricula",
+                filter=Q(oferta__itens_matricula__status__in=[
+                    ItemSolicitacaoMatricula.Status.SOLICITADO,
+                    ItemSolicitacaoMatricula.Status.HOMOLOGADO,
+                ]),
+                distinct=True,
+            )
+        ).order_by("data", "hora_inicio", "oferta__disciplina__nome")
+    )
+    periodo_id = request.GET.get("periodo")
+    polo_id = request.GET.get("polo")
+    status = request.GET.get("status")
+    busca = (request.GET.get("busca") or "").strip()
+    if periodo_id:
+        solicitacoes = solicitacoes.filter(oferta__periodo_id=periodo_id)
+    if polo_id:
+        solicitacoes = solicitacoes.filter(polo_solicitado_id=polo_id)
+    if status:
+        solicitacoes = solicitacoes.filter(status_agendamento=status)
+    if busca:
+        solicitacoes = solicitacoes.filter(
+            Q(oferta__disciplina__codigo__icontains=busca)
+            | Q(oferta__disciplina__nome__icontains=busca)
+            | Q(oferta__docente_responsavel__nome__icontains=busca)
+            | Q(oferta__docente_colaborador__nome__icontains=busca)
+        )
+
+    if request.method == "POST":
+        aula = get_object_or_404(AulaPresencialOferta.objects.select_related("polo_solicitado"), pk=request.POST.get("aula_id"))
+        acao = request.POST.get("acao")
+        sala = None
+        if acao == "atender":
+            sala = get_object_or_404(Sala.objects.select_related("polo"), pk=request.POST.get("sala"))
+        try:
+            atender_solicitacao_aula_presencial(
+                aula=aula,
+                usuario=request.user,
+                sala=sala,
+                observacao=request.POST.get("observacao", ""),
+            )
+            messages.success(request, "Solicitação de aula presencial atualizada.")
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+        query_string = request.GET.urlencode()
+        destino = reverse("agendamentos_aulas_presenciais")
+        return redirect(f"{destino}?{query_string}" if query_string else destino)
+
+    salas_por_polo = {}
+    for sala in Sala.objects.filter(ativa=True, polo__ativo=True).select_related("polo").order_by("nome"):
+        salas_por_polo.setdefault(sala.polo_id, []).append(sala)
+    for solicitacao in solicitacoes:
+        solicitacao.salas_disponiveis = salas_por_polo.get(solicitacao.polo_solicitado_id, [])
+
+    return render(request, "processos/agendamentos_aulas_presenciais.html", {
+        "solicitacoes": solicitacoes,
+        "periodos": PeriodoLetivo.objects.order_by("-nome"),
+        "polos": Polo.objects.filter(ativo=True).order_by("nome"),
+        "status_agendamento": AulaPresencialOferta.StatusAgendamento.choices,
+        "filtros": {"periodo": periodo_id or "", "polo": polo_id or "", "status": status or "", "busca": busca},
+    })
 
 
 @login_required
