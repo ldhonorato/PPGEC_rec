@@ -2421,7 +2421,15 @@ class Documento(models.Model):
     )
     titulo = models.CharField(max_length=255, verbose_name="Título")
     texto = models.TextField(blank=True)
-    arquivo = models.FileField(upload_to="documentos/processos/", blank=True, null=True)
+    # O limite padrao do FileField e 100 e inclui o prefixo de upload. Isso
+    # deixava menos de 80 caracteres para o nome original e fazia o storage
+    # levantar SuspiciousFileOperation somente no momento de salvar.
+    arquivo = models.FileField(
+        upload_to="documentos/processos/",
+        max_length=255,
+        blank=True,
+        null=True,
+    )
     restrito = models.BooleanField(default=False)
     restricao_tipo = models.CharField(
         max_length=40,

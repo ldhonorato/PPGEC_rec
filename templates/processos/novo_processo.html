@@ -192,6 +192,11 @@
             }
             const arquivoAtual = inputArquivo.files[0];
             const nomeArquivo = arquivoAtual.name || "";
+            const maxFilenameLength = 230;
+            if (nomeArquivo.length > maxFilenameLength) {
+                alert(`O nome do arquivo é maior que o permitido. Use no máximo ${maxFilenameLength} caracteres, incluindo a extensão.`);
+                return;
+            }
             const extensao = nomeArquivo.includes(".") ? nomeArquivo.slice(nomeArquivo.lastIndexOf(".")).toLowerCase() : "";
             if (!allowedExtensions.has(extensao)) {
                 alert("Formato nao permitido. Envie PDF, arquivos Office ou imagens.");
