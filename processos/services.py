@@ -12,6 +12,7 @@ from django.utils import timezone
 from .models import (
     AlteracaoMatricula,
     Aluno,
+    AmbienteAulaPresencial,
     AulaPresencialOferta,
     Docente,
     ItemSolicitacaoMatricula,
@@ -262,9 +263,9 @@ def salvar_planejamento_presencial_oferta(*, oferta, usuario, selecoes):
 
     chaves = set()
 
-    for aula in oferta.aulas_presenciais.select_related("reserva"):
-        if aula.reserva:
-            aula.reserva.excluir(usuario=usuario, justificativa="Alteração do planejamento presencial da oferta.")
+    for aula in oferta.aulas_presenciais.prefetch_related("ambientes_reservados__reserva"):
+        for ambiente in aula.ambientes_reservados.all():
+            ambiente.reserva.excluir(usuario=usuario, justificativa="Alteração do planejamento presencial da oferta.")
         aula.delete()
 
     for selecao in selecoes:
@@ -298,39 +299,47 @@ def salvar_planejamento_presencial_oferta(*, oferta, usuario, selecoes):
 
 
 @transaction.atomic
-def atender_solicitacao_aula_presencial(*, aula, usuario, sala=None, observacao=""):
+def atender_solicitacao_aula_presencial(*, aula, usuario, salas=None, observacao=""):
     aula = (
         AulaPresencialOferta.objects.select_for_update()
-        .select_related("oferta__disciplina", "oferta__docente_responsavel", "polo_solicitado", "reserva")
+        .select_related("oferta__disciplina", "oferta__docente_responsavel", "polo_solicitado")
+        .prefetch_related("ambientes_reservados__reserva")
         .get(pk=aula.pk)
     )
     observacao = (observacao or "").strip()
-    if aula.reserva_id:
-        aula.reserva.excluir(usuario=usuario, justificativa="Alteração do atendimento da solicitação de aula presencial.")
-        aula.reserva = None
-        aula.sala = None
+    salas = list(salas or [])
+    polos = [sala.polo_id for sala in salas]
+    if len(polos) != len(set(polos)):
+        raise ValidationError("Selecione no máximo uma sala em cada polo.")
 
-    if sala is None:
+    if not salas:
         if not observacao:
             raise ValidationError("Informe o motivo do não atendimento.")
+    else:
+        if any(not sala.ativa or not sala.polo.ativo for sala in salas):
+            raise ValidationError("Selecione apenas salas e polos ativos.")
+
+    for ambiente in aula.ambientes_reservados.all():
+        ambiente.reserva.excluir(usuario=usuario, justificativa="Alteração do atendimento da solicitação de aula presencial.")
+    aula.ambientes_reservados.all().delete()
+
+    if not salas:
         aula.status_agendamento = AulaPresencialOferta.StatusAgendamento.NAO_ATENDIDA
     else:
-        if sala.polo_id != aula.polo_solicitado_id or not sala.ativa or not sala.polo.ativo:
-            raise ValidationError("Selecione uma sala ativa do polo solicitado.")
         inicio = timezone.make_aware(datetime.combine(aula.data, aula.hora_inicio))
         fim = timezone.make_aware(datetime.combine(aula.data, aula.hora_fim))
-        reserva = ReservaAmbiente(
-            sala=sala,
-            docente=aula.oferta.docente_responsavel,
-            criado_por=usuario,
-            tipo=ReservaAmbiente.TipoReserva.AULA,
-            titulo=f"Aula presencial - {aula.oferta.disciplina.codigo} - {aula.oferta.disciplina.nome}",
-            inicio=inicio,
-            fim=fim,
-        )
-        reserva.save()
-        aula.sala = sala
-        aula.reserva = reserva
+        for sala in salas:
+            reserva = ReservaAmbiente(
+                sala=sala,
+                docente=aula.oferta.docente_responsavel,
+                criado_por=usuario,
+                tipo=ReservaAmbiente.TipoReserva.AULA,
+                titulo=f"Aula presencial - {aula.oferta.disciplina.codigo} - {aula.oferta.disciplina.nome}",
+                inicio=inicio,
+                fim=fim,
+            )
+            reserva.save()
+            AmbienteAulaPresencial.objects.create(aula=aula, sala=sala, reserva=reserva)
         aula.status_agendamento = AulaPresencialOferta.StatusAgendamento.ATENDIDA
 
     aula.observacao_atendimento = observacao

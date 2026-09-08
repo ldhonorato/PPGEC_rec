@@ -992,20 +992,6 @@ class AulaPresencialOferta(models.Model):
         on_delete=models.PROTECT,
         related_name="solicitacoes_aulas_presenciais",
     )
-    sala = models.ForeignKey(
-        "Sala",
-        on_delete=models.PROTECT,
-        related_name="aulas_presenciais_ofertas",
-        null=True,
-        blank=True,
-    )
-    reserva = models.OneToOneField(
-        "ReservaAmbiente",
-        on_delete=models.PROTECT,
-        related_name="aula_presencial_oferta",
-        null=True,
-        blank=True,
-    )
     status_agendamento = models.CharField(
         max_length=15,
         choices=StatusAgendamento.choices,
@@ -1051,10 +1037,6 @@ class AulaPresencialOferta(models.Model):
             errors["encontro"] = "O encontro deve pertencer à oferta."
         if self.polo_solicitado_id and not self.polo_solicitado.ativo:
             errors["polo_solicitado"] = "Selecione um polo ativo."
-        if self.sala_id and self.sala.polo_id != self.polo_solicitado_id:
-            errors["sala"] = "A sala reservada deve pertencer ao polo solicitado."
-        if self.status_agendamento == self.StatusAgendamento.ATENDIDA and not (self.sala_id and self.reserva_id):
-            errors["status_agendamento"] = "Uma solicitação atendida deve possuir sala e reserva."
         if self.status_agendamento == self.StatusAgendamento.NAO_ATENDIDA and not self.observacao_atendimento.strip():
             errors["observacao_atendimento"] = "Informe o motivo do não atendimento."
         if self.hora_inicio and self.hora_fim and self.hora_fim <= self.hora_inicio:
@@ -1072,6 +1054,22 @@ class AulaPresencialOferta(models.Model):
             self.hora_fim = self.hora_fim or self.encontro.hora_fim
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+class AmbienteAulaPresencial(models.Model):
+    aula = models.ForeignKey(AulaPresencialOferta, on_delete=models.CASCADE, related_name="ambientes_reservados")
+    sala = models.ForeignKey("Sala", on_delete=models.PROTECT, related_name="alocacoes_aulas_presenciais")
+    reserva = models.OneToOneField("ReservaAmbiente", on_delete=models.PROTECT, related_name="ambiente_aula_presencial")
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sala__polo__nome", "sala__nome"]
+        constraints = [
+            models.UniqueConstraint(fields=["aula", "sala"], name="unique_sala_por_aula_presencial"),
+        ]
+
+    def __str__(self):
+        return f"{self.aula} - {self.sala}"
 
 
 class SolicitacaoMatricula(models.Model):
