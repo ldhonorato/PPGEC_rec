@@ -14,6 +14,13 @@
         <span>Ao enviar, o processo segue para a <strong>Secretaria PPGEC</strong>,
         que faz a triagem e o encaminha ao setor responsável.</span>
     </p>
+    {% if user.tipo_usuario == "DOCENTE" %}
+    <p class="formulario-aviso">
+        <svg aria-hidden="true"><use href="#i-caixa"></use></svg>
+        <span>Solicitações de banca podem ser realizadas preenchendo o
+        <a href="{% url 'solicitacoes_banca' %}">formulário em /bancas/</a>.</span>
+    </p>
+    {% endif %}
 
     {% comment %}
     Formulario de entrada, nao de filtro.
@@ -185,6 +192,11 @@
             }
             const arquivoAtual = inputArquivo.files[0];
             const nomeArquivo = arquivoAtual.name || "";
+            const maxFilenameLength = 230;
+            if (nomeArquivo.length > maxFilenameLength) {
+                alert(`O nome do arquivo é maior que o permitido. Use no máximo ${maxFilenameLength} caracteres, incluindo a extensão.`);
+                return;
+            }
             const extensao = nomeArquivo.includes(".") ? nomeArquivo.slice(nomeArquivo.lastIndexOf(".")).toLowerCase() : "";
             if (!allowedExtensions.has(extensao)) {
                 alert("Formato nao permitido. Envie PDF, arquivos Office ou imagens.");

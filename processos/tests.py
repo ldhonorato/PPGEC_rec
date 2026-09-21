@@ -27,7 +27,7 @@ from .declaracoes_vinculo import (
     importar_declaracoes_de_vinculo,
     periodo_em_curso,
 )
-from .forms import SetorComissaoForm
+from .forms import DocumentoCadastroForm, SetorComissaoForm
 from .models import (
     AlteracaoAluno,
     AlteracaoMatricula,
@@ -149,6 +149,42 @@ class MetasPlanejamentoTests(TestCase):
         })
         self.assertEqual(response.status_code, 403)
         self.assertFalse(MetaPlanejamentoEstrategico.objects.exists())
+class DocumentoUploadValidationTests(SimpleTestCase):
+    def _form_com_arquivo(self, nome):
+        return DocumentoCadastroForm(
+            {
+                "titulo": "Documento",
+                "tipo_documento": Documento.TipoDocumento.REQUERIMENTO,
+                "restricao_tipo": Documento.RestricaoAcesso.NAO,
+            },
+            {
+                "arquivo": SimpleUploadedFile(
+                    nome,
+                    b"conteudo-pdf",
+                    content_type="application/pdf",
+                )
+            },
+        )
+
+    def test_aceita_nome_maior_que_o_antigo_limite_do_caminho(self):
+        nome = f"{'a' * 145}.pdf"
+
+        form = self._form_com_arquivo(nome)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(Documento._meta.get_field("arquivo").max_length, 255)
+
+    def test_informa_quando_nome_do_arquivo_excede_limite(self):
+        nome = f"{'a' * 227}.pdf"
+
+        form = self._form_com_arquivo(nome)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn(
+            "O nome do arquivo é maior que o permitido",
+            form.errors["arquivo"][0],
+        )
+        self.assertIn("230 caracteres", form.errors["arquivo"][0])
 
 
 class PrazosTrajetoriaTests(TestCase):
@@ -191,6 +227,7 @@ class PrazosTrajetoriaTests(TestCase):
         )
         self.assertEqual(trajetoria.prazo_limite_regimental, original)
         self.assertEqual(trajetoria.meses_prorrogados, 3)
+        self.assertEqual(trajetoria.prazo_limite_efetivo, date(2027, 5, 28))
 
     def test_prorrogacoes_respeitam_o_total_regimental(self):
         trajetoria = self.criar_trajetoria(Aluno.NivelCurso.MESTRADO)
@@ -211,6 +248,18 @@ class PrazosTrajetoriaTests(TestCase):
         )
         self.assertEqual(trajetoria.prazo_limite_regimental, date(2027, 2, 28))
         self.assertEqual(trajetoria.prazo_limite_efetivo, date(2027, 3, 30))
+
+    def test_limite_efetivo_combina_prorrogacoes_e_trancamentos(self):
+        trajetoria = self.criar_trajetoria(Aluno.NivelCurso.MESTRADO)
+        ProrrogacaoTrajetoria.objects.create(
+            trajetoria=trajetoria, meses=3, registrado_por=self.servidor,
+        )
+        TrancamentoTrajetoria.objects.create(
+            trajetoria=trajetoria, data_inicio=date(2025, 6, 1), data_fim=date(2025, 6, 30),
+            registrado_por=self.servidor,
+        )
+
+        self.assertEqual(trajetoria.prazo_limite_efetivo, date(2027, 6, 27))
 
     def test_qualificacao_doutorado_vence_no_quinto_semestre(self):
         trajetoria = TrajetoriaAcademica.objects.create(
@@ -1802,7 +1851,7 @@ class MatriculaViewsTests(TestCase):
         self.assertNotIn(self.aluno.nome, xml_planilhas(consolidada))
 
     @patch("processos.views.send_email_secretaria_planejamento_presencial.delay")
-    def test_planejamento_presencial_cria_reserva_para_oferta_hibrida(self, mock_email):
+    def test_planejamento_presencial_cria_solicitacao_pendente_para_oferta_hibrida(self, mock_email):
         self.oferta.modalidade = OfertaDisciplina.Modalidade.HIBRIDA
         self.oferta.save(update_fields=["modalidade"])
         polo = Polo.objects.create(nome="Polo Matrícula")
@@ -1826,16 +1875,17 @@ class MatriculaViewsTests(TestCase):
                 "aula_encontro": str(encontro.pk),
                 "aula_hora_inicio": encontro.hora_inicio.strftime("%H:%M"),
                 "aula_hora_fim": encontro.hora_fim.strftime("%H:%M"),
-                "aula_sala": str(sala.pk),
+                "aula_polo": str(polo.pk),
             },
         )
 
         self.assertEqual(response.status_code, 302)
         aula = AulaPresencialOferta.objects.get(oferta=self.oferta)
-        self.assertEqual(aula.sala, sala)
+        self.assertEqual(aula.polo_solicitado, polo)
+        self.assertEqual(aula.status_agendamento, AulaPresencialOferta.StatusAgendamento.PENDENTE)
+        self.assertFalse(aula.ambientes_reservados.exists())
         self.assertEqual(aula.hora_inicio, encontro.hora_inicio)
         self.assertEqual(aula.hora_fim, encontro.hora_fim)
-        self.assertEqual(aula.reserva.sala, sala)
         mock_email.assert_called_once_with(self.oferta.pk, self.docente.pk)
 
     def test_filtro_exibe_oferta_hibrida_nao_conforme(self):
@@ -1870,7 +1920,7 @@ class MatriculaViewsTests(TestCase):
                 "aula_encontro": "",
                 "aula_hora_inicio": "10:00",
                 "aula_hora_fim": "12:30",
-                "aula_sala": str(sala.pk),
+                "aula_polo": str(polo.pk),
             },
         )
 
@@ -1880,10 +1930,130 @@ class MatriculaViewsTests(TestCase):
         self.assertEqual(aula.hora_inicio, time(10, 0))
         self.assertEqual(aula.hora_fim, time(12, 30))
         self.assertEqual(aula.carga_horaria_minutos, 150)
-        # A reserva e gravada em UTC; compara no fuso local, como faz a aplicacao.
-        self.assertEqual(timezone.localtime(aula.reserva.inicio).time(), time(10, 0))
-        self.assertEqual(timezone.localtime(aula.reserva.fim).time(), time(12, 30))
+        self.assertEqual(aula.polo_solicitado, polo)
+        self.assertEqual(aula.status_agendamento, AulaPresencialOferta.StatusAgendamento.PENDENTE)
+        self.assertFalse(aula.ambientes_reservados.exists())
         mock_email.assert_called_once_with(self.oferta.pk, self.docente.pk)
+
+    def test_secretaria_atende_solicitacao_e_docente_acompanha_status(self):
+        self.oferta.modalidade = OfertaDisciplina.Modalidade.HIBRIDA
+        self.oferta.save(update_fields=["modalidade"])
+        polo = Polo.objects.create(nome="Polo Atendimento")
+        sala = Sala.objects.create(polo=polo, nome="Sala Atendimento", capacidade=30)
+        data_aula = self.periodo.data_inicio
+        DisponibilidadeSala.objects.create(
+            sala=sala, dia_semana=data_aula.weekday(), hora_inicio=time(8), hora_fim=time(18)
+        )
+        aula = AulaPresencialOferta.objects.create(
+            oferta=self.oferta, data=data_aula, hora_inicio=time(10), hora_fim=time(12),
+            polo_solicitado=polo, criado_por=self.docente,
+        )
+        self.client.force_login(self.secretaria)
+
+        response = self.client.post(reverse("agendamentos_aulas_presenciais"), {
+            "acao": "atender", "aula_id": aula.pk, "salas": [sala.pk],
+            "observacao": "Sala preparada.",
+        })
+
+        self.assertEqual(response.status_code, 302)
+        aula.refresh_from_db()
+        self.assertEqual(aula.status_agendamento, AulaPresencialOferta.StatusAgendamento.ATENDIDA)
+        ambiente = aula.ambientes_reservados.get()
+        self.assertEqual(ambiente.sala, sala)
+        self.assertEqual(ambiente.reserva.sala, sala)
+        self.client.force_login(self.docente)
+        acompanhamento = self.client.get(reverse("matricula_oferta_planejamento_presencial", args=[self.oferta.pk]))
+        self.assertContains(acompanhamento, "Atendida")
+        self.assertContains(acompanhamento, "Sala Atendimento")
+
+    def test_docente_ve_suas_ofertas_antes_das_demais(self):
+        outro_docente = Docente.objects.create_user(
+            email="outro.docente@example.com", nome="Outro Docente", password="senha-segura-123"
+        )
+        outra_disciplina = Disciplina.objects.create(codigo="OUT01", nome="Outra Disciplina", creditos=2, carga_horaria=30)
+        OfertaDisciplina.objects.create(
+            periodo=self.periodo, disciplina=outra_disciplina, docente_responsavel=outro_docente,
+            modalidade=OfertaDisciplina.Modalidade.PRESENCIAL, vagas_regulares=10,
+            criada_por=self.secretaria,
+        )
+        self.client.force_login(self.docente)
+        response = self.client.get(reverse("matriculas_ofertas"))
+        conteudo = response.content.decode()
+        self.assertLess(conteudo.index("Minhas disciplinas ofertadas"), conteudo.index("Demais disciplinas ofertadas"))
+
+    def test_agendamentos_abre_com_pendentes_e_paginacao(self):
+        self.oferta.modalidade = OfertaDisciplina.Modalidade.HIBRIDA
+        self.oferta.save(update_fields=["modalidade"])
+        polo = Polo.objects.create(nome="Polo Fila")
+        aulas = [
+            AulaPresencialOferta(
+                oferta=self.oferta, data=self.periodo.data_inicio + timedelta(days=indice),
+                hora_inicio=time(8), hora_fim=time(9), polo_solicitado=polo, criado_por=self.docente,
+            ) for indice in range(21)
+        ]
+        AulaPresencialOferta.objects.bulk_create(aulas)
+        atendida = AulaPresencialOferta.objects.create(
+            oferta=self.oferta, data=self.periodo.data_inicio, hora_inicio=time(9), hora_fim=time(10),
+            polo_solicitado=polo, criado_por=self.docente,
+            status_agendamento=AulaPresencialOferta.StatusAgendamento.NAO_ATENDIDA,
+            observacao_atendimento="Sem disponibilidade.",
+        )
+        self.client.force_login(self.secretaria)
+
+        response = self.client.get(reverse("agendamentos_aulas_presenciais"))
+
+        self.assertEqual(response.context["pagina"].paginator.per_page, 20)
+        self.assertEqual(response.context["pagina"].paginator.count, 21)
+        self.assertNotContains(response, atendida.observacao_atendimento)
+
+    def test_demanda_de_alunos_por_polo_e_carregada_em_rota_separada(self):
+        self.oferta.modalidade = OfertaDisciplina.Modalidade.HIBRIDA
+        self.oferta.save(update_fields=["modalidade"])
+        polo = Polo.objects.create(nome="Polo Demanda Assíncrona")
+        self.aluno.polo_atuacao = polo
+        self.aluno.save(update_fields=["polo_atuacao"])
+        salvar_solicitacao_matricula(
+            aluno=self.aluno, periodo=self.periodo,
+            tipo_aluno=SolicitacaoMatricula.TipoAluno.REGULAR, ofertas=[self.oferta],
+        )
+        aula = AulaPresencialOferta.objects.create(
+            oferta=self.oferta, data=self.periodo.data_inicio, hora_inicio=time(10), hora_fim=time(11),
+            polo_solicitado=polo, criado_por=self.docente,
+        )
+        self.client.force_login(self.secretaria)
+
+        lista = self.client.get(reverse("agendamentos_aulas_presenciais"))
+        detalhe = self.client.get(reverse("agendamento_aula_presencial_alunos_polos", args=[aula.pk]))
+
+        self.assertNotContains(lista, "Polo Demanda Assíncrona</span><strong>1")
+        self.assertContains(detalhe, "Polo Demanda Assíncrona")
+        self.assertContains(detalhe, "1")
+
+    def test_secretaria_reserva_uma_sala_em_cada_polo(self):
+        self.oferta.modalidade = OfertaDisciplina.Modalidade.HIBRIDA
+        self.oferta.save(update_fields=["modalidade"])
+        polos = [Polo.objects.create(nome=f"Polo Transmissão {indice}") for indice in range(2)]
+        salas = [Sala.objects.create(polo=polo, nome="Sala de transmissão", capacidade=20) for polo in polos]
+        data_aula = self.periodo.data_inicio
+        for sala in salas:
+            DisponibilidadeSala.objects.create(
+                sala=sala, dia_semana=data_aula.weekday(), hora_inicio=time(8), hora_fim=time(18)
+            )
+        aula = AulaPresencialOferta.objects.create(
+            oferta=self.oferta, data=data_aula, hora_inicio=time(14), hora_fim=time(16),
+            polo_solicitado=polos[0], criado_por=self.docente,
+        )
+        self.client.force_login(self.secretaria)
+
+        response = self.client.post(reverse("agendamentos_aulas_presenciais"), {
+            "acao": "atender", "aula_id": aula.pk, "salas": [sala.pk for sala in salas],
+        })
+
+        self.assertEqual(response.status_code, 302)
+        aula.refresh_from_db()
+        self.assertEqual(aula.status_agendamento, AulaPresencialOferta.StatusAgendamento.ATENDIDA)
+        self.assertEqual(aula.ambientes_reservados.count(), 2)
+        self.assertEqual({item.sala.polo_id for item in aula.ambientes_reservados.select_related("sala")}, {polo.pk for polo in polos})
 
     @patch("processos.views.send_email_alunos_sem_matricula.delay")
     def test_gestao_lista_alunos_sem_matricula_e_envia_email(self, mock_email):
@@ -4116,6 +4286,40 @@ class SolicitacaoBancaTests(TestCase):
         self.assertNotContains(response, str(propria))
         self.assertNotContains(response, str(outra))
 
+    def test_detalhe_do_processo_exibe_aluno_interessado_com_link_para_ficha(self):
+        processo = Processo.objects.create(
+            usuario_criado_por=self.docente,
+            aluno_interessado=self.aluno_mestrado,
+            tipo=Processo.TipoProcesso.OUTRO,
+            assunto="Processo com aluno interessado",
+            descricao="Teste do vínculo para a ficha do aluno.",
+            setor_atual=self.setor_secretaria,
+        )
+        self.client.force_login(self.docente)
+
+        response = self.client.get(reverse("processo_detalhe", args=[processo.id]))
+
+        self.assertContains(
+            response,
+            f'href="{reverse("aluno_detalhe", args=[self.aluno_mestrado.id])}"',
+        )
+        self.assertContains(response, self.aluno_mestrado.nome)
+
+    def test_novo_processo_orienta_docente_sobre_formulario_de_banca(self):
+        self.client.force_login(self.docente)
+
+        response = self.client.get(reverse("novo_processo"))
+
+        self.assertContains(response, "Solicitações de banca podem ser realizadas")
+        self.assertContains(response, f'href="{reverse("solicitacoes_banca")}"')
+
+    def test_novo_processo_nao_exibe_orientacao_de_banca_para_aluno(self):
+        self.client.force_login(self.aluno_mestrado)
+
+        response = self.client.get(reverse("novo_processo"))
+
+        self.assertNotContains(response, "Solicitações de banca podem ser realizadas")
+
     @patch("processos.views.send_email_novo_processo_secretaria.delay")
     @patch("processos.views.send_email_novo_processo_orientador.delay")
     @patch("processos.views.send_email_novo_processo_aluno.delay")
@@ -4166,7 +4370,9 @@ class SolicitacaoBancaTests(TestCase):
         self.assertFalse(Processo.objects.filter(assunto="Processo inválido").exists())
 
     @patch("processos.tasks._send_email")
-    def test_email_do_pleno_usa_aluno_interessado_e_orientador(self, enviar_email):
+    def test_email_do_pleno_inclui_dados_do_processo_e_ultimo_encaminhamento(self, enviar_email):
+        from django.template.loader import render_to_string
+
         from .tasks import send_email_movimentacao_pleno
 
         processo = Processo.objects.create(
@@ -4177,6 +4383,13 @@ class SolicitacaoBancaTests(TestCase):
             descricao="Documentação anexada.",
             setor_atual=self.setor_secretaria,
         )
+        pleno, _ = Setor.objects.get_or_create(nome=Setor.NOME_PLENO)
+        encaminhamento = processo.encaminhar(
+            setor_destino=pleno,
+            encaminhado_por=self.servidor,
+            observacao="Favor incluir o processo na próxima pauta.",
+            prazo_limite=timezone.localdate() + timedelta(days=7),
+        )
 
         send_email_movimentacao_pleno.run(processo.id)
 
@@ -4184,7 +4397,13 @@ class SolicitacaoBancaTests(TestCase):
         contexto = enviar_email.call_args.kwargs["contexto"]
         self.assertEqual(contexto["aluno"].id, self.aluno_mestrado.id)
         self.assertEqual(contexto["orientador"].id, self.docente.id)
+        self.assertEqual(contexto["ultimo_encaminhamento"].id, encaminhamento.id)
         self.assertIn(self.aluno_mestrado.nome, enviar_email.call_args.kwargs["subject"])
+        corpo = render_to_string("emails/pleno/novo_processo_pleno.html", contexto)
+        self.assertIn("Banca encaminhada ao Pleno", corpo)
+        self.assertIn("Documentação anexada.", corpo)
+        self.assertIn("Último encaminhamento", corpo)
+        self.assertIn("Favor incluir o processo na próxima pauta.", corpo)
 
     @patch("processos.views.send_email_novo_processo_secretaria.delay")
     @patch("processos.views.send_email_novo_processo_orientador.delay")
@@ -4738,6 +4957,31 @@ class ReservaAmbienteTests(TestCase):
         self.assertContains(response, "Defesa no polo norte")
         self.assertNotContains(response, "Aula de algoritmos")
 
+    def test_reservas_feitas_sao_paginadas_preservando_filtros(self):
+        ReservaAmbiente.objects.bulk_create([
+            ReservaAmbiente(
+                sala=self.sala,
+                docente=self.docente,
+                criado_por=self.servidor,
+                tipo=ReservaAmbiente.TipoReserva.AULA,
+                titulo=f"Reserva paginada {indice:02d}",
+                inicio=self._dt(indice, 9),
+                fim=self._dt(indice, 10),
+            )
+            for indice in range(1, 22)
+        ])
+        self.client.force_login(self.servidor)
+
+        primeira = self.client.get(reverse("reservas_ambientes_feitas"), {"tipo": ReservaAmbiente.TipoReserva.AULA})
+        segunda = self.client.get(reverse("reservas_ambientes_feitas"), {"tipo": ReservaAmbiente.TipoReserva.AULA, "page": 2})
+
+        self.assertEqual(primeira.context["pagina"].paginator.per_page, 20)
+        self.assertEqual(primeira.context["pagina"].paginator.count, 21)
+        self.assertContains(primeira, "Página")
+        self.assertContains(primeira, "de 2")
+        self.assertContains(primeira, "tipo=AULA")
+        self.assertEqual(len(segunda.context["reservas"]), 1)
+
     def test_docente_visualiza_apenas_suas_reservas(self):
         outro_docente = Docente.objects.create(
             email="outro.docente.reserva@example.com",
@@ -5289,6 +5533,11 @@ class TemplatesSintaxeTests(SimpleTestCase):
     def _templates():
         return sorted(Path(settings.BASE_DIR).joinpath("templates").rglob("*.html"))
 
+    def test_detalhe_do_processo_nao_oferece_botao_para_registrar_horas(self):
+        template = Path(settings.BASE_DIR, "templates", "processos", "processo_detalhe.html")
+
+        self.assertNotIn("btn-abrir-modal-horas", template.read_text(encoding="utf-8"))
+
     def test_comentario_de_uma_linha_nao_abre_sem_fechar(self):
         """{# ... #} e sempre de uma linha so.
 
@@ -5795,8 +6044,21 @@ class TrajetoriasNaFichaDoAlunoTests(TestCase):
         rotulos_doutorado = {linha["rotulo"] for linha in _linhas_trajetoria(self.ativa)}
         self.assertIn("Orientador", rotulos_doutorado)
         self.assertIn("Prazo defesa", rotulos_doutorado)
+        self.assertIn("Limite efetivo para defesa", rotulos_doutorado)
         # "Nivel" saiu: o titulo do bloco ja e o nivel do curso.
         self.assertNotIn("Nível", rotulos_doutorado)
+
+    def test_limite_efetivo_exibe_tooltip_sobre_trancamentos_e_prorrogacoes(self):
+        self.client.force_login(self.aluno)
+
+        response = self.client.get(self.url)
+
+        self.assertContains(response, "Limite efetivo para defesa")
+        self.assertContains(
+            response,
+            "calculado considerando os períodos de trancamento e as prorrogações concedidas",
+        )
+        self.assertContains(response, 'class="field-tooltip"')
 
     def test_conclusao_junta_numero_e_data_da_ata(self):
         linhas = {linha["rotulo"]: linha["valor"] for linha in _linhas_trajetoria(self.concluida)}

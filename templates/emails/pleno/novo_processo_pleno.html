@@ -21,6 +21,10 @@
         <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.assunto}}</td>
       </tr>
       <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold; vertical-align:top;">Descrição</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.descricao|linebreaksbr}}</td>
+      </tr>
+      <tr>
         <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Aluno</td>
         <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{aluno.nome}}</td>
       </tr>
@@ -29,6 +33,30 @@
         <td style="padding: 8px;">{{orientador.nome}}</td>
       </tr>
     </table>
+    {% if ultimo_encaminhamento %}
+    <h3 style="color:#1a3a5c; margin:24px 0 8px;">Último encaminhamento</h3>
+    <table style="width:100%; border-collapse:collapse; margin: 8px 0 16px;">
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Movimentação</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">
+          {{ultimo_encaminhamento.setor_origem.nome|default:"Sem setor de origem"}}
+          &rarr; {{ultimo_encaminhamento.setor_destino.nome}}
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Encaminhado por</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{ultimo_encaminhamento.encaminhado_por.nome}}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Data</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{ultimo_encaminhamento.data_encaminhamento|date:"d/m/Y H:i"}}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; font-weight:bold; vertical-align:top;">Despacho</td>
+        <td style="padding: 8px;">{{ultimo_encaminhamento.observacao|default:"Sem observações."|linebreaksbr}}</td>
+      </tr>
+    </table>
+    {% endif %}
     <p style="text-align:center; margin-top: 24px;">
       <a href="{{ site_url }}/processos/{{ processo.id }}/"
          style="background:#6CC858; color:white; padding:12px 28px;

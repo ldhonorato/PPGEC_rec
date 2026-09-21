@@ -42,6 +42,8 @@ from processos.views import (
     disponibilidade_ambientes_view,
     home_view,
     importar_ingressantes_view,
+    agendamentos_aulas_presenciais_view,
+    agendamento_aula_presencial_alunos_polos_view,
     matricula_minha_solicitacao_view,
     matricula_oferta_alunos_view,
     matricula_oferta_exportar_view,
@@ -175,6 +177,8 @@ urlpatterns = [
     path("gestao/matriculas/solicitacoes/exportar/", matriculas_solicitacoes_exportar_view, name="matriculas_solicitacoes_exportar"),
     path("gestao/matriculas/disciplinas/", matriculas_disciplinas_view, name="matriculas_disciplinas"),
     path("gestao/matriculas/ofertas/", matriculas_ofertas_view, name="matriculas_ofertas"),
+    path("gestao/matriculas/agendamentos-presenciais/", agendamentos_aulas_presenciais_view, name="agendamentos_aulas_presenciais"),
+    path("gestao/matriculas/agendamentos-presenciais/<int:aula_id>/alunos-polos/", agendamento_aula_presencial_alunos_polos_view, name="agendamento_aula_presencial_alunos_polos"),
     path("gestao/matriculas/ofertas/<int:oferta_id>/alunos/", matricula_oferta_alunos_view, name="matricula_oferta_alunos"),
     path("gestao/matriculas/ofertas/<int:oferta_id>/exportar/", matricula_oferta_exportar_view, name="matricula_oferta_exportar"),
     path(

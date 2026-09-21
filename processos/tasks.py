@@ -387,11 +387,18 @@ def send_email_movimentacao_pleno(self, processo_id: int):
 
     docentes = User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE)#pega todos os usuários do tipo docente
     aluno = processo.obter_aluno_interessado()
+    ultimo_encaminhamento = (
+        processo.tramitacoes
+        .select_related("setor_origem", "setor_destino", "encaminhado_por")
+        .order_by("-data_encaminhamento", "-pk")
+        .first()
+    )
 
     contexto={
         "processo": processo,
         "aluno": aluno,
-        "orientador": processo.obter_orientador_responsavel()
+        "orientador": processo.obter_orientador_responsavel(),
+        "ultimo_encaminhamento": ultimo_encaminhamento,
     }
 
     try:

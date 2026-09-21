@@ -12,6 +12,7 @@ from django.utils import timezone
 from .models import (
     AlteracaoMatricula,
     Aluno,
+    AmbienteAulaPresencial,
     AulaPresencialOferta,
     Docente,
     ItemSolicitacaoMatricula,
@@ -260,12 +261,11 @@ def salvar_planejamento_presencial_oferta(*, oferta, usuario, selecoes):
     if oferta.modalidade != OfertaDisciplina.Modalidade.HIBRIDA:
         raise ValidationError("Apenas disciplinas híbridas possuem planejamento de aulas presenciais.")
 
-    titulo = f"Aula presencial - {oferta.disciplina.codigo} - {oferta.disciplina.nome}"
     chaves = set()
 
-    for aula in oferta.aulas_presenciais.select_related("reserva"):
-        if aula.reserva:
-            aula.reserva.excluir(usuario=usuario, justificativa="Alteração do planejamento presencial da oferta.")
+    for aula in oferta.aulas_presenciais.prefetch_related("ambientes_reservados__reserva"):
+        for ambiente in aula.ambientes_reservados.all():
+            ambiente.reserva.excluir(usuario=usuario, justificativa="Alteração do planejamento presencial da oferta.")
         aula.delete()
 
     for selecao in selecoes:
@@ -273,7 +273,7 @@ def salvar_planejamento_presencial_oferta(*, oferta, usuario, selecoes):
         if selecao.get("encontro_id"):
             encontro = oferta.encontros.get(pk=selecao["encontro_id"])
         data = selecao["data"]
-        sala = selecao["sala"]
+        polo = selecao["polo"]
         hora_inicio = selecao["hora_inicio"] or getattr(encontro, "hora_inicio", None)
         hora_fim = selecao["hora_fim"] or getattr(encontro, "hora_fim", None)
         if not data or not hora_inicio or not hora_fim:
@@ -285,30 +285,68 @@ def salvar_planejamento_presencial_oferta(*, oferta, usuario, selecoes):
             raise ValidationError("Há aulas presenciais duplicadas com a mesma data e horário.")
         chaves.add(chave)
 
-        inicio = timezone.make_aware(datetime.combine(data, hora_inicio))
-        fim = timezone.make_aware(datetime.combine(data, hora_fim))
-        reserva = ReservaAmbiente(
-            sala=sala,
-            docente=oferta.docente_responsavel,
-            criado_por=usuario,
-            tipo=ReservaAmbiente.TipoReserva.AULA,
-            titulo=titulo,
-            inicio=inicio,
-            fim=fim,
-        )
-        reserva.save()
         AulaPresencialOferta.objects.create(
             oferta=oferta,
             encontro=encontro,
             data=data,
             hora_inicio=hora_inicio,
             hora_fim=hora_fim,
-            sala=sala,
-            reserva=reserva,
+            polo_solicitado=polo,
             criado_por=usuario,
         )
 
     return oferta
+
+
+@transaction.atomic
+def atender_solicitacao_aula_presencial(*, aula, usuario, salas=None, observacao=""):
+    aula = (
+        AulaPresencialOferta.objects.select_for_update()
+        .select_related("oferta__disciplina", "oferta__docente_responsavel", "polo_solicitado")
+        .prefetch_related("ambientes_reservados__reserva")
+        .get(pk=aula.pk)
+    )
+    observacao = (observacao or "").strip()
+    salas = list(salas or [])
+    polos = [sala.polo_id for sala in salas]
+    if len(polos) != len(set(polos)):
+        raise ValidationError("Selecione no máximo uma sala em cada polo.")
+
+    if not salas:
+        if not observacao:
+            raise ValidationError("Informe o motivo do não atendimento.")
+    else:
+        if any(not sala.ativa or not sala.polo.ativo for sala in salas):
+            raise ValidationError("Selecione apenas salas e polos ativos.")
+
+    for ambiente in aula.ambientes_reservados.all():
+        ambiente.reserva.excluir(usuario=usuario, justificativa="Alteração do atendimento da solicitação de aula presencial.")
+    aula.ambientes_reservados.all().delete()
+
+    if not salas:
+        aula.status_agendamento = AulaPresencialOferta.StatusAgendamento.NAO_ATENDIDA
+    else:
+        inicio = timezone.make_aware(datetime.combine(aula.data, aula.hora_inicio))
+        fim = timezone.make_aware(datetime.combine(aula.data, aula.hora_fim))
+        for sala in salas:
+            reserva = ReservaAmbiente(
+                sala=sala,
+                docente=aula.oferta.docente_responsavel,
+                criado_por=usuario,
+                tipo=ReservaAmbiente.TipoReserva.AULA,
+                titulo=f"Aula presencial - {aula.oferta.disciplina.codigo} - {aula.oferta.disciplina.nome}",
+                inicio=inicio,
+                fim=fim,
+            )
+            reserva.save()
+            AmbienteAulaPresencial.objects.create(aula=aula, sala=sala, reserva=reserva)
+        aula.status_agendamento = AulaPresencialOferta.StatusAgendamento.ATENDIDA
+
+    aula.observacao_atendimento = observacao
+    aula.atendida_por = usuario
+    aula.atendida_em = timezone.now()
+    aula.save()
+    return aula
 
 
 @transaction.atomic

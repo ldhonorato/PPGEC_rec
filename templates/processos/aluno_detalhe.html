@@ -149,7 +149,10 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
                         <ul class="info-list info-list-editavel">
                             {% for linha in card.linhas %}
                                 <li>
-                                    <span class="info-label">{{ linha.rotulo }}</span>
+                                    <span class="info-label">
+                                        {{ linha.rotulo }}
+                                        {% if linha.ajuda %}<span class="field-tooltip" title="{{ linha.ajuda }}" aria-label="{{ linha.ajuda }}">ⓘ</span>{% endif %}
+                                    </span>
                                     <span>{{ linha.valor }}</span>
                                     {% if linha.campo %}
                                         <button type="button" class="btn btn-secondary" data-modal-open="modal-trajetoria-{{ linha.campo }}-{{ trajetoria.id }}">Alterar</button>
@@ -225,7 +228,13 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
                         {% else %}
                         <dl class="dados-grid">
                             {% for linha in card.linhas %}
-                                <div><dt>{{ linha.rotulo }}</dt><dd>{{ linha.valor }}</dd></div>
+                                <div>
+                                    <dt>
+                                        {{ linha.rotulo }}
+                                        {% if linha.ajuda %}<span class="field-tooltip" title="{{ linha.ajuda }}" aria-label="{{ linha.ajuda }}">ⓘ</span>{% endif %}
+                                    </dt>
+                                    <dd>{{ linha.valor }}</dd>
+                                </div>
                             {% endfor %}
                             <div>
                                 <dt>Estágios de docência</dt>

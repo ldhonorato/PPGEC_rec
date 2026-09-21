@@ -348,6 +348,7 @@ def _menu_lateral_sections(user):
                     "matricula_oferta_alunos",
                     "matricula_oferta_exportar",
                     "matricula_oferta_planejamento_presencial",
+                    "agendamentos_aulas_presenciais",
                 ],
                 "matriculas",
                 children=[
@@ -369,6 +370,12 @@ def _menu_lateral_sections(user):
                             "matricula_oferta_planejamento_presencial",
                         ],
                         "ofertas",
+                    ),
+                    _menu_item(
+                        "Agendamentos presenciais",
+                        "/gestao/matriculas/agendamentos-presenciais/",
+                        ["agendamentos_aulas_presenciais"],
+                        "ambiente",
                     ),
                 ],
             ),

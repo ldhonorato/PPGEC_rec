@@ -301,7 +301,10 @@ class TrajetoriaAcademica(models.Model):
     @property
     def prazo_limite_efetivo(self):
         limite = self.prazo_limite_regimental
-        return limite + timedelta(days=self.dias_trancados) if limite else None
+        if not limite:
+            return None
+        limite_com_prorrogacoes = self._somar_meses(limite, self.meses_prorrogados)
+        return limite_com_prorrogacoes + timedelta(days=self.dias_trancados)
 
     @property
     def meses_prorrogados(self):
@@ -968,6 +971,11 @@ class EncontroOferta(models.Model):
 
 
 class AulaPresencialOferta(models.Model):
+    class StatusAgendamento(models.TextChoices):
+        PENDENTE = "PENDENTE", "Pendente"
+        ATENDIDA = "ATENDIDA", "Atendida"
+        NAO_ATENDIDA = "NAO_ATENDIDA", "Não atendida"
+
     oferta = models.ForeignKey(OfertaDisciplina, on_delete=models.CASCADE, related_name="aulas_presenciais")
     encontro = models.ForeignKey(
         EncontroOferta,
@@ -979,14 +987,25 @@ class AulaPresencialOferta(models.Model):
     data = models.DateField()
     hora_inicio = models.TimeField(verbose_name="Hora de início")
     hora_fim = models.TimeField()
-    sala = models.ForeignKey("Sala", on_delete=models.PROTECT, related_name="aulas_presenciais_ofertas")
-    reserva = models.OneToOneField(
-        "ReservaAmbiente",
+    polo_solicitado = models.ForeignKey(
+        "Polo",
         on_delete=models.PROTECT,
-        related_name="aula_presencial_oferta",
+        related_name="solicitacoes_aulas_presenciais",
+    )
+    status_agendamento = models.CharField(
+        max_length=15,
+        choices=StatusAgendamento.choices,
+        default=StatusAgendamento.PENDENTE,
+    )
+    observacao_atendimento = models.TextField(blank=True)
+    atendida_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="aulas_presenciais_atendidas",
         null=True,
         blank=True,
     )
+    atendida_em = models.DateTimeField(null=True, blank=True)
     criado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -1016,6 +1035,10 @@ class AulaPresencialOferta(models.Model):
             errors["oferta"] = "O planejamento presencial é exigido apenas para ofertas híbridas."
         if self.oferta_id and self.encontro_id and self.encontro.oferta_id != self.oferta_id:
             errors["encontro"] = "O encontro deve pertencer à oferta."
+        if self.polo_solicitado_id and not self.polo_solicitado.ativo:
+            errors["polo_solicitado"] = "Selecione um polo ativo."
+        if self.status_agendamento == self.StatusAgendamento.NAO_ATENDIDA and not self.observacao_atendimento.strip():
+            errors["observacao_atendimento"] = "Informe o motivo do não atendimento."
         if self.hora_inicio and self.hora_fim and self.hora_fim <= self.hora_inicio:
             errors["hora_fim"] = "O horário final deve ser posterior ao horário inicial."
         if self.oferta_id and self.oferta.periodo.data_inicio and self.data and self.data < self.oferta.periodo.data_inicio:
@@ -1031,6 +1054,22 @@ class AulaPresencialOferta(models.Model):
             self.hora_fim = self.hora_fim or self.encontro.hora_fim
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+class AmbienteAulaPresencial(models.Model):
+    aula = models.ForeignKey(AulaPresencialOferta, on_delete=models.CASCADE, related_name="ambientes_reservados")
+    sala = models.ForeignKey("Sala", on_delete=models.PROTECT, related_name="alocacoes_aulas_presenciais")
+    reserva = models.OneToOneField("ReservaAmbiente", on_delete=models.PROTECT, related_name="ambiente_aula_presencial")
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sala__polo__nome", "sala__nome"]
+        constraints = [
+            models.UniqueConstraint(fields=["aula", "sala"], name="unique_sala_por_aula_presencial"),
+        ]
+
+    def __str__(self):
+        return f"{self.aula} - {self.sala}"
 
 
 class SolicitacaoMatricula(models.Model):
@@ -2460,7 +2499,15 @@ class Documento(models.Model):
     )
     titulo = models.CharField(max_length=255, verbose_name="Título")
     texto = models.TextField(blank=True)
-    arquivo = models.FileField(upload_to="documentos/processos/", blank=True, null=True)
+    # O limite padrao do FileField e 100 e inclui o prefixo de upload. Isso
+    # deixava menos de 80 caracteres para o nome original e fazia o storage
+    # levantar SuspiciousFileOperation somente no momento de salvar.
+    arquivo = models.FileField(
+        upload_to="documentos/processos/",
+        max_length=255,
+        blank=True,
+        null=True,
+    )
     restrito = models.BooleanField(default=False)
     restricao_tipo = models.CharField(
         max_length=40,
