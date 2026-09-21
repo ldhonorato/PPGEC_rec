@@ -1,0 +1,43 @@
+{% load l10n %}
+<header class="pe-header">
+    <div>
+        <p class="pe-eyebrow">Estratégia do programa</p>
+        <h1>{% if acompanhamento %}Acompanhamento da execução{% else %}Metas do Planejamento Estratégico{% endif %}</h1>
+        <p class="muted">{% if acompanhamento %}Prazos, entregas e pontos de atenção para orientar as decisões da coordenação.{% else %}Uma visão integrada das metas e das ações de cada setor.{% endif %}</p>
+    </div>
+    {% if pode_criar_meta and not acompanhamento %}<button class="btn" type="button" data-open-dialog="nova-meta">+ Nova meta</button>{% endif %}
+</header>
+<nav class="pe-tabs" aria-label="Planejamento estratégico">
+    <a href="{% url 'metas_planejamento' %}{% if setor_selecionado %}?setor={{ setor_selecionado.pk }}{% endif %}" {% if not acompanhamento %}aria-current="page"{% endif %}>Visão geral</a>
+    <a href="{% url 'planejamento_acompanhamento' %}{% if setor_selecionado %}?setor={{ setor_selecionado.pk }}{% endif %}" {% if acompanhamento %}aria-current="page"{% endif %}>Acompanhamento</a>
+</nav>
+<form method="get" class="pe-filter">
+    <div>
+        <label for="filtro-setor">Filtrar por setor</label>
+        <select id="filtro-setor" name="setor">
+            <option value="">Todos os setores</option>
+            {% for setor in setores_filtro %}<option value="{{ setor.pk }}" {% if setor.pk == setor_selecionado.pk %}selected{% endif %}>{{ setor.nome }}</option>{% endfor %}
+        </select>
+    </div>
+    <button class="btn btn-secondary" type="submit">Aplicar filtro</button>
+    {% if setor_selecionado %}<a href="{% if acompanhamento %}{% url 'planejamento_acompanhamento' %}{% else %}{% url 'metas_planejamento' %}{% endif %}">Limpar</a>{% endif %}
+    <span class="pe-filter-date">Posição em {{ hoje|date:"d/m/Y" }}</span>
+</form>
+<div class="pe-scope">
+    <h2>{% if setor_selecionado %}{{ setor_selecionado.nome }}{% else %}Panorama geral{% endif %}</h2>
+    <span class="muted">{{ total_metas }} meta{{ total_metas|pluralize }} · {{ grupos|length }} setor{{ grupos|length|pluralize:"es" }} com metas</span>
+</div>
+<section class="pe-kpis" aria-label="Indicadores do planejamento">
+    <article class="pe-kpi"><span>Ações cadastradas</span><strong>{{ resumo.total }}</strong><p>Distribuídas em {{ total_metas }} meta{{ total_metas|pluralize }}</p></article>
+    <article class="pe-kpi pe-kpi-success"><span>Conclusão do planejamento</span><strong>{% if resumo.base_conclusao %}{{ resumo.taxa_conclusao }}<small>%</small>{% else %}—{% endif %}</strong><p>{{ resumo.concluidas }} de {{ resumo.base_conclusao }} ações · exclui canceladas</p></article>
+    <article class="pe-kpi {% if resumo.atrasadas %}pe-kpi-danger{% endif %}"><span>Ações atrasadas</span><strong>{{ resumo.atrasadas }}</strong><p>Prazo encerrado, ainda não concluídas</p></article>
+    <article class="pe-kpi {% if resumo.proximas %}pe-kpi-warning{% endif %}"><span>Vencem em até 30 dias</span><strong>{{ resumo.proximas }}</strong><p>Ações em aberto, incluindo hoje</p></article>
+</section>
+{% if not acompanhamento %}
+<section class="pe-panel" aria-labelledby="status-title">
+    <div class="pe-section-heading"><div><h2 id="status-title">Distribuição por status</h2><p class="muted">Situação informada pelos setores para cada ação.</p></div><span class="pe-pill">{{ resumo.total }} ações</span></div>
+    {% if resumo.total %}<div class="pe-status-track" aria-hidden="true">{% for status in resumo.status %}{% if status.total %}<span class="pe-fill-{{ status.tom }}" style="width:{{ status.percentual|unlocalize }}%"></span>{% endif %}{% endfor %}</div>{% endif %}
+    <div class="pe-status-grid">{% for status in resumo.status %}<div><span><i class="pe-dot pe-fill-{{ status.tom }}" aria-hidden="true"></i>{{ status.nome }}</span><strong>{{ status.total }} <small>{{ status.percentual|floatformat:0 }}%</small></strong></div>{% endfor %}</div>
+    {% if not resumo.total %}<p class="muted">Ainda não há ações neste recorte. Cadastre ações nas metas para iniciar o acompanhamento.</p>{% endif %}
+</section>
+{% endif %}

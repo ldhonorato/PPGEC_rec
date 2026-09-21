@@ -79,7 +79,9 @@ from processos.views import (
     validar_cadastros_alunos_view,
 )
 
-from processos.views_planejamento import MetasPlanejamentoListView
+from processos.views_planejamento import (
+    MetasPlanejamentoListView, PlanejamentoAcompanhamentoView, AcaoPlanejamentoFormView, AcaoPlanejamentoDeleteView,
+)
 
 urlpatterns = [
     re_path(r"^media/(?P<path>.+)$", arquivo_enviado_view, name="media_file"),
@@ -193,7 +195,11 @@ urlpatterns = [
     path("matriculas/minhas/<int:solicitacao_id>/", matricula_minha_solicitacao_view, name="matricula_minha_solicitacao"),
     path('admin/', admin.site.urls),
     path("teste-email/", teste_email),
-    path("metas/", MetasPlanejamentoListView.as_view(), name="metas_planejamento")
+    path("metas/", MetasPlanejamentoListView.as_view(), name="metas_planejamento"),
+    path("metas/acompanhamento/", PlanejamentoAcompanhamentoView.as_view(), name="planejamento_acompanhamento"),
+    path("metas/<int:meta_pk>/acoes/nova/", AcaoPlanejamentoFormView.as_view(), name="acao_planejamento_criar"),
+    path("metas/<int:meta_pk>/acoes/<int:pk>/editar/", AcaoPlanejamentoFormView.as_view(), name="acao_planejamento_editar"),
+    path("metas/<int:meta_pk>/acoes/<int:pk>/remover/", AcaoPlanejamentoDeleteView.as_view(), name="acao_planejamento_remover"),
 ]
 
 if settings.DEBUG:

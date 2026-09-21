@@ -149,6 +149,169 @@ class MetasPlanejamentoTests(TestCase):
         })
         self.assertEqual(response.status_code, 403)
         self.assertFalse(MetaPlanejamentoEstrategico.objects.exists())
+    def test_acoes_fluxo_completo_e_agrupamento(self):
+        from .models import AcoesPlanejamentoEstrategico
+        SetorMembro.objects.create(setor=self.setor_estrategico, usuario=self.docente)
+        meta = MetaPlanejamentoEstrategico.objects.create(setor=self.setor_estrategico, categoria="Cooperação")
+        self.client.force_login(self.docente)
+        criar = reverse("acao_planejamento_criar", args=[meta.pk])
+        self.assertEqual(self.client.get(criar).status_code, 200)
+        dados = {"acao": "Firmar convênios", "status": "Em andamento", "data_inicio_planejado": "2026-09-21", "resultados_esperados": "Dois convênios"}
+        self.assertRedirects(self.client.post(criar, dados), reverse("metas_planejamento"))
+        acao = AcoesPlanejamentoEstrategico.objects.get(meta_planejamento_estrategico=meta)
+        response = self.client.get(reverse("metas_planejamento"))
+        self.assertContains(response, f'id="setor-{self.setor_estrategico.pk}"')
+        self.assertContains(response, "Firmar convênios")
+        self.assertContains(response, "Dois convênios")
+        editar = reverse("acao_planejamento_editar", args=[meta.pk, acao.pk])
+        self.assertContains(self.client.get(editar), 'value="2026-09-21"')
+        dados["acao"] = "Ampliar convênios"
+        self.assertRedirects(self.client.post(editar, dados), reverse("metas_planejamento"))
+        acao.refresh_from_db()
+        self.assertEqual(acao.acao, "Ampliar convênios")
+        remover = reverse("acao_planejamento_remover", args=[meta.pk, acao.pk])
+        self.assertEqual(self.client.get(remover).status_code, 200)
+        self.assertTrue(AcoesPlanejamentoEstrategico.objects.filter(pk=acao.pk).exists())
+        self.assertRedirects(self.client.post(remover), reverse("metas_planejamento"))
+        self.assertFalse(AcoesPlanejamentoEstrategico.objects.filter(pk=acao.pk).exists())
+
+    def test_acoes_permissoes_e_vinculo_com_meta(self):
+        from .models import AcoesPlanejamentoEstrategico
+        meta = MetaPlanejamentoEstrategico.objects.create(setor=self.setor_estrategico, categoria="Meta")
+        outra = MetaPlanejamentoEstrategico.objects.create(setor=self.outro_estrategico, categoria="Outra")
+        acao = AcoesPlanejamentoEstrategico.objects.create(meta_planejamento_estrategico=outra, acao="Ação protegida")
+        self.client.force_login(self.docente)
+        for nome, args in (("acao_planejamento_criar", [outra.pk]), ("acao_planejamento_editar", [outra.pk, acao.pk]), ("acao_planejamento_remover", [outra.pk, acao.pk])):
+            url = reverse(nome, args=args)
+            self.assertEqual(self.client.get(url).status_code, 403)
+            self.assertEqual(self.client.post(url, {"acao": "Indevida", "status": "Não iniciada"}).status_code, 403)
+        response = self.client.get(reverse("metas_planejamento"))
+        self.assertContains(response, "Ação protegida")
+        self.assertNotContains(response, "Editar ação")
+        membro = SetorMembro.objects.create(setor=self.setor_estrategico, usuario=self.docente)
+        for nome in ("acao_planejamento_editar", "acao_planejamento_remover"):
+            self.assertEqual(self.client.post(reverse(nome, args=[meta.pk, acao.pk])).status_code, 404)
+        membro.data_saida = date(2026, 9, 21)
+        membro.save()
+        self.assertEqual(self.client.post(reverse("acao_planejamento_criar", args=[meta.pk])).status_code, 403)
+        acao.refresh_from_db()
+        self.assertEqual(acao.acao, "Ação protegida")
+
+    def test_metas_agrupadas_por_setor_independentemente_da_categoria(self):
+        for setor, categoria in (
+            (self.setor_estrategico, "A"), (self.outro_estrategico, "B"),
+            (self.setor_estrategico, "C"),
+        ):
+            MetaPlanejamentoEstrategico.objects.create(setor=setor, categoria=categoria)
+        self.client.force_login(self.docente)
+        response = self.client.get(reverse("metas_planejamento"))
+        self.assertContains(response, f'id="setor-{self.setor_estrategico.pk}"', count=1)
+        self.assertContains(response, f'id="setor-{self.outro_estrategico.pk}"', count=1)
+        self.assertEqual(
+            [meta.setor_id for meta in response.context["metas"]],
+            [self.outro_estrategico.pk, self.setor_estrategico.pk, self.setor_estrategico.pk],
+        )
+
+    def test_acao_invalida_preserva_formulario(self):
+        SetorMembro.objects.create(setor=self.setor_estrategico, usuario=self.docente)
+        meta = MetaPlanejamentoEstrategico.objects.create(setor=self.setor_estrategico, categoria="Meta")
+        self.client.force_login(self.docente)
+        response = self.client.post(reverse("acao_planejamento_criar", args=[meta.pk]), {
+            "acao": "", "status": "Não iniciada", "data_inicio_planejado": "2026-09-21", "data_termino_planejado": "2026-09-20",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("acao", response.context["form"].errors)
+        self.assertIn("data_termino_planejado", response.context["form"].errors)
+        self.assertFalse(meta.acoes_planejamento_estrategico.exists())
+
+
+class PlanejamentoDashboardTests(TestCase):
+    def setUp(self):
+        from .models import AcoesPlanejamentoEstrategico
+        self.Acao = AcoesPlanejamentoEstrategico
+        self.hoje = date(2026, 9, 21)
+        self.user = User.objects.create_user(email="painel@example.com", password="senha", nome="Coordenação", tipo_usuario=User.TipoUsuario.SERVIDOR)
+        self.setor = Setor.objects.create(nome="Pesquisa", tipo=Setor.TipoSetor.ESTRATEGICO)
+        self.outro = Setor.objects.create(nome="Formação", tipo=Setor.TipoSetor.ESTRATEGICO)
+        self.meta = MetaPlanejamentoEstrategico.objects.create(setor=self.setor, categoria="Ampliar produção")
+        self.outra_meta = MetaPlanejamentoEstrategico.objects.create(setor=self.outro, categoria="Qualificar formação")
+        self.client.force_login(self.user)
+
+    def criar_acao(self, status, meta=None, **kwargs):
+        return self.Acao.objects.create(meta_planejamento_estrategico=meta or self.meta, acao=kwargs.pop("acao", status), status=status, **kwargs)
+
+    @patch("processos.planejamento_dashboard.timezone.localdate", return_value=date(2026, 9, 21))
+    def test_indicadores_filtro_e_canceladas(self, _hoje):
+        self.criar_acao("Não iniciada", data_termino_planejado=self.hoje - timedelta(days=1))
+        self.criar_acao("Em andamento", data_inicio_planejado=self.hoje, data_termino_planejado=self.hoje)
+        self.criar_acao("Concluída parcialmente", data_inicio_planejado=self.hoje, data_termino_planejado=self.hoje + timedelta(days=30))
+        self.criar_acao("Concluída totalmente", data_termino_planejado=self.hoje - timedelta(days=10))
+        self.criar_acao("Cancelada", data_termino_planejado=self.hoje - timedelta(days=10))
+        self.criar_acao("Não iniciada", meta=self.outra_meta, acao="Ação de formação", data_termino_planejado=self.hoje + timedelta(days=31))
+        response = self.client.get(reverse("metas_planejamento"))
+        resumo = response.context["resumo"]
+        self.assertEqual(resumo["total"], 6)
+        self.assertEqual(resumo["atrasadas"], 1)
+        self.assertEqual(resumo["proximas"], 2)
+        self.assertEqual(resumo["taxa_conclusao"], 20)
+        self.assertEqual(resumo["sem_cronograma"], 2)
+        self.assertEqual(sum(status["total"] for status in resumo["status"]), 6)
+        for nome in ("metas_planejamento", "planejamento_acompanhamento"):
+            response = self.client.get(reverse(nome), {"setor": self.setor.pk})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.context["resumo"]["total"], 5)
+            self.assertEqual(response.context["resumo"]["taxa_conclusao"], 25)
+            self.assertEqual(response.context["total_metas"], 1)
+            self.assertNotContains(response, "Ação de formação")
+        alertas = response.context["acoes_atencao"]
+        self.assertEqual(len(alertas), 3)
+        self.assertTrue(alertas[0].atrasada)
+
+    def test_vazio_filtro_invalido_e_apenas_canceladas(self):
+        vazio = Setor.objects.create(nome="Setor sem metas", tipo=Setor.TipoSetor.ESTRATEGICO)
+        for nome in ("metas_planejamento", "planejamento_acompanhamento"):
+            response = self.client.get(reverse(nome), {"setor": vazio.pk})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.context["resumo"]["total"], 0)
+            self.assertEqual(response.context["grupos"], [])
+            self.assertEqual(self.client.get(reverse(nome), {"setor": "inválido"}).status_code, 404)
+        self.criar_acao("Cancelada")
+        response = self.client.get(reverse("planejamento_acompanhamento"))
+        self.assertEqual(response.context["resumo"]["base_conclusao"], 0)
+        self.assertEqual(response.context["acoes_atencao"], [])
+        self.assertContains(response, "O cronograma ainda não tem datas suficientes")
+
+    def test_cronograma_intervalos_e_execucao_em_curso(self):
+        from .planejamento_dashboard import montar_cronograma
+        acao = self.criar_acao("Em andamento", data_inicio_planejado=self.hoje - timedelta(days=10), data_termino_planejado=self.hoje + timedelta(days=10), data_inicio_executado=self.hoje - timedelta(days=5))
+        sem_datas = self.criar_acao("Não iniciada")
+        invalida = self.criar_acao("Não iniciada", data_inicio_planejado=self.hoje, data_termino_planejado=self.hoje - timedelta(days=1))
+        painel = montar_cronograma([acao, sem_datas, invalida], self.hoje)
+        self.assertTrue(painel["tem_intervalos"])
+        intervalos = painel["linhas_cronograma"][0]["intervalos"]
+        self.assertEqual(len(intervalos), 2)
+        self.assertEqual(intervalos[1]["fim"], self.hoje)
+        self.assertTrue(intervalos[1]["em_curso"])
+        for intervalo in intervalos:
+            self.assertGreaterEqual(intervalo["inicio_percentual"], 0)
+            self.assertLessEqual(intervalo["inicio_percentual"] + intervalo["largura_percentual"], 100)
+        self.assertEqual(painel["linhas_cronograma"][1]["intervalos"], [])
+        self.assertEqual(painel["linhas_cronograma"][2]["intervalos"], [])
+        response = self.client.get(reverse("planejamento_acompanhamento"))
+        self.assertContains(response, "Cronograma de execução")
+        self.assertContains(response, "Entregas e resultados")
+        self.assertContains(response, "pe-gantt-planejado")
+
+    def test_acompanhamento_respeita_acesso_e_nao_aceita_post(self):
+        url = reverse("planejamento_acompanhamento")
+        self.assertEqual(self.client.post(url).status_code, 405)
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)
+        aluno = Aluno.objects.create_user(email="painel.aluno@example.com", password="senha", nome="Aluno")
+        self.client.force_login(aluno)
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+
 class DocumentoUploadValidationTests(SimpleTestCase):
     def _form_com_arquivo(self, nome):
         return DocumentoCadastroForm(

@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from .models import (
     Aluno,
+    AcoesPlanejamentoEstrategico,
     ApresentacaoQualificacao,
     Disciplina,
     DisponibilidadeSala,
@@ -60,6 +61,38 @@ class MetaPlanejamentoEstrategicoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["setor"].queryset = setores if setores is not None else Setor.objects.none()
         self.fields["setor"].empty_label = "Selecione"
+
+
+class AcaoPlanejamentoEstrategicoForm(forms.ModelForm):
+    class Meta:
+        model = AcoesPlanejamentoEstrategico
+        fields = (
+            "acao", "status", "data_inicio_planejado", "data_termino_planejado",
+            "resultados_esperados", "data_inicio_executado", "data_termino_executado",
+            "resultados_atingidos", "observacoes",
+        )
+        widgets = {
+            **{campo: forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}) for campo in (
+                "data_inicio_planejado", "data_termino_planejado",
+                "data_inicio_executado", "data_termino_executado",
+            )},
+            **{campo: forms.Textarea(attrs={"rows": 3}) for campo in (
+                "acao", "resultados_esperados", "resultados_atingidos", "observacoes",
+            )},
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["acao"].required = True
+
+    def clean(self):
+        cleaned = super().clean()
+        for tipo in ("planejado", "executado"):
+            inicio = cleaned.get(f"data_inicio_{tipo}")
+            termino = cleaned.get(f"data_termino_{tipo}")
+            if inicio and termino and termino < inicio:
+                self.add_error(f"data_termino_{tipo}", "O término não pode ser anterior ao início.")
+        return cleaned
 
 
 MAX_DOCUMENTO_UPLOAD_SIZE = 5 * 1024 * 1024

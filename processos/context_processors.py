@@ -267,7 +267,7 @@ def _menu_lateral_sections(user):
         )
     if pode_visualizar_metas_planejamento(user):
         principal_items.append(
-            _menu_item("Metas do Planejamento", "/metas/", ["metas_planejamento"], "metas")
+            _menu_item("Metas do Planejamento", "/metas/", ["metas_planejamento", "planejamento_acompanhamento", "acao_planejamento_criar", "acao_planejamento_editar", "acao_planejamento_remover"], "metas")
         )
     if _has_assinaturas_access(user) and not _has_gestao_access(user):
         principal_items.append(
