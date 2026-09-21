@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Remover ação | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <h1 class="section-title">Remover ação</h1>
+    <p>{{ meta.setor.nome }} — {{ meta.categoria }}</p>
+    <p>Confirma a remoção desta ação?</p>
+    <p>{{ object.acao|linebreaksbr }}</p>
+    <form method="post" class="formulario">
+        {% csrf_token %}
+        <div class="formulario-acoes">
+            <button class="btn" type="submit">Remover ação</button>
+            <a class="btn btn-secondary" href="{% url 'metas_planejamento' %}">Cancelar</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

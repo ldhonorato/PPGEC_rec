@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static l10n %}
+{% block title %}Acompanhamento do planejamento | AcadFlow{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/planejamento.css' %}">{% endblock %}
+{% block content %}
+<div class="pe-page">
+{% include "processos/planejamento_painel.html" %}
+<section class="pe-panel" aria-labelledby="cronograma-title">
+    <div class="pe-section-heading"><div><h2 id="cronograma-title">Cronograma de execução</h2><p class="muted">Compare o período planejado com a execução registrada.</p></div><div class="pe-legend"><span><i class="pe-dot pe-fill-azul" aria-hidden="true"></i>Planejado</span><span><i class="pe-dot pe-fill-verde" aria-hidden="true"></i>Executado</span><span><i class="pe-dot pe-fill-vermelho" aria-hidden="true"></i>Hoje</span></div></div>
+    {% if acoes %}
+    {% if tem_intervalos %}
+    <div class="pe-gantt-scroll" role="region" aria-label="Cronograma de ações, com rolagem horizontal" tabindex="0">
+        <div class="pe-gantt">
+            <div class="pe-gantt-header"><strong>Ação / setor</strong><div class="pe-gantt-axis">{% for marco in marcos_cronograma %}<span>{{ marco|date:"d/m/y" }}</span>{% endfor %}</div></div>
+            {% for linha in linhas_cronograma %}
+            <div class="pe-gantt-row">
+                <div class="pe-gantt-label"><a href="{% url 'metas_planejamento' %}?setor={{ linha.acao.meta_painel.setor_id }}#acao-{{ linha.acao.pk }}">{{ linha.acao.acao|default:"Ação sem descrição" }}</a><small>{{ linha.acao.meta_painel.setor.nome }} · {{ linha.acao.meta_painel.categoria }}</small><span class="pe-pill pe-tone-{{ linha.acao.tom }}">{{ linha.acao.get_status_display }}</span></div>
+                <div class="pe-gantt-lanes">
+                    <span class="pe-today" style="left:{{ hoje_percentual|unlocalize }}%" aria-hidden="true"></span>
+                    {% for intervalo in linha.intervalos %}<span class="pe-gantt-bar pe-gantt-{{ intervalo.tipo }}" style="left:{{ intervalo.inicio_percentual|unlocalize }}%;width:{{ intervalo.largura_percentual|unlocalize }}%" title="{{ intervalo.tipo|capfirst }}: {{ intervalo.inicio|date:'d/m/Y' }} a {{ intervalo.fim|date:'d/m/Y' }}{% if intervalo.em_curso %} (em curso, até hoje){% endif %}"><span class="pe-sr-only">{{ intervalo.tipo|capfirst }}: {{ intervalo.inicio|date:"d/m/Y" }} a {{ intervalo.fim|date:"d/m/Y" }}{% if intervalo.em_curso %} (em curso, até hoje){% endif %}</span></span>{% empty %}<span class="pe-gantt-missing">Sem intervalo completo registrado</span>{% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <p class="pe-note">Barras representam datas, não percentual de conclusão. A execução em curso se estende até hoje quando há início registrado. Intervalos incompletos ou inválidos não são desenhados. As datas completas estão na tabela abaixo.</p>
+    {% else %}<div class="pe-empty"><h3>O cronograma ainda não tem datas suficientes</h3><p class="muted">Informe início e término nas ações para visualizar os períodos. As ações continuam disponíveis abaixo.</p></div>{% endif %}
+    {% else %}<div class="pe-empty"><h3>Nenhuma ação para acompanhar</h3><p class="muted">Cadastre ações nas metas para iniciar o cronograma deste recorte.</p></div>{% endif %}
+</section>
+<section class="pe-panel" aria-labelledby="atencao-title">
+    <div class="pe-section-heading"><div><p class="pe-eyebrow">Prioridades da coordenação</p><h2 id="atencao-title">Pontos de atenção</h2></div><span class="pe-pill">{{ acoes_atencao|length }} ações</span></div>
+    {% if acoes_atencao %}<div class="pe-attention-list">
+        {% for acao in acoes_atencao %}<a class="pe-attention-item" href="{% url 'metas_planejamento' %}?setor={{ acao.meta_painel.setor_id }}#acao-{{ acao.pk }}"><div><strong>{{ acao.acao|default:"Ação sem descrição" }}</strong><small>{{ acao.meta_painel.setor.nome }} · {{ acao.meta_painel.categoria }}</small></div><div class="pe-action-tags">{% if acao.atrasada %}<span class="pe-pill pe-tone-vermelho">{{ acao.dias_atraso }} dia{{ acao.dias_atraso|pluralize }} em atraso</span>{% elif acao.proxima %}<span class="pe-pill pe-tone-ambar">Vence em {{ acao.data_termino_planejado|date:"d/m/Y" }}</span>{% endif %}{% if acao.sem_cronograma %}<span class="pe-pill pe-tone-neutro">Sem cronograma completo</span>{% endif %}</div></a>{% endfor %}
+    </div>{% else %}<div class="pe-empty-inline">{% if acoes %}Nenhuma ação em aberto com atraso, vencimento nos próximos 30 dias ou cronograma incompleto.{% else %}Os alertas aparecerão quando houver ações cadastradas.{% endif %}</div>{% endif %}
+    <p class="pe-note">Considera ações não iniciadas, em andamento e parcialmente concluídas. Concluídas totalmente e canceladas não geram alertas.</p>
+</section>
+{% if acoes %}
+<section class="pe-panel" aria-labelledby="entregas-title">
+    <div class="pe-section-heading"><div><h2 id="entregas-title">Entregas e resultados</h2><p class="muted">Datas e evidências registradas pelas equipes.</p></div></div>
+    <div class="pe-table-scroll" role="region" aria-label="Tabela de entregas, com rolagem horizontal" tabindex="0">
+        <table class="pe-table"><thead><tr><th scope="col">Ação / setor</th><th scope="col">Status</th><th scope="col">Planejado</th><th scope="col">Executado</th><th scope="col">Resultados</th></tr></thead><tbody>
+        {% for acao in acoes %}<tr><td><a href="{% url 'metas_planejamento' %}?setor={{ acao.meta_painel.setor_id }}#acao-{{ acao.pk }}">{{ acao.acao|default:"Ação sem descrição" }}</a><small>{{ acao.meta_painel.setor.nome }}</small><small>{{ acao.meta_painel.categoria }}</small></td><td><span class="pe-pill pe-tone-{{ acao.tom }}">{{ acao.get_status_display }}</span></td><td><small>Início: {{ acao.data_inicio_planejado|date:"d/m/Y"|default:"Não informado" }}</small><small>Fim: {{ acao.data_termino_planejado|date:"d/m/Y"|default:"Não informado" }}</small></td><td><small>Início: {{ acao.data_inicio_executado|date:"d/m/Y"|default:"Não informado" }}</small><small>Fim: {{ acao.data_termino_executado|date:"d/m/Y"|default:"Não informado" }}</small></td><td><strong>Esperados</strong><p>{{ acao.resultados_esperados|default:"Não informados"|linebreaksbr }}</p><strong>Atingidos</strong><p>{{ acao.resultados_atingidos|default:"Não informados"|linebreaksbr }}</p></td></tr>{% endfor %}
+        </tbody></table>
+    </div>
+</section>
+{% endif %}
+</div>
+{% endblock %}

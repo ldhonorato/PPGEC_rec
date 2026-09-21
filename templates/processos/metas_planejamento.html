@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Metas do Planejamento Estratégico | AcadFlow{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/planejamento.css' %}">{% endblock %}
+{% block content %}
+<div class="pe-page">
+{% include "processos/planejamento_painel.html" %}
+{% if pode_criar_meta %}
+<dialog id="nova-meta" class="modal-dialog" {% if form.errors %}data-open-on-load{% endif %}>
+    <div class="modal-body">
+        <div class="actions-row">
+            <h2 class="section-title">Nova meta</h2>
+            <button class="btn btn-secondary" type="button" data-close-dialog>Fechar</button>
+        </div>
+        <form method="post" class="formulario">
+            {% csrf_token %}
+            <div class="grid-two">
+                {% for field in form %}
+                    <div class="formulario-campo">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}{{ field.errors }}
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="formulario-acoes"><button class="btn" type="submit">Criar meta</button></div>
+        </form>
+    </div>
+</dialog>
+{% endif %}
+
+{% if not setor_selecionado and grupos %}
+<section aria-labelledby="setores-title">
+    <div class="pe-section-heading"><div><h2 id="setores-title">Resultados por setor</h2><p class="muted">Selecione um setor para explorar suas metas e ações.</p></div></div>
+    <div class="pe-sector-grid">
+    {% for grupo in grupos %}
+        <a class="pe-sector-card" href="?setor={{ grupo.setor.pk }}">
+            <div class="pe-section-heading"><h3>{{ grupo.setor.nome }}</h3><span aria-hidden="true">↗</span></div>
+            <p class="muted">{{ grupo.metas|length }} meta{{ grupo.metas|length|pluralize }} · {{ grupo.resumo.total }} ações</p>
+            <div class="pe-sector-progress"><strong>{% if grupo.resumo.base_conclusao %}{{ grupo.resumo.taxa_conclusao }}%{% else %}—{% endif %}</strong><span>concluído</span></div>
+            <progress max="100" value="{{ grupo.resumo.taxa_conclusao }}" aria-label="Conclusão de {{ grupo.setor.nome }}">{{ grupo.resumo.taxa_conclusao }}%</progress>
+            <div class="pe-sector-foot"><span>{{ grupo.resumo.concluidas }} concluída{{ grupo.resumo.concluidas|pluralize }} · exclui canceladas</span>{% if grupo.resumo.atrasadas %}<span class="pe-alert-text">{{ grupo.resumo.atrasadas }} em atraso</span>{% endif %}</div>
+        </a>
+    {% endfor %}
+    </div>
+</section>
+{% endif %}
+<div class="pe-section-heading"><div><h2>Metas e ações</h2><p class="muted">Abra uma ação para consultar resultados, datas e observações.</p></div>{% if resumo.sem_cronograma %}<span class="pe-pill pe-tone-ambar">{{ resumo.sem_cronograma }} ações sem cronograma completo</span>{% endif %}</div>
+{% for grupo in grupos %}
+<section class="pe-sector-metas" aria-labelledby="setor-{{ grupo.setor.pk }}">
+    <div class="pe-sector-heading"><h3 id="setor-{{ grupo.setor.pk }}">{{ grupo.setor.nome }}</h3><span>{{ grupo.metas|length }} meta{{ grupo.metas|length|pluralize }} · {{ grupo.resumo.total }} ações</span></div>
+    {% for meta in grupo.metas %}
+    <article class="pe-meta" id="meta-{{ meta.pk }}">
+        <div class="pe-section-heading"><div><p class="pe-eyebrow">Meta · {{ meta.get_periodo_vigente_display }}</p><h4>{{ meta.categoria }}</h4></div><span class="pe-pill">{{ meta.resumo.concluidas }}/{{ meta.resumo.total }} ações concluídas</span></div>
+        {% if meta.fragilidade or meta.indicador %}<dl class="pe-meta-context">{% if meta.fragilidade %}<div><dt>Fragilidade</dt><dd>{{ meta.fragilidade|linebreaksbr }}</dd></div>{% endif %}{% if meta.indicador %}<div><dt>Indicador de acompanhamento</dt><dd>{{ meta.indicador|linebreaksbr }}</dd></div>{% endif %}</dl>{% endif %}
+        <div class="pe-section-heading pe-actions-heading"><h5>Ações previstas <span class="muted">({{ meta.resumo.total }})</span></h5>{% if meta.setor_id in setores_editaveis %}<a class="btn btn-secondary" href="{% url 'acao_planejamento_criar' meta.pk %}">+ Nova ação</a>{% endif %}</div>
+        {% for acao in meta.acoes_painel %}
+        <details class="pe-action" id="acao-{{ acao.pk }}">
+            <summary><span class="pe-action-name">{{ acao.acao|default:"Ação sem descrição" }}</span><span class="pe-action-tags">{% if acao.atrasada %}<span class="pe-pill pe-tone-vermelho">{{ acao.dias_atraso }} dia{{ acao.dias_atraso|pluralize }} em atraso</span>{% endif %}<span class="pe-pill pe-tone-{{ acao.tom }}">{{ acao.get_status_display }}</span></span></summary>
+            <div class="pe-action-body">
+                <dl class="pe-action-data">
+                    <div><dt>Início planejado</dt><dd>{{ acao.data_inicio_planejado|date:"d/m/Y"|default:"Não informado" }}</dd></div>
+                    <div><dt>Término planejado</dt><dd>{{ acao.data_termino_planejado|date:"d/m/Y"|default:"Não informado" }}</dd></div>
+                    <div><dt>Início executado</dt><dd>{{ acao.data_inicio_executado|date:"d/m/Y"|default:"Não informado" }}</dd></div>
+                    <div><dt>Término executado</dt><dd>{{ acao.data_termino_executado|date:"d/m/Y"|default:"Não informado" }}</dd></div>
+                </dl>
+                <dl class="pe-meta-context"><div><dt>Resultados esperados</dt><dd>{{ acao.resultados_esperados|default:"Não informados"|linebreaksbr }}</dd></div><div><dt>Resultados atingidos</dt><dd>{{ acao.resultados_atingidos|default:"Não informados"|linebreaksbr }}</dd></div></dl>
+                {% if acao.observacoes %}<dl><dt>Observações</dt><dd>{{ acao.observacoes|linebreaksbr }}</dd></dl>{% endif %}
+                {% if meta.setor_id in setores_editaveis %}<div class="pe-action-buttons"><a class="btn btn-secondary" href="{% url 'acao_planejamento_editar' meta.pk acao.pk %}">Editar ação</a><a class="pe-alert-text" href="{% url 'acao_planejamento_remover' meta.pk acao.pk %}">Remover ação</a></div>{% endif %}
+            </div>
+        </details>
+        {% empty %}<div class="pe-empty-inline">Nenhuma ação cadastrada para esta meta.</div>{% endfor %}
+    </article>
+    {% endfor %}
+</section>
+{% empty %}<section class="pe-panel pe-empty"><h3>Nenhuma meta cadastrada{% if setor_selecionado %} neste setor{% endif %}</h3><p class="muted">As metas estratégicas aparecerão aqui quando forem registradas.</p></section>{% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+if (location.hash.startsWith("#acao-")) {
+    const action = document.getElementById(location.hash.slice(1));
+    if (action?.tagName === "DETAILS") action.open = true;
+}
+document.querySelectorAll("[data-open-dialog]").forEach((button) => {
+    button.addEventListener("click", () => document.getElementById(button.dataset.openDialog)?.showModal());
+});
+document.querySelectorAll("[data-close-dialog]").forEach((button) => {
+    button.addEventListener("click", () => button.closest("dialog")?.close());
+});
+document.querySelectorAll("dialog[data-open-on-load]").forEach((dialog) => dialog.showModal());
+</script>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Ação do Planejamento Estratégico | AcadFlow{% endblock %}
+{% block content %}
+<section class="card panel">
+    <h1 class="section-title">{% if form.instance.pk %}Editar ação{% else %}Nova ação{% endif %}</h1>
+    <p>{{ meta.setor.nome }} — {{ meta.categoria }}</p>
+    <form method="post" class="formulario">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="grid-two">
+        {% for field in form %}
+            <div class="formulario-campo">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}{{ field.errors }}
+            </div>
+        {% endfor %}
+        </div>
+        <div class="formulario-acoes">
+            <button class="btn" type="submit">Salvar ação</button>
+            <a class="btn btn-secondary" href="{% url 'metas_planejamento' %}">Cancelar</a>
+        </div>
+    </form>
+</section>
+{% endblock %}
