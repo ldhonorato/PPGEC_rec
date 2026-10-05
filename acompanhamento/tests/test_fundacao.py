@@ -11,6 +11,8 @@ from acompanhamento.tests.test_linha_de_base import criar_perfis
 from processos import context_processors
 from processos import views as processos_views
 
+from unittest.mock import patch
+
 PERFIS_COM_GESTAO = {
     "docente_coordenador",
     "servidor",
@@ -56,8 +58,10 @@ class PaginaInicialTests(TestCase):
 
     @override_settings(ACOMPANHAMENTO_ATIVO=True)
     def test_modulo_sem_telas_informa_que_nao_ha_telas(self):
+
         self.client.force_login(self.perfis["servidor"])
-        self.assertContains(self.client.get(self.endereco), "Ainda não há telas disponíveis.")
+        with patch("acompanhamento.views.TELAS", ()):
+            self.assertContains(self.client.get(self.endereco), "Ainda não há telas disponíveis.")
 
 
 class RegraDeAcessoTests(TestCase):

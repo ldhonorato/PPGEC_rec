@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Painel de Docentes | Coordenação{% endblock %}
+
+{% block content %}
+<section class="card">
+    <h1 class="section-title">Painel de Docentes</h1>
+    <p>Total de docentes ativos: {{ total_ativos }}</p>
+    <p>Permanentes: {{ total_permanentes }}</p>
+    <p>Colaboradores: {{ total_colaboradores }}</p>
+</section>
+{% endblock %}

@@ -7,4 +7,6 @@ tela nova mexe no código que monta o menu em todas as páginas.
 Cada item é um par (título, nome da rota).
 """
 
-TELAS = ()
+TELAS = (
+    ("Painel de Docentes", "acompanhamento:painel_docentes"),
+)
