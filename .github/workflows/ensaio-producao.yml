@@ -45,6 +45,7 @@ jobs:
           SECURE_HSTS_SECONDS=0
           USE_X_FORWARDED_PROTO=False
           ACOMPANHAMENTO_ATIVO=False
+          ACOMPANHAMENTO_AVISO_ATIVO=False
           EOF
           cat > docker-compose.ensaio.yml <<'EOF'
           services:
