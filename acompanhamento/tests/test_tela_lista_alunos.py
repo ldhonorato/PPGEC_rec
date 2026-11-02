@@ -19,6 +19,7 @@ from acompanhamento.lista_alunos import (
 from acompanhamento.models import MarcoCalendario, PlanilhaBaixada
 from acompanhamento.tests.test_lista_alunos import criar_aluno
 from acompanhamento.tests.test_linha_de_base import criar_perfis
+from processos.models import Aluno
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, ACOMPANHAMENTO_ATIVO=True)
@@ -311,6 +312,24 @@ class TelaListaAlunosTests(TestCase):
         celula_nome = workbook.active["A8"]
         self.assertEqual(celula_nome.value, "=1+1")
         self.assertEqual(celula_nome.data_type, "s")
+
+    def test_excel_troca_caractere_invisivel_do_nome_e_do_filtro_por_espaco(self):
+        criar_aluno(
+            "Nome Colado",
+            prazo_qualificacao="2025.1",
+            data_limite_qualificacao=date(2025, 6, 1),
+        )
+        Aluno.objects.filter(nome="Nome Colado").update(nome="Nome\x0bColado")
+
+        resposta = self.client.get(
+            self.endereco,
+            {"nome": "Nome\x0bColado", "marco": MARCO_INTERMEDIARIO, "exportar": "xlsx"},
+        )
+
+        self.assertEqual(resposta.status_code, 200)
+        planilha = load_workbook(BytesIO(resposta.content)).active
+        self.assertEqual(planilha["A8"].value, "Nome Colado")
+        self.assertIn("Nome: Nome Colado", planilha["A4"].value)
 
     def test_filtro_de_semestre_invalido_exibe_erro(self):
         resposta = self.client.get(
