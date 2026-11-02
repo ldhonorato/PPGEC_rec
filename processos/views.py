@@ -2651,6 +2651,7 @@ def alunos_view(request):
 
     if acompanhamento_ativo:
         from acompanhamento.lista_alunos import (
+            IRREGULARES,
             MARCOS,
             QUALQUER_MARCO,
             SITUACOES_FILTRO,
@@ -2660,6 +2661,10 @@ def alunos_view(request):
         marco = request.GET.get("marco", "").strip()
         marco_qualquer = marco == QUALQUER_MARCO
         situacao_marco = request.GET.get("situacao_marco", "").strip()
+        # "Qualquer marco" só lista irregulares: a opção "Todas" do formulário
+        # não pode virar um erro na tela.
+        if marco_qualquer and not situacao_marco:
+            situacao_marco = IRREGULARES
         semestre_marco = request.GET.get("semestre_marco", "").strip()
         exportar_excel = request.GET.get("exportar") == "xlsx"
         marcos = tuple(MARCOS.items())
