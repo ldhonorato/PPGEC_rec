@@ -119,12 +119,41 @@ class TelaListaAlunosTests(TestCase):
         self.assertNotContains(resposta, ">Situação no marco</th>")
         self.assertContains(resposta, ">Matrícula</th>")
 
+    def test_qualquer_marco_sem_situacao_lista_os_irregulares(self):
+        com_situacao = self.client.get(
+            self.endereco, {"marco": QUALQUER_MARCO, "situacao_marco": IRREGULARES}
+        )
+
+        for parametros in (
+            {"marco": QUALQUER_MARCO},
+            {"marco": QUALQUER_MARCO, "situacao_marco": ""},
+        ):
+            with self.subTest(parametros=parametros):
+                resposta = self.client.get(self.endereco, parametros)
+
+                self.assertEqual(list(resposta.context["messages"]), [])
+                self.assertEqual(resposta.context["filtro_situacao_marco"], IRREGULARES)
+                self.assertContains(resposta, "Atrasado Tela Marco")
+                self.assertEqual(
+                    resposta.context["pagina"].paginator.count,
+                    com_situacao.context["pagina"].paginator.count,
+                )
+
+    def test_excel_qualquer_marco_sem_situacao_e_baixado(self):
+        resposta = self.client.get(
+            self.endereco,
+            {"nome": "Atrasado Tela Marco", "marco": QUALQUER_MARCO, "exportar": "xlsx"},
+        )
+
+        self.assertEqual(
+            resposta["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        planilha = load_workbook(BytesIO(resposta.content)).active
+        self.assertEqual(planilha["A8"].value, "Atrasado Tela Marco")
+
     def test_qualquer_marco_recusa_situacao_ou_semestre_incompativeis(self):
         for parametros, mensagem in (
-            (
-                {"marco": QUALQUER_MARCO},
-                '“Qualquer marco” só aceita a situação “Irregular”.',
-            ),
             (
                 {"marco": QUALQUER_MARCO, "situacao_marco": "regular"},
                 '“Qualquer marco” só aceita a situação “Irregular”.',
