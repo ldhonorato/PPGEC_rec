@@ -1,22 +1,27 @@
 # Manual de Uso para a Secretaria: Módulo de Acompanhamento Acadêmico (AcadFlow)
 
-Este manual tem como objetivo orientar a Secretaria do PPGEC no uso diário do **Módulo de Acompanhamento Acadêmico**. Ele detalha o fluxo de navegação, a aplicação de filtros e a interpretação de cada um dos painéis do sistema.
+Este manual tem como objetivo orientar a Secretaria do PPGEC no uso diário do **Módulo de Acompanhamento Acadêmico**. Ele detalha o fluxo de navegação, a aplicação de filtros e a interpretação de cada um dos painéis e recursos do sistema.
 
 ---
 
-## 1. Acesso ao Módulo de Acompanhamento
+## 1. Acesso ao Módulo e Página Inicial (Início)
 
 ### **Como Navegar**
 1. Na barra lateral esquerda do **AcadFlow**, localize o grupo **Coordenação**.
 2. Clique no item **Acompanhamento (Prazos e indicadores dos alunos)**.
-3. Você será direcionado para a central de navegação que reúne os links para todas as telas do módulo:
+3. Você será direcionado para a central de navegação que reúne as telas em cartões, cada uma com uma frase do que ela faz, exibindo também o total de alunos irregulares no topo da página:
    * **Painel de Docentes**
    * **Painel de Processos**
-   * **Carga de orientação**
+   * **Carga de Orientação**
    * **Calendário de Marcos**
-   * **Painel de sucesso por turma**
+   * **Painel de Sucesso por Turma**
 
 ![Central de Navegação do Acompanhamento](imagens/01-menu-acompanhamento.png)
+
+### **Cartão "Alunos Irregulares" na Página Inicial**
+Para os usuários que possuem acesso de gestão (como Coordenação, Secretaria, Servidores e Bolsistas), a página inicial do sistema (**Início**) apresenta o cartão **"Alunos irregulares"**, que é o primeiro cartão da Visão geral.
+* **O que exibe:** O quantitativo total consolidado de discentes que possuem pelo menos uma irregularidade ativa em qualquer um dos marcos acadêmicos.
+* **Integração:** Ao clicar sobre o cartão, você será direcionado automaticamente para a **Lista de Alunos**, já pré-filtrada com a situação **"Irregular"** no modo **"Qualquer marco"**.
 
 ---
 
@@ -25,11 +30,18 @@ Este manual tem como objetivo orientar a Secretaria do PPGEC no uso diário do *
 ### **Como Navegar e Filtrar**
 1. Na barra lateral, acesse **Cadastro > Alunos** (ou pelo caminho de navegação do sistema).
 2. Utilize os filtros no topo da tela para monitorar a situação dos discentes:
-   * **Marco acadêmico:** Escolha entre **"Projeto de dissertação ou qualificação"**, **"Defesa"** ou **"Qualquer marco"**. Esta última opção reúne, em uma linha por aluno, quem está irregular em um ou nos dois marcos; use-a com a situação **"Irregular"** e sem preencher o semestre.
-   * **Situação no marco:** Selecione o status do discente. As opções são *Irregular* (que agrupa as duas situações irregulares), *Regular* (que inclui o marco cumprido) e *Não foi possível calcular* (que inclui situações sem prazo cadastrado e falhas no cálculo). Na lista e no Excel, as situações irregulares são exibidas como *Irregular*.
+   * **Marco acadêmico:** Escolha entre **"Projeto de dissertação ou qualificação"**, **"Defesa"** ou **"Qualquer marco"**. A opção **"Qualquer marco"** exibe uma linha por aluno que esteja irregular em um ou nos dois marcos. Deixe a situação em **"Irregular"** ou **"Todas"** e o campo de semestre em branco. Com outra situação ou com semestre preenchido, a tela mostra um erro.
+   * **Situação no marco:** Selecione o status do discente entre as três opções disponíveis:
+     * **Irregular:** Une e agrupa todas as situações de atraso no marco.
+     * **Regular:** A situação está em dia ou o marco já foi cumprido.
+     * **Não foi possível calcular:** Falta um dado para o cálculo, como a data limite do semestre.
    > **Dica de Uso:** Para identificar rapidamente discentes em atraso, a secretaria deve selecionar a opção **"Irregular"**.
    * **Semestre do marco:** Digite o período referente (ex: `2026.1`).
-3. **Exportação de Dados:** Após selecionar um **Marco acadêmico**, o botão **Baixar em Excel** ficará visível na tela. Clique nele para gerar e baixar a planilha contendo apenas os alunos filtrados.
+
+### **Exportação para Excel**
+Após selecionar um **Marco acadêmico**, o botão **Baixar em Excel** ficará visível na tela. Clique nele para gerar e baixar a planilha.
+* A planilha gerada em Excel traz exatamente os discentes resultantes dos filtros aplicados na tela.
+* O arquivo inclui no topo da planilha a indicação clara dos **filtros aplicados**, o **total de alunos listados** e a **data e hora exatas** em que a exportação foi gerada.
 
 ![Lista de Alunos](imagens/07-lista-de-alunos.png)
 
@@ -52,7 +64,7 @@ Este manual tem como objetivo orientar a Secretaria do PPGEC no uso diário do *
 ## 4. Carga de Orientação
 
 ### **Como Navegar e Interpretar**
-1. Acesse **Carga de orientação** através da página inicial do módulo de Acompanhamento.
+1. Acesse **Carga de Orientação** através da página inicial do módulo de Acompanhamento.
 2. O painel apresenta o quantitativo de orientações, coorientações e supervisões de pós-doutorado vinculadas a cada docente do programa, permitindo o acompanhamento da distribuição de discentes entre o corpo docente.
 
 ![Carga de Orientação](imagens/06-carga-de-orientacao.png)
@@ -99,14 +111,30 @@ Este manual tem como objetivo orientar a Secretaria do PPGEC no uso diário do *
 ## 7. Painel de Sucesso por Turma
 
 ### **Como Navegar e Filtrar**
-1. Clique em **Painel de sucesso por turma**.
-2. No campo **Nível**, selecione entre **Mestrado** ou **Doutorado** e clique em **Filtrar**.
+1. Clique em **Painel de Sucesso por Turma** na central de Acompanhamento.
+2. Utilize o formulário superior para definir os filtros de consulta:
+   * **Nível:** Selecione entre **Mestrado** ou **Doutorado**.
+   * **Ano inicial e Ano final:** Informe o intervalo de anos desejado (ex.: ano inicial `2024` e ano final `2026`) para filtrar as turmas pelo ano de ingresso. Deixar estes campos em branco significa consultar todas as turmas cadastradas.
+3. Clique em **Filtrar**. Os valores informados permanecem selecionados no formulário após a submissão.
 
 ![Painel de Sucesso por Turma](imagens/05-painel-sucesso-turma.png)
 
-### **Como Interpretar os Dados**
-* **Aviso de Dados Limitados:** Em turmas anteriores a `2026.2`, um alerta informativo é exibido comunicando que registros históricos de desligamentos, prorrogações ou defesas anteriores ao início do uso do AcadFlow podem não estar cadastrados.
-* **Total de Ingressantes:** Apresenta o número absoluto de alunos cadastrados naquela turma de ingresso.
-* **Indicadores em Barras (Proporcionais):**
-  * **Concluídos, Desligados, Trancados e Ativos:** A largura de cada barra representa o percentual exato calculado em relação ao total de ingressantes da turma.
-  * **Ativos Regulares, Ativos Irregulares e Com Prorrogação:** Acompanhamento detalhado do status atual dos alunos que permanecem matriculados no programa.
+### **Como Ler o Gráfico das Sete Barras**
+A tela exibe um **gráfico comparativo único**, onde cada turma de ingresso é representada por um grupo de 7 colunas verticais dispostas lado a lado, ordenadas cronologicamente da turma mais antiga para a mais nova.
+
+As 7 categorias exibidas por turma são:
+1. **Concluídos**
+2. **Desligados**
+3. **Trancados**
+4. **Ativos** (Soma total dos discentes com vínculo ativo)
+5. **Ativos regulares**
+6. **Ativos irregulares**
+7. **Com prorrogação**
+
+#### **Regras de Interpretação e Cálculo:**
+* **Altura da Barra:** A altura visual de cada coluna representa o percentual exato calculado em relação ao total de ingressantes daquela turma específica.
+* **Quantidade Absoluta:** O número posicionado acima de cada barra indica a quantidade absoluta de alunos naquela condição. Ao passar o mouse sobre a barra, aparecem o rótulo completo, a quantidade e o percentual formatado.
+* **Ativos Regulares:** Ativos regulares inclui quem aparece como "Não foi possível calcular" na lista de alunos.
+* **Turmas Históricas (marcadas com \*):** Turmas anteriores a `2026.2` são sinalizadas com um asterisco ao lado do nome da turma (ex.: `2025.1*`). Um aviso destacado comunica que registros de desligamentos, prorrogações ou defesas anteriores à implantação do AcadFlow podem não estar totalmente cadastrados.
+* **Turmas Recentes:** Turmas mais recentes podem apresentar 0% na coluna de *Concluídos*, uma vez que o regulamento exige um tempo mínimo para a realização de defesas (12 meses para o Mestrado e 24 meses para o Doutorado).
+* **Regra da Categoria "Com Prorrogação":** A barra **"Com prorrogação"** contabiliza qualquer discente da turma que tenha recebido concessão de prazo extra ao longo de sua trajetória, independentemente de seu status atual (seja ele ativo, concluído, trancado ou desligado).
