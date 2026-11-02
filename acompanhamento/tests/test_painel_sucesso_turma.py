@@ -299,3 +299,61 @@ class PainelSucessoTurmaServicoTests(TestCase):
         self.assertEqual(turma_dados["taxa_trancamento"], 2.5)
         self.assertEqual(turma_dados["taxa_ativos_regulares"], 25.0)
         self.assertEqual(turma_dados["taxa_ativos_irregulares"], 10.0)
+
+    def test_filtro_intervalo_anos_e_validacoes(self):
+        """Testa validações de ano_inicial e ano_final levantando ValueError com formato ou ordem inválidos."""
+        # Formato inválido
+        with self.assertRaisesMessage(ValueError, "Ano inicial inválido. Utilize o formato YYYY."):
+            calcular_painel_sucesso_turma(Aluno.NivelCurso.MESTRADO, ano_inicial="25")
+
+        with self.assertRaisesMessage(ValueError, "Ano final inválido. Utilize o formato YYYY."):
+            calcular_painel_sucesso_turma(Aluno.NivelCurso.MESTRADO, ano_final="ABCD")
+
+        # ano_inicial maior que ano_final
+        with self.assertRaisesMessage(ValueError, "O ano inicial não pode ser maior que o ano final."):
+            calcular_painel_sucesso_turma(Aluno.NivelCurso.MESTRADO, ano_inicial=2026, ano_final=2025)
+
+    def test_filtro_por_ano_seleciona_turmas_corretas(self):
+        """Testa se o filtro por ano seleciona exatamente as turmas do intervalo com base no campo ingresso."""
+        data_ref = date(2099, 12, 1)
+
+        turmas_anos = ["2090.1", "2090.2", "2091.1", "2091.2", "2092.1"]
+        for idx, t in enumerate(turmas_anos):
+            aluno = Aluno.objects.create_user(email=f"aluno_ano_{idx}@teste.invalid", nome=f"Aluno {idx}")
+            TrajetoriaAcademica.objects.create(
+                aluno=aluno,
+                nivel_curso=Aluno.NivelCurso.DOUTORADO,
+                status=TrajetoriaAcademica.Status.ATIVA,
+                ingresso=t,
+                data_ingresso=date(int(t[:4]), 3 if t.endswith(".1") else 8, 1),
+            )
+
+        res = calcular_painel_sucesso_turma(
+            Aluno.NivelCurso.DOUTORADO,
+            data_referencia=data_ref,
+            ano_inicial=2090,
+            ano_final=2091,
+        )
+        turmas_retornadas = [item["turma"] for item in res if item["turma"].startswith("209")]
+        self.assertEqual(turmas_retornadas, ["2091.2", "2091.1", "2090.2", "2090.1"])
+
+        res_2092 = calcular_painel_sucesso_turma(
+            Aluno.NivelCurso.DOUTORADO,
+            data_referencia=data_ref,
+            ano_inicial=2092,
+            ano_final=2092,
+        )
+        turmas_2092 = [item["turma"] for item in res_2092 if item["turma"].startswith("209")]
+        self.assertEqual(turmas_2092, ["2092.1"])
+
+        # Só um dos dois anos
+        so_inicial = calcular_painel_sucesso_turma(
+            Aluno.NivelCurso.DOUTORADO, data_referencia=data_ref, ano_inicial=2092
+        )
+        self.assertEqual([item["turma"] for item in so_inicial], ["2092.1"])
+
+        so_final = calcular_painel_sucesso_turma(
+            Aluno.NivelCurso.DOUTORADO, data_referencia=data_ref, ano_final=2090
+        )
+        turmas_so_final = [item["turma"] for item in so_final if item["turma"].startswith("209")]
+        self.assertEqual(turmas_so_final, ["2090.2", "2090.1"])

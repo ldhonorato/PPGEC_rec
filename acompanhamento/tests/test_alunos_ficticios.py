@@ -56,6 +56,30 @@ ESPERADO = [
      "doutorado qualificado, defesa vencida"),
     (14, "DOUTORADO", "ATIVA", IRREGULAR_COM_CHANCE, REGULAR,
      "qualificação atrasada, com chance"),
+    # Turmas antigas, para o painel de sucesso por turma. Sem data limite do
+    # projeto cadastrada, o marco sai "sem prazo".
+    (15, "MESTRADO", "ATIVA", SEM_PRAZO, REGULAR, "turma de 6 meses atrás"),
+    (16, "MESTRADO", "ATIVA", SEM_PRAZO, REGULAR, "ativo com prorrogação"),
+    (17, "MESTRADO", "CONCLUIDA", CUMPRIDO, FORA_DO_CALCULO,
+     "concluído com prorrogação"),
+    (18, "MESTRADO", "CONCLUIDA", CUMPRIDO, FORA_DO_CALCULO, "concluído"),
+    (19, "MESTRADO", "DESLIGADA", SEM_PRAZO, IRREGULAR_SEM_CHANCE, "desligado"),
+    (20, "MESTRADO", "CONCLUIDA", CUMPRIDO, FORA_DO_CALCULO,
+     "concluído com 6 meses de prorrogação"),
+    (21, "MESTRADO", "TRANCADA", SEM_PRAZO, IRREGULAR_SEM_CHANCE, "trancado"),
+    (22, "MESTRADO", "CONCLUIDA", CUMPRIDO, FORA_DO_CALCULO, "concluído"),
+    (23, "MESTRADO", "DESLIGADA", SEM_PRAZO, IRREGULAR_SEM_CHANCE, "desligado"),
+    (24, "DOUTORADO", "ATIVA", SEM_PRAZO, REGULAR, "turma de 6 meses atrás"),
+    (25, "DOUTORADO", "DESLIGADA", SEM_PRAZO, REGULAR, "desligado"),
+    (26, "DOUTORADO", "TRANCADA", SEM_PRAZO, REGULAR, "trancado"),
+    (27, "DOUTORADO", "CONCLUIDA", CUMPRIDO, FORA_DO_CALCULO,
+     "concluído com prorrogação"),
+    (28, "DOUTORADO", "ATIVA", SEM_PRAZO, REGULAR, "ativo com prorrogação"),
+    (29, "DOUTORADO", "CONCLUIDA", CUMPRIDO, FORA_DO_CALCULO, "concluído"),
+    (30, "DOUTORADO", "CONCLUIDA", CUMPRIDO, FORA_DO_CALCULO, "concluído"),
+    (31, "DOUTORADO", "DESLIGADA", SEM_PRAZO, IRREGULAR_SEM_CHANCE, "desligado"),
+    (32, "DOUTORADO", "CONCLUIDA", CUMPRIDO, FORA_DO_CALCULO,
+     "concluído com 12 meses de prorrogação"),
 ]
 
 
@@ -75,7 +99,7 @@ class AlunosFicticiosSituacaoTests(TestCase):
         )
         cls.resultados = calcular_situacoes(cls.trajetorias, REFERENCIA)
 
-    def test_gera_as_14_trajetorias(self):
+    def test_gera_todas_as_trajetorias(self):
         self.assertEqual(len(self.trajetorias), len(ESPERADO))
 
     def test_cada_aluno_cai_na_situacao_esperada(self):
@@ -121,3 +145,29 @@ class AlunosFicticiosSituacaoTests(TestCase):
             data_referencia=REFERENCIA,
         )
         self.assertEqual(sem_extensoes.situacao, IRREGULAR_SEM_CHANCE)
+
+    def test_turmas_em_pelo_menos_cinco_anos_por_nivel(self):
+        for nivel in ("MESTRADO", "DOUTORADO"):
+            with self.subTest(nivel=nivel):
+                anos = {t.ingresso[:4] for t in self.trajetorias if t.nivel_curso == nivel}
+                self.assertGreaterEqual(len(anos), 5)
+
+    def test_cada_nivel_tem_concluido_desligado_trancado_e_prorrogacao(self):
+        for nivel in ("MESTRADO", "DOUTORADO"):
+            with self.subTest(nivel=nivel):
+                do_nivel = [t for t in self.trajetorias if t.nivel_curso == nivel]
+                status = {t.status for t in do_nivel}
+                self.assertTrue(
+                    {"CONCLUIDA", "DESLIGADA", "TRANCADA", "ATIVA"} <= status
+                )
+                self.assertTrue(any(t.meses_prorrogados > 0 for t in do_nivel))
+
+    def test_concluidos_em_varias_turmas_por_nivel(self):
+        for nivel in ("MESTRADO", "DOUTORADO"):
+            with self.subTest(nivel=nivel):
+                turmas = {
+                    t.ingresso
+                    for t in self.trajetorias
+                    if t.nivel_curso == nivel and t.status == "CONCLUIDA"
+                }
+                self.assertGreaterEqual(len(turmas), 3)

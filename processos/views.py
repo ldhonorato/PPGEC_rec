@@ -1,9 +1,7 @@
 import logging
 import re
 from datetime import datetime, timedelta
-from io import BytesIO
 
-from openpyxl import Workbook
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
@@ -2012,6 +2010,11 @@ def home_view(request):
                 status_aluno=Aluno.StatusAluno.EM_AVALIACAO
             ).count(),
         }
+        # O import fica aqui dentro para o modulo desligado nao ser carregado.
+        if settings.ACOMPANHAMENTO_ATIVO:
+            from acompanhamento.lista_alunos import cartao_alunos_irregulares
+
+            context["cartao_irregulares"] = cartao_alunos_irregulares()
 
     if request.user.tipo_usuario == User.TipoUsuario.ALUNO:
         aluno = getattr(request.user, "aluno", None)
@@ -2632,6 +2635,7 @@ def alunos_view(request):
     linhas_marco = None
     filtros_marco_validos = True
     exportar_excel = False
+    marco_qualquer = False
     marcos = ()
     situacoes_marco = ()
     filtros_rotulos = {
@@ -2647,32 +2651,30 @@ def alunos_view(request):
 
     if acompanhamento_ativo:
         from acompanhamento.lista_alunos import (
-            DEFESA,
             IRREGULARES,
-            MARCO_INTERMEDIARIO,
             MARCOS,
-            SITUACOES,
+            QUALQUER_MARCO,
+            SITUACOES_FILTRO,
             listar_alunos_por_marco,
         )
 
         marco = request.GET.get("marco", "").strip()
+        marco_qualquer = marco == QUALQUER_MARCO
         situacao_marco = request.GET.get("situacao_marco", "").strip()
+        # "Qualquer marco" só lista irregulares: a opção "Todas" do formulário
+        # não pode virar um erro na tela.
+        if marco_qualquer and not situacao_marco:
+            situacao_marco = IRREGULARES
         semestre_marco = request.GET.get("semestre_marco", "").strip()
         exportar_excel = request.GET.get("exportar") == "xlsx"
-        marcos = (
-            (MARCO_INTERMEDIARIO, MARCOS[MARCO_INTERMEDIARIO]),
-            (DEFESA, MARCOS[DEFESA]),
-        )
-        situacoes_marco = (
-            (IRREGULARES, "Irregulares"),
-            *SITUACOES.items(),
-        )
+        marcos = tuple(MARCOS.items())
+        situacoes_marco = tuple(SITUACOES_FILTRO.items())
         filtros_rotulos.update(
             {
                 "marco": ("Marco", MARCOS.get),
                 "situacao_marco": (
                     "Situação no marco",
-                    dict(((IRREGULARES, "Irregulares"), *SITUACOES.items())).get,
+                    SITUACOES_FILTRO.get,
                 ),
                 "semestre_marco": ("Semestre do marco", None),
             }
@@ -2692,11 +2694,12 @@ def alunos_view(request):
             filtros_marco_validos = False
         if exportar_excel and filtros_marco_validos:
             from acompanhamento.models import PlanilhaBaixada
+            from acompanhamento.planilha_alunos import resposta_planilha_alunos
 
-            resposta = _resposta_xlsx_alunos_por_marco(
+            resposta = resposta_planilha_alunos(
                 linhas_marco,
                 marco,
-                MARCOS[marco],
+                _filtros_ativos(request, filtros_rotulos),
             )
             PlanilhaBaixada.objects.create(
                 baixada_por=request.user,
@@ -2751,6 +2754,7 @@ def alunos_view(request):
             "filtro_situacao_marco": situacao_marco,
             "filtro_semestre_marco": semestre_marco,
             "marco_selecionado": bool(marco),
+            "marco_qualquer": marco_qualquer,
             "total_alunos_filtrados": pagina.paginator.count,
             "status_list": Aluno.StatusAluno.choices,
             "nivel_list": Aluno.NivelCurso.choices,
@@ -2762,67 +2766,6 @@ def alunos_view(request):
             "can_view_caixa": _can_view_caixa(request.user),
         },
     )
-
-
-def _resposta_xlsx_alunos_por_marco(linhas, marco, marco_label):
-    workbook = Workbook()
-    planilha = workbook.active
-    planilha.title = "Alunos"
-    planilha.append(
-        [
-            "Matrícula",
-            "Nome",
-            "E-mail",
-            "Polo",
-            "Nível",
-            "Ingresso",
-            "Orientador",
-            "Marco",
-            "Situação",
-            "Data limite",
-            "Prazo de reapresentação",
-            "Semestre do marco",
-            "Motivo",
-        ]
-    )
-    for celula in planilha[planilha.max_row]:
-        if isinstance(celula.value, str) and celula.value.startswith("="):
-            celula.data_type = "s"
-    for linha in linhas:
-        resultado = linha.resultado
-        planilha.append(
-            [
-                linha.aluno.matricula,
-                linha.aluno.nome,
-                linha.aluno.email,
-                linha.aluno.polo_atuacao.nome if linha.aluno.polo_atuacao else "",
-                linha.trajetoria.get_nivel_curso_display(),
-                linha.trajetoria.ingresso,
-                linha.trajetoria.orientador.nome if linha.trajetoria.orientador else "",
-                marco_label,
-                linha.situacao_display,
-                resultado.data_limite.strftime("%d/%m/%Y") if resultado.data_limite else "",
-                resultado.prazo_reapresentacao.strftime("%d/%m/%Y") if resultado.prazo_reapresentacao else "",
-                linha.semestre_marco,
-                resultado.motivo,
-            ]
-        )
-        for celula in planilha[planilha.max_row]:
-            if isinstance(celula.value, str) and celula.value.startswith("="):
-                celula.data_type = "s"
-    planilha.freeze_panes = "A2"
-    planilha.auto_filter.ref = planilha.dimensions
-    arquivo = BytesIO()
-    workbook.save(arquivo)
-    response = HttpResponse(
-        arquivo.getvalue(),
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-    data_exportacao = timezone.localdate().isoformat()
-    response["Content-Disposition"] = (
-        f'attachment; filename="alunos_por_marco_{marco}_{data_exportacao}.xlsx"'
-    )
-    return response
 
 
 def _linhas_trajetoria(trajetoria):

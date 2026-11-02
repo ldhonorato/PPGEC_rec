@@ -56,6 +56,38 @@ STATUS_ABERTOS = [
 JANELA_DIAS = 200
 
 
+# Alunos das turmas antigas: (nível, meses desde o ingresso, desfecho,
+# meses de prorrogação). Concluído precisa de pelo menos 14 meses no
+# mestrado e 26 no doutorado, senão a data da defesa é recusada.
+TURMAS_DO_PAINEL = [
+    ("MESTRADO", 6, "ativo", 0),
+    ("MESTRADO", 20, "ativo", 3),
+    ("MESTRADO", 30, "concluido", 3),
+    ("MESTRADO", 42, "concluido", 0),
+    ("MESTRADO", 42, "desligado", 0),
+    ("MESTRADO", 54, "concluido", 6),
+    ("MESTRADO", 54, "trancado", 0),
+    ("MESTRADO", 66, "concluido", 0),
+    ("MESTRADO", 66, "desligado", 0),
+    ("DOUTORADO", 6, "ativo", 0),
+    ("DOUTORADO", 18, "desligado", 0),
+    ("DOUTORADO", 30, "trancado", 0),
+    ("DOUTORADO", 40, "concluido", 6),
+    ("DOUTORADO", 40, "ativo", 6),
+    ("DOUTORADO", 52, "concluido", 0),
+    ("DOUTORADO", 62, "concluido", 0),
+    ("DOUTORADO", 62, "desligado", 0),
+    ("DOUTORADO", 74, "concluido", 12),
+]
+
+STATUS_DO_DESFECHO = {
+    "ativo": TrajetoriaAcademica.Status.ATIVA,
+    "concluido": TrajetoriaAcademica.Status.ATIVA,  # nova_trajetoria conclui
+    "desligado": TrajetoriaAcademica.Status.DESLIGADA,
+    "trancado": TrajetoriaAcademica.Status.TRANCADA,
+}
+
+
 class Command(BaseCommand):
     help = "Remove os dados fictícios anteriores e cria um conjunto novo."
 
@@ -297,7 +329,28 @@ class Command(BaseCommand):
         self.data_no_calendario(limite)
         self.nova_trajetoria("DOUTORADO", data_ingresso=somar_meses(limite, -24))
 
+        # Turmas de anos diferentes para o painel de sucesso por turma. Vêm
+        # depois dos 14 de cima, sem mudar a ordem deles.
+        for nivel, meses, desfecho, prorrogacao in TURMAS_DO_PAINEL:
+            trajetoria = self.nova_trajetoria(
+                nivel,
+                ingresso=meses,
+                defendeu=desfecho == "concluido",
+                status=STATUS_DO_DESFECHO[desfecho],
+            )
+            self.prorrogar(trajetoria, prorrogacao)
+
         return TrajetoriaAcademica.objects.filter(aluno__email__endswith=DOMINIO).count()
+
+    def prorrogar(self, trajetoria, meses):
+        # Cada concessão tem no máximo 3 meses no mestrado e 6 no doutorado.
+        por_vez = 3 if trajetoria.nivel_curso == "MESTRADO" else 6
+        while meses > 0:
+            parte = min(meses, por_vez)
+            ProrrogacaoTrajetoria.objects.create(
+                trajetoria=trajetoria, meses=parte, registrado_por=self.secretaria
+            )
+            meses -= parte
 
     def nova_trajetoria(
         self,

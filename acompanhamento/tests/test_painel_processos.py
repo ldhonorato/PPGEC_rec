@@ -206,7 +206,7 @@ class PainelProcessosServicoTests(TestCase):
             descricao="Teste",
             setor_atual=self.setor,
         )
-        mes_esperado = proc.data_criacao.strftime("%Y-%m")
+        mes_esperado = timezone.localtime(proc.data_criacao).strftime("%Y-%m")
 
         dados = calcular_painel_processos()
 

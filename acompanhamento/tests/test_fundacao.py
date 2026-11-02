@@ -57,6 +57,27 @@ class PaginaInicialTests(TestCase):
                 self.assertEqual(self.client.get(self.endereco).status_code, esperado)
 
     @override_settings(ACOMPANHAMENTO_ATIVO=True)
+    def test_pagina_inicial_mostra_as_telas_e_o_total_de_irregulares(self):
+        self.client.force_login(self.perfis["servidor"])
+        cartao = {"total": 3, "endereco": "/coordenacao/alunos/?marco=qualquer"}
+        with patch("acompanhamento.views.cartao_alunos_irregulares", return_value=cartao):
+            resposta = self.client.get(self.endereco)
+
+        self.assertContains(resposta, "alunos irregulares")
+        self.assertContains(resposta, "/coordenacao/alunos/?marco=qualquer")
+        self.assertContains(resposta, "Concluídos, desligados e ativos de cada turma.")
+
+    @override_settings(ACOMPANHAMENTO_ATIVO=True)
+    def test_erro_na_conta_de_irregulares_nao_derruba_a_pagina_inicial(self):
+        self.client.force_login(self.perfis["servidor"])
+        with patch("acompanhamento.views.cartao_alunos_irregulares", return_value=None):
+            resposta = self.client.get(self.endereco)
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertNotContains(resposta, "Ver a lista")
+        self.assertContains(resposta, "Painel de Processos")
+
+    @override_settings(ACOMPANHAMENTO_ATIVO=True)
     def test_modulo_sem_telas_informa_que_nao_ha_telas(self):
 
         self.client.force_login(self.perfis["servidor"])

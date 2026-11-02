@@ -9,6 +9,7 @@ from django.utils.formats import number_format
 from .chave import aviso_ativo
 from .decoradores import tela_do_modulo
 from .forms import MarcoCalendarioForm
+from .lista_alunos import cartao_alunos_irregulares
 from .models import ExecucaoAviso, MarcoCalendario
 from .servicos import (
     calcular_painel_docentes,
@@ -22,9 +23,13 @@ from .telas import TELAS
 @tela_do_modulo
 def inicio(request):
     """Página inicial do módulo, com a lista das telas disponíveis."""
-    telas = [{"titulo": titulo, "endereco": reverse(rota)} for titulo, rota in TELAS]
+    telas = [
+        {"titulo": titulo, "descricao": descricao, "endereco": reverse(rota), "icone": icone}
+        for titulo, descricao, rota, icone in TELAS
+    ]
     contexto = {
         "telas": telas,
+        "cartao_irregulares": cartao_alunos_irregulares(),
         "aviso_ativo": aviso_ativo(),
         "ultima_execucao_aviso": ExecucaoAviso.objects.first() if aviso_ativo() else None,
     }
@@ -114,6 +119,7 @@ def _barras_da_turma(turma):
     return [
         {
             "rotulo": rotulo,
+            "quantidade": turma[contagem],
             "total": f"{turma[contagem]} ({number_format(turma[percentual], decimal_pos=1)}%)",
             "largura": turma[percentual],
         }
@@ -217,12 +223,32 @@ def painel_sucesso_turma(request):
     elif not nivel_selecionado:
         nivel_selecionado = nivel_padrao
 
-    turmas = calcular_painel_sucesso_turma(nivel=nivel_selecionado)
+    ano_inicial = request.GET.get("ano_inicial", "").strip() or None
+    ano_final = request.GET.get("ano_final", "").strip() or None
+
+    try:
+        turmas = calcular_painel_sucesso_turma(
+            nivel=nivel_selecionado,
+            ano_inicial=ano_inicial,
+            ano_final=ano_final,
+        )
+    except ValueError as e:
+        messages.error(request, str(e))
+        turmas = calcular_painel_sucesso_turma(nivel=nivel_selecionado)
+
     for turma in turmas:
         turma["barras"] = _barras_da_turma(turma)
 
+    turmas_grafico = list(reversed(turmas))
+
+    alerta_dados_limitados = any(t.get("dados_limitados") for t in turmas)
+
     contexto = {
         "nivel_selecionado": nivel_selecionado,
+        "ano_inicial": request.GET.get("ano_inicial", ""),
+        "ano_final": request.GET.get("ano_final", ""),
         "turmas": turmas,
+        "turmas_grafico": turmas_grafico,
+        "alerta_dados_limitados": alerta_dados_limitados,
     }
     return render(request, "acompanhamento/painel_sucesso_turma.html", contexto)

@@ -1,7 +1,11 @@
 {% extends "base.html" %}
+{% load static %}
 {% load l10n %}
 {% block title %}Painel de Processos | Coordenação{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'acompanhamento/css/painel_processos.css' %}">
+{% endblock %}
 {% block content %}
 <section class="card">
     <div class="lista-cabecalho">

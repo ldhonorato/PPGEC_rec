@@ -13,6 +13,8 @@ from acompanhamento.lista_alunos import (
     DEFESA,
     IRREGULARES,
     MARCO_INTERMEDIARIO,
+    QUALQUER_MARCO,
+    cartao_alunos_irregulares,
     listar_alunos_por_marco,
 )
 from acompanhamento.models import MarcoCalendario
@@ -115,15 +117,104 @@ class ListaAlunosPorMarcoTests(TestCase):
         self.assertEqual(situacoes["Elisa Sem Chance"], IRREGULAR_SEM_CHANCE)
         self.assertEqual(situacoes["Igor Doutorado"], SEM_PRAZO)
 
+    def test_as_duas_situacoes_irregulares_sao_exibidas_com_o_mesmo_rotulo(self):
+        displays = {linha.aluno.nome: linha.situacao_display for linha in self.listar()}
+        self.assertEqual(displays["Bruno Com Chance"], "Irregular")
+        self.assertEqual(displays["Elisa Sem Chance"], "Irregular")
+
     def test_atalho_irregulares_traz_as_duas_situacoes_irregulares(self):
         self.assertEqual(
             nomes(self.listar(situacao=IRREGULARES)),
             ["Bruno Com Chance", "Elisa Sem Chance"],
         )
 
+    def test_qualquer_marco_reune_irregulares_sem_duplicar_alunos(self):
+        criar_aluno(
+            "Julia Apenas Defesa",
+            data_ingresso=date(2020, 1, 1),
+            isQualificado=True,
+        )
+        criar_aluno(
+            "Marina Ambos os Marcos",
+            data_ingresso=date(2020, 1, 1),
+            data_limite_qualificacao=date(2026, 7, 10),
+            prazo_qualificacao="2026.2",
+        )
+
+        linhas = self.listar(marco=QUALQUER_MARCO, situacao=IRREGULARES)
+        por_nome = {linha.aluno.nome: linha for linha in linhas}
+
+        self.assertEqual(
+            set(por_nome),
+            {
+                "Bruno Com Chance",
+                "Elisa Sem Chance",
+                "Julia Apenas Defesa",
+                "Marina Ambos os Marcos",
+            },
+        )
+        self.assertEqual(
+            por_nome["Bruno Com Chance"].marco_display,
+            "Projeto de dissertação ou qualificação",
+        )
+        self.assertEqual(por_nome["Julia Apenas Defesa"].marco_display, "Defesa")
+        self.assertEqual(
+            por_nome["Marina Ambos os Marcos"].marco_display,
+            "Projeto de dissertação ou qualificação e Defesa",
+        )
+
+    def test_cartao_usa_o_total_da_lista_e_aponta_para_o_filtro(self):
+        cartao = cartao_alunos_irregulares(data_referencia=REFERENCIA)
+        linhas = listar_alunos_por_marco(
+            Aluno.objects.all(),
+            QUALQUER_MARCO,
+            situacao=IRREGULARES,
+            data_referencia=REFERENCIA,
+        )
+
+        self.assertEqual(cartao["total"], len(linhas))
+        self.assertEqual(
+            cartao["endereco"],
+            "/coordenacao/alunos/?marco=qualquer&situacao_marco=irregulares",
+        )
+
+    def test_cartao_registra_erro_e_retorna_none(self):
+        with patch(
+            "acompanhamento.lista_alunos.listar_alunos_por_marco",
+            side_effect=RuntimeError("falha no cálculo"),
+        ):
+            with self.assertLogs("acompanhamento.lista_alunos", level="ERROR"):
+                self.assertIsNone(cartao_alunos_irregulares(data_referencia=REFERENCIA))
+
     def test_filtro_por_uma_situacao(self):
         self.assertEqual(
-            nomes(self.listar(situacao=IRREGULAR_COM_CHANCE)), ["Bruno Com Chance"]
+            nomes(self.listar(situacao=REGULAR)),
+            ["Ana Regular", "Carla Cumprida"],
+        )
+
+    def test_coluna_situacao_mostra_os_tres_estados(self):
+        situacoes = {linha.aluno.nome: linha.situacao_display for linha in self.listar()}
+
+        self.assertEqual(situacoes["Ana Regular"], "Regular")
+        self.assertEqual(situacoes["Carla Cumprida"], "Regular")
+        self.assertEqual(situacoes["Bruno Com Chance"], "Irregular")
+        self.assertEqual(situacoes["Diego Sem Prazo"], "Não foi possível calcular")
+
+    def test_filtro_nao_calculado_reune_sem_prazo_e_falha_de_calculo(self):
+        original = nucleo.calcular_situacao_trajetoria
+
+        def falha_para_o_bruno(trajetoria, *args, **kwargs):
+            if trajetoria.aluno.nome == "Bruno Com Chance":
+                raise RuntimeError("cadastro inesperado")
+            return original(trajetoria, *args, **kwargs)
+
+        with patch.object(nucleo, "calcular_situacao_trajetoria", falha_para_o_bruno):
+            with self.assertLogs("acompanhamento.situacao", level="ERROR"):
+                linhas = self.listar(situacao=NAO_CALCULADO)
+
+        self.assertEqual(
+            nomes(linhas),
+            ["Bruno Com Chance", "Diego Sem Prazo", "Igor Doutorado"],
         )
 
     def test_filtro_pelo_semestre_do_marco(self):
@@ -146,13 +237,44 @@ class ListaAlunosPorMarcoTests(TestCase):
         self.assertEqual(bruno.semestre_marco, "2027.1")
 
     def test_filtros_invalidos_sao_recusados(self):
-        for filtros in (
-            {"marco": "outro"},
-            {"situacao": "atrasado"},
-            {"semestre_marco": "2026-2"},
+        for filtros, mensagem in (
+            ({"marco": "outro"}, "Marco inválido."),
+            ({"situacao": "atrasado"}, "Situação inválida."),
+            ({"situacao": IRREGULAR_COM_CHANCE}, "Situação inválida."),
+            ({"situacao": IRREGULAR_SEM_CHANCE}, "Situação inválida."),
+            ({"situacao": CUMPRIDO}, "Situação inválida."),
+            ({"situacao": SEM_PRAZO}, "Situação inválida."),
+            (
+                {"semestre_marco": "2026-2"},
+                "Semestre do marco inválido. Use o formato AAAA.1 ou AAAA.2.",
+            ),
         ):
-            with self.subTest(filtros=filtros), self.assertRaises(ValueError):
+            with self.subTest(filtros=filtros), self.assertRaises(ValueError) as erro:
                 self.listar(**filtros)
+            self.assertEqual(str(erro.exception), mensagem)
+
+    def test_qualquer_marco_exige_irregular_e_semestre_vazio(self):
+        for filtros, mensagem in (
+            (
+                {"marco": QUALQUER_MARCO},
+                '“Qualquer marco” só aceita a situação “Irregular”.',
+            ),
+            (
+                {"marco": QUALQUER_MARCO, "situacao": REGULAR},
+                '“Qualquer marco” só aceita a situação “Irregular”.',
+            ),
+            (
+                {
+                    "marco": QUALQUER_MARCO,
+                    "situacao": IRREGULARES,
+                    "semestre_marco": "2026.2",
+                },
+                'Não é possível filtrar “Qualquer marco” por semestre.',
+            ),
+        ):
+            with self.subTest(filtros=filtros), self.assertRaises(ValueError) as erro:
+                self.listar(**filtros)
+            self.assertEqual(str(erro.exception), mensagem)
 
     def test_falha_em_um_aluno_nao_derruba_a_lista(self):
         original = nucleo.calcular_situacao_trajetoria

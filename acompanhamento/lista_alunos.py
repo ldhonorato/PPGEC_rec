@@ -8,9 +8,12 @@ doutorado entra, e todos os alunos são carregados de uma vez, com número
 fixo de consultas.
 """
 
+import logging
 import re
 from dataclasses import dataclass
+from urllib.parse import urlencode
 
+from django.urls import reverse
 from django.utils import timezone
 
 from acompanhamento.models import MarcoCalendario
@@ -27,21 +30,35 @@ from acompanhamento.situacao import (
 )
 from processos.models import Aluno, TrajetoriaAcademica
 
+logger = logging.getLogger(__name__)
+
 MARCO_INTERMEDIARIO = "marco"
 DEFESA = "defesa"
+QUALQUER_MARCO = "qualquer"
 MARCOS = {
     MARCO_INTERMEDIARIO: "Projeto de dissertação ou qualificação",
     DEFESA: "Defesa",
+    QUALQUER_MARCO: "Qualquer marco",
 }
 
 IRREGULARES = "irregulares"
 SITUACOES = {
     REGULAR: "Regular",
-    IRREGULAR_COM_CHANCE: "Irregular com chance",
-    IRREGULAR_SEM_CHANCE: "Irregular sem chance",
-    CUMPRIDO: "Cumprido",
-    SEM_PRAZO: "Sem prazo cadastrado",
+    IRREGULAR_COM_CHANCE: "Irregular",
+    IRREGULAR_SEM_CHANCE: "Irregular",
+    CUMPRIDO: "Regular",
+    SEM_PRAZO: "Não foi possível calcular",
     NAO_CALCULADO: "Não foi possível calcular",
+}
+SITUACOES_FILTRO = {
+    IRREGULARES: "Irregular",
+    REGULAR: "Regular",
+    NAO_CALCULADO: "Não foi possível calcular",
+}
+SITUACOES_POR_FILTRO = {
+    IRREGULARES: (IRREGULAR_COM_CHANCE, IRREGULAR_SEM_CHANCE),
+    REGULAR: (REGULAR, CUMPRIDO),
+    NAO_CALCULADO: (SEM_PRAZO, NAO_CALCULADO),
 }
 
 _FORMATO_SEMESTRE = re.compile(r"^\d{4}\.[12]$")
@@ -53,6 +70,8 @@ class LinhaAluno:
     trajetoria: TrajetoriaAcademica
     resultado: Resultado
     semestre_marco: str
+    marco_display: str = ""
+    resultados_marco: tuple[tuple[str, Resultado], ...] = ()
 
     @property
     def situacao_display(self):
@@ -64,7 +83,12 @@ def validar_filtros(marco, situacao="", semestre_marco=""):
     que a tela mostra quando algum deles é inválido."""
     if marco not in MARCOS:
         raise ValueError("Marco inválido.")
-    if situacao and situacao != IRREGULARES and situacao not in SITUACOES:
+    if marco == QUALQUER_MARCO:
+        if situacao != IRREGULARES:
+            raise ValueError('“Qualquer marco” só aceita a situação “Irregular”.')
+        if semestre_marco:
+            raise ValueError('Não é possível filtrar “Qualquer marco” por semestre.')
+    if situacao and situacao not in SITUACOES_FILTRO:
         raise ValueError("Situação inválida.")
     if semestre_marco and not _FORMATO_SEMESTRE.match(semestre_marco):
         raise ValueError("Semestre do marco inválido. Use o formato AAAA.1 ou AAAA.2.")
@@ -94,9 +118,7 @@ def _trajetorias_ativas(alunos):
 def _combina_situacao(resultado, situacao):
     if not situacao:
         return True
-    if situacao == IRREGULARES:
-        return resultado.situacao in (IRREGULAR_COM_CHANCE, IRREGULAR_SEM_CHANCE)
-    return resultado.situacao == situacao
+    return resultado.situacao in SITUACOES_POR_FILTRO[situacao]
 
 
 def listar_alunos_por_marco(
@@ -105,9 +127,9 @@ def listar_alunos_por_marco(
     """Alunos com a situação no marco escolhido, já filtrados e ordenados.
 
     alunos: queryset de Aluno com os filtros da tela já aplicados.
-    marco: MARCO_INTERMEDIARIO ou DEFESA.
-    situacao: uma das chaves de SITUACOES, IRREGULARES (as duas situações
-    irregulares) ou vazio para todas.
+    marco: um marco de MARCOS. QUALQUER_MARCO exige situação IRREGULARES e
+    não aceita filtro por semestre.
+    situacao: uma das chaves de SITUACOES_FILTRO ou vazio para todas.
     semestre_marco: "AAAA.1" ou "AAAA.2"; mantém só quem tem a data limite
     do marco nesse semestre.
     data_referencia: data do cálculo; sem ela, vale o dia de hoje.
@@ -121,6 +143,30 @@ def listar_alunos_por_marco(
 
     linhas = []
     for trajetoria in trajetorias:
+        if marco == QUALQUER_MARCO:
+            resultados_marco = tuple(
+                (MARCOS[chave], situacoes[trajetoria.pk][chave])
+                for chave in (MARCO_INTERMEDIARIO, DEFESA)
+                if _combina_situacao(
+                    situacoes[trajetoria.pk][chave], IRREGULARES
+                )
+            )
+            if not resultados_marco:
+                continue
+            linhas.append(
+                LinhaAluno(
+                    aluno=trajetoria.aluno,
+                    trajetoria=trajetoria,
+                    resultado=resultados_marco[0][1],
+                    semestre_marco="",
+                    marco_display=" e ".join(
+                        nome_marco for nome_marco, _ in resultados_marco
+                    ),
+                    resultados_marco=resultados_marco,
+                )
+            )
+            continue
+
         resultado = situacoes[trajetoria.pk][marco]
         # Quem já defendeu sai do cálculo e não aparece na lista.
         if resultado.situacao == FORA_DO_CALCULO:
@@ -140,7 +186,30 @@ def listar_alunos_por_marco(
                 trajetoria=trajetoria,
                 resultado=resultado,
                 semestre_marco=semestre,
+                marco_display=MARCOS[marco],
+                resultados_marco=((MARCOS[marco], resultado),),
             )
         )
     linhas.sort(key=lambda linha: (linha.aluno.nome or "").lower())
     return linhas
+
+
+def cartao_alunos_irregulares(data_referencia=None):
+    """Total e endereço da lista de alunos irregulares em qualquer marco."""
+    try:
+        linhas = listar_alunos_por_marco(
+            Aluno.objects.all(),
+            QUALQUER_MARCO,
+            situacao=IRREGULARES,
+            data_referencia=data_referencia,
+        )
+        query = urlencode(
+            {"marco": QUALQUER_MARCO, "situacao_marco": IRREGULARES}
+        )
+        return {
+            "total": len(linhas),
+            "endereco": f"{reverse('coordenacao_alunos')}?{query}",
+        }
+    except Exception:
+        logger.exception("Falha ao calcular o cartão de alunos irregulares.")
+        return None

@@ -31,6 +31,14 @@ Numero que nao significa nada ensina a ignorar os numeros da tela, inclusive
 os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
 {% endcomment %}
 <section class="metric-grid" aria-label="Visão geral">
+    {% if cartao_irregulares %}
+        <a class="card metric-card {% if cartao_irregulares.total %}is-alerta{% else %}is-green{% endif %}"
+           href="{{ cartao_irregulares.endereco }}">
+            <svg class="metric-icon" aria-hidden="true"><use href="#i-alerta"></use></svg>
+            <p class="metric-value">{{ cartao_irregulares.total }}</p>
+            <p class="metric-label">Alunos irregulares</p>
+        </a>
+    {% endif %}
     {% if user.tipo_usuario == "DOCENTE" %}
         <a class="card metric-card" href="{% url 'menu_meus_processos' %}">
             <svg class="metric-icon" aria-hidden="true"><use href="#i-meus-processos"></use></svg>

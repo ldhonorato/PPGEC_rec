@@ -1,18 +1,42 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Acompanhamento | Coordenação{% endblock %}
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'acompanhamento/css/inicio.css' %}">
+{% endblock %}
 {% block content %}
 <section class="card">
     <h1 class="section-title">Acompanhamento</h1>
-    {% if telas %}
-    <ul>
-        {% for tela in telas %}
-        <li><a href="{{ tela.endereco }}">{{ tela.titulo }}</a></li>
-        {% endfor %}
-    </ul>
-    {% else %}
-    <p>Ainda não há telas disponíveis.</p>
+    <p class="muted">Prazos dos alunos e indicadores do programa.</p>
+
+    {% if cartao_irregulares %}
+        <a class="acomp-irregulares {% if cartao_irregulares.total %}tem-irregulares{% endif %}" href="{{ cartao_irregulares.endereco }}">
+            <svg class="acomp-icone" aria-hidden="true"><use href="#i-alerta"></use></svg>
+            <span class="acomp-irregulares-total">{{ cartao_irregulares.total }}</span>
+            <span class="acomp-irregulares-texto">aluno{{ cartao_irregulares.total|pluralize }} irregular{{ cartao_irregulares.total|pluralize:"es" }}</span>
+            <span class="acomp-irregulares-acao">Ver a lista</span>
+        </a>
     {% endif %}
-    <p class="muted">
+
+    {% if telas %}
+        <ul class="acomp-telas">
+            {% for tela in telas %}
+                <li>
+                    <a class="acomp-tela" href="{{ tela.endereco }}">
+                        <svg class="acomp-icone" aria-hidden="true"><use href="#{{ tela.icone }}"></use></svg>
+                        <span class="acomp-tela-texto">
+                            <span class="acomp-tela-titulo">{{ tela.titulo }}</span>
+                            <span class="acomp-tela-descricao">{{ tela.descricao }}</span>
+                        </span>
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>Ainda não há telas disponíveis.</p>
+    {% endif %}
+
+    <p class="muted acomp-aviso">
         {% if not aviso_ativo %}
         O aviso diário de alunos atrasados está desligado.
         {% elif ultima_execucao_aviso %}

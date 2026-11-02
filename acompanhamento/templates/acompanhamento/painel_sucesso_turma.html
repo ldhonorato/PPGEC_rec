@@ -1,4 +1,9 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'acompanhamento/css/grafico_sucesso.css' %}">
+{% endblock %}
 
 {% block title %}Painel de Sucesso por Turma | AcadFlow{% endblock %}
 
@@ -20,27 +25,51 @@
                     <option value="DOUTORADO" {% if nivel_selecionado == "DOUTORADO" %}selected{% endif %}>Doutorado</option>
                 </select>
             </div>
+
+            <div class="filtros-campo filtros-campo-data">
+                <label for="ano_inicial">Ano inicial</label>
+                <input type="number" id="ano_inicial" name="ano_inicial" value="{{ ano_inicial }}" placeholder="Ex: 2022">
+            </div>
+
+            <div class="filtros-campo filtros-campo-data">
+                <label for="ano_final">Ano final</label>
+                <input type="number" id="ano_final" name="ano_final" value="{{ ano_final }}" placeholder="Ex: 2026">
+            </div>
+
             <button class="btn" type="submit">Filtrar</button>
         </div>
     </form>
 </section>
 
-{% for turma in turmas %}
+{% if turmas %}
     <section class="card">
-        <h2 class="section-title">Turma {{ turma.turma }}</h2>
-        <p class="muted">{{ turma.ingressantes }} ingressante{{ turma.ingressantes|pluralize }}. Os percentuais são calculados sobre os ingressantes.</p>
+        <h2 class="section-title">Indicadores por Turma</h2>
+        <p class="muted">Comparativo de discentes por turma de ingresso. A altura de cada barra é o percentual sobre os ingressantes da turma, e o número é a quantidade.</p>
 
-        {% if turma.dados_limitados %}
-            <p class="alert alert-info">
-                Esta turma é anterior a 2026.2. O Acadflow começou em 2026.2, e desligamentos, prorrogações e defesas anteriores podem não estar registrados.
+        {% if alerta_dados_limitados %}
+            <p class="alert alert-info grafico-alerta-espacado grafico-aviso">
+                Esta consulta inclui turmas anteriores a 2026.2 (marcadas com *). O Acadflow começou em 2026.2, e desligamentos, prorrogações e defesas anteriores podem não estar totalmente registrados.
             </p>
         {% endif %}
 
-        {% include "acompanhamento/_barras.html" with titulo="Indicadores da turma" barras=turma.barras vazio="Sem dados para os indicadores." %}
+        {% include "acompanhamento/includes/_grafico_sucesso.html" %}
+
+        <p class="muted grafico-alerta-espacado">
+            Turmas recentes podem não apresentar concluídos porque a defesa ocorre a partir de 12 meses no mestrado e 24 meses no doutorado. "Ativos regulares" inclui quem está como "Não foi possível calcular" na lista de alunos.
+        </p>
     </section>
-{% empty %}
+{% else %}
     <section class="card">
-        <p class="estado-vazio-inline">Nenhuma turma encontrada.</p>
+        <p class="estado-vazio-inline">Nenhuma turma encontrada para os filtros selecionados.</p>
     </section>
-{% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Abre o gráfico nas turmas mais recentes; as antigas ficam ao rolar para a esquerda.
+    document.querySelectorAll("[data-grafico-rolagem]").forEach(function (area) {
+        area.scrollLeft = area.scrollWidth;
+    });
+</script>
 {% endblock %}

@@ -1,5 +1,11 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Alunos | Coordenação{% endblock %}
+{% block extra_head %}
+    {% if acompanhamento_ativo %}
+        <link rel="stylesheet" href="{% static 'acompanhamento/css/lista_por_marco.css' %}">
+    {% endif %}
+{% endblock %}
 {% block content %}
 <section class="card">
     <h1 class="section-title">Alunos</h1>
@@ -72,7 +78,7 @@
                     </select>
                 </div>
                 {% if acompanhamento_ativo %}
-                    <div class="filtros-campo filtros-campo-escolha">
+                    <div class="filtros-campo filtros-campo-escolha filtros-campo-marco">
                         <label for="id_marco">Marco acadêmico</label>
                         <select id="id_marco" name="marco">
                             <option value="">Não filtrar por marco</option>
@@ -139,19 +145,20 @@
                 <thead>
                     <tr>
                         <th scope="col">Aluno</th>
+                        {% if marco_selecionado %}
+                            {% if marco_qualquer %}<th scope="col" class="coluna-marco-nome">Marco</th>{% endif %}
+                            <th scope="col">Situação no marco</th>
+                            <th scope="col">Data limite</th>
+                            <th scope="col">Reapresentação até</th>
+                            <th scope="col">Semestre do marco</th>
+                            <th scope="col" class="coluna-marco-detalhe">Detalhe</th>
+                        {% endif %}
                         <th scope="col">Matrícula</th>
                         <th scope="col">Polo</th>
                         <th scope="col">Nível</th>
                         <th scope="col">Ingresso</th>
                         <th scope="col">Orientador</th>
                         <th scope="col">Trajetória</th>
-                        {% if marco_selecionado %}
-                            <th scope="col">Situação no marco</th>
-                            <th scope="col">Data limite</th>
-                            <th scope="col">Reapresentação até</th>
-                            <th scope="col">Semestre do marco</th>
-                            <th scope="col">Detalhe</th>
-                        {% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -161,6 +168,40 @@
                                 <a href="{% url 'aluno_detalhe' aluno.id %}">{{ aluno.nome }}</a>
                                 <span class="celula-secundaria">{{ aluno.email }}</span>
                             </td>
+                            {% if marco_selecionado %}
+                                {% if marco_qualquer %}
+                                    <td class="coluna-marco-nome">{{ aluno.linha_marco.marco_display }}</td>
+                                {% endif %}
+                                <td><span class="badge {% if aluno.linha_marco.situacao_display == "Irregular" %}badge-no{% elif aluno.linha_marco.situacao_display == "Regular" %}badge-ok{% else %}badge-aviso{% endif %}">{{ aluno.linha_marco.situacao_display }}</span></td>
+                                <td class="celula-numero celula-apoio coluna-marco-data">
+                                    {% if marco_qualquer %}
+                                        {% for nome_marco, resultado_marco in aluno.linha_marco.resultados_marco %}
+                                            {{ nome_marco }}: {{ resultado_marco.data_limite|date:"d/m/Y"|default:"—" }}<br>
+                                        {% endfor %}
+                                    {% else %}
+                                        {{ aluno.linha_marco.resultado.data_limite|date:"d/m/Y"|default:"—" }}
+                                    {% endif %}
+                                </td>
+                                <td class="celula-numero celula-apoio coluna-marco-data">
+                                    {% if marco_qualquer %}
+                                        {% for nome_marco, resultado_marco in aluno.linha_marco.resultados_marco %}
+                                            {{ nome_marco }}: {{ resultado_marco.prazo_reapresentacao|date:"d/m/Y"|default:"—" }}<br>
+                                        {% endfor %}
+                                    {% else %}
+                                        {{ aluno.linha_marco.resultado.prazo_reapresentacao|date:"d/m/Y"|default:"—" }}
+                                    {% endif %}
+                                </td>
+                                <td class="celula-numero celula-apoio">{{ aluno.linha_marco.semestre_marco|default:"—" }}</td>
+                                <td class="celula-apoio coluna-marco-detalhe">
+                                    {% if marco_qualquer %}
+                                        {% for nome_marco, resultado_marco in aluno.linha_marco.resultados_marco %}
+                                            {{ nome_marco }}: {{ resultado_marco.motivo|default:"—" }}<br>
+                                        {% endfor %}
+                                    {% else %}
+                                        {{ aluno.linha_marco.resultado.motivo|default:"—" }}
+                                    {% endif %}
+                                </td>
+                            {% endif %}
                             <td class="celula-numero celula-apoio">{{ aluno.matricula|default:"—" }}</td>
                             <td class="celula-apoio">{{ aluno.polo_atuacao.nome|default:"—" }}</td>
                             <td class="celula-apoio">{{ aluno.trajetoria_atual.get_nivel_curso_display|default:"—" }}</td>
@@ -173,13 +214,6 @@
                                     <span class="celula-apoio">Sem trajetória</span>
                                 {% endif %}
                             </td>
-                            {% if marco_selecionado %}
-                                <td>{{ aluno.linha_marco.situacao_display }}</td>
-                                <td class="celula-numero celula-apoio">{{ aluno.linha_marco.resultado.data_limite|date:"d/m/Y"|default:"—" }}</td>
-                                <td class="celula-numero celula-apoio">{{ aluno.linha_marco.resultado.prazo_reapresentacao|date:"d/m/Y"|default:"—" }}</td>
-                                <td class="celula-numero celula-apoio">{{ aluno.linha_marco.semestre_marco|default:"—" }}</td>
-                                <td class="celula-apoio">{{ aluno.linha_marco.resultado.motivo|default:"—" }}</td>
-                            {% endif %}
                         </tr>
                     {% endfor %}
                 </tbody>

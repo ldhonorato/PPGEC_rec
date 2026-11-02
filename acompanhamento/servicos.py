@@ -275,10 +275,35 @@ def _anterior_aos_registros(turma):
         return False
 
 
-def calcular_painel_sucesso_turma(nivel, data_referencia=None):
+def calcular_painel_sucesso_turma(
+    nivel,
+    data_referencia=None,
+    ano_inicial=None,
+    ano_final=None,
+):
     """
     Calcula indicadores de taxa de sucesso e distribuição por turma de ingresso para um nível específico.
+    Permite filtrar opcionalmente por intervalo de anos de ingresso (ex: 2024 a 2026).
     """
+    if ano_inicial is not None:
+        ano_inicial_str = str(ano_inicial).strip()
+        if not (len(ano_inicial_str) == 4 and ano_inicial_str.isdigit()):
+            raise ValueError("Ano inicial inválido. Utilize o formato YYYY.")
+        ano_ini = int(ano_inicial_str)
+    else:
+        ano_ini = None
+
+    if ano_final is not None:
+        ano_final_str = str(ano_final).strip()
+        if not (len(ano_final_str) == 4 and ano_final_str.isdigit()):
+            raise ValueError("Ano final inválido. Utilize o formato YYYY.")
+        ano_fim = int(ano_final_str)
+    else:
+        ano_fim = None
+
+    if ano_ini is not None and ano_fim is not None and ano_ini > ano_fim:
+        raise ValueError("O ano inicial não pode ser maior que o ano final.")
+
     if data_referencia is None:
         data_referencia = timezone.localdate()
 
@@ -296,9 +321,15 @@ def calcular_painel_sucesso_turma(nivel, data_referencia=None):
         .order_by("-ingresso")
     )
 
+    if ano_ini is not None:
+        trajetorias_qs = trajetorias_qs.filter(ingresso__gte=f"{ano_ini}.1")
+
+    if ano_fim is not None:
+        trajetorias_qs = trajetorias_qs.filter(ingresso__lte=f"{ano_fim}.2")
+
     lista_trajetorias = list(trajetorias_qs)
 
-    # Coleta trajetórias ativas para calcular situações de marco/defesa
+    # Coleta trajetórias ativas para verificar situações
     ativas = [t for t in lista_trajetorias if t.status == TrajetoriaAcademica.Status.ATIVA]
     situacoes = calcular_situacoes(ativas, data_referencia)
 
@@ -338,7 +369,7 @@ def calcular_painel_sucesso_turma(nivel, data_referencia=None):
             dados["trancados"] += 1
         elif traj.status == TrajetoriaAcademica.Status.ATIVA:
             dados["ativos"] += 1
-            # Verifica se está irregular com chance ou sem chance no marco ou na defesa
+            # Verifica se está irregular no marco ou na defesa
             dados_sit = situacoes.get(traj.pk, {})
             eh_irregular = any(
                 dados_sit.get(chave)
