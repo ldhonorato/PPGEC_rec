@@ -13,6 +13,7 @@ from django.contrib.staticfiles import finders
 from django.http import HttpResponse
 from django.utils import timezone
 from openpyxl import Workbook
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.drawing.image import Image
 from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
 from openpyxl.drawing.xdr import XDRPositiveSize2D
@@ -117,6 +118,13 @@ def _fundo(cor):
     return PatternFill("solid", start_color=cor, end_color=cor)
 
 
+def _sem_caractere_invisivel(valor):
+    """O Excel não aceita caracteres de controle, que podem vir de texto colado."""
+    if isinstance(valor, str):
+        return ILLEGAL_CHARACTERS_RE.sub(" ", valor)
+    return valor
+
+
 def _colunas_do_marco(marco):
     """Como na tela, a coluna Marco só aparece em "Qualquer marco"."""
     if marco == QUALQUER_MARCO:
@@ -174,7 +182,7 @@ def _valores_do_aluno(linha, marco):
         linha.trajetoria.ingresso,
         linha.trajetoria.orientador.nome if linha.trajetoria.orientador else "",
     ]
-    return [valor if valor else SEM_VALOR for valor in valores]
+    return [_sem_caractere_invisivel(valor) if valor else SEM_VALOR for valor in valores]
 
 
 def _escrever_topo(planilha, total, filtros, colunas):
@@ -186,7 +194,9 @@ def _escrever_topo(planilha, total, filtros, colunas):
     _colocar_logo(planilha)
 
     agora = timezone.localtime()
-    filtros_texto = "  |  ".join(f"{filtro['titulo']}: {filtro['valor']}" for filtro in filtros)
+    filtros_texto = _sem_caractere_invisivel(
+        "  |  ".join(f"{filtro['titulo']}: {filtro['valor']}" for filtro in filtros)
+    )
     resumo = f"{total} aluno{'' if total == 1 else 's'}  |  Gerada em {agora:%d/%m/%Y às %H:%M}"
     topo = (
         (2, PROGRAMA, _fonte(size=9, color=COR_SUBTITULO_MARCA), 20),
