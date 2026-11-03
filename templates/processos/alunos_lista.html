@@ -1,5 +1,11 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Alunos | Coordenação{% endblock %}
+{% block extra_head %}
+    {% if acompanhamento_ativo %}
+        <link rel="stylesheet" href="{% static 'acompanhamento/css/lista_por_marco.css' %}">
+    {% endif %}
+{% endblock %}
 {% block content %}
 <section class="card">
     <h1 class="section-title">Alunos</h1>
@@ -32,7 +38,7 @@
             </div>
         </div>
 
-        <details class="revelar" {% if filtro_nivel or filtro_reingressante or filtro_ingresso_inicio or filtro_ingresso_fim or filtro_sem_matricula_periodo %}open{% endif %}>
+        <details class="revelar" {% if filtro_nivel or filtro_reingressante or filtro_ingresso_inicio or filtro_ingresso_fim or filtro_sem_matricula_periodo or filtro_marco or filtro_situacao_marco or filtro_semestre_marco %}open{% endif %}>
             <summary>Mais filtros</summary>
             <div class="filtros-linha">
                 <div class="filtros-campo filtros-campo-escolha">
@@ -71,8 +77,38 @@
                         {% endfor %}
                     </select>
                 </div>
+                {% if acompanhamento_ativo %}
+                    <div class="filtros-campo filtros-campo-escolha filtros-campo-marco">
+                        <label for="id_marco">Marco acadêmico</label>
+                        <select id="id_marco" name="marco">
+                            <option value="">Não filtrar por marco</option>
+                            {% for value, label in marcos %}
+                                <option value="{{ value }}" {% if filtro_marco == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filtros-campo filtros-campo-escolha">
+                        <label for="id_situacao_marco">Situação no marco</label>
+                        <select id="id_situacao_marco" name="situacao_marco">
+                            <option value="">Todas</option>
+                            {% for value, label in situacoes_marco %}
+                                <option value="{{ value }}" {% if filtro_situacao_marco == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filtros-campo filtros-campo-data">
+                        <label for="id_semestre_marco">Semestre do marco</label>
+                        <input id="id_semestre_marco" type="text" name="semestre_marco"
+                               value="{{ filtro_semestre_marco }}" placeholder="2026.2" inputmode="numeric">
+                    </div>
+                {% endif %}
             </div>
         </details>
+        {% if acompanhamento_ativo and filtro_marco %}
+            <div class="filtros-acoes">
+                <button class="btn" type="submit" name="exportar" value="xlsx">Baixar em Excel</button>
+            </div>
+        {% endif %}
     </form>
 
     {% if filtros_ativos %}
@@ -109,6 +145,14 @@
                 <thead>
                     <tr>
                         <th scope="col">Aluno</th>
+                        {% if marco_selecionado %}
+                            {% if marco_qualquer %}<th scope="col" class="coluna-marco-nome">Marco</th>{% endif %}
+                            <th scope="col">Situação no marco</th>
+                            <th scope="col">Data limite</th>
+                            <th scope="col">Reapresentação até</th>
+                            <th scope="col">Semestre do marco</th>
+                            <th scope="col" class="coluna-marco-detalhe">Detalhe</th>
+                        {% endif %}
                         <th scope="col">Matrícula</th>
                         <th scope="col">Polo</th>
                         <th scope="col">Nível</th>
@@ -124,6 +168,40 @@
                                 <a href="{% url 'aluno_detalhe' aluno.id %}">{{ aluno.nome }}</a>
                                 <span class="celula-secundaria">{{ aluno.email }}</span>
                             </td>
+                            {% if marco_selecionado %}
+                                {% if marco_qualquer %}
+                                    <td class="coluna-marco-nome">{{ aluno.linha_marco.marco_display }}</td>
+                                {% endif %}
+                                <td><span class="badge {% if aluno.linha_marco.situacao_display == "Irregular" %}badge-no{% elif aluno.linha_marco.situacao_display == "Regular" %}badge-ok{% else %}badge-aviso{% endif %}">{{ aluno.linha_marco.situacao_display }}</span></td>
+                                <td class="celula-numero celula-apoio coluna-marco-data">
+                                    {% if marco_qualquer %}
+                                        {% for nome_marco, resultado_marco in aluno.linha_marco.resultados_marco %}
+                                            {{ nome_marco }}: {{ resultado_marco.data_limite|date:"d/m/Y"|default:"—" }}<br>
+                                        {% endfor %}
+                                    {% else %}
+                                        {{ aluno.linha_marco.resultado.data_limite|date:"d/m/Y"|default:"—" }}
+                                    {% endif %}
+                                </td>
+                                <td class="celula-numero celula-apoio coluna-marco-data">
+                                    {% if marco_qualquer %}
+                                        {% for nome_marco, resultado_marco in aluno.linha_marco.resultados_marco %}
+                                            {{ nome_marco }}: {{ resultado_marco.prazo_reapresentacao|date:"d/m/Y"|default:"—" }}<br>
+                                        {% endfor %}
+                                    {% else %}
+                                        {{ aluno.linha_marco.resultado.prazo_reapresentacao|date:"d/m/Y"|default:"—" }}
+                                    {% endif %}
+                                </td>
+                                <td class="celula-numero celula-apoio">{{ aluno.linha_marco.semestre_marco|default:"—" }}</td>
+                                <td class="celula-apoio coluna-marco-detalhe">
+                                    {% if marco_qualquer %}
+                                        {% for nome_marco, resultado_marco in aluno.linha_marco.resultados_marco %}
+                                            {{ nome_marco }}: {{ resultado_marco.motivo|default:"—" }}<br>
+                                        {% endfor %}
+                                    {% else %}
+                                        {{ aluno.linha_marco.resultado.motivo|default:"—" }}
+                                    {% endif %}
+                                </td>
+                            {% endif %}
                             <td class="celula-numero celula-apoio">{{ aluno.matricula|default:"—" }}</td>
                             <td class="celula-apoio">{{ aluno.polo_atuacao.nome|default:"—" }}</td>
                             <td class="celula-apoio">{{ aluno.trajetoria_atual.get_nivel_curso_display|default:"—" }}</td>

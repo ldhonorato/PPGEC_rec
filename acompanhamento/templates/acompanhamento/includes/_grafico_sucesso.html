@@ -1,0 +1,40 @@
+{% load l10n %}
+<div class="grafico-sucesso-container">
+    <div class="grafico-legenda">
+        {% for barra in turmas_grafico.0.barras %}
+            <div class="legenda-item"><span class="legenda-cor cor-{{ forloop.counter }}"></span> {{ barra.rotulo }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="grafico-corpo">
+        <div class="grafico-escala" aria-hidden="true">
+            <span>100%</span>
+            <span>75%</span>
+            <span>50%</span>
+            <span>25%</span>
+            <span>0%</span>
+        </div>
+        <div class="tabela-envolvido" data-grafico-rolagem>
+            <div class="grafico-area">
+                {% for turma in turmas_grafico %}
+                    <div class="turma-grupo">
+                        <div class="turma-barras">
+                            {% for barra in turma.barras %}
+                                <div class="barra-coluna-wrapper" title="{{ barra.rotulo }}: {{ barra.total }}" aria-label="{{ barra.rotulo }}: {{ barra.total }}">
+                                    <div class="barra-coluna cor-{{ forloop.counter }}" style="height: {{ barra.largura|unlocalize }}%">
+                                        <span class="barra-quantidade">{{ barra.quantidade }}</span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="turma-rotulo">
+                            Turma {{ turma.turma }}{% if turma.dados_limitados %}<span class="badge-dados-limitados" title="Dados anteriores a 2026.2 podem estar incompletos">*</span>{% endif %}
+                            <div class="turma-ingressantes">{{ turma.ingressantes }} ingressante{{ turma.ingressantes|pluralize }}</div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>

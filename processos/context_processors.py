@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db.models import Q
 
 from .services import processos_atrasados_queryset, processos_atrasados_url
@@ -140,6 +141,7 @@ DESCRICOES_MENU = {
     "Solicitação de Banca": "Qualificação e defesa",
     # Gestao
     "Dashboard": "Indicadores do programa",
+    "Acompanhamento": "Prazos e indicadores dos alunos",
     "Matrículas": "Períodos, turmas e solicitações",
     "Períodos letivos": "Calendário e prazos do semestre",
     "Solicitações": "Pedidos de matrícula dos alunos",
@@ -408,6 +410,14 @@ def _menu_lateral_sections(user):
             ),
             _menu_item("Setores e Comissões", "/coordenacao/setores/", ["setores_comissoes"], "setores"),
         ])
+        # Módulo de acompanhamento acadêmico: um único item, estático, que só
+        # aparece com a chave do módulo ligada. Fica dentro deste bloco, que já
+        # verificou o acesso de gestão, para não fazer nenhuma consulta nova ao
+        # banco. As telas do módulo ficam na página inicial dele, e não aqui.
+        if getattr(settings, "ACOMPANHAMENTO_ATIVO", False):
+            coordenacao_items.append(
+                _menu_item("Acompanhamento", "/acompanhamento/", ["acompanhamento_inicio"], "trajetoria")
+            )
         coordenacao_items.append(
             _menu_item(
                 "Assinaturas",
