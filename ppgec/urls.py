@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
-from django.urls import path, re_path, reverse_lazy
+from django.urls import include, path, re_path, reverse_lazy
 from django.contrib.auth.views import (
     PasswordResetCompleteView,
     PasswordResetConfirmView,
@@ -200,6 +200,9 @@ urlpatterns = [
     path("metas/<int:meta_pk>/acoes/nova/", AcaoPlanejamentoFormView.as_view(), name="acao_planejamento_criar"),
     path("metas/<int:meta_pk>/acoes/<int:pk>/editar/", AcaoPlanejamentoFormView.as_view(), name="acao_planejamento_editar"),
     path("metas/<int:meta_pk>/acoes/<int:pk>/remover/", AcaoPlanejamentoDeleteView.as_view(), name="acao_planejamento_remover"),
+    # Módulo de acompanhamento acadêmico. As rotas ficam sempre registradas;
+    # com a chave do módulo desligada, todas respondem como página inexistente.
+    path("acompanhamento/", include("acompanhamento.urls")),
 ]
 
 if settings.DEBUG:

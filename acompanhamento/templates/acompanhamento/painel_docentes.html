@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load l10n %}
+{% block title %}Painel de Docentes | Coordenação{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="lista-cabecalho">
+        <div>
+            <h1 class="section-title">Painel de Docentes</h1>
+            <p class="muted">Distribuição dos docentes ativos por polo.</p>
+        </div>
+        {% if somente_permanentes %}
+            <a class="btn btn-secondary" href="?">Mostrar todos</a>
+        {% else %}
+            <a class="btn btn-secondary" href="?somente_permanentes=1">Só permanentes</a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="metric-grid" aria-label="Totais de docentes">
+    <article class="card metric-card">
+        <p class="metric-value">{{ total_ativos }}</p>
+        <p class="metric-label">Docentes ativos</p>
+    </article>
+    <article class="card metric-card is-green">
+        <p class="metric-value">{{ total_permanentes }}</p>
+        <p class="metric-label">Permanentes</p>
+    </article>
+    <article class="card metric-card is-purple">
+        <p class="metric-value">{{ total_colaboradores }}</p>
+        <p class="metric-label">Colaboradores</p>
+    </article>
+    <article class="card metric-card is-green">
+        <p class="metric-value">{{ percentual_permanentes|floatformat:1 }}%</p>
+        <p class="metric-label">% de permanentes</p>
+    </article>
+    <article class="card metric-card is-purple">
+        <p class="metric-value">{{ percentual_colaboradores|floatformat:1 }}%</p>
+        <p class="metric-label">% de colaboradores</p>
+    </article>
+    <article class="card metric-card is-orange">
+        <p class="metric-value">{{ total_internos }}</p>
+        <p class="metric-label">Internos</p>
+    </article>
+    <article class="card metric-card {% if total_externos %}is-alerta{% endif %}">
+        <p class="metric-value">{{ total_externos }}</p>
+        <p class="metric-label">Externos</p>
+    </article>
+</section>
+
+<section class="card">
+    <h2 class="section-title">Distribuição por polo</h2>
+    <p class="muted">Percentual calculado sobre {{ total_distribuicao }} docente{{ total_distribuicao|pluralize }}{% if somente_permanentes %} permanente{{ total_distribuicao|pluralize }}{% endif %}.</p>
+    {% if distribuicao_polos %}
+        <ul class="activity-list">
+            {% for polo in distribuicao_polos %}
+                <li>
+                    <svg class="soft-icon" aria-hidden="true"><use href="#i-orientandos"></use></svg>
+                    <div>
+                        <strong>{{ polo.nome }}</strong>
+                        <div class="barra-progresso" role="img" aria-label="{{ polo.nome }}: {{ polo.percentual|floatformat:1 }}% dos docentes">
+                            <span style="width: {{ polo.percentual|unlocalize }}%"></span>
+                        </div>
+                    </div>
+                    <span class="estado-item">{{ polo.total_docentes }} docente{{ polo.total_docentes|pluralize }} · {{ polo.percentual|floatformat:1 }}%</span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="estado-vazio-inline">Nenhum docente ativo para exibir.</p>
+    {% endif %}
+</section>
+{% endblock %}

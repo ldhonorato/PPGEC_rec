@@ -1,0 +1,247 @@
+name: Ensaio de produção
+
+on:
+  pull_request:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ensaio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      COMPOSE_FILE: docker-compose-prod.yml:docker-compose.ensaio.yml
+
+    steps:
+      - name: Baixar o código do pull request
+        uses: actions/checkout@v4
+
+      - name: Baixar a main do repositório do professor (base do banco já migrado)
+        uses: actions/checkout@v4
+        with:
+          repository: ldhonorato/PPGEC_rec
+          ref: main
+          path: main
+
+      - name: Preparar .env e arquivo de troca de imagem
+        run: |
+          cat > .env <<'EOF'
+          DEBUG=False
+          SECRET_KEY=chave-do-ensaio-descartavel
+          ALLOWED_HOSTS=localhost,127.0.0.1
+          USE_POSTGRES=True
+          POSTGRES_DB=ppgec
+          POSTGRES_USER=ppgec
+          POSTGRES_PASSWORD=senha_do_ensaio
+          POSTGRES_HOST=db
+          POSTGRES_PORT=5432
+          CELERY_BROKER_URL=redis://redis:6379/0
+          SECURE_SSL_REDIRECT=False
+          SESSION_COOKIE_SECURE=False
+          CSRF_COOKIE_SECURE=False
+          SECURE_HSTS_SECONDS=0
+          USE_X_FORWARDED_PROTO=False
+          ACOMPANHAMENTO_ATIVO=False
+          ACOMPANHAMENTO_AVISO_ATIVO=False
+          EOF
+          cat > docker-compose.ensaio.yml <<'EOF'
+          services:
+            web:
+              image: ppgec_rec:${ENSAIO_TAG:-ensaio}
+              pull_policy: never
+            celery:
+              image: ppgec_rec:${ENSAIO_TAG:-ensaio}
+              pull_policy: never
+            celery-beat:
+              image: ppgec_rec:${ENSAIO_TAG:-ensaio}
+              pull_policy: never
+          EOF
+
+      - name: Construir as imagens com o Dockerfile do projeto
+        id: build
+        run: |
+          docker build -t ppgec_rec:main ./main
+          docker build -t ppgec_rec:ensaio .
+
+      - name: Migrar o banco até a main
+        id: migra_main
+        env:
+          ENSAIO_TAG: main
+        run: |
+          docker compose up -d db redis
+          docker compose run --rm web python manage.py migrate
+
+      - name: Subir os serviços com a imagem do PR e aplicar as migrations novas
+        id: sobe
+        env:
+          ENSAIO_TAG: ensaio
+        run: |
+          docker compose up -d db redis web celery celery-beat
+          # O web aplica as migrations sozinho ao subir (entrypoint.sh), como na
+          # produção. Um segundo migrate em paralelo disputa a criação das
+          # tabelas, então o ensaio só espera e confere que nada ficou pendente.
+          for i in $(seq 1 60); do
+            if docker compose exec -T web python manage.py migrate --check > /dev/null 2>&1; then
+              echo "Migrations aplicadas (tentativa $i)"; break
+            fi
+            if [ "$i" = "60" ]; then
+              echo "As migrations não terminaram a tempo"
+              docker compose logs --no-color web; exit 1
+            fi
+            sleep 2
+          done
+          docker compose exec -T web python manage.py makemigrations --check --dry-run
+          docker compose ps
+
+      - name: O site responde e o /acompanhamento/ dá 404 com o módulo desligado
+        id: site
+        env:
+          ENSAIO_TAG: ensaio
+        run: |
+          code=000
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/ || true)
+            echo "tentativa $i: HTTP $code"
+            if [ "$code" != "000" ]; then break; fi
+            sleep 2
+          done
+          if [ "$code" != "200" ] && [ "$code" != "302" ]; then
+            echo "Resposta inesperada da página inicial: $code"; exit 1
+          fi
+          acomp=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/acompanhamento/)
+          echo "/acompanhamento/ com a chave desligada: HTTP $acomp"
+          [ "$acomp" = "404" ]
+
+      - name: Páginas principais com cada perfil
+        id: paginas
+        env:
+          ENSAIO_TAG: ensaio
+        run: |
+          docker compose exec -T web python manage.py test processos.tests.TodasAsTelasRenderizamTests
+          docker compose exec -T web python manage.py test acompanhamento
+
+      - name: A tarefa do beat está registrada no worker
+        id: beat
+        env:
+          ENSAIO_TAG: ensaio
+        run: |
+          tarefa=$(docker compose exec -T web python -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE','ppgec.settings'); import django; django.setup(); from ppgec.celery import app; print(app.conf.beat_schedule['acompanhamento-aviso-diario']['task'])" | tail -n 1 | tr -d '\r')
+          echo "Tarefa da entrada do beat: $tarefa"
+          [ -n "$tarefa" ]
+          registradas=""
+          for i in $(seq 1 15); do
+            registradas=$(docker compose exec -T celery celery -A ppgec inspect registered 2>&1 || true)
+            if echo "$registradas" | grep -qF "$tarefa"; then
+              echo "Tarefa registrada no worker (tentativa $i)"; exit 0
+            fi
+            sleep 4
+          done
+          echo "$registradas"
+          echo "A tarefa $tarefa não aparece em inspect registered"
+          exit 1
+
+      - name: Com o módulo ligado e o aviso desligado, a tarefa não faz nada
+        id: aviso_desligado
+        env:
+          ENSAIO_TAG: ensaio
+        run: |
+          # Estado do primeiro dia do professor: módulo ligado, aviso desligado.
+          sed -i 's/^ACOMPANHAMENTO_ATIVO=.*/ACOMPANHAMENTO_ATIVO=True/' .env
+          grep -E "^ACOMPANHAMENTO_(AVISO_)?ATIVO=" .env
+          grep -qx "ACOMPANHAMENTO_AVISO_ATIVO=False" .env
+          docker compose up -d web celery celery-beat
+          for i in $(seq 1 60); do
+            if docker compose exec -T web python manage.py migrate --check > /dev/null 2>&1; then
+              echo "Web pronto (tentativa $i)"; break
+            fi
+            if [ "$i" = "60" ]; then
+              echo "O web não subiu a tempo"
+              docker compose logs --no-color web; exit 1
+            fi
+            sleep 2
+          done
+          # Com o módulo ligado, a página do módulo deixa de dar 404.
+          acomp=000
+          for i in $(seq 1 15); do
+            acomp=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/acompanhamento/ || true)
+            if [ "$acomp" != "000" ] && [ "$acomp" != "404" ]; then break; fi
+            sleep 2
+          done
+          echo "/acompanhamento/ com o módulo ligado: HTTP $acomp"
+          [ "$acomp" = "200" ] || [ "$acomp" = "302" ]
+          # A tarefa sai sem fazer nada e sem gravar aviso.
+          resultado=$(docker compose exec -T celery python manage.py shell -c "from acompanhamento.tasks import enviar_avisos_irregularidade as t; print(t())" | tail -n 1 | tr -d '\r')
+          echo "Resultado da tarefa: $resultado"
+          [ "$resultado" = "{'avisos_novos': 0, 'emails_enviados': 0}" ]
+          avisos=$(docker compose exec -T web python manage.py shell -c "from acompanhamento.models import AvisoIrregularidade as A; print(A.objects.count())" | tail -n 1 | tr -d '\r')
+          echo "Avisos gravados: $avisos"
+          [ "$avisos" = "0" ]
+
+      - name: Nenhum contêiner reiniciou
+        id: reinicios
+        env:
+          ENSAIO_TAG: ensaio
+        run: |
+          sleep 45
+          falhou=0
+          for c in ppgec_db ppgec_redis ppgec_web ppgec_celery ppgec_celery_beat; do
+            estado=$(docker inspect -f '{{.State.Status}}' $c)
+            reinicios=$(docker inspect -f '{{.RestartCount}}' $c)
+            echo "$c estado=$estado reinícios=$reinicios"
+            if [ "$estado" != "running" ] || [ "$reinicios" != "0" ]; then falhou=1; fi
+          done
+          exit $falhou
+
+      - name: Nenhum log com exceção
+        id: logs
+        env:
+          ENSAIO_TAG: ensaio
+        run: |
+          docker compose logs --no-color web celery celery-beat > logs-ensaio.txt 2>&1
+          if grep -nE "Traceback|Exception|ERROR" logs-ensaio.txt; then
+            echo "Encontrado registro de erro nos logs"; exit 1
+          fi
+          echo "Nenhuma exceção nos logs"
+
+      - name: Resumo para colar no pull request
+        if: always()
+        run: |
+          marca() {
+            case "$1" in
+              success) echo "ok" ;;
+              skipped) echo "não executado" ;;
+              *) echo "falhou" ;;
+            esac
+          }
+          {
+            echo "## Ensaio de produção"
+            echo "Commit testado: \`${GITHUB_SHA}\`"
+            echo ""
+            echo "Base do banco: main de ldhonorato/PPGEC_rec."
+            echo ""
+            echo "Diferença em relação à produção: sem HTTPS (redirecionamento SSL, cookies seguros e HSTS desligados) e imagens construídas no próprio job."
+            echo ""
+            echo "| Item | Resultado |"
+            echo "|---|---|"
+            echo "| Imagem construída com o Dockerfile | $(marca '${{ steps.build.outcome }}') |"
+            echo "| Migrations sobre banco já migrado até a main do professor | $(marca '${{ steps.migra_main.outcome }}') |"
+            echo "| Serviços do docker-compose-prod.yml no ar, migrations do PR e makemigrations --check | $(marca '${{ steps.sobe.outcome }}') |"
+            echo "| Site responde e /acompanhamento/ dá 404 com a chave desligada | $(marca '${{ steps.site.outcome }}') |"
+            echo "| Páginas principais com cada perfil | $(marca '${{ steps.paginas.outcome }}') |"
+            echo "| Tarefa do beat registrada no worker | $(marca '${{ steps.beat.outcome }}') |"
+            echo "| Módulo ligado e aviso desligado: tarefa não faz nada | $(marca '${{ steps.aviso_desligado.outcome }}') |"
+            echo "| Nenhum contêiner reiniciou | $(marca '${{ steps.reinicios.outcome }}') |"
+            echo "| Nenhum log com exceção | $(marca '${{ steps.logs.outcome }}') |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar os logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-ensaio
+          path: logs-ensaio.txt
+          if-no-files-found: ignore

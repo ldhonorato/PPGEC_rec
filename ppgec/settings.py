@@ -153,6 +153,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'processos',
+    'acompanhamento',
 ]
 
 MIDDLEWARE = [
@@ -377,3 +378,13 @@ CELERY_TASK_SERIALIZER = "json"
 
 # django-celery-results
 INSTALLED_APPS += ["django_celery_results"]
+
+# Módulo de acompanhamento acadêmico
+#
+# Chave geral do módulo. Desligada, o sistema se comporta exatamente como antes
+# da instalação do módulo: nenhum item de menu novo e nenhuma tela do módulo
+# acessível. Ligar ou desligar exige apenas mudar a variável e reiniciar os
+# contêineres, sem reverter código.
+ACOMPANHAMENTO_ATIVO = env_bool("ACOMPANHAMENTO_ATIVO", False)
+# Aviso diário de alunos irregulares. Só funciona com o módulo também ativo.
+ACOMPANHAMENTO_AVISO_ATIVO = env_bool("ACOMPANHAMENTO_AVISO_ATIVO", False)

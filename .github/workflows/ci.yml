@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ppgec
+          POSTGRES_USER: ppgec
+          POSTGRES_PASSWORD: ppgec_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ppgec -d ppgec"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DEBUG: "True"
+      USE_POSTGRES: "True"
+      POSTGRES_DB: ppgec
+      POSTGRES_USER: ppgec
+      POSTGRES_PASSWORD: ppgec_ci_password
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      SECRET_KEY: ci-only-chave-descartavel
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Django check
+        run: python manage.py check
+
+      - name: Migrations pendentes?
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Suíte inteira (módulo desligado)
+        run: python manage.py test
+
+      - name: Suíte do projeto com o módulo ligado
+        env:
+          ACOMPANHAMENTO_ATIVO: "True"
+        run: python manage.py test processos
