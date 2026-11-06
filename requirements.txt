@@ -1,5 +1,6 @@
 django==5.2
 celery==5.4.0
+kombu==5.6.2
 redis==5.2.1
 django-celery-results==2.5.1
 python-dotenv==1.0.0
@@ -7,8 +8,30 @@ whitenoise==6.4.0
 psycopg2-binary==2.9.10
 openpyxl==3.1.5
 xlrd==2.0.1
+gunicorn==26.2.0
+amqp==5.4.2
+asgiref==3.13.0
+billiard==4.3.2
+click==8.5.0
+click-didyoumean==0.3.1
+click-plugins==1.1.1.2
+click-repl==0.4.1
+et-xmlfile==2.0.0
+jmespath==1.1.0
+prompt_toolkit==3.0.53
+python-dateutil==2.9.0.post0
+six==1.17.0
+sqlparse==0.6.1
+typing-extensions==4.16.0
+tzdata==2026.6
+urllib3==2.8.0
+vine==5.1.0
+wcwidth==0.9.4
 
 # Armazenamento dos documentos enviados em bucket S3. O extra [s3] traz o
 # boto3; sem AWS_STORAGE_BUCKET_NAME definido nada disso e carregado, e os
 # arquivos continuam em disco.
 django-storages[s3]==1.14.6
+boto3==1.43.123
+botocore==1.43.123
+s3transfer==0.19.3
