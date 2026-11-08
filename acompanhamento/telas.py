@@ -40,11 +40,11 @@ TELAS = [
     ),
 ]
 
-# Registrada separadamente para que a view inicio só adicione o cartão 
+# Registrada separadamente para que a view inicio só adicione o cartão
 # para quem possui a permissão pode_ver_painel_professores
 TELA_PAINEL_PROFESSORES = (
     "Painel por Professor",
-    "Turmas, prazos, defesas e previsão de conclusão por docente.",
+    "Turmas, prazos e defesas por docente.",
     "acompanhamento:painel_professores",
     "i-orientandos",
 )

@@ -5,7 +5,7 @@
     <link rel="stylesheet" href="{% static 'acompanhamento/css/grafico_sucesso.css' %}">
 {% endblock %}
 
-{% block title %}Painel por Professor | AcadFlow{% endblock %}
+{% block title %}Painel por Professor | Acadflow{% endblock %}
 
 {% block content %}
 <section class="card">
@@ -18,7 +18,7 @@
 
     <form method="get" class="filtros" aria-label="Filtro do painel">
         {% if erros_filtro %}
-            <div class="alert alert-erro mb-3">
+            <div class="alert alert-danger">
                 {% for erro in erros_filtro %}
                     <p>{{ erro }}</p>
                 {% endfor %}
@@ -62,47 +62,46 @@
 </section>
 
 {% if not orientador_id %}
-    {% comment %} Visão Geral: Lista com todos os professores {% endcomment %}
     {% if dados_painel and dados_painel.linhas %}
         <section class="card">
-            <div class="tabela-container">
-                <table class="tabela-dados">
+            <div class="tabela-envolvido">
+                <table class="tabela">
                     <thead>
                         <tr>
                             <th>Professor</th>
-                            <th class="texto-centro">Alunos</th>
-                            <th class="texto-centro">Ativos</th>
-                            <th class="texto-centro">Concluídos</th>
-                            <th class="texto-centro">Desligados</th>
-                            <th class="texto-centro">Com prorrogação</th>
-                            <th class="texto-centro">Prazo vencido</th>
-                            <th class="texto-centro">Defenderam</th>
-                            <th class="texto-centro">No prazo regular</th>
+                            <th>Alunos</th>
+                            <th>Ativos</th>
+                            <th>Concluídos</th>
+                            <th>Desligados</th>
+                            <th>Com prorrogação</th>
+                            <th>Prazo vencido</th>
+                            <th>Defenderam</th>
+                            <th>No prazo regular</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for linha in dados_painel.linhas %}
                             <tr>
                                 <td><strong>{{ linha.nome }}</strong></td>
-                                <td class="texto-centro">{{ linha.alunos }}</td>
-                                <td class="texto-centro">{{ linha.ativos }}</td>
-                                <td class="texto-centro">{{ linha.concluidos }}</td>
-                                <td class="texto-centro">{{ linha.desligados }}</td>
-                                <td class="texto-centro">
+                                <td>{{ linha.alunos }}</td>
+                                <td>{{ linha.ativos }}</td>
+                                <td>{{ linha.concluidos }}</td>
+                                <td>{{ linha.desligados }}</td>
+                                <td>
                                     {{ linha.com_prorrogacao }}
                                     {% if linha.taxa_prorrogacao != None %}
                                         <span class="muted">({{ linha.taxa_prorrogacao|floatformat:1 }}%)</span>
                                     {% endif %}
                                 </td>
-                                <td class="texto-centro">{{ linha.prazo_vencido }}</td>
-                                <td class="texto-centro">
+                                <td>{{ linha.prazo_vencido }}</td>
+                                <td>
                                     {% if linha.taxa_sucesso != None %}
                                         {{ linha.defenderam }} <span class="muted">({{ linha.taxa_sucesso|floatformat:1 }}%)</span>
                                     {% else %}
-                                        <span class="tag tag-cinza">Sem base</span>
+                                        <span class="badge badge-aviso">Sem base</span>
                                     {% endif %}
                                 </td>
-                                <td class="texto-centro">
+                                <td>
                                     {{ linha.defenderam_no_prazo }}
                                     {% if linha.taxa_no_prazo != None %}
                                         <span class="muted">({{ linha.taxa_no_prazo|floatformat:1 }}%)</span>
@@ -115,29 +114,29 @@
                         <tfoot>
                             <tr>
                                 <td><strong>Total</strong></td>
-                                <td class="texto-centro">{{ dados_painel.total.alunos }}</td>
-                                <td class="texto-centro">{{ dados_painel.total.ativos }}</td>
-                                <td class="texto-centro">{{ dados_painel.total.concluidos }}</td>
-                                <td class="texto-centro">{{ dados_painel.total.desligados }}</td>
-                                <td class="texto-centro">
+                                <td>{{ dados_painel.total.alunos }}</td>
+                                <td>{{ dados_painel.total.ativos }}</td>
+                                <td>{{ dados_painel.total.concluidos }}</td>
+                                <td>{{ dados_painel.total.desligados }}</td>
+                                <td>
                                     {{ dados_painel.total.com_prorrogacao }}
                                     {% if dados_painel.total.taxa_prorrogacao != None %}
                                         <span class="muted">({{ dados_painel.total.taxa_prorrogacao|floatformat:1 }}%)</span>
                                     {% endif %}
                                 </td>
-                                <td class="texto-centro">{{ dados_painel.total.prazo_vencido }}</td>
-                                <td class="texto-centro">
+                                <td>{{ dados_painel.total.prazo_vencido }}</td>
+                                <td>
                                     {% if dados_painel.total.taxa_sucesso != None %}
                                         {{ dados_painel.total.defenderam }} <span class="muted">({{ dados_painel.total.taxa_sucesso|floatformat:1 }}%)</span>
                                     {% else %}
-                                        <span class="tag tag-cinza">Sem base</span>
+                                        <span class="badge badge-aviso">Sem base</span>
                                     {% endif %}
                                 </td>
-                                <td class="texto-centro">
+                                <td>
                                     {% if dados_painel.total.taxa_no_prazo != None %}
                                         {{ dados_painel.total.defenderam_no_prazo }} <span class="muted">({{ dados_painel.total.taxa_no_prazo|floatformat:1 }}%)</span>
                                     {% else %}
-                                        <span class="tag tag-cinza">Sem base</span>
+                                        <span class="badge badge-aviso">Sem base</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -148,15 +147,14 @@
         </section>
     {% endif %}
 {% else %}
-    {% comment %} Visão Específica do Professor Selecionado: Gráfico por Turma {% endcomment %}
     {% if turmas %}
         <section class="card">
             <h2 class="section-title">Indicadores por Turma</h2>
             <p class="muted">Comparativo de discentes sob orientação do professor por turma de ingresso.</p>
 
-            <p class="alert alert-info grafico-alerta-espacado grafico-aviso">
-                Esta consulta inclui turmas anteriores a 2026.2 (marcadas com *). O Acadflow começou em 2026.2, e desligamentos, prorrogações e defesas anteriores podem não estar totalmente registrados.
-            </p>
+            {% if alerta_dados_limitados %}
+              <!-- Mantenha aqui o conteúdo atual do aviso -->
+            {% endif %}
 
             {% include "acompanhamento/includes/_grafico_sucesso.html" %}
         </section>

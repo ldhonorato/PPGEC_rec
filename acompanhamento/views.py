@@ -2,13 +2,11 @@ from datetime import date
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.http import request
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.formats import number_format
 
-from .servicos import calcular_painel_professores, calcular_painel_sucesso_turma
 from .chave import aviso_ativo
 from .decoradores import tela_do_modulo
 from .forms import MarcoCalendarioForm
@@ -24,6 +22,10 @@ from .servicos import (
 )
 from .telas import TELAS, TELA_PAINEL_PROFESSORES
 
+
+turmas = []
+turmas_grafico = []
+alerta_dados_limitados = False
 
 @tela_do_modulo
 def inicio(request):
@@ -278,42 +280,34 @@ def painel_professores(request):
         raise PermissionDenied
 
     nivel = request.GET.get("nivel", "MESTRADO")
-    orientador_id_raw = request.GET.get("orientador_id", "").strip()
-    ano_inicial = request.GET.get("ano_inicial", "").strip() or None
-    ano_final = request.GET.get("ano_final", "").strip() or None
+    orientador_id_raw = request.GET.get("orientador_id", "")
+    ano_inicial_raw = request.GET.get("ano_inicial", "")
+    ano_final_raw = request.GET.get("ano_final", "")
 
-    orientador_id = (
-        int(orientador_id_raw)
-        if orientador_id_raw.isdigit()
-        else None
-    )
+    orientador_id = int(orientador_id_raw) if orientador_id_raw.isdigit() else None
+    ano_inicial = int(ano_inicial_raw) if ano_inicial_raw.isdigit() else None
+    ano_final = int(ano_final_raw) if ano_final_raw.isdigit() else None
 
     erros_filtro = []
     dados_painel = None
+    turmas = []
     turmas_grafico = []
+    alerta_dados_limitados = False
     professores = []
 
     try:
-        # Calcula os indicadores de todos os orientadores.
-        # A função valida o nível e o intervalo de anos.
         dados_painel = calcular_painel_professores(
             nivel=nivel,
             ano_inicial=ano_inicial,
             ano_final=ano_final,
         )
 
-        # Monta a lista de professores a partir dos resultados do cálculo.
         professores = [
-            {
-                "id": linha["orientador_id"],
-                "nome": linha["nome"],
-            }
-            for linha in dados_painel["linhas"]
-            if linha["orientador_id"] is not None
+            {"id": linha["orientador_id"], "nome": linha["nome"]}
+            for linha in dados_painel.get("linhas", [])
+            if linha.get("orientador_id") is not None
         ]
 
-        # Quando um professor é selecionado, calcula o sucesso
-        # das turmas orientadas por ele.
         if orientador_id is not None:
             turmas = calcular_painel_sucesso_turma(
                 nivel=nivel,
@@ -327,6 +321,10 @@ def painel_professores(request):
 
             turmas_grafico = list(reversed(turmas))
 
+            alerta_dados_limitados = any(
+                turma.get("dados_limitados") for turma in turmas
+            )
+
     except ValueError as e:
         erros_filtro.append(str(e))
 
@@ -337,12 +335,10 @@ def painel_professores(request):
         "ano_final": request.GET.get("ano_final", ""),
         "professores_list": professores,
         "dados_painel": dados_painel,
-        "turmas": turmas_grafico,
+        "turmas": turmas,
+        "turmas_grafico": turmas_grafico,
+        "alerta_dados_limitados": alerta_dados_limitados,
         "erros_filtro": erros_filtro,
     }
 
-    return render(
-        request,
-        "acompanhamento/painel_professores.html",
-        contexto,
-    )
+    return render(request, "acompanhamento/painel_professores.html", contexto)

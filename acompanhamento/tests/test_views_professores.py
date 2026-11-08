@@ -1,8 +1,8 @@
+from datetime import date
+
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
-
-from datetime import date
 
 from acompanhamento.tests.test_linha_de_base import criar_perfis
 
@@ -10,12 +10,8 @@ from acompanhamento.tests.test_linha_de_base import criar_perfis
 @override_settings(ACOMPANHAMENTO_ATIVO=True)
 class PainelProfessoresViewTests(TestCase):
     def setUp(self):
-        # Utiliza o helper do sistema para criar perfis válidos
         perfis = criar_perfis()
-
-        # O modelo Docente vincula-se ao User através da propriedade .docente
-        # Já o Servidor vincula-se através de .usuario
-        self.coordenador = perfis["docente_coordenador"].docente
+        self.coordenador = perfis["docente_coordenador"]
         self.servidor = perfis["servidor"]
 
         self.url = reverse("acompanhamento:painel_professores")
@@ -32,11 +28,9 @@ class PainelProfessoresViewTests(TestCase):
         """Servidor sem permissão deve receber HTTP 403 e não visualizar o cartão na inicial."""
         self.client.force_login(self.servidor)
 
-        # Acesso direto deve ser negado com 403 (PermissionDenied)
         response_painel = self.client.get(self.url)
         self.assertEqual(response_painel.status_code, 403)
 
-        # Cartão não deve ser renderizado na página inicial do módulo
         response_inicio = self.client.get(self.url_inicio)
         self.assertEqual(response_inicio.status_code, 200)
         self.assertNotContains(response_inicio, "Painel por Professor")
@@ -63,7 +57,7 @@ class PainelProfessoresViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            "O ano inicial não pode ser maior que o ano final."
+            "O ano inicial não pode ser maior que o ano final.",
         )
 
     @override_settings(DEBUG=True)
@@ -75,14 +69,37 @@ class PainelProfessoresViewTests(TestCase):
             data_referencia=date(2026, 11, 5),
         )
 
-        # O comando pode remover os usuários anteriores.
-        # Recria os perfis para autenticar com um usuário válido.
         perfis = criar_perfis()
-        self.coordenador = perfis["docente_coordenador"].docente
-
+        self.coordenador = perfis["docente_coordenador"]
         self.client.force_login(self.coordenador)
 
         response = self.client.get(self.url)
-
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Sem base")
+
+    @override_settings(DEBUG=True)
+    def test_grafico_exibe_barras_ao_selecionar_professor(self):
+        """Garante que ao filtrar por um professor específico o gráfico renderiza as turmas."""
+        call_command(
+            "gerar_dados_ficticios",
+            semente=42,
+            data_referencia=date(2026, 11, 5),
+        )
+
+        perfis = criar_perfis()
+        self.coordenador = perfis["docente_coordenador"]
+        self.client.force_login(self.coordenador)
+
+        response_geral = self.client.get(self.url)
+        self.assertEqual(response_geral.status_code, 200)
+
+        professores = response_geral.context["professores_list"]
+        self.assertTrue(len(professores) > 0, "Deve haver professores na lista fictícia")
+
+        orientador_id = professores[0]["id"]
+        response_prof = self.client.get(self.url, {"orientador_id": orientador_id})
+
+        self.assertEqual(response_prof.status_code, 200)
+        self.assertTrue(response_prof.context["turmas_grafico"])
+        self.assertContains(response_prof, "turma-grupo")
+        
