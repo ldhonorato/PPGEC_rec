@@ -2,11 +2,13 @@ from datetime import date
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.http import request
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.formats import number_format
 
+from .servicos import calcular_painel_professores, calcular_painel_sucesso_turma
 from .chave import aviso_ativo
 from .decoradores import tela_do_modulo
 from .forms import MarcoCalendarioForm
@@ -20,7 +22,6 @@ from .servicos import (
     calcular_painel_sucesso_turma,
     validar_semestre,
 )
-from .previsao_conclusao import calcular_previsao_conclusao
 from .telas import TELAS, TELA_PAINEL_PROFESSORES
 
 
@@ -272,82 +273,72 @@ def painel_sucesso_turma(request):
 
 @tela_do_modulo
 def painel_professores(request):
-    # 1. Verificar a permissão de acesso do usuário (Regra do Daniel)
+    """Exibe o painel de acompanhamento de discentes agrupado por professor."""
     if not pode_ver_painel_professores(request.user):
         raise PermissionDenied
 
-    # 2. Obter e tratar os parâmetros dos filtros (nível, professor e anos)
-    nivel = request.GET.get("nivel", "MESTRADO").upper()
-    orientador_id_raw = request.GET.get("orientador_id", "")
-    ano_inicial_raw = request.GET.get("ano_inicial", "")
-    ano_final_raw = request.GET.get("ano_final", "")
+    nivel = request.GET.get("nivel", "MESTRADO")
+    orientador_id_raw = request.GET.get("orientador_id", "").strip()
+    ano_inicial = request.GET.get("ano_inicial", "").strip() or None
+    ano_final = request.GET.get("ano_final", "").strip() or None
 
-    # Tratamento de ID do orientador
-    orientador_id = None
-    if orientador_id_raw.isdigit():
-        orientador_id = int(orientador_id_raw)
+    orientador_id = (
+        int(orientador_id_raw)
+        if orientador_id_raw.isdigit()
+        else None
+    )
 
-    # Lista para armazenar eventuais mensagens de erro dos filtros (evitando erro HTTP 500)
     erros_filtro = []
-
-    # Tratamento e validação dos anos (mesmo padrão do painel_sucesso_turma)
-    ano_inicial = None
-    if ano_inicial_raw:
-        try:
-            ano_inicial = int(ano_inicial_raw)
-        except ValueError:
-            erros_filtro.append("Ano inicial inválido.")
-
-    ano_final = None
-    if ano_final_raw:
-        try:
-            ano_final = int(ano_final_raw)
-        except ValueError:
-            erros_filtro.append("Ano final inválido.")
-
-    if ano_inicial and ano_final and ano_inicial > ano_final:
-        erros_filtro.append("O ano inicial não pode ser maior que o ano final.")
-
-    # 3. Processar os dados se não houver erros de formulário
     dados_painel = None
-    grafico_turmas = None
-    previsao_conclusao = None
+    turmas_grafico = []
+    professores = []
 
-    if not erros_filtro:
-        try:
-            # Dados da tabela geral ou por professor
-            dados_painel = calcular_painel_professores(
+    try:
+        # Calcula os indicadores de todos os orientadores.
+        # A função valida o nível e o intervalo de anos.
+        dados_painel = calcular_painel_professores(
+            nivel=nivel,
+            ano_inicial=ano_inicial,
+            ano_final=ano_final,
+        )
+
+        # Monta a lista de professores a partir dos resultados do cálculo.
+        professores = [
+            {
+                "id": linha["orientador_id"],
+                "nome": linha["nome"],
+            }
+            for linha in dados_painel["linhas"]
+            if linha["orientador_id"] is not None
+        ]
+
+        # Quando um professor é selecionado, calcula o sucesso
+        # das turmas orientadas por ele.
+        if orientador_id is not None:
+            turmas = calcular_painel_sucesso_turma(
                 nivel=nivel,
                 ano_inicial=ano_inicial,
                 ano_final=ano_final,
+                orientador_id=orientador_id,
             )
 
-            # Se um professor foi selecionado, busca os dados adicionais (Gráfico e Previsão)
-            if orientador_id is not None:
-                grafico_turmas = calcular_painel_sucesso_turma(
-                    nivel=nivel,
-                    ano_inicial=ano_inicial,
-                    ano_final=ano_final,
-                    orientador_id=orientador_id,
-                )
-                previsao_conclusao = calcular_previsao_conclusao(
-                    orientador_id=orientador_id,
-                    nivel=nivel,
-                )
-        except Exception as e:
-            # Trata eventuais exceções de cálculo sem quebrar com Erro 500
-            erros_filtro.append("Erro ao processar os indicadores selecionados.")
+            for turma in turmas:
+                turma["barras"] = _barras_da_turma(turma)
 
-    # 4. Montar o contexto e renderizar o template
+            turmas_grafico = list(reversed(turmas))
+
+    except ValueError as e:
+        erros_filtro.append(str(e))
+
     contexto = {
-        "nivel": nivel,
+        "nivel_selecionado": nivel,
         "orientador_id": orientador_id,
-        "ano_inicial": ano_inicial_raw,
-        "ano_final": ano_final_raw,
-        "erros_filtro": erros_filtro,
+        "ano_inicial": request.GET.get("ano_inicial", ""),
+        "ano_final": request.GET.get("ano_final", ""),
+        "professores_list": professores,
         "dados_painel": dados_painel,
-        "grafico_turmas": grafico_turmas,
-        "previsao_conclusao": previsao_conclusao,
+        "turmas": turmas_grafico,
+        "erros_filtro": erros_filtro,
     }
 
     return render(

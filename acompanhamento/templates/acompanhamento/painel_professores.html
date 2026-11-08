@@ -1,220 +1,177 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'acompanhamento/css/grafico_sucesso.css' %}">
+{% endblock %}
+
+{% block title %}Painel por Professor | AcadFlow{% endblock %}
+
 {% block content %}
-<div class="container-fluid py-4">
-  <h2 class="h4 fw-bold mb-3">Painel por Professor</h2>
-
-  {% comment %} Aviso fixo exigido na especificação {% endcomment %}
-  <div class="alert alert-info py-2 mb-4 text-sm">
-    <i class="bi bi-info-circle-fill me-2"></i>
-    Os registros do Acadflow começam em 2026.2. Números de turmas anteriores podem estar incompletos.
-  </div>
-
-  {% comment %} Formulário de Filtros {% endcomment %}
-  <div class="card card-body mb-4 shadow-sm">
-    <form method="GET" action="{% url 'acompanhamento:painel_professores' %}" class="row g-3 align-items-end">
-      
-      {% comment %} Exibição de erros de formulário {% endcomment %}
-      {% if erros_filtro %}
-        <div class="col-12">
-          <div class="alert alert-danger py-2 mb-0">
-            <ul class="mb-0 ps-3">
-              {% for erro in erros_filtro %}
-                <li>{{ erro }}</li>
-              {% endfor %}
-            </ul>
-          </div>
+<section class="card">
+    <div class="lista-cabecalho">
+        <div>
+            <h1 class="section-title">Painel por Professor</h1>
+            <p class="muted">Acompanhamento de turmas, prazos e defesas por docente.</p>
         </div>
-      {% endif %}
+    </div>
 
-      <div class="col-md-3">
-        <label for="id_nivel" class="form-label fw-semibold">Nível</label>
-        <select name="nivel" id="id_nivel" class="form-select">
-          <option value="MESTRADO" {% if nivel == "MESTRADO" %}selected{% endif %}>Mestrado</option>
-          <option value="DOUTORADO" {% if nivel == "DOUTORADO" %}selected{% endif %}>Doutorado</option>
-        </select>
-      </div>
-
-      <div class="col-md-3">
-        <label for="id_orientador" class="form-label fw-semibold">Professor</label>
-        <select name="orientador_id" id="id_orientador" class="form-select">
-          <option value="">Todos os professores</option>
-          {% for prof in professores_list %}
-            <option value="{{ prof.id }}" {% if orientador_id == prof.id %}selected{% endif %}>
-              {{ prof.nome }}
-            </option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="col-md-2">
-        <label for="id_ano_inicial" class="form-label fw-semibold">Ano inicial</label>
-        <input type="number" name="ano_inicial" id="id_ano_inicial" class="form-control" value="{{ ano_inicial }}" placeholder="Ex: 2024">
-      </div>
-
-      <div class="col-md-2">
-        <label for="id_ano_final" class="form-label fw-semibold">Ano final</label>
-        <input type="number" name="ano_final" id="id_ano_final" class="form-control" value="{{ ano_final }}" placeholder="Ex: 2026">
-      </div>
-
-      <div class="col-md-2 d-grid">
-        <button type="submit" class="btn btn-primary">
-          <i class="bi bi-filter me-1"></i> Filtrar
-        </button>
-      </div>
-    </form>
-  </div>
-
-  {% if not orientador_id %}
-    {% comment %} CENA 1: Sem professor escolhido - Tabela geral por professor {% endcomment %}
-    {% if dados_painel %}
-      <div class="card shadow-sm mb-4">
-        <div class="card-body p-0 table-responsive">
-          <table class="table table-hover table-striped mb-0 align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>Professor</th>
-                <th class="text-center">Alunos</th>
-                <th class="text-center">Ativos</th>
-                <th class="text-center">Concluídos</th>
-                <th class="text-center">Desligados</th>
-                <th class="text-center">Com prorrogação</th>
-                <th class="text-center">Prazo vencido</th>
-                <th class="text-center">Defenderam</th>
-                <th class="text-center">No prazo regular</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for linha in dados_painel.linhas %}
-                <tr>
-                  <td class="fw-semibold">{{ linha.nome }}</td>
-                  <td class="text-center">{{ linha.alunos }}</td>
-                  <td class="text-center">{{ linha.ativos }}</td>
-                  <td class="text-center">{{ linha.concluidos }}</td>
-                  <td class="text-center">{{ linha.desligados }}</td>
-                  <td class="text-center">
-                    {{ linha.com_prorrogacao }}
-                    {% if linha.taxa_prorrogacao != None %}
-                      <small class="text-muted">({{ linha.taxa_prorrogacao|floatformat:1 }}%)</small>
-                    {% endif %}
-                  </td>
-                  <td class="text-center">{{ linha.prazo_vencido }}</td>
-                  <td class="text-center">
-                    {{ linha.defenderam }}
-                    {% if linha.taxa_sucesso != None %}
-                      <small class="text-muted">({{ linha.taxa_sucesso|floatformat:1 }}%)</small>
-                    {% else %}
-                      <span class="badge bg-secondary">Sem base</span>
-                    {% endif %}
-                  </td>
-                  <td class="text-center">
-                    {{ linha.defenderam_no_prazo }}
-                    {% if linha.taxa_no_prazo != None %}
-                      <small class="text-muted">({{ linha.taxa_no_prazo|floatformat:1 }}%)</small>
-                    {% endif %}
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-            {% if dados_painel.total %}
-              <tfoot class="table-dark fw-bold">
-                <tr>
-                  <td>Total</td>
-                  <td class="text-center">{{ dados_painel.total.alunos }}</td>
-                  <td class="text-center">{{ dados_painel.total.ativos }}</td>
-                  <td class="text-center">{{ dados_painel.total.concluidos }}</td>
-                  <td class="text-center">{{ dados_painel.total.desligados }}</td>
-                  <td class="text-center">
-                    {{ dados_painel.total.com_prorrogacao }}
-                    <small class="text-light">({{ dados_painel.total.taxa_prorrogacao|floatformat:1 }}%)</small>
-                  </td>
-                  <td class="text-center">{{ dados_painel.total.prazo_vencido }}</td>
-                  <td class="text-center">
-                    {{ dados_painel.total.defenderam }}
-                    <small class="text-light">({{ dados_painel.total.taxa_sucesso|floatformat:1 }}%)</small>
-                  </td>
-                  <td class="text-center">
-                    {{ dados_painel.total.defenderam_no_prazo }}
-                    <small class="text-light">({{ dados_painel.total.taxa_no_prazo|floatformat:1 }}%)</small>
-                  </td>
-                </tr>
-              </tfoot>
-            {% endif %}
-          </table>
-        </div>
-      </div>
-    {% endif %}
-
-  {% else %}
-    {% comment %} CENA 2: Com professor escolhido - Indicadores, Gráfico e Previsão {% endcomment %}
-    
-    {% comment %} Include do gráfico de barras reutilizável {% endcomment %}
-    <h5 class="fw-bold mt-4">Desempenho por Turma</h5>
-    {% include "acompanhamento/includes/_barras_da_turma.html" %}
-
-    {% comment %} Bloco da Previsão de Conclusão {% endcomment %}
-    {% if previsao_conclusao %}
-      <div class="card shadow-sm my-4">
-        <div class="card-header bg-light">
-          <h5 class="card-title fw-bold mb-0">Previsão de Conclusão (Alunos Ativos)</h5>
-        </div>
-        <div class="card-body">
-          <div class="row text-center mb-3">
-            <div class="col-md-6 border-end">
-              <span class="text-muted text-xs d-block">Prazo Vencido</span>
-              <span class="h4 fw-bold text-danger">{{ previsao_conclusao.prazo_vencido }}</span>
-            </div>
-            <div class="col-md-6">
-              <span class="text-muted text-xs d-block">Sem Previsão</span>
-              <span class="h4 fw-bold text-warning">{{ previsao_conclusao.sem_previsao }}</span>
-            </div>
-          </div>
-
-          <h6>Previsão por Aluno:</h6>
-          <div class="table-responsive">
-            <table class="table table-sm table-bordered align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th>Aluno</th>
-                  <th class="text-center">Turma</th>
-                  <th class="text-center">Data Limite de Defesa</th>
-                  <th class="text-center">Semestre Previsto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for aluno in previsao_conclusao.alunos %}
-                  <tr>
-                    <td>{{ aluno.nome }}</td>
-                    <td class="text-center">{{ aluno.turma }}</td>
-                    <td class="text-center">
-                      {% if aluno.data_limite %}
-                        {{ aluno.data_limite|date:"d/m/Y" }}
-                      {% else %}
-                        <span class="text-muted">-</span>
-                      {% endif %}
-                    </td>
-                    <td class="text-center fw-semibold">
-                      {% if aluno.semestre %}
-                        {{ aluno.semestre }}
-                      {% else %}
-                        <span class="badge bg-warning text-dark">Sem previsão</span>
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% empty %}
-                  <tr>
-                    <td colspan="4" class="text-center text-muted py-2">
-                      Nenhum aluno ativo com previsão cadastrada.
-                    </td>
-                  </tr>
+    <form method="get" class="filtros" aria-label="Filtro do painel">
+        {% if erros_filtro %}
+            <div class="alert alert-erro mb-3">
+                {% for erro in erros_filtro %}
+                    <p>{{ erro }}</p>
                 {% endfor %}
-              </tbody>
-            </table>
-          </div>
+            </div>
+        {% endif %}
+
+        <div class="filtros-linha">
+            <div class="filtros-campo">
+                <label for="nivel">Nível</label>
+                <select id="nivel" name="nivel">
+                    <option value="MESTRADO" {% if nivel_selecionado == "MESTRADO" %}selected{% endif %}>Mestrado</option>
+                    <option value="DOUTORADO" {% if nivel_selecionado == "DOUTORADO" %}selected{% endif %}>Doutorado</option>
+                </select>
+            </div>
+
+            <div class="filtros-campo">
+                <label for="orientador_id">Professor</label>
+                <select id="orientador_id" name="orientador_id">
+                    <option value="">Todos os professores</option>
+                    {% for prof in professores_list %}
+                        <option value="{{ prof.id }}" {% if orientador_id == prof.id %}selected{% endif %}>
+                            {{ prof.nome }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filtros-campo filtros-campo-data">
+                <label for="ano_inicial">Ano inicial</label>
+                <input type="number" id="ano_inicial" name="ano_inicial" value="{{ ano_inicial }}" placeholder="Ex: 2022">
+            </div>
+
+            <div class="filtros-campo filtros-campo-data">
+                <label for="ano_final">Ano final</label>
+                <input type="number" id="ano_final" name="ano_final" value="{{ ano_final }}" placeholder="Ex: 2026">
+            </div>
+
+            <button class="btn" type="submit">Filtrar</button>
         </div>
-      </div>
+    </form>
+</section>
+
+{% if not orientador_id %}
+    {% comment %} Visão Geral: Lista com todos os professores {% endcomment %}
+    {% if dados_painel and dados_painel.linhas %}
+        <section class="card">
+            <div class="tabela-container">
+                <table class="tabela-dados">
+                    <thead>
+                        <tr>
+                            <th>Professor</th>
+                            <th class="texto-centro">Alunos</th>
+                            <th class="texto-centro">Ativos</th>
+                            <th class="texto-centro">Concluídos</th>
+                            <th class="texto-centro">Desligados</th>
+                            <th class="texto-centro">Com prorrogação</th>
+                            <th class="texto-centro">Prazo vencido</th>
+                            <th class="texto-centro">Defenderam</th>
+                            <th class="texto-centro">No prazo regular</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linha in dados_painel.linhas %}
+                            <tr>
+                                <td><strong>{{ linha.nome }}</strong></td>
+                                <td class="texto-centro">{{ linha.alunos }}</td>
+                                <td class="texto-centro">{{ linha.ativos }}</td>
+                                <td class="texto-centro">{{ linha.concluidos }}</td>
+                                <td class="texto-centro">{{ linha.desligados }}</td>
+                                <td class="texto-centro">
+                                    {{ linha.com_prorrogacao }}
+                                    {% if linha.taxa_prorrogacao != None %}
+                                        <span class="muted">({{ linha.taxa_prorrogacao|floatformat:1 }}%)</span>
+                                    {% endif %}
+                                </td>
+                                <td class="texto-centro">{{ linha.prazo_vencido }}</td>
+                                <td class="texto-centro">
+                                    {% if linha.taxa_sucesso != None %}
+                                        {{ linha.defenderam }} <span class="muted">({{ linha.taxa_sucesso|floatformat:1 }}%)</span>
+                                    {% else %}
+                                        <span class="tag tag-cinza">Sem base</span>
+                                    {% endif %}
+                                </td>
+                                <td class="texto-centro">
+                                    {{ linha.defenderam_no_prazo }}
+                                    {% if linha.taxa_no_prazo != None %}
+                                        <span class="muted">({{ linha.taxa_no_prazo|floatformat:1 }}%)</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if dados_painel.total %}
+                        <tfoot>
+                            <tr>
+                                <td><strong>Total</strong></td>
+                                <td class="texto-centro">{{ dados_painel.total.alunos }}</td>
+                                <td class="texto-centro">{{ dados_painel.total.ativos }}</td>
+                                <td class="texto-centro">{{ dados_painel.total.concluidos }}</td>
+                                <td class="texto-centro">{{ dados_painel.total.desligados }}</td>
+                                <td class="texto-centro">
+                                    {{ dados_painel.total.com_prorrogacao }}
+                                    {% if dados_painel.total.taxa_prorrogacao != None %}
+                                        <span class="muted">({{ dados_painel.total.taxa_prorrogacao|floatformat:1 }}%)</span>
+                                    {% endif %}
+                                </td>
+                                <td class="texto-centro">{{ dados_painel.total.prazo_vencido }}</td>
+                                <td class="texto-centro">
+                                    {% if dados_painel.total.taxa_sucesso != None %}
+                                        {{ dados_painel.total.defenderam }} <span class="muted">({{ dados_painel.total.taxa_sucesso|floatformat:1 }}%)</span>
+                                    {% else %}
+                                        <span class="tag tag-cinza">Sem base</span>
+                                    {% endif %}
+                                </td>
+                                <td class="texto-centro">
+                                    {% if dados_painel.total.taxa_no_prazo != None %}
+                                        {{ dados_painel.total.defenderam_no_prazo }} <span class="muted">({{ dados_painel.total.taxa_no_prazo|floatformat:1 }}%)</span>
+                                    {% else %}
+                                        <span class="tag tag-cinza">Sem base</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+        </section>
     {% endif %}
-  {% endif %}
-</div>
+{% else %}
+    {% comment %} Visão Específica do Professor Selecionado: Gráfico por Turma {% endcomment %}
+    {% if turmas %}
+        <section class="card">
+            <h2 class="section-title">Indicadores por Turma</h2>
+            <p class="muted">Comparativo de discentes sob orientação do professor por turma de ingresso.</p>
+
+            <p class="alert alert-info grafico-alerta-espacado grafico-aviso">
+                Esta consulta inclui turmas anteriores a 2026.2 (marcadas com *). O Acadflow começou em 2026.2, e desligamentos, prorrogações e defesas anteriores podem não estar totalmente registrados.
+            </p>
+
+            {% include "acompanhamento/includes/_grafico_sucesso.html" %}
+        </section>
+    {% else %}
+        <section class="card">
+            <p class="estado-vazio-inline">Nenhuma turma encontrada para o professor selecionado.</p>
+        </section>
+    {% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.querySelectorAll("[data-grafico-rolagem]").forEach(function (area) {
+        area.scrollLeft = area.scrollWidth;
+    });
+</script>
 {% endblock %}

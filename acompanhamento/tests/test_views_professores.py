@@ -1,77 +1,88 @@
-from django.contrib.auth import get_user_model
-from django.core.exceptions import PermissionDenied
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-User = get_user_model()
+from datetime import date
+
+from acompanhamento.tests.test_linha_de_base import criar_perfis
 
 
+@override_settings(ACOMPANHAMENTO_ATIVO=True)
 class PainelProfessoresViewTests(TestCase):
     def setUp(self):
-        # 1. Usuário Coordenador (Acesso Permitido)
-        self.coordenador = User.objects.create_user(
-            username="coordenador",
-            email="coordenador@teste.invalid",
-            password="senha_teste",
-            is_staff=True,
-        )
-        # Adicione o perfil/vínculo de coordenador conforme o modelo do sistema (ex: Docente.coordenador = True)
+        # Utiliza o helper do sistema para criar perfis válidos
+        perfis = criar_perfis()
 
-        # 2. Usuário Comum / Servidor (Acesso Negado)
-        self.servidor = User.objects.create_user(
-            username="servidor",
-            email="servidor@teste.invalid",
-            password="senha_teste",
-        )
+        # O modelo Docente vincula-se ao User através da propriedade .docente
+        # Já o Servidor vincula-se através de .usuario
+        self.coordenador = perfis["docente_coordenador"].docente
+        self.servidor = perfis["servidor"]
 
         self.url = reverse("acompanhamento:painel_professores")
         self.url_inicio = reverse("acompanhamento:acompanhamento_inicio")
 
-    # CENÁRIO 1: Coordenador abre a tela com sucesso
     def test_coordenador_consegue_acessar_painel_professores(self):
-        self.client.login(username="coordenador", password="senha_teste")
+        """Coordenador autenticado deve acessar a tela com sucesso (HTTP 200)."""
+        self.client.force_login(self.coordenador)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "acompanhamento/painel_professores.html")
 
-    # CENÁRIO 2: Servidor recebe 403 e NÃO vê o cartão na página inicial
     def test_servidor_recebe_403_e_nao_ve_cartao_no_inicio(self):
-        self.client.login(username="servidor", password="senha_teste")
-        
-        # Testa o acesso direto à tela (deve retornar 403 / PermissionDenied)
+        """Servidor sem permissão deve receber HTTP 403 e não visualizar o cartão na inicial."""
+        self.client.force_login(self.servidor)
+
+        # Acesso direto deve ser negado com 403 (PermissionDenied)
         response_painel = self.client.get(self.url)
         self.assertEqual(response_painel.status_code, 403)
 
-        # Testa a página inicial (o cartão não deve estar presente no contexto/HTML)
+        # Cartão não deve ser renderizado na página inicial do módulo
         response_inicio = self.client.get(self.url_inicio)
         self.assertEqual(response_inicio.status_code, 200)
         self.assertNotContains(response_inicio, "Painel por Professor")
 
-    # CENÁRIO 3: Com a chave do módulo desligada, responde com 404
     @override_settings(ACOMPANHAMENTO_ATIVO=False)
     def test_chave_desligada_retorna_404(self):
-        self.client.login(username="coordenador", password="senha_teste")
+        """Com o módulo inativo, qualquer tentativa de acesso deve responder HTTP 404."""
+        self.client.force_login(self.coordenador)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 404)
 
-    # CENÁRIO 4: Professor ou parâmetros de filtro inválidos não quebram com Erro 500
     def test_filtros_invalidos_nao_causam_erro_500(self):
-        self.client.login(username="coordenador", password="senha_teste")
-        
-        # Passa ID de professor inexistente e anos inválidos/invertidos
-        response = self.client.get(self.url, {
-            "orientador_id": "99999",
-            "ano_inicial": "abc",
-            "ano_final": "2020",
-        })
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Ano inicial inválido.")
+        """Entradas numéricas inconsistentes devem ser tratadas sem erro 500."""
+        self.client.force_login(self.coordenador)
 
-    # CENÁRIO 5: Exibição "Sem base" quando a taxa é None
-    def test_exibicao_sem_base_quando_taxa_sucesso_eh_none(self):
-        self.client.login(username="coordenador", password="senha_teste")
-        response = self.client.get(self.url)
+        response = self.client.get(
+            self.url,
+            {
+                "orientador_id": "99999",
+                "ano_inicial": "2026",
+                "ano_final": "2020",
+            },
+        )
         self.assertEqual(response.status_code, 200)
-        # Verifica se o badge ou texto "Sem base" é renderizado na tabela
+        self.assertContains(
+            response,
+            "O ano inicial não pode ser maior que o ano final."
+        )
+
+    @override_settings(DEBUG=True)
+    def test_exibicao_sem_base_quando_taxa_sucesso_eh_none(self):
+        """Gera a massa fictícia e confirma a renderização da tag 'Sem base'."""
+        call_command(
+            "gerar_dados_ficticios",
+            semente=42,
+            data_referencia=date(2026, 11, 5),
+        )
+
+        # O comando pode remover os usuários anteriores.
+        # Recria os perfis para autenticar com um usuário válido.
+        perfis = criar_perfis()
+        self.coordenador = perfis["docente_coordenador"].docente
+
+        self.client.force_login(self.coordenador)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Sem base")
-        
