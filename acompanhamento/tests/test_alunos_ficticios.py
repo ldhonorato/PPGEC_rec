@@ -10,6 +10,7 @@ from datetime import date
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 
+from acompanhamento.servicos import calcular_painel_professores
 from acompanhamento.situacao import (
     CUMPRIDO,
     FORA_DO_CALCULO,
@@ -80,7 +81,28 @@ ESPERADO = [
     (31, "DOUTORADO", "DESLIGADA", SEM_PRAZO, IRREGULAR_SEM_CHANCE, "desligado"),
     (32, "DOUTORADO", "CONCLUIDA", CUMPRIDO, FORA_DO_CALCULO,
      "concluído com 12 meses de prorrogação"),
+    (33, "MESTRADO", "CONCLUIDA", CUMPRIDO, FORA_DO_CALCULO,
+     "defendeu dentro do prazo regular"),
+    (34, "MESTRADO", "CONCLUIDA", CUMPRIDO, FORA_DO_CALCULO,
+     "defendeu dentro do prazo regular"),
+    (35, "DOUTORADO", "CONCLUIDA", CUMPRIDO, FORA_DO_CALCULO,
+     "defendeu dentro do prazo regular"),
+    (36, "DOUTORADO", "CONCLUIDA", CUMPRIDO, FORA_DO_CALCULO,
+     "defendeu dentro do prazo regular, com prorrogação"),
 ]
+
+# Painel por professor na data de referência: (alunos, prazo vencido,
+# defenderam, defenderam no prazo, com prorrogação).
+PAINEL_PROFESSORES = {
+    ("MESTRADO", "Alice Moura"): (7, 6, 6, 2, 2),
+    ("MESTRADO", "Bruno Tavares"): (7, 5, 1, 0, 1),
+    ("MESTRADO", "Carla Duarte"): (6, 1, 0, 0, 1),
+    ("MESTRADO", "Diego Ferraz"): (2, 0, 0, 0, 0),
+    ("DOUTORADO", "Alice Moura"): (3, 3, 3, 1, 0),
+    ("DOUTORADO", "Bruno Tavares"): (3, 3, 1, 0, 1),
+    ("DOUTORADO", "Carla Duarte"): (5, 1, 1, 1, 3),
+    ("DOUTORADO", "Diego Ferraz"): (3, 0, 0, 0, 0),
+}
 
 
 @override_settings(DEBUG=True)
@@ -171,3 +193,26 @@ class AlunosFicticiosSituacaoTests(TestCase):
                     if t.nivel_curso == nivel and t.status == "CONCLUIDA"
                 }
                 self.assertGreaterEqual(len(turmas), 3)
+
+    def test_numeros_de_cada_orientador_no_painel(self):
+        for nivel in ("MESTRADO", "DOUTORADO"):
+            painel = calcular_painel_professores(nivel, data_referencia=REFERENCIA)
+            linhas = {linha["nome"]: linha for linha in painel["linhas"]}
+            for (nivel_esperado, nome), numeros in PAINEL_PROFESSORES.items():
+                if nivel_esperado != nivel:
+                    continue
+                with self.subTest(nivel=nivel, orientador=nome):
+                    linha = linhas[nome]
+                    obtido = (
+                        linha["alunos"],
+                        linha["prazo_vencido"],
+                        linha["defenderam"],
+                        linha["defenderam_no_prazo"],
+                        linha["com_prorrogacao"],
+                    )
+                    self.assertEqual(obtido, numeros)
+
+    def test_orientador_so_com_alunos_novos_fica_sem_taxa(self):
+        painel = calcular_painel_professores("MESTRADO", data_referencia=REFERENCIA)
+        diego = next(l for l in painel["linhas"] if l["nome"] == "Diego Ferraz")
+        self.assertIsNone(diego["taxa_sucesso"])
