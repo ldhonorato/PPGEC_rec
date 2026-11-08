@@ -23,10 +23,6 @@ from .servicos import (
 from .telas import TELAS, TELA_PAINEL_PROFESSORES
 
 
-turmas = []
-turmas_grafico = []
-alerta_dados_limitados = False
-
 @tela_do_modulo
 def inicio(request):
     """Página inicial do módulo, com a lista das telas disponíveis."""
@@ -282,7 +278,6 @@ def painel_professores(request):
     nivel = request.GET.get("nivel", "MESTRADO")
     orientador_id_raw = request.GET.get("orientador_id", "")
     
-    # Tratamento restaurado: envia a string limpa ou None para que a validação do serviço levante ValueError em caso de entrada inválida
     ano_inicial = request.GET.get("ano_inicial", "").strip() or None
     ano_final = request.GET.get("ano_final", "").strip() or None
 

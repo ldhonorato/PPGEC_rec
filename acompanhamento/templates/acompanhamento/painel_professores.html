@@ -153,7 +153,9 @@
             <p class="muted">Comparativo de discentes sob orientação do professor por turma de ingresso.</p>
 
             {% if alerta_dados_limitados %}
-              <!-- Mantenha aqui o conteúdo atual do aviso -->
+                <p class="alert alert-info grafico-alerta-espacado grafico-aviso">
+                    Esta consulta inclui turmas anteriores a 2026.2 (marcadas com *). O Acadflow começou em 2026.2, e desligamentos, prorrogações e defesas anteriores podem não estar totalmente registrados.
+                </p>
             {% endif %}
 
             {% include "acompanhamento/includes/_grafico_sucesso.html" %}
