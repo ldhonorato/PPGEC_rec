@@ -281,12 +281,12 @@ def painel_professores(request):
 
     nivel = request.GET.get("nivel", "MESTRADO")
     orientador_id_raw = request.GET.get("orientador_id", "")
-    ano_inicial_raw = request.GET.get("ano_inicial", "")
-    ano_final_raw = request.GET.get("ano_final", "")
+    
+    # Tratamento restaurado: envia a string limpa ou None para que a validação do serviço levante ValueError em caso de entrada inválida
+    ano_inicial = request.GET.get("ano_inicial", "").strip() or None
+    ano_final = request.GET.get("ano_final", "").strip() or None
 
     orientador_id = int(orientador_id_raw) if orientador_id_raw.isdigit() else None
-    ano_inicial = int(ano_inicial_raw) if ano_inicial_raw.isdigit() else None
-    ano_final = int(ano_final_raw) if ano_final_raw.isdigit() else None
 
     erros_filtro = []
     dados_painel = None
@@ -308,22 +308,18 @@ def painel_professores(request):
             if linha.get("orientador_id") is not None
         ]
 
-        if orientador_id is not None:
+        if orientador_id:
             turmas = calcular_painel_sucesso_turma(
                 nivel=nivel,
                 ano_inicial=ano_inicial,
                 ano_final=ano_final,
                 orientador_id=orientador_id,
             )
-
             for turma in turmas:
                 turma["barras"] = _barras_da_turma(turma)
 
             turmas_grafico = list(reversed(turmas))
-
-            alerta_dados_limitados = any(
-                turma.get("dados_limitados") for turma in turmas
-            )
+            alerta_dados_limitados = any(t.get("dados_limitados") for t in turmas)
 
     except ValueError as e:
         erros_filtro.append(str(e))
@@ -331,8 +327,8 @@ def painel_professores(request):
     contexto = {
         "nivel_selecionado": nivel,
         "orientador_id": orientador_id,
-        "ano_inicial": request.GET.get("ano_inicial", ""),
-        "ano_final": request.GET.get("ano_final", ""),
+        "ano_inicial": ano_inicial or "",
+        "ano_final": ano_final or "",
         "professores_list": professores,
         "dados_painel": dados_painel,
         "turmas": turmas,
