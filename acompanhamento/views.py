@@ -1,6 +1,7 @@
 from datetime import date
 
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -11,22 +12,37 @@ from .decoradores import tela_do_modulo
 from .forms import MarcoCalendarioForm
 from .lista_alunos import cartao_alunos_irregulares
 from .models import ExecucaoAviso, MarcoCalendario
+from .permissoes import pode_ver_painel_professores
 from .servicos import (
     calcular_painel_docentes,
     calcular_painel_processos,
+    calcular_painel_professores,
     calcular_painel_sucesso_turma,
     validar_semestre,
 )
-from .telas import TELAS
+from .previsao_conclusao import calcular_previsao_conclusao
+from .telas import TELAS, TELA_PAINEL_PROFESSORES
 
 
 @tela_do_modulo
 def inicio(request):
     """Página inicial do módulo, com a lista das telas disponíveis."""
+    # Monta a lista base com as telas padrão
     telas = [
         {"titulo": titulo, "descricao": descricao, "endereco": reverse(rota), "icone": icone}
         for titulo, descricao, rota, icone in TELAS
     ]
+
+    # Acrescenta o cartão do Painel por Professor apenas para quem tem permissão
+    if pode_ver_painel_professores(request.user):
+        titulo, descricao, rota, icone = TELA_PAINEL_PROFESSORES
+        telas.append({
+            "titulo": titulo,
+            "descricao": descricao,
+            "endereco": reverse(rota),
+            "icone": icone,
+        })
+
     contexto = {
         "telas": telas,
         "cartao_irregulares": cartao_alunos_irregulares(),
@@ -252,3 +268,90 @@ def painel_sucesso_turma(request):
         "alerta_dados_limitados": alerta_dados_limitados,
     }
     return render(request, "acompanhamento/painel_sucesso_turma.html", contexto)
+
+
+@tela_do_modulo
+def painel_professores(request):
+    # 1. Verificar a permissão de acesso do usuário (Regra do Daniel)
+    if not pode_ver_painel_professores(request.user):
+        raise PermissionDenied
+
+    # 2. Obter e tratar os parâmetros dos filtros (nível, professor e anos)
+    nivel = request.GET.get("nivel", "MESTRADO").upper()
+    orientador_id_raw = request.GET.get("orientador_id", "")
+    ano_inicial_raw = request.GET.get("ano_inicial", "")
+    ano_final_raw = request.GET.get("ano_final", "")
+
+    # Tratamento de ID do orientador
+    orientador_id = None
+    if orientador_id_raw.isdigit():
+        orientador_id = int(orientador_id_raw)
+
+    # Lista para armazenar eventuais mensagens de erro dos filtros (evitando erro HTTP 500)
+    erros_filtro = []
+
+    # Tratamento e validação dos anos (mesmo padrão do painel_sucesso_turma)
+    ano_inicial = None
+    if ano_inicial_raw:
+        try:
+            ano_inicial = int(ano_inicial_raw)
+        except ValueError:
+            erros_filtro.append("Ano inicial inválido.")
+
+    ano_final = None
+    if ano_final_raw:
+        try:
+            ano_final = int(ano_final_raw)
+        except ValueError:
+            erros_filtro.append("Ano final inválido.")
+
+    if ano_inicial and ano_final and ano_inicial > ano_final:
+        erros_filtro.append("O ano inicial não pode ser maior que o ano final.")
+
+    # 3. Processar os dados se não houver erros de formulário
+    dados_painel = None
+    grafico_turmas = None
+    previsao_conclusao = None
+
+    if not erros_filtro:
+        try:
+            # Dados da tabela geral ou por professor
+            dados_painel = calcular_painel_professores(
+                nivel=nivel,
+                ano_inicial=ano_inicial,
+                ano_final=ano_final,
+            )
+
+            # Se um professor foi selecionado, busca os dados adicionais (Gráfico e Previsão)
+            if orientador_id is not None:
+                grafico_turmas = calcular_painel_sucesso_turma(
+                    nivel=nivel,
+                    ano_inicial=ano_inicial,
+                    ano_final=ano_final,
+                    orientador_id=orientador_id,
+                )
+                previsao_conclusao = calcular_previsao_conclusao(
+                    orientador_id=orientador_id,
+                    nivel=nivel,
+                )
+        except Exception as e:
+            # Trata eventuais exceções de cálculo sem quebrar com Erro 500
+            erros_filtro.append("Erro ao processar os indicadores selecionados.")
+
+    # 4. Montar o contexto e renderizar o template
+    contexto = {
+        "nivel": nivel,
+        "orientador_id": orientador_id,
+        "ano_inicial": ano_inicial_raw,
+        "ano_final": ano_final_raw,
+        "erros_filtro": erros_filtro,
+        "dados_painel": dados_painel,
+        "grafico_turmas": grafico_turmas,
+        "previsao_conclusao": previsao_conclusao,
+    }
+
+    return render(
+        request,
+        "acompanhamento/painel_professores.html",
+        contexto,
+    )

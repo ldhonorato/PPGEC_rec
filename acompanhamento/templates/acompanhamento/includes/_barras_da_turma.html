@@ -1,0 +1,47 @@
+{% comment %}
+  Include reutilizável para renderizar o gráfico comparativo de 7 barras por turma.
+  Espera receber 'grafico_turmas' no contexto.
+{% endcomment %}
+
+{% if grafico_turmas %}
+  <div class="grafico-turmas-container my-4">
+    {% if grafico_turmas.dados_limitados %}
+      <div class="alert alert-warning py-2 text-sm">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+        Os registros do Acadflow começam em 2026.2. Números de turmas anteriores podem estar incompletos.
+      </div>
+    {% endif %}
+
+    <div class="d-flex flex-row overflow-x-auto gap-4 pt-4 pb-2">
+      {% for turma in grafico_turmas.turmas %}
+        <div class="turma-coluna border rounded p-3 text-center" style="min-width: 220px;">
+          <h6 class="fw-bold mb-3">
+            Turma {{ turma.nome }}{% if turma.historica %}*{% endif %}
+          </h6>
+          
+          {% comment %} Renderização das 7 barras verticais {% endcomment %}
+          <div class="d-flex justify-content-between align-items-end" style="height: 180px;">
+            {% for barra in turma.barras %}
+              <div class="barra-wrapper position-relative text-center flex-fill mx-1" style="height: 100%;">
+                <span class="text-xs fw-semibold position-absolute top-0 start-50 translate-middle-x" style="margin-top: -18px;">
+                  {{ barra.quantidade }}
+                </span>
+                <div 
+                  class="barra-coluna bg-{{ barra.cor_classe }} rounded-top"
+                  style="height: {{ barra.percentual }}%; width: 100%; transition: height 0.3s;"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  title="{{ barra.rotulo }}: {{ barra.quantidade }} ({{ barra.percentual_formatado }}%)">
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+          
+          <div class="text-muted text-xs mt-2">
+            Total: {{ turma.total_ingressantes }} ingressantes
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
