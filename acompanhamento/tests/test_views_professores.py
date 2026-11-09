@@ -1,10 +1,12 @@
 from datetime import date
 
 from django.core.management import call_command
+from django.http import response
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from acompanhamento.tests.test_linha_de_base import criar_perfis
+from processos.models import Docente
 
 
 @override_settings(ACOMPANHAMENTO_ATIVO=True)
@@ -105,7 +107,7 @@ class PainelProfessoresViewTests(TestCase):
 
     @override_settings(DEBUG=True)
     def test_previsao_conclusao_calculada_para_professores(self):
-        """Garante que a previsão de conclusão é invocada na view ao selecionar um orientador."""
+        """Garante que a previsão de conclusão é calculada e exibida no template ao selecionar um orientador."""
         call_command(
             "gerar_dados_ficticios",
             semente=42,
@@ -115,21 +117,12 @@ class PainelProfessoresViewTests(TestCase):
         perfis = criar_perfis()
         self.client.force_login(perfis["docente_coordenador"])
 
-        response_geral = self.client.get(self.url)
-        dados_painel = response_geral.context["dados_painel"]
-
-        # Busca o ID de um orientador que possui discentes ativos na massa fictícia
-        orientador_id = None
-        for linha in dados_painel.get("linhas", []):
-            if linha.get("orientador_id") is not None and linha.get("ativos", 0) > 0:
-                orientador_id = linha["orientador_id"]
-                break
-
-        if not orientador_id:
-            professores = response_geral.context["professores_list"]
-            orientador_id = professores[0]["id"]
-
-        response = self.client.get(self.url, {"orientador_id": orientador_id})
+        alice = Docente.objects.get(nome__icontains="Alice")
+        response = self.client.get(
+            self.url, {"orientador_id": alice.pk, "nivel": "MESTRADO"}
+        )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("dados_previsao", response.context)
+        self.assertIsNotNone(response.context["dados_previsao"])
+        self.assertContains(response, "Previsão de conclusão")
+        self.assertContains(response, "30/11/2027")

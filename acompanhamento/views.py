@@ -261,8 +261,8 @@ def painel_sucesso_turma(request):
 
     contexto = {
         "nivel_selecionado": nivel_selecionado,
-        "ano_inicial": request.GET.get("ano_inicial", ""),
-        "ano_final": request.GET.get("ano_final", ""),
+        "ano_inicial": ano_inicial or "",
+        "ano_final": ano_final or "",
         "turmas": turmas,
         "turmas_grafico": turmas_grafico,
         "alerta_dados_limitados": alerta_dados_limitados,
@@ -317,7 +317,6 @@ def painel_professores(request):
             turmas_grafico = list(reversed(turmas))
             alerta_dados_limitados = any(t.get("dados_limitados") for t in turmas)
 
-            # Chama a função de previsão do PR #61
             dados_previsao = calcular_previsao_conclusao(
                 orientador_id=orientador_id,
                 nivel=nivel,
@@ -329,8 +328,8 @@ def painel_professores(request):
     contexto = {
         "nivel_selecionado": nivel,
         "orientador_id": orientador_id,
-        "ano_inicial": request.GET.get("ano_inicial", ""),
-        "ano_final": request.GET.get("ano_final", ""),
+        "ano_inicial": ano_inicial or "",
+        "ano_final": ano_final or "",
         "professores_list": professores,
         "dados_painel": dados_painel,
         "turmas": turmas,
