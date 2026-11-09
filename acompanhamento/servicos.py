@@ -410,13 +410,59 @@ def calcular_painel_sucesso_turma(
     for dados in turmas_dict.values():
         total = dados["ingressantes"]
         if total > 0:
-            dados["taxa_conclusao"] = round((dados["concluidos"] / total) * 100, 1)
-            dados["taxa_desligamento"] = round((dados["desligados"] / total) * 100, 1)
-            dados["taxa_trancamento"] = round((dados["trancados"] / total) * 100, 1)
-            dados["taxa_ativos"] = round((dados["ativos"] / total) * 100, 1)
-            dados["taxa_ativos_regulares"] = round((dados["ativos_regulares"] / total) * 100, 1)
-            dados["taxa_ativos_irregulares"] = round((dados["ativos_irregulares"] / total) * 100, 1)
+            # 1. Taxas das quatro categorias principais
+            t_conc = round((dados["concluidos"] / total) * 100, 1)
+            t_desl = round((dados["desligados"] / total) * 100, 1)
+            t_tranc = round((dados["trancados"] / total) * 100, 1)
+            t_ativos = round((dados["ativos"] / total) * 100, 1)
+
+            # Ajuste de resíduo para somar exatamente 100.0%
+            soma_4 = round(t_conc + t_desl + t_tranc + t_ativos, 1)
+            diff_4 = round(100.0 - soma_4, 1)
+            if diff_4 != 0:
+                categorias = [
+                    ("concluidos", t_conc, dados["concluidos"]),
+                    ("desligados", t_desl, dados["desligados"]),
+                    ("trancados", t_tranc, dados["trancados"]),
+                    ("ativos", t_ativos, dados["ativos"]),
+                ]
+                # Aplica a diferença na categoria não-vazia com maior contagem
+                categorias_validas = [c for c in categorias if c[2] > 0]
+                if categorias_validas:
+                    maior_cat = max(categorias_validas, key=lambda c: (c[2], c[1]))[0]
+                    if maior_cat == "concluidos":
+                        t_conc = round(t_conc + diff_4, 1)
+                    elif maior_cat == "desligados":
+                        t_desl = round(t_desl + diff_4, 1)
+                    elif maior_cat == "trancados":
+                        t_tranc = round(t_tranc + diff_4, 1)
+                    elif maior_cat == "ativos":
+                        t_ativos = round(t_ativos + diff_4, 1)
+
+            dados["taxa_conclusao"] = t_conc
+            dados["taxa_desligamento"] = t_desl
+            dados["taxa_trancamento"] = t_tranc
+            dados["taxa_ativos"] = t_ativos
+
+            # 2. Distribuição interna dos ativos (deve somar exatamente taxa_ativos)
+            t_reg = round((dados["ativos_regulares"] / total) * 100, 1)
+            t_irreg = round((dados["ativos_irregulares"] / total) * 100, 1)
+
+            if dados["ativos"] > 0:
+                soma_sub = round(t_reg + t_irreg, 1)
+                diff_sub = round(t_ativos - soma_sub, 1)
+                if diff_sub != 0:
+                    if dados["ativos_regulares"] >= dados["ativos_irregulares"]:
+                        t_reg = round(t_reg + diff_sub, 1)
+                    else:
+                        t_irreg = round(t_irreg + diff_sub, 1)
+
+            dados["taxa_ativos_regulares"] = t_reg
+            dados["taxa_ativos_irregulares"] = t_irreg
+
+            # 3. Prorrogação permanece independente
             dados["percentual_prorrogacao"] = round((dados["com_prorrogacao"] / total) * 100, 1)
+
         resultado.append(dados)
 
     return resultado
