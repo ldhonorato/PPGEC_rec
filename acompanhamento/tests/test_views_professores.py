@@ -5,6 +5,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from acompanhamento.tests.test_linha_de_base import criar_perfis
+from processos.models import Docente
 
 
 @override_settings(ACOMPANHAMENTO_ATIVO=True)
@@ -102,4 +103,25 @@ class PainelProfessoresViewTests(TestCase):
         self.assertEqual(response_prof.status_code, 200)
         self.assertTrue(response_prof.context["turmas_grafico"])
         self.assertContains(response_prof, "turma-grupo")
-        
+
+    @override_settings(DEBUG=True)
+    def test_previsao_conclusao_calculada_para_professores(self):
+        """Garante que a previsão de conclusão é calculada e exibida no template ao selecionar um orientador."""
+        call_command(
+            "gerar_dados_ficticios",
+            semente=42,
+            data_referencia=date(2026, 11, 5),
+        )
+
+        perfis = criar_perfis()
+        self.client.force_login(perfis["docente_coordenador"])
+
+        alice = Docente.objects.get(nome__icontains="Alice")
+        response = self.client.get(
+            self.url, {"orientador_id": alice.pk, "nivel": "MESTRADO"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(response.context["dados_previsao"])
+        self.assertContains(response, "Previsão de conclusão")
+        self.assertContains(response, "30/11/2027")

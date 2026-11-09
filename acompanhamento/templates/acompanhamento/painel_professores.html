@@ -12,7 +12,7 @@
     <div class="lista-cabecalho">
         <div>
             <h1 class="section-title">Painel por Professor</h1>
-            <p class="muted">Acompanhamento de turmas, prazos e defesas por docente.</p>
+            <p class="muted">Acompanhamento de turmas, prazos, defesas e previsão de conclusão por docente.</p>
         </div>
     </div>
 
@@ -165,6 +165,46 @@
             <p class="estado-vazio-inline">Nenhuma turma encontrada para o professor selecionado.</p>
         </section>
     {% endif %}
+
+    <section class="card">
+        <h2 class="section-title">Previsão de conclusão</h2>
+        <p class="muted">Alunos ativos do professor, pelo limite de defesa com prorrogações e trancamentos.</p>
+        {% if dados_previsao and dados_previsao.alunos %}
+            <div class="tabela-envolvido">
+                <table class="tabela">
+                    <thead><tr><th>Semestre</th><th>Alunos</th></tr></thead>
+                    <tbody>
+                        {% for item in dados_previsao.por_semestre %}
+                            <tr><td>{{ item.semestre }}</td><td>{{ item.alunos }}</td></tr>
+                        {% endfor %}
+                        <tr><td>Prazo vencido</td><td>{{ dados_previsao.prazo_vencido }}</td></tr>
+                        <tr><td>Sem previsão</td><td>{{ dados_previsao.sem_previsao }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="tabela-envolvido">
+                <table class="tabela">
+                    <thead><tr><th>Aluno</th><th>Turma</th><th>Limite de defesa</th><th>Semestre</th></tr></thead>
+                    <tbody>
+                        {% for aluno in dados_previsao.alunos %}
+                            <tr>
+                                <td>{{ aluno.nome }}</td>
+                                <td>{{ aluno.turma }}</td>
+                                <td>{{ aluno.data_limite|date:"d/m/Y"|default:"Sem previsão" }}</td>
+                                <td>
+                                    {% if aluno.semestre %}{{ aluno.semestre }}
+                                    {% elif aluno.data_limite %}<span class="badge badge-aviso">Prazo vencido</span>
+                                    {% else %}-{% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="estado-vazio-inline">Nenhum aluno ativo para este professor.</p>
+        {% endif %}
+    </section>
 {% endif %}
 {% endblock %}
 
