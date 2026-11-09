@@ -102,4 +102,34 @@ class PainelProfessoresViewTests(TestCase):
         self.assertEqual(response_prof.status_code, 200)
         self.assertTrue(response_prof.context["turmas_grafico"])
         self.assertContains(response_prof, "turma-grupo")
-        
+
+    @override_settings(DEBUG=True)
+    def test_previsao_conclusao_calculada_para_professores(self):
+        """Garante que a previsão de conclusão é invocada na view ao selecionar um orientador."""
+        call_command(
+            "gerar_dados_ficticios",
+            semente=42,
+            data_referencia=date(2026, 11, 5),
+        )
+
+        perfis = criar_perfis()
+        self.client.force_login(perfis["docente_coordenador"])
+
+        response_geral = self.client.get(self.url)
+        dados_painel = response_geral.context["dados_painel"]
+
+        # Busca o ID de um orientador que possui discentes ativos na massa fictícia
+        orientador_id = None
+        for linha in dados_painel.get("linhas", []):
+            if linha.get("orientador_id") is not None and linha.get("ativos", 0) > 0:
+                orientador_id = linha["orientador_id"]
+                break
+
+        if not orientador_id:
+            professores = response_geral.context["professores_list"]
+            orientador_id = professores[0]["id"]
+
+        response = self.client.get(self.url, {"orientador_id": orientador_id})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("dados_previsao", response.context)

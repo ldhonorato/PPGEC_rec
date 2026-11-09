@@ -13,6 +13,7 @@ from .forms import MarcoCalendarioForm
 from .lista_alunos import cartao_alunos_irregulares
 from .models import ExecucaoAviso, MarcoCalendario
 from .permissoes import pode_ver_painel_professores
+from .previsao_conclusao import calcular_previsao_conclusao
 from .servicos import (
     calcular_painel_docentes,
     calcular_painel_processos,
@@ -277,7 +278,6 @@ def painel_professores(request):
 
     nivel = request.GET.get("nivel", "MESTRADO")
     orientador_id_raw = request.GET.get("orientador_id", "")
-    
     ano_inicial = request.GET.get("ano_inicial", "").strip() or None
     ano_final = request.GET.get("ano_final", "").strip() or None
 
@@ -289,6 +289,7 @@ def painel_professores(request):
     turmas_grafico = []
     alerta_dados_limitados = False
     professores = []
+    dados_previsao = None
 
     try:
         dados_painel = calcular_painel_professores(
@@ -316,19 +317,26 @@ def painel_professores(request):
             turmas_grafico = list(reversed(turmas))
             alerta_dados_limitados = any(t.get("dados_limitados") for t in turmas)
 
+            # Chama a função de previsão do PR #61
+            dados_previsao = calcular_previsao_conclusao(
+                orientador_id=orientador_id,
+                nivel=nivel,
+            )
+
     except ValueError as e:
         erros_filtro.append(str(e))
 
     contexto = {
         "nivel_selecionado": nivel,
         "orientador_id": orientador_id,
-        "ano_inicial": ano_inicial or "",
-        "ano_final": ano_final or "",
+        "ano_inicial": request.GET.get("ano_inicial", ""),
+        "ano_final": request.GET.get("ano_final", ""),
         "professores_list": professores,
         "dados_painel": dados_painel,
         "turmas": turmas,
         "turmas_grafico": turmas_grafico,
         "alerta_dados_limitados": alerta_dados_limitados,
+        "dados_previsao": dados_previsao,
         "erros_filtro": erros_filtro,
     }
 

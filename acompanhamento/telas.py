@@ -44,7 +44,7 @@ TELAS = [
 # para quem possui a permissão pode_ver_painel_professores
 TELA_PAINEL_PROFESSORES = (
     "Painel por Professor",
-    "Turmas, prazos e defesas por docente.",
+    "Turmas, prazos, defesas e previsão de conclusão por docente.",
     "acompanhamento:painel_professores",
     "i-orientandos",
 )
