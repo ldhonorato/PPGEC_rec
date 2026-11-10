@@ -1,8 +1,22 @@
 # Entrega do módulo de acompanhamento acadêmico
 
-Equipe E4. Situação em 02/11/2026, com base na branch `develop`.
+Equipe E4. Situação em 09/11/2026, com base na branch `develop`.
 
 Este documento é para quem vai instalar, operar ou continuar o módulo. O uso das telas está no [manual da secretaria](manual-de-uso-secretaria.md).
+
+## O que muda nesta entrega
+
+Em relação à versão 1.4.0, que está na `main` do repositório oficial:
+
+| Mudança | Efeito |
+|---|---|
+| Painel por Professor | Tela nova, só para o docente coordenador e para os membros da Coordenação PPG. Mostra os números de cada professor, o gráfico por turma dos alunos dele e a previsão de conclusão dos alunos ativos |
+| Taxas do Painel de Sucesso por Turma | Concluídos, desligados, trancados e ativos agora somam sempre 100,0%. Regulares e irregulares somam a taxa de ativos |
+| Versões fixas no `requirements.txt` | Corrige o worker do Celery, que entra em reinício quando a imagem é gerada com o `kombu` 5.7.0, publicado em 03/11/2026. Sem o worker, o aviso diário não roda |
+| Manual da secretaria | Seção nova sobre o Painel por Professor |
+| Dados fictícios | Os alunos de teste passam a ter orientador e defesas. Só valem com `DEBUG=True` |
+
+A entrega não traz migration nova e não muda o `Dockerfile` nem os arquivos do Docker Compose. Os passos para atualizar a produção estão na seção 4, em "Atualizar para esta versão".
 
 ## 1. Visão geral
 
@@ -18,6 +32,7 @@ O módulo chega desligado. Com a chave desligada, as telas novas respondem como 
 | Painel de Sucesso por Turma | `/acompanhamento/painel-sucesso-turma/` | Gráfico de sete barras e detalhes por turma de ingresso |
 | Painel de Processos | `/acompanhamento/processos/` | Processos abertos, atrasados e tempo médio no período |
 | Painel de Docentes | `/acompanhamento/docentes/` | Distribuição por polo, permanentes e colaboradores |
+| Painel por Professor | `/acompanhamento/professores/` | Alunos, prazos, defesas e prorrogações por professor. Com um professor escolhido, mostra o gráfico por turma e a previsão de conclusão dos alunos ativos |
 | Calendário de Marcos | `/acompanhamento/calendario-marcos/` | Cadastro das datas de projeto e qualificação por semestre |
 | Aviso diário | E-mail às 7h, horário de Recife | Avisa a Secretaria PPGEC e a Coordenação PPG sobre alunos que ficaram atrasados |
 
@@ -54,7 +69,7 @@ flowchart LR
     worker --> email
 ```
 
-Em relação à `main` do repositório oficial (`b4fd0d0`), a entrega não altera `requirements.txt`, `Dockerfile` nem os arquivos do Docker Compose.
+A entrega não altera o `Dockerfile` nem os arquivos do Docker Compose. O `requirements.txt` passa a fixar a versão de todas as dependências, inclusive as indiretas, nas versões da imagem que funcionava em 02/11/2026. Assim, uma versão nova publicada por terceiros não muda mais a imagem sem aviso.
 
 ## 3. Como o módulo é organizado
 
@@ -86,8 +101,9 @@ flowchart TB
 | Arquivo em `acompanhamento/` | Papel |
 |---|---|
 | `chave.py` | Lê as duas chaves |
-| `decoradores.py` e `permissoes.py` | Regras de acesso às telas |
+| `decoradores.py` e `permissoes.py` | Regras de acesso às telas, inclusive a do Painel por Professor |
 | `situacao.py` | Regras de prazo |
+| `previsao_conclusao.py` | Previsão de conclusão dos alunos ativos de um professor |
 | `lista_alunos.py` | Lista por marco e cartão de irregulares |
 | `planilha_alunos.py` | Arquivo Excel |
 | `servicos.py` | Cálculo dos painéis |
@@ -151,6 +167,29 @@ As telas voltam a responder como página inexistente, e o cartão e o menu somem
 
 Para parar só os e-mails, basta colocar `ACOMPANHAMENTO_AVISO_ATIVO=False` e rodar o mesmo comando.
 
+### Atualizar para esta versão
+
+Esta versão não traz migration e não pede mudança no `.env`.
+
+1. Fazer o merge do pull request na `stage` e, depois, da `stage` na `main`.
+2. O workflow "Build and push web image" gera a imagem nova a partir da `main`.
+3. Em até 5 minutos, o Watchtower troca os contêineres `web`, `celery` e `celery-beat` pela imagem nova. Banco, Redis e pgAdmin não mudam.
+
+Depois da troca, conferir no servidor, na pasta do `docker-compose-prod.yml`. Os comandos só leem informações e não enviam e-mail:
+
+```
+docker compose -f docker-compose-prod.yml ps
+docker inspect -f '{{.Name}} {{.State.Status}} reinicios={{.RestartCount}}' ppgec_celery ppgec_celery_beat
+docker compose -f docker-compose-prod.yml exec celery celery -A ppgec inspect registered | grep enviar_avisos_irregularidade
+docker compose -f docker-compose-prod.yml logs --since 1h celery celery-beat | grep -i -E "unregistered|Traceback|ERROR"
+```
+
+O esperado é: os contêineres em `running`, o worker e o beat com `reinicios=0`, a tarefa `acompanhamento.tasks.enviar_avisos_irregularidade` listada e nenhuma linha no último comando.
+
+Com o módulo ligado, entrar como docente coordenador ou como membro da Coordenação PPG e abrir `/acompanhamento/professores/`. Os outros perfis recebem acesso negado nessa tela, e o cartão dela não aparece para eles.
+
+Se a tela nova der problema, desligar o módulo, como em "Desligar", resolve sem mexer no código. Reverter o merge na `main` também funciona, porque não há migration nova, mas traz de volta as versões soltas do `requirements.txt` e, com elas, o problema do worker.
+
 ### Como a entrega foi conferida
 
 A cada pull request para a `develop`, o CI roda os testes em PostgreSQL 16 e Python 3.11. O ensaio de produção parte do banco migrado com a `main` do repositório oficial, aplica as migrations novas e confere que:
@@ -161,7 +200,7 @@ A cada pull request para a `develop`, o CI roda os testes em PostgreSQL 16 e Pyt
 - com o módulo ligado e o aviso desligado, a tarefa não faz nada;
 - nenhum contêiner reiniciou e os logs não têm exceção.
 
-O último ensaio na `develop` passou em 02/11/2026. O ensaio não cobre o servidor do cliente (ver seção 8).
+Desde 06/11/2026, o GitHub Actions do fork da equipe está parado. Nesta entrega, os passos do CI rodaram na máquina da equipe antes de cada merge na `develop`, e o ensaio rodou com Docker, também na máquina da equipe, com PostgreSQL 16. O último ensaio, com a `develop` em `cc402fd` sobre o banco migrado com a `main` oficial em `05d2842`, passou em 09/11/2026 em todos os itens acima. O ensaio não cobre o servidor do cliente (ver seção 8).
 
 ## 5. Como operar
 
@@ -239,6 +278,21 @@ Ativo irregular é quem está irregular no marco ou na defesa. Ativos regulares 
 
 Turmas anteriores a 2026.2 aparecem com aviso, porque desligamentos, prorrogações e defesas dessas turmas podem não ter sido lançados.
 
+Concluídos, desligados, trancados e ativos somam sempre 100,0%. Quando o arredondamento deixa sobra, ela vai para a categoria com mais alunos. Da mesma forma, ativos regulares e irregulares somam a taxa de ativos. A barra Com prorrogação é contada à parte.
+
+### Painel por Professor
+
+As regras foram confirmadas pelo professor em 06/11/2026.
+
+- **Professor:** é o orientador da trajetória. A coorientação fica fora, e quem não tem orientador aparece na linha "Sem orientador".
+- **Prazo vencido:** alunos cujo prazo regimental da defesa já passou, sem contar prorrogações nem trancamentos. No último dia do prazo, o aluno ainda não conta. Sem data de ingresso, não entra.
+- **Defenderam:** alunos concluídos com data de defesa, entre os que têm prazo vencido.
+- **No prazo regular:** quem defendeu até o prazo regimental.
+- **Taxa de sucesso:** defenderam sobre prazo vencido. Sem nenhum aluno com prazo vencido, a tela mostra "Sem base" em vez de 0%.
+- **Taxa de prorrogação:** alunos com pelo menos uma prorrogação sobre o total de alunos do professor.
+- **Previsão de conclusão:** só alunos ativos. Usa o mesmo limite de defesa da lista de alunos, já com prorrogações e trancamentos, e o converte em semestre pelo calendário. Limite já passado aparece como "Prazo vencido", e aluno sem data de ingresso, como "Sem previsão".
+- **Troca de orientador:** o sistema guarda só o orientador atual, então todo o histórico do aluno fica com ele.
+
 ### Diferença conhecida
 
 A página do aluno, do sistema original, conta a prorrogação mantendo o dia. No exemplo acima, ela mostra 28/05/2027, e o módulo mostra 31/05/2027. O módulo segue a resposta da coordenação, e a página do aluno não foi alterada.
@@ -253,6 +307,9 @@ A página do aluno, do sistema original, conta a prorrogação mantendo o dia. N
 | Situação calculada na hora | Evita guardar um valor que pode ficar defasado quando o cadastro muda | Toda abertura da lista e da página inicial refaz o cálculo |
 | Mesma regra de acesso da gestão do sistema | Não cria uma segunda regra para manter | Servidor, bolsista e voluntário também veem as telas (ver seção 8) |
 | Mesmo cálculo para cartão, lista e planilha | Os números não podem divergir entre as telas | Uma mudança na lista afeta as três saídas |
+| Painel por Professor só para o coordenador e a Coordenação PPG | Os números por professor são sensíveis. Confirmado pelo professor em 06/11/2026 | Cada professor ainda não vê os próprios números |
+| Taxa de sucesso só entre quem tem prazo vencido | Alunos ainda dentro do prazo baixariam a taxa sem ter falhado | Turmas recentes aparecem como "Sem base" |
+| Versões fixas no `requirements.txt` | Em 03/11/2026, uma versão nova do `kombu` derrubou o worker sem nenhuma mudança no código | Atualizar uma dependência passa a ser uma mudança explícita, com teste e ensaio |
 
 ## 8. Riscos, pendências e o que ficou de fora
 
@@ -263,12 +320,13 @@ A página do aluno, do sistema original, conta a prorrogação mantendo o dia. N
 | Contas de teste no banco | A migration `0003_seed_mock_data`, do sistema original, cria o "Aluno Mock 1". Se ele existir em produção, entra no cartão, na lista e no aviso | Equipe confere, coordenação decide a remoção |
 | Quem pode ver as telas | A lista e a planilha têm dados pessoais. Hoje, servidor, bolsista e voluntário também veem | Coordenação |
 | Números e lista | A secretaria e a coordenação precisam validar os números com dados reais | Secretaria e coordenação |
-| E-mail e Celery no servidor | Nada disso foi conferido no servidor do cliente | Equipe e DTI, com a lista de verificação |
+| E-mail e Celery no servidor | Nada disso foi conferido no servidor do cliente. A equipe não tem acesso a ele, que exige a VPN da POLI | Professor ou DTI, com os comandos de "Atualizar para esta versão" e a lista de verificação |
 
 ### Limitações conhecidas
 
-- As taxas de cada turma são arredondadas uma a uma, e a soma pode dar 99,9% ou 100,1%.
 - O início dos registros (2026.2) está fixo em `servicos.py`.
+- No Painel por Professor, o histórico do aluno fica com o orientador atual. Se o orientador mudou, os números antigos passam para o novo.
+- O desempenho do Painel por Professor com o tamanho real do programa, cerca de 400 alunos e 40 professores, ainda está sendo medido.
 - A lista considera a trajetória ativa mais recente do aluno, e o painel conta todas as ativas. Os números só divergem se um aluno tiver duas trajetórias ativas.
 - O desempenho do Painel de Processos com muitos dados não foi medido.
 - O módulo usa uma função privada do sistema, `_has_gestao_access`. Um teste avisa se as duas cópias dessa regra divergirem.
@@ -277,10 +335,6 @@ A página do aluno, do sistema original, conta a prorrogação mantendo o dia. N
 
 Pedidos da coordenação ainda sem definição de prioridade:
 
-- taxa de sucesso de defesa por professor;
-- taxa de prorrogação por professor;
-- alunos por professor em cada semestre, com previsão de conclusão;
-- sucesso por turma filtrado por professor;
 - curvas semestre a semestre;
 - melhoria da página de Dashboard.
 
@@ -304,6 +358,9 @@ Pedidos da coordenação ainda sem definição de prioridade:
 | Trancamento | Período de suspensão, cujos dias somam aos prazos |
 | Levantamento inicial | Primeiro e-mail do aviso, com todos os atrasados daquele momento |
 | Chave | Variável do `.env` que liga ou desliga o módulo ou o aviso |
+| Prazo regimental | Prazo da defesa sem prorrogações nem trancamentos: 24 meses no mestrado e 48 no doutorado |
+| Sem base | Taxa que não pode ser calculada porque nenhum aluno chegou ao fim do prazo |
+| Previsão de conclusão | Semestre em que termina o limite de defesa de um aluno ativo |
 
 Documentos relacionados:
 
