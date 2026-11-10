@@ -138,3 +138,23 @@ As 7 categorias exibidas por turma são:
 * **Turmas Históricas (marcadas com \*):** Turmas anteriores a `2026.2` são sinalizadas com um asterisco ao lado do nome da turma (ex.: `2025.1*`). Um aviso destacado comunica que registros de desligamentos, prorrogações ou defesas anteriores à implantação do AcadFlow podem não estar totalmente cadastrados.
 * **Turmas Recentes:** Turmas mais recentes podem apresentar 0% na coluna de *Concluídos*, uma vez que o regulamento exige um tempo mínimo para a realização de defesas (12 meses para o Mestrado e 24 meses para o Doutorado).
 * **Regra da Categoria "Com Prorrogação":** A barra **"Com prorrogação"** contabiliza qualquer discente da turma que tenha recebido concessão de prazo extra ao longo de sua trajetória, independentemente de seu status atual (seja ele ativo, concluído, trancado ou desligado).
+
+---
+
+## 8. Painel por Professor
+
+### **Como Navegar e Filtrar**
+1. Na central de **Acompanhamento**, clique em **Painel por Professor**.
+2. Em **Nível**, escolha **Mestrado** ou **Doutorado**.
+3. Para ver um professor específico, escolha o nome em **Professor**. Se deixar **Todos os professores**, será exibido um resumo geral.
+4. Se quiser limitar a consulta às turmas de alguns anos, preencha **Ano inicial** e **Ano final** (por exemplo, `2024` e `2026`). Para incluir todos os anos, deixe os dois campos em branco.
+5. Clique em **Filtrar**.
+
+Quando um professor específico é selecionado, a tela também mostra os indicadores por turma e a previsão de conclusão dos alunos ativos.
+
+![Painel por Professor com dados fictícios](imagens/08-painel-por-professor.png)
+
+### **Como Interpretar**
+* **Prazo vencido:** mostra quantos alunos já passaram da data limite original para a defesa. O número não considera prorrogações ou trancamentos. Portanto, não significa necessariamente que o aluno foi desligado ou que seu prazo atualizado terminou.
+* **Sem base:** aparece quando nenhum aluno tem prazo vencido. Sem esses casos, o sistema não consegue calcular a taxa de sucesso. Isso não quer dizer que a taxa seja zero.
+* **Previsão de conclusão:** indica em que semestre os alunos ativos poderão concluir, considerando as prorrogações e os trancamentos registrados. Na lista, **Prazo vencido** indica que a data calculada já passou; **Sem previsão** indica que não foi possível calcular uma data.
