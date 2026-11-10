@@ -15,6 +15,7 @@ Este manual tem como objetivo orientar a Secretaria do PPGEC no uso diário do *
    * **Carga de Orientação**
    * **Calendário de Marcos**
    * **Painel de Sucesso por Turma**
+   * **Painel por Professor**, só para o docente coordenador e para a Coordenação PPG
 
 ![Central de Navegação do Acompanhamento](imagens/01-menu-acompanhamento.png)
 
@@ -142,6 +143,8 @@ As 7 categorias exibidas por turma são:
 ---
 
 ## 8. Painel por Professor
+
+Esta tela aparece só para o docente coordenador e para os membros da Coordenação PPG. Para os outros perfis, o cartão não aparece na central de Acompanhamento.
 
 ### **Como Navegar e Filtrar**
 1. Na central de **Acompanhamento**, clique em **Painel por Professor**.
