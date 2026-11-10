@@ -1,6 +1,7 @@
 from datetime import date
 
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -11,22 +12,37 @@ from .decoradores import tela_do_modulo
 from .forms import MarcoCalendarioForm
 from .lista_alunos import cartao_alunos_irregulares
 from .models import ExecucaoAviso, MarcoCalendario
+from .permissoes import pode_ver_painel_professores
+from .previsao_conclusao import calcular_previsao_conclusao
 from .servicos import (
     calcular_painel_docentes,
     calcular_painel_processos,
+    calcular_painel_professores,
     calcular_painel_sucesso_turma,
     validar_semestre,
 )
-from .telas import TELAS
+from .telas import TELAS, TELA_PAINEL_PROFESSORES
 
 
 @tela_do_modulo
 def inicio(request):
     """Página inicial do módulo, com a lista das telas disponíveis."""
+    # Monta a lista base com as telas padrão
     telas = [
         {"titulo": titulo, "descricao": descricao, "endereco": reverse(rota), "icone": icone}
         for titulo, descricao, rota, icone in TELAS
     ]
+
+    # Acrescenta o cartão do Painel por Professor apenas para quem tem permissão
+    if pode_ver_painel_professores(request.user):
+        titulo, descricao, rota, icone = TELA_PAINEL_PROFESSORES
+        telas.append({
+            "titulo": titulo,
+            "descricao": descricao,
+            "endereco": reverse(rota),
+            "icone": icone,
+        })
+
     contexto = {
         "telas": telas,
         "cartao_irregulares": cartao_alunos_irregulares(),
@@ -245,10 +261,82 @@ def painel_sucesso_turma(request):
 
     contexto = {
         "nivel_selecionado": nivel_selecionado,
-        "ano_inicial": request.GET.get("ano_inicial", ""),
-        "ano_final": request.GET.get("ano_final", ""),
+        "ano_inicial": ano_inicial or "",
+        "ano_final": ano_final or "",
         "turmas": turmas,
         "turmas_grafico": turmas_grafico,
         "alerta_dados_limitados": alerta_dados_limitados,
     }
     return render(request, "acompanhamento/painel_sucesso_turma.html", contexto)
+
+
+@tela_do_modulo
+def painel_professores(request):
+    """Exibe o painel de acompanhamento de discentes agrupado por professor."""
+    if not pode_ver_painel_professores(request.user):
+        raise PermissionDenied
+
+    nivel = request.GET.get("nivel", "MESTRADO")
+    orientador_id_raw = request.GET.get("orientador_id", "")
+    ano_inicial = request.GET.get("ano_inicial", "").strip() or None
+    ano_final = request.GET.get("ano_final", "").strip() or None
+
+    orientador_id = int(orientador_id_raw) if orientador_id_raw.isdigit() else None
+
+    erros_filtro = []
+    dados_painel = None
+    turmas = []
+    turmas_grafico = []
+    alerta_dados_limitados = False
+    professores = []
+    dados_previsao = None
+
+    try:
+        dados_painel = calcular_painel_professores(
+            nivel=nivel,
+            ano_inicial=ano_inicial,
+            ano_final=ano_final,
+        )
+
+        professores = [
+            {"id": linha["orientador_id"], "nome": linha["nome"]}
+            for linha in dados_painel.get("linhas", [])
+            if linha.get("orientador_id") is not None
+        ]
+
+        if orientador_id:
+            turmas = calcular_painel_sucesso_turma(
+                nivel=nivel,
+                ano_inicial=ano_inicial,
+                ano_final=ano_final,
+                orientador_id=orientador_id,
+            )
+            for turma in turmas:
+                turma["barras"] = _barras_da_turma(turma)
+
+            turmas_grafico = list(reversed(turmas))
+            alerta_dados_limitados = any(t.get("dados_limitados") for t in turmas)
+
+            dados_previsao = calcular_previsao_conclusao(
+                orientador_id=orientador_id,
+                nivel=nivel,
+            )
+
+    except ValueError as e:
+        erros_filtro.append(str(e))
+
+    contexto = {
+        "nivel_selecionado": nivel,
+        "orientador_id": orientador_id,
+        "ano_inicial": ano_inicial or "",
+        "ano_final": ano_final or "",
+        "professores_list": professores,
+        "dados_painel": dados_painel,
+        "turmas": turmas,
+        "turmas_grafico": turmas_grafico,
+        "alerta_dados_limitados": alerta_dados_limitados,
+        "dados_previsao": dados_previsao,
+        "erros_filtro": erros_filtro,
+    }
+
+    return render(request, "acompanhamento/painel_professores.html", contexto)
