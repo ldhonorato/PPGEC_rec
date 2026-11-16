@@ -7027,6 +7027,7 @@ class MenuDaContaFechaTests(SimpleTestCase):
         self.assertIn("resumo.focus()", self.base)
 
 
+@override_settings(ACOMPANHAMENTO_ATIVO=True)
 class MenuMarcaItemAtivoTests(TestCase):
     """Toda tela acende exatamente um item da barra lateral.
 

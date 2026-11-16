@@ -2984,6 +2984,10 @@ def aluno_detalhe_view(request, aluno_id):
             else:
                 trajetoria_registro = trajetoria_atual
             pendencias = _pendencias_registro_marco(trajetoria_registro, marco)
+            if (marco == "qualificacao" and trajetoria_registro and trajetoria_registro.isQualificado
+                    and acao != "registrar_apresentacao_qualificacao"):
+                # Editing another field must not ask to confirm an already recorded milestone.
+                pendencias = []
             if pendencias:
                 if request.POST.get("confirmar_pendencias_integralizacao") != "1":
                     return render(request, "processos/confirmar_registro_marco.html", {
