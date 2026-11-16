@@ -23,7 +23,9 @@ WORKDIR /app
 COPY requirements.txt ./
 
 RUN pip install --upgrade pip \
-	&& pip install --no-cache-dir -r requirements.txt gunicorn
+	&& pip install --no-cache-dir -r requirements.txt \
+	&& pip check \
+	&& python -c "from kombu.transport.redis import Channel; Channel.__new__(Channel)._get_client()"
 
 COPY . .
 
