@@ -142,6 +142,8 @@ jobs:
           done
           echo "$registradas"
           echo "A tarefa $tarefa não aparece em inspect registered"
+          docker inspect -f 'estado={{.State.Status}} código={{.State.ExitCode}} erro={{.State.Error}} oom={{.State.OOMKilled}}' ppgec_celery || true
+          docker compose logs --no-color --tail=100 celery || true
           exit 1
 
       - name: Com o módulo ligado e o aviso desligado, a tarefa não faz nada

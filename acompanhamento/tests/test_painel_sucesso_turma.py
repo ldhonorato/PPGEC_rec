@@ -357,3 +357,132 @@ class PainelSucessoTurmaServicoTests(TestCase):
         )
         turmas_so_final = [item["turma"] for item in so_final if item["turma"].startswith("209")]
         self.assertEqual(turmas_so_final, ["2090.2", "2090.1"])
+
+    def test_arredondamento_taxas_quatro_categorias_principais(self):
+        """
+        Verifica se a redistribuição de resíduos das quatro categorias principais
+        soma 100.0% e confere os valores exatos de cada percentual.
+        """
+        turma = "2094.1"
+        data_ref = date(2099, 1, 1)
+
+        # 3 ingressantes: 1 concluído, 1 desligado e 1 ativo regular
+        # Sem ajuste: 33.3 + 33.3 + 0 + 33.3 = 99.9%
+        # Com ajuste: concluídos recebe o resíduo -> 33.4%
+        a1 = Aluno.objects.create_user(email="conc_antigo@teste.invalid", nome="C Antigo")
+        TrajetoriaAcademica.objects.create(
+            aluno=a1,
+            nivel_curso=Aluno.NivelCurso.MESTRADO,
+            status=TrajetoriaAcademica.Status.CONCLUIDA,
+            ingresso=turma,
+            data_ingresso=date(2094, 3, 1),
+            isQualificado=True,
+            numero_defesa="DEF-94",
+            data_defesa=date(2095, 3, 1),
+        )
+
+        a2 = Aluno.objects.create_user(email="desl_antigo@teste.invalid", nome="D Antigo")
+        TrajetoriaAcademica.objects.create(
+            aluno=a2,
+            nivel_curso=Aluno.NivelCurso.MESTRADO,
+            status=TrajetoriaAcademica.Status.DESLIGADA,
+            ingresso=turma,
+            data_ingresso=date(2094, 3, 1),
+        )
+
+        a3 = Aluno.objects.create_user(email="ativo_antigo@teste.invalid", nome="A Antigo")
+        TrajetoriaAcademica.objects.create(
+            aluno=a3,
+            nivel_curso=Aluno.NivelCurso.MESTRADO,
+            status=TrajetoriaAcademica.Status.ATIVA,
+            ingresso=turma,
+            data_ingresso=date(2098, 1, 1),
+        )
+
+        dados = calcular_painel_sucesso_turma(Aluno.NivelCurso.MESTRADO, data_referencia=data_ref)
+        turma_dados = next((t for t in dados if t["turma"] == turma), None)
+        self.assertIsNotNone(turma_dados)
+
+        self.assertEqual(turma_dados["taxa_conclusao"], 33.4)
+        self.assertEqual(turma_dados["taxa_desligamento"], 33.3)
+        self.assertEqual(turma_dados["taxa_ativos"], 33.3)
+        self.assertEqual(turma_dados["taxa_ativos_regulares"], 33.3)
+        self.assertEqual(turma_dados["taxa_ativos_irregulares"], 0.0)
+
+        soma_principais = round(
+            turma_dados["taxa_conclusao"]
+            + turma_dados["taxa_desligamento"]
+            + turma_dados["taxa_trancamento"]
+            + turma_dados["taxa_ativos"],
+            1,
+        )
+        self.assertEqual(soma_principais, 100.0)
+
+    def test_arredondamento_taxas_ajuste_dos_ativos(self):
+        """
+        Verifica se a distribuição interna dos ativos fecha exatamente na taxa de ativos
+        quando há empate de dízima entre regulares e irregulares.
+        """
+        turma = "2095.1"
+        data_ref = date(2099, 6, 1)
+
+        # 3 ingressantes: 1 concluído, 1 ativo regular e 1 ativo irregular
+        # Concluídos: 33.3%, Ativos: 66.7%
+        # Sem ajuste nos ativos: 33.3 + 33.3 = 66.6% (falta 0.1)
+        # Com ajuste: regular desempata para cima -> 33.4% e irregular 33.3%
+        a_conc = Aluno.objects.create_user(email="conc_arr@teste.invalid", nome="C Arr")
+        TrajetoriaAcademica.objects.create(
+            aluno=a_conc,
+            nivel_curso=Aluno.NivelCurso.MESTRADO,
+            status=TrajetoriaAcademica.Status.CONCLUIDA,
+            ingresso=turma,
+            data_ingresso=date(2095, 3, 1),
+            isQualificado=True,
+            numero_defesa="DEF-95",
+            data_defesa=date(2096, 3, 1),
+        )
+
+        a_reg = Aluno.objects.create_user(email="ativo_reg_arr@teste.invalid", nome="A Reg Arr")
+        TrajetoriaAcademica.objects.create(
+            aluno=a_reg,
+            nivel_curso=Aluno.NivelCurso.MESTRADO,
+            status=TrajetoriaAcademica.Status.ATIVA,
+            ingresso=turma,
+            data_ingresso=date(2099, 1, 1),
+        )
+
+        a_irreg = Aluno.objects.create_user(email="ativo_irreg_arr@teste.invalid", nome="A Irreg Arr")
+        TrajetoriaAcademica.objects.create(
+            aluno=a_irreg,
+            nivel_curso=Aluno.NivelCurso.MESTRADO,
+            status=TrajetoriaAcademica.Status.ATIVA,
+            ingresso=turma,
+            data_ingresso=date(2095, 1, 1),
+        )
+
+        dados = calcular_painel_sucesso_turma(Aluno.NivelCurso.MESTRADO, data_referencia=data_ref)
+        turma_dados = next((t for t in dados if t["turma"] == turma), None)
+        self.assertIsNotNone(turma_dados)
+
+        self.assertEqual(turma_dados["taxa_conclusao"], 33.3)
+        self.assertEqual(turma_dados["taxa_desligamento"], 0.0)
+        self.assertEqual(turma_dados["taxa_trancamento"], 0.0)
+        self.assertEqual(turma_dados["taxa_ativos"], 66.7)
+
+        self.assertEqual(turma_dados["taxa_ativos_regulares"], 33.4)
+        self.assertEqual(turma_dados["taxa_ativos_irregulares"], 33.3)
+
+        soma_principais = round(
+            turma_dados["taxa_conclusao"]
+            + turma_dados["taxa_desligamento"]
+            + turma_dados["taxa_trancamento"]
+            + turma_dados["taxa_ativos"],
+            1,
+        )
+        self.assertEqual(soma_principais, 100.0)
+
+        soma_ativos = round(
+            turma_dados["taxa_ativos_regulares"] + turma_dados["taxa_ativos_irregulares"],
+            1,
+        )
+        self.assertEqual(soma_ativos, turma_dados["taxa_ativos"])

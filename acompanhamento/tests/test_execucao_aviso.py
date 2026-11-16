@@ -45,13 +45,23 @@ class RegistroDaExecucaoTests(TestCase):
 
     def test_cada_vez_que_roda_registra_uma_execucao(self):
         aluno_de_mestrado("Aluno Atrasado", -30)
+
         rodar_aviso_diario(HOJE)
         rodar_aviso_diario(HOJE)
 
         self.assertEqual(ExecucaoAviso.objects.count(), 2)
-        ultima, primeira = ExecucaoAviso.objects.all()
-        self.assertEqual((primeira.avisos_novos, primeira.emails_enviados), (1, 1))
-        self.assertEqual((ultima.avisos_novos, ultima.emails_enviados), (0, 0))
+
+        primeira, ultima = ExecucaoAviso.objects.order_by("pk")
+
+        self.assertEqual(
+            (primeira.avisos_novos, primeira.emails_enviados),
+            (1, 1),
+        )
+
+        self.assertEqual(
+            (ultima.avisos_novos, ultima.emails_enviados),
+            (0, 0),
+        )
 
     def test_envio_que_falha_aparece_como_pendente(self):
         aluno_de_mestrado("Aluno Atrasado", -30)
