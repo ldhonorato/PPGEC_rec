@@ -22,10 +22,10 @@ Parametros (todos opcionais, exceto trajetorias):
         <table class="tabela">
             <thead>
                 <tr>
-                    <th scope="col">Aluno</th>
+                    <th scope="col">Aluno(a)</th>
                     <th scope="col">Nível</th>
                     <th scope="col">Ingresso</th>
-                    {% if mostrar_orientador %}<th scope="col">Orientador</th>{% endif %}
+                    {% if mostrar_orientador %}<th scope="col">Orientador(a)</th>{% endif %}
                     {% if mostrar_papel %}<th scope="col">Seu papel</th>{% endif %}
                 </tr>
             </thead>
@@ -46,11 +46,11 @@ Parametros (todos opcionais, exceto trajetorias):
                         {% if mostrar_papel %}
                             <td class="celula-apoio">
                                 {% if trajetoria.orientador_id == user.id and trajetoria.coorientador_id == user.id %}
-                                    Orientador e coorientador
+                                    Orientador(a) e coorientador(a)
                                 {% elif trajetoria.orientador_id == user.id %}
-                                    Orientador
+                                    Orientador(a)
                                 {% elif trajetoria.coorientador_id == user.id %}
-                                    Coorientador
+                                    Coorientador(a)
                                 {% else %}
                                     —
                                 {% endif %}

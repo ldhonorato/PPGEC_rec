@@ -103,4 +103,4 @@ class GerarDadosFicticiosTests(TestCase):
         rodar()
         rodar()
         trajetorias = TrajetoriaAcademica.objects.filter(aluno__email__endswith=DOMINIO)
-        self.assertEqual(trajetorias.count(), 32)
+        self.assertEqual(trajetorias.count(), 36)

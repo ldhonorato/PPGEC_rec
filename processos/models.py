@@ -46,9 +46,9 @@ class UserManager(BaseUserManager):
 
 class User(AbstractUser):
     class TipoUsuario(models.TextChoices):
-        ALUNO = "ALUNO", "Aluno"
+        ALUNO = "ALUNO", "Aluno(a)"
         DOCENTE = "DOCENTE", "Docente"
-        SERVIDOR = "SERVIDOR", "Servidor"
+        SERVIDOR = "SERVIDOR", "Servidor(a)"
         BOLSISTA_VOLUNTARIO = "BOLSISTA_VOLUNTARIO", "Bolsista/Voluntário"
 
     username = None
@@ -92,7 +92,7 @@ class Aluno(User):
         MESTRADO = "MESTRADO", "Mestrado"
         DOUTORADO = "DOUTORADO", "Doutorado"
         POSDOUTORADO = "POSDOUTORADO", "Pós-Doutorado"
-        ALUNO_ESPECIAL = "ALUNO_ESPECIAL", "Aluno especial"
+        ALUNO_ESPECIAL = "ALUNO_ESPECIAL", "Aluno(a) especial"
 
     class SexoAtribuidoNascimento(models.TextChoices):
         FEMININO = "FEMININO", "Feminino"
@@ -131,14 +131,14 @@ class Aluno(User):
     )
 
     class Meta:
-        verbose_name = "Aluno"
-        verbose_name_plural = "Alunos"
+        verbose_name = "Aluno(a)"
+        verbose_name_plural = "Alunos(as)"
 
     def clean(self):
         errors = {}
 
         if self.tipo_usuario and self.tipo_usuario != User.TipoUsuario.ALUNO:
-            errors["tipo_usuario"] = "Aluno deve ter tipo_usuario ALUNO."
+            errors["tipo_usuario"] = "Aluno(a) deve ter tipo_usuario ALUNO."
         if self.cpf and not validar_cpf_brasileiro(self.cpf):
             errors["cpf"] = "Informe um CPF válido."
 
@@ -212,6 +212,7 @@ class Docente(User):
 
 
 class TrajetoriaAcademica(models.Model):
+    registro_defesa_com_pendencias = models.BooleanField(default=False)
     class Status(models.TextChoices):
         EM_HOMOLOGACAO = "EM_HOMOLOGACAO", "Em homologação"
         ATIVA = "ATIVA", "Ativa"
@@ -411,14 +412,14 @@ class TrajetoriaAcademica(models.Model):
         if self.orientador and self.orientador.tipo_usuario != User.TipoUsuario.DOCENTE:
             errors["orientador"] = "O responsável deve ser um docente do PPGEC."
         if self.usa_supervisao and not self.orientador:
-            errors["orientador"] = "Informe o supervisor do Pós-Doutorado."
+            errors["orientador"] = "Informe o(a) supervisor(a) do Pós-Doutorado."
         if self.coorientador and self.coorientador.tipo_usuario != User.TipoUsuario.DOCENTE:
-            errors["coorientador"] = "Coorientador deve ser um usuário do tipo DOCENTE."
+            errors["coorientador"] = "Coorientador(a) deve ser um(a) usuário(a) do tipo DOCENTE."
         if self.coorientador and self.coorientador_externo_nome.strip():
-            errors["coorientador"] = "Informe coorientador cadastrado ou coorientador externo, não ambos."
-            errors["coorientador_externo_nome"] = "Informe coorientador cadastrado ou coorientador externo, não ambos."
+            errors["coorientador"] = "Informe coorientador(a) cadastrado(a) ou coorientador(a) externo(a), não ambos."
+            errors["coorientador_externo_nome"] = "Informe coorientador(a) cadastrado(a) ou coorientador(a) externo(a), não ambos."
         if self.coorientador and self.orientador_id == self.coorientador_id:
-            errors["coorientador"] = "Coorientador deve ser diferente do orientador."
+            errors["coorientador"] = "Coorientador(a) deve ser diferente do(a) orientador(a)."
 
         if not self.coorientador_externo_nome.strip():
             self.coorientador_externo_email = ""
@@ -443,11 +444,12 @@ class TrajetoriaAcademica(models.Model):
                 errors["data_defesa"] = (
                     f"Informe a {self.data_conclusao_label.lower()} para concluir a trajetória."
                 )
-            if self.usa_prazos_academicos and self.data_ingresso and not self.isQualificado:
+            if (self.usa_prazos_academicos and self.data_ingresso and not self.isQualificado
+                    and not self.registro_defesa_com_pendencias):
                 errors["isQualificado"] = (
                     f"A aprovação no {self.qualificacao_label_lower} é obrigatória antes da defesa."
                 )
-            elif self.data_minima_defesa and self.data_defesa < self.data_minima_defesa:
+            elif self.data_minima_defesa and self.data_defesa and self.data_defesa < self.data_minima_defesa:
                 errors["data_defesa"] = (
                     f"A defesa só pode ocorrer a partir de {self.data_minima_defesa:%d/%m/%Y}."
                 )
@@ -553,6 +555,7 @@ class TrancamentoTrajetoria(models.Model):
 
 
 class ApresentacaoQualificacao(models.Model):
+    registro_com_pendencias = models.BooleanField(default=False)
     class Conceito(models.TextChoices):
         A = "A", "A"
         B = "B", "B"
@@ -599,7 +602,7 @@ class ApresentacaoQualificacao(models.Model):
             creditos = self.trajetoria.disciplinas.filter(
                 situacao=DisciplinaTrajetoria.Situacao.APROVADA
             ).aggregate(total=models.Sum("creditos"))["total"] or 0
-            if creditos < 12:
+            if creditos < 12 and not self.registro_com_pendencias:
                 errors["trajetoria"] = "O projeto exige pelo menos 12 créditos aprovados em disciplinas (50%)."
         if errors:
             raise ValidationError(errors)
@@ -1303,8 +1306,8 @@ class AlteracaoAluno(models.Model):
         DEPOSITO_FINAL = "DEPOSITO_FINAL", "Depósito versão final"
         PRAZO_QUALIFICACAO = "PRAZO_QUALIFICACAO", "Prazo qualificação"
         PRAZO_DEFESA = "PRAZO_DEFESA", "Prazo defesa"
-        ORIENTADOR = "ORIENTADOR", "Orientador"
-        COORIENTADOR = "COORIENTADOR", "Coorientador"
+        ORIENTADOR = "ORIENTADOR", "Orientador(a)"
+        COORIENTADOR = "COORIENTADOR", "Coorientador(a)"
         REINGRESSO = "REINGRESSO", "Reingresso"
         TRAJETORIA = "TRAJETORIA", "Trajetória acadêmica"
         ESTAGIO_DOCENCIA = "ESTAGIO_DOCENCIA", "Estágio docência"
@@ -1735,7 +1738,7 @@ class SolicitacaoBanca(models.Model):
         if self.docente and self.docente.tipo_usuario != User.TipoUsuario.DOCENTE:
             errors["docente"] = "Solicitação de banca deve ser criada por docente."
         if self.trajetoria_id and self.aluno_id and self.trajetoria.aluno_id != self.aluno_id:
-            errors["trajetoria"] = "A trajetória selecionada não pertence ao aluno informado."
+            errors["trajetoria"] = "A trajetória selecionada não pertence ao(a) aluno(a) informado(a)."
         if self.trajetoria_id and self.docente_id:
             docente_vinculado = self.trajetoria.orientador_id == self.docente_id or self.trajetoria.coorientador_id == self.docente_id
             if not docente_vinculado:
@@ -1762,7 +1765,7 @@ class SolicitacaoBanca(models.Model):
             if not self.ciencia_recomendacao_mpf:
                 errors["ciencia_recomendacao_mpf"] = "Confirme a ciência da recomendação."
             if not self.finalizado_por_id:
-                errors["finalizado_por"] = "Informe o usuário responsável pela finalização."
+                errors["finalizado_por"] = "Informe o(a) usuário(a) responsável pela finalização."
             if not self.finalizado_em:
                 errors["finalizado_em"] = "Informe a data de finalização."
 
@@ -2153,6 +2156,7 @@ class Processo(models.Model):
 
     class TipoProcesso(models.TextChoices):
         APROVEITAMENTO_DISPENSA_CREDITOS = "APROVEITAMENTO_DISPENSA_CREDITOS", "Aproveitamento de Créditos ou Dispensa de Disciplina"
+        ENTREGA_PROJETO_DISSERTACAO = "ENTREGA_PROJETO_DISSERTACAO", "Entrega de Projeto de Dissertação"
         DEFESA_MESTRADO = "DEFESA_MESTRADO", "Defesa de Mestrado"
         DEFESA_DOUTORADO = "DEFESA_DOUTORADO", "Defesa de Doutorado"
         QUALIFICACAO_DOUTORADO = "QUALIFICACAO_DOUTORADO", "Qualificação de Doutorado"
@@ -2183,6 +2187,15 @@ class Processo(models.Model):
         null=True,
         blank=True,
         help_text="Discente a quem o processo se refere, independentemente de quem realizou a abertura.",
+    )
+    destinatario_devolucao = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="processos_aguardando_acao",
+        verbose_name="Responsável pela ação solicitada",
+    )
+    setor_acompanhamento = models.ForeignKey(
+        Setor, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="processos_devolvidos",
     )
     tipo = models.CharField(max_length=40, choices=TipoProcesso.choices)
     assunto = models.CharField(max_length=255)
@@ -2326,21 +2339,21 @@ class Processo(models.Model):
     def solicitar_ciente_orientador(self, *, solicitado_por, mensagem_solicitacao: str = ""):
         orientador = self.obter_orientador_responsavel()
         if not orientador:
-            raise ValidationError("Processo sem orientador definido para solicitar ciente.")
+            raise ValidationError("Processo sem orientador(a) definido(a) para solicitar ciente.")
 
         ciente_registrado = self.manifestacoes.filter(
             tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
             status=ManifestacaoProcesso.StatusManifestacao.CIENTE,
         ).exists()
         if ciente_registrado:
-            raise ValidationError("O orientador já manifestou ciência neste processo.")
+            raise ValidationError("O(a) orientador(a) já manifestou ciência neste processo.")
 
         pendente = self.manifestacoes.filter(
             tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
             status=ManifestacaoProcesso.StatusManifestacao.PENDENTE,
         ).exists()
         if pendente:
-            raise ValidationError("Já existe solicitação de ciente do orientador pendente.")
+            raise ValidationError("Já existe solicitação de ciente do(a) orientador(a) pendente.")
 
         manifestacao = ManifestacaoProcesso.objects.create(
             processo=self,
@@ -2358,7 +2371,7 @@ class Processo(models.Model):
     def registrar_ciencia_espontanea_orientador(self, *, orientador, mensagem: str = ""):
         orientador_responsavel = self.obter_orientador_responsavel()
         if not orientador_responsavel or orientador.id != orientador_responsavel.id:
-            raise ValidationError("Apenas o orientador responsável pode manifestar ciência.")
+            raise ValidationError("Apenas o(a) orientador(a) responsável pode manifestar ciência.")
 
         if self.manifestacoes.filter(
             tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
@@ -2387,6 +2400,7 @@ class Processo(models.Model):
         observacao: str = "",
         status_resultante: str | None = None,
         prazo_limite: models.DateField | None = None,  #Parâmetro para receber a data exata
+        destinatario_devolucao=None,
     ):
         if self.esta_finalizado:
             raise ValidationError("Não e permitido encaminhar processo finalizado.")
@@ -2394,7 +2408,7 @@ class Processo(models.Model):
             tipo=ManifestacaoProcesso.TipoManifestacao.CIENTE_ORIENTADOR,
             status=ManifestacaoProcesso.StatusManifestacao.PENDENTE,
         ).exists():
-            raise ValidationError("Não e permitido encaminhar com ciente do orientador pendente.")
+            raise ValidationError("Não e permitido encaminhar com ciente do(a) orientador(a) pendente.")
 
         # Exige data limite se o destino for o Pleno 
         if setor_destino and "pleno" in (setor_destino.nome or "").lower():
@@ -2409,15 +2423,25 @@ class Processo(models.Model):
 
         status_novo = status_resultante or self.StatusProcesso.EM_ANALISE
         setor_origem = self.setor_atual
+        devolvendo = setor_destino.nome == "Requerente"
+        if devolvendo:
+            if not destinatario_devolucao or destinatario_devolucao.pk not in {
+                self.usuario_criado_por_id, self.aluno_interessado_id,
+            }:
+                raise ValidationError("Selecione o requerente ou o(a) aluno(a) interessado(a) para receber a devolução.")
+            status_novo = self.StatusProcesso.AGUARDANDO_DOCUMENTO
 
         with transaction.atomic():
             self.setor_atual = setor_destino
             self.status = status_novo
+            self.destinatario_devolucao = destinatario_devolucao if devolvendo else None
+            self.setor_acompanhamento = setor_origem if devolvendo else None
             
             if prazo_limite:
                 self.prazo_limite = prazo_limite
                 
-            self.save(update_fields=["setor_atual", "status", "prazo_limite", "atualizado_em"])
+            self.save(update_fields=["setor_atual", "status", "prazo_limite", "atualizado_em",
+                                     "destinatario_devolucao", "setor_acompanhamento"])
 
             return TramitacaoProcesso.objects.create(
                 processo=self,
@@ -2426,6 +2450,7 @@ class Processo(models.Model):
                 encaminhado_por=encaminhado_por,
                 observacao=observacao,
                 status_resultante=status_novo,
+                destinatario_devolucao=destinatario_devolucao if devolvendo else None,
             )
 
     def finalizar(self, *, termo_finalizacao: str, status_final: str | None = None):
@@ -2605,6 +2630,10 @@ class Documento(models.Model):
 
 
 class TramitacaoProcesso(models.Model):
+    destinatario_devolucao = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="devolucoes_recebidas",
+    )
     processo = models.ForeignKey(
         Processo,
         on_delete=models.CASCADE,
@@ -2645,7 +2674,7 @@ class TramitacaoProcesso(models.Model):
 
 class ManifestacaoProcesso(models.Model):
     class TipoManifestacao(models.TextChoices):
-        CIENTE_ORIENTADOR = "CIENTE_ORIENTADOR", "Ciente do orientador"
+        CIENTE_ORIENTADOR = "CIENTE_ORIENTADOR", "Ciente do(a) orientador(a)"
 
     class StatusManifestacao(models.TextChoices):
         PENDENTE = "PENDENTE", "Pendente"
@@ -3023,7 +3052,7 @@ class EstagioDocencia(models.Model):
 
     class Status(models.TextChoices):
         NAO_INICIADO = "NAO_INICIADO", "Não Iniciado"
-        AGUARD_CIENCIA = "AGUARD_CIENCIA", "Aguardando Ciente do Orientador"
+        AGUARD_CIENCIA = "AGUARD_CIENCIA", "Aguardando Ciente do(a) Orientador(a)"
         AGUARD_ASSINATURA = "AGUARD_ASSINATURA", "Aguardando Aprovação da Coordenação"
         ANALISE_DISP = "ANALISE_DISP", "Em Análise de Dispensa"
         DISPENSADO = "DISPENSADO", "Dispensado"
@@ -3041,7 +3070,7 @@ class EstagioDocencia(models.Model):
     supervisor = models.CharField(
         max_length=255,
         blank=True,
-        verbose_name="Nome do Supervisor"
+        verbose_name="Nome do(a) Supervisor(a)"
     ) 
     
     processo_vinculado = models.OneToOneField(
@@ -3120,7 +3149,7 @@ class DeclaracaoDeVinculo(models.Model):
         Aluno,
         on_delete=models.CASCADE,
         related_name="declaracoes_de_vinculo",
-        verbose_name="Aluno",
+        verbose_name="Aluno(a)",
     )
     periodo = models.ForeignKey(
         PeriodoLetivo,

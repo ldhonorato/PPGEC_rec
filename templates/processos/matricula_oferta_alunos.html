@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Alunos da Oferta | AcadFlow{% endblock %}
+{% block title %}Alunos(as) da Oferta | AcadFlow{% endblock %}
 {% block content %}
 <section class="card panel">
     <div class="actions-row">
@@ -28,7 +28,7 @@
 </section>
 
 <section class="card">
-    <h2 class="section-title">Alunos</h2>
+    <h2 class="section-title">Alunos(as)</h2>
     {% if itens %}
         <ul class="list">
             {% for item in itens %}
@@ -68,7 +68,7 @@
         <div class="estado-vazio">
     <svg aria-hidden="true"><use href="#i-matricula"></use></svg>
     <p class="estado-vazio-titulo">Nenhuma matrícula solicitada</p>
-    <p>As solicitações dos alunos para esta oferta aparecem aqui.</p>
+    <p>As solicitações dos(as) alunos(as) para esta oferta aparecem aqui.</p>
 </div>
     {% endif %}
 </section>

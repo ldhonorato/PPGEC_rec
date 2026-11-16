@@ -7,13 +7,13 @@
 {% block content %}
 <section class="card">
     <h1 class="section-title">Acompanhamento</h1>
-    <p class="muted">Prazos dos alunos e indicadores do programa.</p>
+    <p class="muted">Prazos dos(as) alunos(as) e indicadores do programa.</p>
 
     {% if cartao_irregulares %}
         <a class="acomp-irregulares {% if cartao_irregulares.total %}tem-irregulares{% endif %}" href="{{ cartao_irregulares.endereco }}">
             <svg class="acomp-icone" aria-hidden="true"><use href="#i-alerta"></use></svg>
             <span class="acomp-irregulares-total">{{ cartao_irregulares.total }}</span>
-            <span class="acomp-irregulares-texto">aluno{{ cartao_irregulares.total|pluralize }} irregular{{ cartao_irregulares.total|pluralize:"es" }}</span>
+            <span class="acomp-irregulares-texto">aluno{{ cartao_irregulares.total|pluralize }}{{ cartao_irregulares.total|pluralize:"(a),(as)" }} irregular{{ cartao_irregulares.total|pluralize:"es" }}</span>
             <span class="acomp-irregulares-acao">Ver a lista</span>
         </a>
     {% endif %}
@@ -38,7 +38,7 @@
 
     <p class="muted acomp-aviso">
         {% if not aviso_ativo %}
-        O aviso diário de alunos atrasados está desligado.
+        O aviso diário de alunos(as) atrasados(as) está desligado.
         {% elif ultima_execucao_aviso %}
         Último aviso rodou em {{ ultima_execucao_aviso.executada_em|date:"d/m/Y H:i" }}:
         {{ ultima_execucao_aviso.avisos_novos }} aviso(s) novo(s),

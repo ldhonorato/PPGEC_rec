@@ -5,18 +5,18 @@
 <section class="card">
     <div class="secao-cabecalho">
         <h1 class="section-title">Declarações de vínculo</h1>
-        <a class="btn btn-secondary" href="{% url 'coordenacao_alunos' %}">Ver alunos</a>
+        <a class="btn btn-secondary" href="{% url 'coordenacao_alunos' %}">Ver alunos(as)</a>
     </div>
     <p class="muted">
         Envie os PDFs emitidos para o semestre. Cada arquivo deve ser nomeado com o
-        CPF do aluno — é por ele que o sistema encontra o destinatário.
+        CPF do(a) aluno(a) — é por esse número que o sistema identifica a pessoa destinatária.
     </p>
 
     <p class="formulario-aviso">
         <svg aria-hidden="true"><use href="#i-alerta"></use></svg>
         <span>
             A declaração vale apenas para o período escolhido abaixo. Ela aparece
-            para o aluno em <strong>Documento de Vínculo</strong> assim que o envio
+            para o(a) aluno(a) em <strong>Documento de Vínculo</strong> assim que o envio
             terminar.
         </span>
     </p>
@@ -59,7 +59,7 @@
             <div class="tabela-envolvido">
                 <table class="tabela">
                     <thead>
-                        <tr><th>Arquivo</th><th>Aluno</th><th>Motivo</th></tr>
+                        <tr><th>Arquivo</th><th>Aluno(a)</th><th>Motivo</th></tr>
                     </thead>
                     <tbody>
                         {% for item in recusados %}
@@ -85,7 +85,7 @@
                             {% if item.substituiu %}<span>Substituiu a anterior</span>{% endif %}
                         </span>
                         {% if item.invisivel_ao_aluno %}
-                            <span class="badge badge-aviso">Sem matrícula no período — o aluno ainda não vê</span>
+                            <span class="badge badge-aviso">Sem matrícula no período — o(a) aluno(a) ainda não vê</span>
                         {% endif %}
                     </li>
                 {% endfor %}
@@ -105,7 +105,7 @@
         <div class="tabela-envolvido">
             <table class="tabela">
                 <thead>
-                    <tr><th>Aluno</th><th>Matrícula</th><th>Enviada em</th><th class="celula-acoes">Arquivo</th></tr>
+                    <tr><th>Aluno(a)</th><th>Matrícula</th><th>Enviada em</th><th class="celula-acoes">Arquivo</th></tr>
                 </thead>
                 <tbody>
                     {% for declaracao in enviadas %}

@@ -102,7 +102,7 @@ def importar_ingressantes(*, arquivo, nivel_curso, ingresso):
             Q(cpf=cpf) | Q(nome__iexact=nome, trajetorias__ingresso=ingresso)
         ).distinct().first()
         if existente:
-            resultado["motivo"] = f"O aluno já possui cadastro ({existente.email})."
+            resultado["motivo"] = f"O(a) aluno(a) já possui cadastro ({existente.email})."
             resultados.append(resultado)
             continue
         if User.objects.filter(email__iexact=email).exists():
@@ -118,7 +118,7 @@ def importar_ingressantes(*, arquivo, nivel_curso, ingresso):
                 is_active=True,
             )
             if not orientador_nome or orientadores.count() != 1:
-                resultado["motivo"] = "Orientador não encontrado de forma única."
+                resultado["motivo"] = "Orientador(a) não encontrado(a) de forma única."
                 resultados.append(resultado)
                 continue
             orientador = orientadores.first()
