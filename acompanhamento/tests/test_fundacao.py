@@ -66,7 +66,7 @@ class PaginaInicialTests(TestCase):
         with patch("acompanhamento.views.cartao_alunos_irregulares", return_value=cartao):
             resposta = self.client.get(self.endereco)
 
-        self.assertContains(resposta, "alunos irregulares")
+        self.assertContains(resposta, "alunos(as) irregulares")
         self.assertContains(resposta, "/coordenacao/alunos/?marco=qualquer")
         self.assertContains(resposta, "Concluídos, desligados e ativos de cada turma.")
 

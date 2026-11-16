@@ -5,7 +5,7 @@
     <h2 style="color: white; margin: 0;">AcadFlow — {% if resposta %}Resposta no debate{% else %}Debate aberto{% endif %} — Processo {{processo.numero}}</h2>
   </div>
   <div style="background: #f9f9f9; padding: 28px; border-radius: 0 0 8px 8px;">
-    <p>Olá, Professor.</p>
+    <p>Olá, Professor(a).</p>
     {% if resposta %}
       <p>O debate deste processo recebeu uma nova resposta.</p>
     {% else %}
@@ -29,7 +29,7 @@
         <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{processo.assunto}}</td>
       </tr>
       <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Aluno</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight:bold;">Aluno(a)</td>
         <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{aluno.nome}}</td>
       </tr>
       <tr>

@@ -27,8 +27,8 @@ TELAS = [
         "i-setores",
     ),
     (
-        "Carga de Orientação",
-        "Alunos por orientador.",
+        "Dashboard",
+        "Indicadores do programa e distribuição de alunos(as) por orientador(a).",
         "coordenacao_dashboard",
         "i-orientandos",
     ),
@@ -43,7 +43,7 @@ TELAS = [
 # Registrada separadamente para que a view inicio só adicione o cartão
 # para quem possui a permissão pode_ver_painel_professores
 TELA_PAINEL_PROFESSORES = (
-    "Painel por Professor",
+    "Painel por Professor(a)",
     "Turmas, prazos, defesas e previsão de conclusão por docente.",
     "acompanhamento:painel_professores",
     "i-orientandos",

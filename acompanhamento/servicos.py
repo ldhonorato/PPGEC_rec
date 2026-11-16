@@ -468,7 +468,7 @@ def calcular_painel_sucesso_turma(
     return resultado
 
 
-SEM_ORIENTADOR = "Sem orientador"
+SEM_ORIENTADOR = "Sem orientador(a)"
 
 _CONTAGENS_PROFESSOR = (
     "alunos",

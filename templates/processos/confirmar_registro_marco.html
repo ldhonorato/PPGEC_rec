@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Confirmar registro acadêmico | AcadFlow{% endblock %}
+{% block content %}
+<section class="card">
+    <h1 class="section-title">Confirmar registro de {{ marco }}</h1>
+    <p>Os registros de <strong>{{ aluno.nome }}</strong> no AcadFlow ainda não comprovam todos os requisitos de integralização:</p>
+    <ul>{% for pendencia in pendencias %}<li>{{ pendencia }}</li>{% endfor %}</ul>
+    <p>Durante a migração, informações já existentes podem ainda não estar cadastradas. Deseja registrar {{ marco }} mesmo com essas pendências?</p>
+    <p class="muted">A confirmação ficará registrada no histórico. As disciplinas e demais pendências continuarão visíveis para atualização posterior.</p>
+    <form method="post" class="formulario">
+        {% csrf_token %}
+        {% for chave, valor in dados %}<input type="hidden" name="{{ chave }}" value="{{ valor }}">{% endfor %}
+        <input type="hidden" name="confirmar_pendencias_integralizacao" value="1">
+        <div class="formulario-acoes">
+            <a class="btn btn-secondary" href="{% url 'aluno_detalhe' aluno.pk %}">Cancelar</a>
+            <button class="btn" type="submit">Confirmar registro com pendências</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

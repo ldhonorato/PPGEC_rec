@@ -1,6 +1,7 @@
-"""Cartão "Alunos irregulares" na página inicial."""
+"""Cartão "Alunos(as) irregulares" na página inicial."""
 
 from datetime import date
+import re
 from unittest import mock
 
 from django.test import TestCase, override_settings
@@ -13,13 +14,13 @@ from acompanhamento.tests.test_linha_de_base import criar_perfis
 from acompanhamento.tests.test_lista_alunos import criar_aluno
 from processos.models import TrajetoriaAcademica
 
-TEXTO = "Alunos irregulares"
+TEXTO = "Alunos(as) irregulares"
 FUNCAO = "acompanhamento.lista_alunos.cartao_alunos_irregulares"
 
 
 def numero_do_cartao(total):
     """Padrão do número logo acima do rótulo do cartão (e não de outro cartão)."""
-    return rf'metric-value">{total}</p>\s*<p class="metric-label">{TEXTO}'
+    return rf'metric-value">{total}</p>\s*<p class="metric-label">{re.escape(TEXTO)}'
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -91,7 +92,7 @@ class CartaoAlunosIrregularesTests(TestCase):
 
         self.assertEqual(resposta.status_code, 200)
         self.assertNotContains(resposta, TEXTO)
-        self.assertContains(resposta, "Alunos com trajetória ativa")
+        self.assertContains(resposta, "Alunos(as) com trajetória ativa")
 
     @override_settings(ACOMPANHAMENTO_ATIVO=True)
     def test_sem_irregulares_o_cartao_mostra_zero(self):

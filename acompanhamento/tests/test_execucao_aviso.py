@@ -133,5 +133,5 @@ class InicioMostraOUltimoAvisoTests(TestCase):
 
         resposta = self.abrir()
 
-        self.assertContains(resposta, "O aviso diário de alunos atrasados está desligado.")
+        self.assertContains(resposta, "O aviso diário de alunos(as) atrasados(as) está desligado.")
         self.assertNotContains(resposta, "Último aviso rodou em")

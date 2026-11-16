@@ -55,7 +55,7 @@ TITULO_MARCO = "Marco"
 TITULO_SITUACAO = "Situação no marco"
 # (título, largura, centralizada, de apoio)
 COLUNAS = (
-    ("Aluno", 32, False, False),
+    ("Aluno(a)", 32, False, False),
     (TITULO_MARCO, 26, False, False),
     (TITULO_SITUACAO, 27, True, False),
     ("Data limite", 25, True, False),
@@ -67,7 +67,7 @@ COLUNAS = (
     ("Polo", 16, False, True),
     ("Nível", 13, False, True),
     ("Ingresso", 11, True, True),
-    ("Orientador", 28, False, True),
+    ("Orientador(a)", 28, False, True),
 )
 
 
@@ -197,10 +197,10 @@ def _escrever_topo(planilha, total, filtros, colunas):
     filtros_texto = _sem_caractere_invisivel(
         "  |  ".join(f"{filtro['titulo']}: {filtro['valor']}" for filtro in filtros)
     )
-    resumo = f"{total} aluno{'' if total == 1 else 's'}  |  Gerada em {agora:%d/%m/%Y às %H:%M}"
+    resumo = f"{total} aluno{'(a)' if total == 1 else 's(as)'}  |  Gerada em {agora:%d/%m/%Y às %H:%M}"
     topo = (
         (2, PROGRAMA, _fonte(size=9, color=COR_SUBTITULO_MARCA), 20),
-        (3, "Alunos por marco acadêmico", _fonte(size=16, bold=True, color=COR_TEXTO), 34),
+        (3, "Alunos(as) por marco acadêmico", _fonte(size=16, bold=True, color=COR_TEXTO), 34),
         (4, f"Filtros: {filtros_texto}" if filtros_texto else "Sem filtros", _fonte(color=COR_APOIO), 18),
         (5, resumo, _fonte(color=COR_APOIO), 18),
         (6, None, _fonte(), 8),
@@ -283,9 +283,9 @@ def resposta_planilha_alunos(linhas, marco, filtros=()):
     """Monta o arquivo .xlsx da lista filtrada."""
     workbook = Workbook()
     workbook.properties.creator = "AcadFlow"
-    workbook.properties.title = "Alunos por marco acadêmico"
+    workbook.properties.title = "Alunos(as) por marco acadêmico"
     planilha = workbook.active
-    planilha.title = "Alunos"
+    planilha.title = "Alunos(as)"
 
     linhas = list(linhas)
     colunas = _colunas_do_marco(marco)

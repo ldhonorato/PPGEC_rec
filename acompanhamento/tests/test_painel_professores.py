@@ -152,10 +152,10 @@ class PainelProfessoresTests(TestCase):
     def test_linhas_em_ordem_alfabetica_e_sem_orientador_no_fim(self):
         nomes = [linha["nome"] for linha in self.calcular()["linhas"]]
 
-        self.assertEqual(nomes, ["Ana Souza", "Bruno Lima", "Sem orientador"])
+        self.assertEqual(nomes, ["Ana Souza", "Bruno Lima", "Sem orientador(a)"])
 
     def test_linha_sem_orientador(self):
-        linha = linha_de(self.calcular(), "Sem orientador")
+        linha = linha_de(self.calcular(), "Sem orientador(a)")
 
         self.assertIsNone(linha["orientador_id"])
         self.assertEqual((linha["alunos"], linha["ativos"], linha["prazo_vencido"]), (1, 1, 1))
@@ -268,8 +268,8 @@ class PainelProfessoresTests(TestCase):
         self.assertEqual(recentes["total"]["alunos"], 3)
 
         self.assertEqual(linha_de(antigos, "Ana Souza")["alunos"], 3)
-        self.assertEqual(linha_de(antigos, "Sem orientador")["alunos"], 1)
-        self.assertEqual([linha["nome"] for linha in antigos["linhas"]], ["Ana Souza", "Sem orientador"])
+        self.assertEqual(linha_de(antigos, "Sem orientador(a)")["alunos"], 1)
+        self.assertEqual([linha["nome"] for linha in antigos["linhas"]], ["Ana Souza", "Sem orientador(a)"])
 
     def test_filtro_por_nivel(self):
         resultado = calcular_painel_professores(DOUTORADO, REFERENCIA)
