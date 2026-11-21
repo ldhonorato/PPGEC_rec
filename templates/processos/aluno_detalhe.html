@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{% if is_self_aluno %}Minha Trajetória{% else %}{{ aluno.nome }} | Alunos{% endif %}{% endblock %}
+{% block title %}{% if is_self_aluno %}Minha Trajetória{% else %}{{ aluno.nome }} | Alunos(as){% endif %}{% endblock %}
 {% block content %}
 {% comment %}
 Cabecalho da ficha do aluno.
@@ -39,7 +39,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
             <div><dt>Matrícula</dt><dd>{{ aluno.matricula|default:"—" }}</dd></div>
             {% if trajetoria_atual %}
                 <div><dt>Ingresso</dt><dd>{{ trajetoria_atual.ingresso|default:"—" }}</dd></div>
-                <div><dt>{% if trajetoria_atual.nivel_curso == "POSDOUTORADO" %}Supervisor{% else %}Orientador{% endif %}</dt><dd>{{ trajetoria_atual.orientador.nome|default:"—" }}</dd></div>
+                <div><dt>{% if trajetoria_atual.nivel_curso == "POSDOUTORADO" %}Supervisor(a){% else %}Orientador(a){% endif %}</dt><dd>{{ trajetoria_atual.orientador.nome|default:"—" }}</dd></div>
             {% endif %}
         </dl>
 
@@ -48,7 +48,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
                 {% if is_self_aluno %}
                     Você ainda não possui trajetória acadêmica ativa. A coordenação cadastra a trajetória após a validação do seu vínculo.
                 {% else %}
-                    Este aluno ainda não possui trajetória acadêmica ativa.
+                    Este aluno(a) ainda não possui trajetória acadêmica ativa.
                 {% endif %}
             </p>
         {% endif %}
@@ -63,7 +63,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
                     </form>
                 {% endif %}
                 <button type="button" class="btn btn-secondary" data-modal-open="modal-dados">Alterar dados</button>
-                <a class="btn btn-secondary" href="{% url 'coordenacao_alunos' %}">Voltar para alunos</a>
+                <a class="btn btn-secondary" href="{% url 'coordenacao_alunos' %}">Voltar para alunos(as)</a>
             </div>
         {% elif is_orientador_do_aluno %}
             {% comment %}
@@ -72,7 +72,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
             coordenacao, e a listagem dele e outra.
             {% endcomment %}
             <div class="acoes-cabecalho">
-                <a class="btn btn-secondary" href="{% url 'menu_meus_orientandos' %}">Voltar para orientandos</a>
+                <a class="btn btn-secondary" href="{% url 'menu_meus_orientandos' %}">Voltar para orientandos(as)</a>
             </div>
         {% endif %}
     </section>
@@ -164,7 +164,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
                             {% if trajetoria.usa_prazos_academicos %}
                             <li><span class="info-label">Histórico de prorrogações</span><span>{% for item in trajetoria.prorrogacoes.all %}{{ item.meses }} mês(es) em {{ item.data_concessao|date:"d/m/Y" }}{% if not forloop.last %}; {% endif %}{% empty %}Nenhuma{% endfor %}</span><span></span></li>
                             <li><span class="info-label">Períodos trancados</span><span>{% for item in trajetoria.trancamentos.all %}{{ item.data_inicio|date:"d/m/Y" }} a {{ item.data_fim|date:"d/m/Y" }}{% if not forloop.last %}; {% endif %}{% empty %}Nenhum{% endfor %}</span><span></span></li>
-                            <li><span class="info-label">Apresentações</span><span>{% for item in trajetoria.apresentacoes_qualificacao.all %}{{ item.tentativa }}ª: conceito {{ item.conceito }} em {{ item.data_apresentacao|date:"d/m/Y" }}{% if not forloop.last %}; {% endif %}{% empty %}Nenhuma{% endfor %}</span><span></span></li>
+                            <li><span class="info-label">Apresentações</span><span>{% for item in trajetoria.apresentacoes_qualificacao.all %}{{ item.tentativa }}ª: conceito {{ item.conceito }} em {{ item.data_apresentacao|date:"d/m/Y" }}{% if item.registro_com_pendencias %} <span class="badge">Registro com pendências confirmado</span>{% endif %}{% if not forloop.last %}; {% endif %}{% empty %}Nenhuma{% endfor %}</span><span></span></li>
                             {% endif %}
                             <li>
                                 <span class="info-label">Estágios de docência</span>
@@ -418,7 +418,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
                     {% if is_self_aluno %}
                         A coordenação cadastra sua trajetória após a validação do vínculo.
                     {% else %}
-                        A trajetória define nível, prazos e orientação do aluno.
+                        A trajetória define nível, prazos e orientação do(a) aluno(a).
                     {% endif %}
                 </p>
             </div>
@@ -426,7 +426,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
     </section>
 
     <section id="historico-alteracoes" class="card">
-        <h2 class="section-title">Histórico de alterações do aluno</h2>
+        <h2 class="section-title">Histórico de alterações do(a) aluno(a)</h2>
         {% if alteracoes_display %}
             <ul class="list">
                 {% for item in alteracoes_display %}
@@ -456,7 +456,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
     aqui o mesmo formato que ve em "Meus Processos".
     {% endcomment %}
     <section id="processos-aluno" class="card">
-        <h2 class="section-title">{% if is_self_aluno %}Meus processos{% else %}Processos abertos pelo aluno{% endif %}</h2>
+        <h2 class="section-title">{% if is_self_aluno %}Meus processos{% else %}Processos abertos pelo(a) aluno(a){% endif %}</h2>
         {% with texto_vazio=is_self_aluno|yesno:"Os processos que você abrir aparecem aqui.,Este aluno ainda não abriu processos." %}
             {% include "includes/tabela_processos.html" with processos=processos_aluno mostrar_tipo=True mostrar_setor=True vazio_titulo="Nenhum processo aberto" vazio_texto=texto_vazio %}
         {% endwith %}
@@ -465,7 +465,7 @@ aquele <section>, os cartoes ficavam fora dela e encostavam um no outro.
 {% if can_manage_aluno %}
 <dialog id="modal-dados" class="modal-dialog">
     <div class="modal-body">
-        <div class="modal-head"><h3 class="section-title">Alterar dados do aluno</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar dados do(a) aluno(a)</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_dados">
@@ -515,7 +515,7 @@ faltava a da coordenacao.
                 <div class="formulario-campo" data-nivel-section="PRAZOS"><label>Prazo de qualificação/projeto</label>{{ nova_trajetoria_form.prazo_qualificacao }}</div>
                 <div class="formulario-campo" data-nivel-section="PRAZOS"><label>Data limite do projeto (mestrado)</label>{{ nova_trajetoria_form.data_limite_qualificacao }}</div>
                 <div class="formulario-campo" data-nivel-section="PRAZOS"><label>Prazo defesa</label>{{ nova_trajetoria_form.prazo_defesa }}</div>
-                <div class="formulario-campo" data-nivel-section="VINCULO_DOCENTE"><label data-vinculo-docente-label>Orientador</label>{{ nova_trajetoria_form.orientador }}</div>
+                <div class="formulario-campo" data-nivel-section="VINCULO_DOCENTE"><label data-vinculo-docente-label>Orientador(a)</label>{{ nova_trajetoria_form.orientador }}</div>
             </div>
             <div data-nivel-section="PRAZOS">
                 <label>{{ nova_trajetoria_form.reingressante }} Reingressante</label>
@@ -523,18 +523,18 @@ faltava a da coordenacao.
             </div>
 
             <div data-nivel-section="ORIENTACAO">
-                <label>Tipo de coorientador</label>
+                <label>Tipo de coorientador(a)</label>
                 {{ nova_trajetoria_form.tipo_coorientador }}
                 <div data-coorientador-section="CADASTRADO">
-                    <label>Coorientador cadastrado</label>
+                    <label>Coorientador(a) cadastrado(a)</label>
                     {{ nova_trajetoria_form.coorientador }}
                 </div>
                 <div data-coorientador-section="EXTERNO">
-                    <label>Nome do coorientador externo</label>
+                    <label>Nome do(a) coorientador(a) externo(a)</label>
                     {{ nova_trajetoria_form.coorientador_externo_nome }}
-                    <label>Email do coorientador externo</label>
+                    <label>Email do(a) coorientador(a) externo(a)</label>
                     {{ nova_trajetoria_form.coorientador_externo_email }}
-                    <label>Instituição do coorientador externo</label>
+                    <label>Instituição do(a) coorientador(a) externo(a)</label>
                     {{ nova_trajetoria_form.coorientador_externo_instituicao }}
                 </div>
             </div>
@@ -744,7 +744,7 @@ faltava a da coordenacao.
 
             <div class="grid-two">
                 <div class="formulario-campo">
-                    <label>Supervisor</label>
+                    <label>Supervisor(a)</label>
                     <input name="supervisor" required>
                 </div>
                 <div class="formulario-campo">
@@ -759,7 +759,7 @@ faltava a da coordenacao.
                     <label>Status</label>
                     <select name="status">
                         <option value="NAO_INICIADO">Não Iniciado</option>
-                        <option value="AGUARD_CIENCIA">Aguardando Ciente do Orientador</option>
+                        <option value="AGUARD_CIENCIA">Aguardando Ciente do(a) Orientador(a)</option>
                         <option value="AGUARD_ASSINATURA">Aguardando Aprovação da Coordenação</option>
                         <option value="ANALISE_DISP">Em Análise de Dispensa</option>
                         <option value="DISPENSADO">Dispensado</option>
@@ -806,7 +806,7 @@ faltava a da coordenacao.
             <div class="grid-two">
 
                 <div class="formulario-campo">
-                    <label>Supervisor</label>
+                    <label>Supervisor(a)</label>
                     <input name="supervisor"
                            value="{{ estagio.supervisor }}">
                 </div>
@@ -875,18 +875,18 @@ faltava a da coordenacao.
 
 <dialog id="modal-trajetoria-orientador-{{ trajetoria.id }}" class="modal-dialog">
     <div class="modal-body">
-        <div class="modal-head"><h3 class="section-title">Alterar {% if trajetoria.nivel_curso == "POSDOUTORADO" %}supervisor{% else %}orientador{% endif %}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar {% if trajetoria.nivel_curso == "POSDOUTORADO" %}supervisor(a){% else %}orientador(a){% endif %}</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
             <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
             <input type="hidden" name="campo" value="orientador">
-            <label>{% if trajetoria.nivel_curso == "POSDOUTORADO" %}Supervisor{% else %}Orientador{% endif %}</label>
+            <label>{% if trajetoria.nivel_curso == "POSDOUTORADO" %}Supervisor(a){% else %}Orientador(a){% endif %}</label>
             {{ form.orientador }}
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
             <div class="formulario-acoes">
-                <button class="btn" type="submit">Salvar {% if trajetoria.nivel_curso == "POSDOUTORADO" %}supervisor{% else %}orientador{% endif %}</button>
+                <button class="btn" type="submit">Salvar {% if trajetoria.nivel_curso == "POSDOUTORADO" %}supervisor(a){% else %}orientador(a){% endif %}</button>
             </div>
         </form>
     </div>
@@ -894,30 +894,30 @@ faltava a da coordenacao.
 
 <dialog id="modal-trajetoria-coorientador-{{ trajetoria.id }}" class="modal-dialog">
     <div class="modal-body">
-        <div class="modal-head"><h3 class="section-title">Alterar coorientador</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
+        <div class="modal-head"><h3 class="section-title">Alterar coorientador(a)</h3><button type="button" class="modal-close" data-modal-close>Fechar</button></div>
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="acao" value="alterar_trajetoria_campo">
             <input type="hidden" name="trajetoria_id" value="{{ trajetoria.id }}">
             <input type="hidden" name="campo" value="coorientador">
-            <label>Tipo de coorientador</label>
+            <label>Tipo de coorientador(a)</label>
             {{ form.tipo_coorientador }}
             <div data-coorientador-section="CADASTRADO">
-                <label>Coorientador cadastrado</label>
+                <label>Coorientador(a) cadastrado(a)</label>
                 {{ form.coorientador }}
             </div>
             <div data-coorientador-section="EXTERNO">
-                <label>Nome do coorientador externo</label>
+                <label>Nome do(a) coorientador(a) externo(a)</label>
                 {{ form.coorientador_externo_nome }}
-                <label>Email do coorientador externo</label>
+                <label>Email do(a) coorientador(a) externo(a)</label>
                 {{ form.coorientador_externo_email }}
-                <label>Instituição do coorientador externo</label>
+                <label>Instituição do(a) coorientador(a) externo(a)</label>
                 {{ form.coorientador_externo_instituicao }}
             </div>
             <label>Comentário</label>
             <textarea name="comentario" rows="3" required></textarea>
             <div class="formulario-acoes">
-                <button class="btn" type="submit">Salvar coorientador</button>
+                <button class="btn" type="submit">Salvar coorientador(a)</button>
             </div>
         </form>
     </div>
@@ -978,7 +978,7 @@ faltava a da coordenacao.
                 <div class="formulario-campo"><label>Ano</label>{{ publicacao_form.ano }}</div>
                 <div class="formulario-campo"><label>DOI/URL</label>{{ publicacao_form.doi_url }}</div>
             </div>
-            <label>Autores</label>
+            <label>Autores(as)</label>
             {{ publicacao_form.autores }}
             <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar publicação</button>
@@ -1011,7 +1011,7 @@ faltava a da coordenacao.
                 <div class="formulario-campo"><label>Ano</label><input type="number" name="ano" value="{{ publicacao.ano|default_if_none:'' }}" min="1900" max="2100"></div>
                 <div class="formulario-campo"><label>DOI/URL</label><input name="doi_url" value="{{ publicacao.doi_url }}" maxlength="255"></div>
             </div>
-            <label>Autores</label>
+            <label>Autores(as)</label>
             <textarea name="autores" rows="3">{{ publicacao.autores }}</textarea>
             <div class="formulario-acoes">
                 <button class="btn" type="submit">Salvar publicação</button>
@@ -1141,7 +1141,7 @@ faltava a da coordenacao.
                     section.style.display = mostrar ? "" : "none";
                 });
                 modal.querySelectorAll("[data-vinculo-docente-label]").forEach((label) => {
-                    label.textContent = nivel === "POSDOUTORADO" ? "Supervisor" : "Orientador";
+                    label.textContent = nivel === "POSDOUTORADO" ? "Supervisor(a)" : "Orientador(a)";
                 });
                 modal.querySelectorAll("[data-conclusao-numero-label]").forEach((label) => {
                     label.textContent = nivel === "POSDOUTORADO" ? "Numero do relatorio final" : "Numero da defesa";

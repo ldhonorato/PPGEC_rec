@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}Alunos | Coordenação{% endblock %}
+{% block title %}Alunos(as) | Coordenação{% endblock %}
 {% block extra_head %}
     {% if acompanhamento_ativo %}
         <link rel="stylesheet" href="{% static 'acompanhamento/css/lista_por_marco.css' %}">
@@ -8,12 +8,12 @@
 {% endblock %}
 {% block content %}
 <section class="card">
-    <h1 class="section-title">Alunos</h1>
+    <h1 class="section-title">Alunos(as)</h1>
     <form method="get" class="filtros">
         <div class="filtros-linha">
             <div class="filtros-campo filtros-campo-busca">
                 <label for="id_nome">Nome</label>
-                <input id="id_nome" type="search" name="nome" value="{{ filtro_nome }}" placeholder="nome do aluno">
+                <input id="id_nome" type="search" name="nome" value="{{ filtro_nome }}" placeholder="nome do(a) aluno(a)">
             </div>
             <div class="filtros-campo filtros-campo-escolha">
                 <label for="id_status">Status</label>
@@ -128,14 +128,14 @@
     {% if periodo_sem_matricula %}
         <div class="alert alert-info">
             <strong>{{ total_alunos_filtrados }}</strong>
-            aluno{{ total_alunos_filtrados|pluralize }} com trajetória ativa e sem matrícula registrada em
+            aluno{{ total_alunos_filtrados|pluralize }}{{ total_alunos_filtrados|pluralize:"(a),(as)" }} com trajetória ativa e sem matrícula registrada em
             <strong>{{ periodo_sem_matricula.nome }}</strong>.
         </div>
     {% endif %}
     <div class="lista-cabecalho">
-        <h2 class="section-title">Alunos cadastrados</h2>
+        <h2 class="section-title">Alunos(as) cadastrados(as)</h2>
         {% if alunos %}
-            <span class="lista-contagem">{{ pagina.paginator.count }} aluno{{ pagina.paginator.count|pluralize }}</span>
+            <span class="lista-contagem">{{ pagina.paginator.count }} aluno{{ pagina.paginator.count|pluralize }}{{ pagina.paginator.count|pluralize:"(a),(as)" }}</span>
         {% endif %}
     </div>
 
@@ -144,7 +144,7 @@
             <table class="tabela">
                 <thead>
                     <tr>
-                        <th scope="col">Aluno</th>
+                        <th scope="col">Aluno(a)</th>
                         {% if marco_selecionado %}
                             {% if marco_qualquer %}<th scope="col" class="coluna-marco-nome">Marco</th>{% endif %}
                             <th scope="col">Situação no marco</th>
@@ -157,7 +157,7 @@
                         <th scope="col">Polo</th>
                         <th scope="col">Nível</th>
                         <th scope="col">Ingresso</th>
-                        <th scope="col">Orientador</th>
+                        <th scope="col">Orientador(a)</th>
                         <th scope="col">Trajetória</th>
                     </tr>
                 </thead>
@@ -223,8 +223,8 @@
     {% else %}
         <div class="estado-vazio">
             <svg aria-hidden="true"><use href="#i-alunos"></use></svg>
-            <p class="estado-vazio-titulo">Nenhum aluno encontrado</p>
-            <p>Nenhum aluno corresponde aos filtros informados. Ajuste os critérios acima.</p>
+            <p class="estado-vazio-titulo">Nenhum(a) aluno(a) encontrado(a)</p>
+            <p>Nenhum(a) aluno(a) corresponde aos filtros informados. Ajuste os critérios acima.</p>
         </div>
     {% endif %}
 </section>

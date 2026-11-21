@@ -37,7 +37,7 @@ def calcular_previsao_conclusao(orientador_id, nivel, data_referencia=None):
     total_sem_previsao = 0
 
     for traj in ativas:
-        aluno_nome = traj.aluno.nome if traj.aluno else "Aluno não informado"
+        aluno_nome = traj.aluno.nome if traj.aluno else "Aluno(a) não informado(a)"
         turma_ingresso = traj.ingresso or "Não informada"
 
         dados_defesa = situacoes.get(traj.pk, {}).get("defesa") if traj.data_ingresso else None

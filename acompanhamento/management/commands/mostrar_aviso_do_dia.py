@@ -41,7 +41,7 @@ def _dia(data):
 
 class Command(BaseCommand):
     help = (
-        "Mostra o e-mail do aviso de alunos atrasados do dia, sem gravar "
+        "Mostra o e-mail do aviso de alunos(as) atrasados(as) do dia, sem gravar "
         "nada no banco e sem enviar e-mail."
     )
 

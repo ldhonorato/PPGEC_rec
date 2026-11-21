@@ -13,6 +13,7 @@ Parametros (todos opcionais, exceto processos):
                      ("Requerente" na visao da secretaria, "Aluno" na do
                      orientador)
   mostrar_tipo       inclui a coluna Tipo
+  mostrar_requerente  inclui quem abriu o processo
   mostrar_setor      inclui a coluna Setor atual
   mostrar_prazo      inclui a coluna Prazo
   vazio_titulo       titulo do estado vazio
@@ -25,6 +26,7 @@ Parametros (todos opcionais, exceto processos):
                 <tr>
                     <th scope="col">Processo</th>
                     {% if coluna_pessoa %}<th scope="col">{{ coluna_pessoa }}</th>{% endif %}
+                    {% if mostrar_requerente %}<th scope="col">Requerente</th>{% endif %}
                     {% if mostrar_tipo %}<th scope="col">Tipo</th>{% endif %}
                     {% if mostrar_setor %}<th scope="col">Setor atual</th>{% endif %}
                     {% if mostrar_prazo %}<th scope="col">Prazo</th>{% endif %}
@@ -41,11 +43,18 @@ Parametros (todos opcionais, exceto processos):
                         {% if coluna_pessoa %}
                             <td class="celula-apoio">{{ processo.aluno_interessado.nome|default:"—" }}</td>
                         {% endif %}
+                        {% if mostrar_requerente %}
+                            <td class="celula-apoio">{{ processo.usuario_criado_por.nome|default:"—" }}</td>
+                        {% endif %}
                         {% if mostrar_tipo %}
                             <td class="celula-apoio">{{ processo.get_tipo_display }}</td>
                         {% endif %}
                         {% if mostrar_setor %}
-                            <td class="celula-apoio">{{ processo.setor_atual.nome|default:"—" }}</td>
+                            <td class="celula-apoio">{{ processo.setor_atual.nome|default:"—" }}
+                                {% if processo.destinatario_devolucao_id and processo.setor_atual.nome == "Requerente" %}
+                                    <span class="celula-secundaria">Aguardando ação de {{ processo.destinatario_devolucao.nome }}</span>
+                                {% endif %}
+                            </td>
                         {% endif %}
                         {% if mostrar_prazo %}
                             <td class="celula-numero {% if processo.esta_atrasado %}celula-atrasada{% else %}celula-apoio{% endif %}">

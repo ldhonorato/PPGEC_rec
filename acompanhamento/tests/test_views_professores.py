@@ -34,7 +34,7 @@ class PainelProfessoresViewTests(TestCase):
 
         response_inicio = self.client.get(self.url_inicio)
         self.assertEqual(response_inicio.status_code, 200)
-        self.assertNotContains(response_inicio, "Painel por Professor")
+        self.assertNotContains(response_inicio, "Painel por Professor(a)")
 
     @override_settings(ACOMPANHAMENTO_ATIVO=False)
     def test_chave_desligada_retorna_404(self):

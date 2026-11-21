@@ -1,49 +1,42 @@
-# Entrega do módulo de acompanhamento acadêmico
+# Documento técnico: módulo de acompanhamento acadêmico
 
-Equipe E4. Situação em 09/11/2026, com base na branch `develop`.
+Equipe E4. Situação em 21/11/2026, versão 1.4.1 do AcadFlow, igual na `main` do repositório oficial e na `develop` do fork da equipe.
 
-Este documento é para quem vai instalar, operar ou continuar o módulo. O uso das telas está no [manual da secretaria](manual-de-uso-secretaria.md).
+Este documento é para quem vai instalar, operar ou continuar o módulo. O que o módulo é, para quem e as regras que ele segue estão no [documento de negócio](documento-de-negocio.md). O que ficou pendente está na [passagem de conhecimento](passagem-de-conhecimento.md). O uso das telas está no [manual da secretaria](manual-de-uso-secretaria.md).
 
-## O que muda nesta entrega
+## Histórico
 
-Em relação à versão 1.4.0, que está na `main` do repositório oficial:
-
-| Mudança | Efeito |
+| Data | O que mudou |
 |---|---|
-| Painel por Professor | Tela nova, só para o docente coordenador e para os membros da Coordenação PPG. Mostra os números de cada professor, o gráfico por turma dos alunos dele e a previsão de conclusão dos alunos ativos |
-| Taxas do Painel de Sucesso por Turma | Concluídos, desligados, trancados e ativos agora somam sempre 100,0%. Regulares e irregulares somam a taxa de ativos |
-| Versões fixas no `requirements.txt` | Corrige o worker do Celery, que entra em reinício quando a imagem é gerada com o `kombu` 5.7.0, publicado em 03/11/2026. Sem o worker, o aviso diário não roda |
-| Manual da secretaria | Seção nova sobre o Painel por Professor |
-| Dados fictícios | Os alunos de teste passam a ter orientador e defesas. Só valem com `DEBUG=True` |
-
-A entrega não traz migration nova e não muda o `Dockerfile` nem os arquivos do Docker Compose. Os passos para atualizar a produção estão na seção 4, em "Atualizar para esta versão".
+| 02/11/2026 | Documento criado com a primeira entrega completa do módulo: lista por marco, planilha, aviso diário, calendário e painéis |
+| 03/11/2026 | Módulo em produção na versão 1.4.0, com as chaves desligadas |
+| 09/11/2026 | Painel por Professor, taxas do Painel de Sucesso por Turma que somam 100% e versões fixas no `requirements.txt` |
+| 16/11/2026 | O coordenador publicou a versão 1.4.1: Redis e `kombu` compatíveis, conferência das dependências no build, Dashboard aberto pela página de Acompanhamento e textos com flexão de gênero |
+| 21/11/2026 | Documento passa a tratar só da parte técnica. As regras de negócio foram para o documento de negócio, e os riscos e pendências, para a passagem de conhecimento |
 
 ## 1. Visão geral
 
-O módulo acrescenta ao Acadflow o acompanhamento dos prazos dos alunos de mestrado e doutorado e os painéis pedidos pela coordenação do PPGEC. Ele calcula a situação de cada aluno nos marcos acadêmicos, mostra os irregulares e pode avisar a secretaria e a coordenação por e-mail.
+O módulo acrescenta ao AcadFlow o acompanhamento dos prazos dos alunos de mestrado e doutorado e os painéis pedidos pela coordenação. Ele chega desligado. Com a chave desligada, as telas novas respondem como página inexistente e o menu não muda.
 
-O módulo chega desligado. Com a chave desligada, as telas novas respondem como página inexistente e o menu não muda.
-
-| O que foi entregue | Onde fica | O que faz |
-|---|---|---|
-| Página de Acompanhamento | `/acompanhamento/` | Reúne as telas em cartões, mostra o total de alunos irregulares e o estado do aviso diário |
-| Cartão "Alunos irregulares" | Página inicial do sistema | Mostra o total e abre a lista filtrada |
-| Lista de alunos por marco | `/coordenacao/alunos/` | Tela já existente, com filtros de marco, situação e semestre, colunas novas e download em Excel |
-| Painel de Sucesso por Turma | `/acompanhamento/painel-sucesso-turma/` | Gráfico de sete barras e detalhes por turma de ingresso |
-| Painel de Processos | `/acompanhamento/processos/` | Processos abertos, atrasados e tempo médio no período |
-| Painel de Docentes | `/acompanhamento/docentes/` | Distribuição por polo, permanentes e colaboradores |
-| Painel por Professor | `/acompanhamento/professores/` | Alunos, prazos, defesas e prorrogações por professor. Com um professor escolhido, mostra o gráfico por turma e a previsão de conclusão dos alunos ativos |
-| Calendário de Marcos | `/acompanhamento/calendario-marcos/` | Cadastro das datas de projeto e qualificação por semestre |
-| Aviso diário | E-mail às 7h, horário de Recife | Avisa a Secretaria PPGEC e a Coordenação PPG sobre alunos que ficaram atrasados |
-
-A página de Acompanhamento também leva à Carga de Orientação, que é uma tela original do sistema.
+| Tela ou serviço | Endereço |
+|---|---|
+| Página de Acompanhamento | `/acompanhamento/` |
+| Cartão "Alunos irregulares" | Página inicial do sistema |
+| Lista de alunos por marco e planilha | `/coordenacao/alunos/`, tela original com filtros novos |
+| Painel de Sucesso por Turma | `/acompanhamento/painel-sucesso-turma/` |
+| Painel de Processos | `/acompanhamento/processos/` |
+| Painel de Docentes | `/acompanhamento/docentes/` |
+| Painel por Professor | `/acompanhamento/professores/` |
+| Calendário de Marcos | `/acompanhamento/calendario-marcos/` |
+| Dashboard | `/coordenacao/dashboard/`, tela original, aberta pelo cartão da página de Acompanhamento |
+| Aviso diário | Tarefa do Celery, às 7h, horário de Recife |
 
 ## 2. Onde o módulo se encaixa
 
 ```mermaid
 flowchart LR
     gestao["Secretaria e coordenação"]
-    acadflow["Acadflow com o módulo de acompanhamento"]
+    acadflow["AcadFlow com o módulo de acompanhamento"]
     email["Servidor de e-mail"]
 
     gestao -->|"usam as telas"| acadflow
@@ -69,7 +62,7 @@ flowchart LR
     worker --> email
 ```
 
-A entrega não altera o `Dockerfile` nem os arquivos do Docker Compose. O `requirements.txt` passa a fixar a versão de todas as dependências, inclusive as indiretas, nas versões da imagem que funcionava em 02/11/2026. Assim, uma versão nova publicada por terceiros não muda mais a imagem sem aviso.
+O `requirements.txt` fixa a versão de todas as dependências, inclusive as indiretas. Assim, uma versão nova publicada por terceiros não muda a imagem sem aviso. Desde a 1.4.1, o Celery usa `kombu[redis]==5.6.2` com `redis==6.1.0`, e o `Dockerfile` roda `pip check` e testa o transporte Redis do `kombu` durante o build. Uma combinação incompatível agora quebra o build, e não mais o worker em produção.
 
 ## 3. Como o módulo é organizado
 
@@ -102,7 +95,7 @@ flowchart TB
 |---|---|
 | `chave.py` | Lê as duas chaves |
 | `decoradores.py` e `permissoes.py` | Regras de acesso às telas, inclusive a do Painel por Professor |
-| `situacao.py` | Regras de prazo |
+| `situacao.py` | Regras de prazo de cada marco |
 | `previsao_conclusao.py` | Previsão de conclusão dos alunos ativos de um professor |
 | `lista_alunos.py` | Lista por marco e cartão de irregulares |
 | `planilha_alunos.py` | Arquivo Excel |
@@ -119,7 +112,7 @@ Fora do app, o código alterado é:
 | `ppgec/settings.py` | Registra o app e as duas chaves |
 | `ppgec/urls.py` | Inclui as rotas do módulo |
 | `ppgec/celery.py` | Agenda a tarefa do aviso |
-| `processos/context_processors.py` | Item "Acompanhamento" no menu, só com a chave ligada |
+| `processos/context_processors.py` | Item "Acompanhamento" no menu, só com a chave ligada. O item também fica marcado no Dashboard |
 | `processos/views.py` | Filtros e planilha na lista de alunos, cartão na página inicial |
 | `templates/processos/alunos_lista.html` | Campos, colunas e botão do Excel |
 | `templates/processos/home.html` | Cartão de alunos irregulares |
@@ -129,7 +122,7 @@ Para continuar o módulo:
 
 - Uma tela nova entra na lista de `telas.py`, sem mexer no menu do sistema, e usa o decorador `tela_do_modulo`.
 - Os dados de teste saem de `python manage.py gerar_dados_ficticios`. O comando recusa rodar com `DEBUG=False`.
-- Os testes rodam com `DEBUG=True`: `python manage.py test` e, com o módulo ligado, `ACOMPANHAMENTO_ATIVO=True python manage.py test processos`.
+- As decisões técnicas estão na seção 6. Antes de mudar uma regra de prazo, conferir o documento de negócio, porque as regras foram confirmadas pela coordenação.
 
 ## 4. Como ligar e desligar
 
@@ -138,9 +131,11 @@ Para continuar o módulo:
 | `ACOMPANHAMENTO_ATIVO` | `False` | Liga as telas, o menu e o cartão |
 | `ACOMPANHAMENTO_AVISO_ATIVO` | `False` | Liga o aviso diário. Só vale com a chave do módulo ligada |
 
+Em 21/11/2026, o endereço `/acompanhamento/` de produção pede login em vez de responder como página inexistente, o que indica que o módulo está ligado. O estado do aviso não pôde ser conferido de fora.
+
 ### Instalação
 
-O contêiner `web` aplica as migrations ao subir, mesmo com as chaves desligadas. A entrega traz quatro migrations, todas do app `acompanhamento`, e elas só criam tabelas novas.
+O contêiner `web` aplica as migrations ao subir, mesmo com as chaves desligadas. O módulo tem quatro migrations, todas do app `acompanhamento`, e elas só criam tabelas novas.
 
 | Migration | Tabela |
 |---|---|
@@ -165,17 +160,17 @@ O aviso diário tem um passo a passo próprio, na [lista de verificação do ser
 
 As telas voltam a responder como página inexistente, e o cartão e o menu somem. Os dados continuam nas tabelas e voltam a aparecer ao religar. Não é preciso reverter código nem migration.
 
+Desde a 1.4.1, o Dashboard não tem mais item próprio no menu e é aberto pelo cartão da página de Acompanhamento. Com o módulo desligado, ele continua em `/coordenacao/dashboard/`, mas sem atalho no menu.
+
 Para parar só os e-mails, basta colocar `ACOMPANHAMENTO_AVISO_ATIVO=False` e rodar o mesmo comando.
 
-### Atualizar para esta versão
+### Como atualizar a produção
 
-Esta versão não traz migration e não pede mudança no `.env`.
+O caminho do código é `develop` do fork, `homolog` do fork, `stage` do repositório oficial e `main` do repositório oficial. Os dois últimos merges são do coordenador.
 
-1. Fazer o merge do pull request na `stage` e, depois, da `stage` na `main`.
-2. O workflow "Build and push web image" gera a imagem nova a partir da `main`.
-3. Em até 5 minutos, o Watchtower troca os contêineres `web`, `celery` e `celery-beat` pela imagem nova. Banco, Redis e pgAdmin não mudam.
-
-Depois da troca, conferir no servidor, na pasta do `docker-compose-prod.yml`. Os comandos só leem informações e não enviam e-mail:
+1. O merge na `main` dispara o workflow "Build and push web image", que gera a imagem.
+2. Em até 5 minutos, o Watchtower troca os contêineres `web`, `celery` e `celery-beat` pela imagem nova. Banco, Redis e pgAdmin não mudam.
+3. Depois da troca, conferir no servidor, na pasta do `docker-compose-prod.yml`. Os comandos só leem informações e não enviam e-mail:
 
 ```
 docker compose -f docker-compose-prod.yml ps
@@ -186,13 +181,20 @@ docker compose -f docker-compose-prod.yml logs --since 1h celery celery-beat | g
 
 O esperado é: os contêineres em `running`, o worker e o beat com `reinicios=0`, a tarefa `acompanhamento.tasks.enviar_avisos_irregularidade` listada e nenhuma linha no último comando.
 
-Com o módulo ligado, entrar como docente coordenador ou como membro da Coordenação PPG e abrir `/acompanhamento/professores/`. Os outros perfis recebem acesso negado nessa tela, e o cartão dela não aparece para eles.
+Se uma versão nova der problema numa tela do módulo, desligar o módulo resolve sem mexer no código.
 
-Se a tela nova der problema, desligar o módulo, como em "Desligar", resolve sem mexer no código. Reverter o merge na `main` também funciona, porque não há migration nova, mas traz de volta as versões soltas do `requirements.txt` e, com elas, o problema do worker.
+## 5. Testes e ensaio de produção
 
-### Como a entrega foi conferida
+Os testes rodam com `DEBUG=True`:
 
-A cada pull request para a `develop`, o CI roda os testes em PostgreSQL 16 e Python 3.11. O ensaio de produção parte do banco migrado com a `main` do repositório oficial, aplica as migrations novas e confere que:
+```
+python manage.py check
+python manage.py makemigrations --check --dry-run
+python manage.py test
+ACOMPANHAMENTO_ATIVO=True python manage.py test processos
+```
+
+O workflow `.github/workflows/ci.yml` roda esses passos em PostgreSQL 16 e Python 3.11 a cada pull request para a `develop`. O workflow `.github/workflows/ensaio-producao.yml` parte do banco migrado com a `main` oficial, aplica as migrations novas e confere que:
 
 - o site responde e `/acompanhamento/` dá 404 com o módulo desligado;
 - as páginas principais abrem com cada perfil;
@@ -200,9 +202,9 @@ A cada pull request para a `develop`, o CI roda os testes em PostgreSQL 16 e Pyt
 - com o módulo ligado e o aviso desligado, a tarefa não faz nada;
 - nenhum contêiner reiniciou e os logs não têm exceção.
 
-Desde 06/11/2026, o GitHub Actions do fork da equipe está parado. Nesta entrega, os passos do CI rodaram na máquina da equipe antes de cada merge na `develop`, e o ensaio rodou com Docker, também na máquina da equipe, com PostgreSQL 16. O último ensaio, com a `develop` em `cc402fd` sobre o banco migrado com a `main` oficial em `05d2842`, passou em 09/11/2026 em todos os itens acima. O ensaio não cobre o servidor do cliente (ver seção 8).
+O último ensaio, em 09/11/2026, passou em todos os itens. O ensaio não cobre o servidor do cliente.
 
-## 5. Como operar
+## 6. Como operar
 
 ### Aviso diário
 
@@ -212,15 +214,13 @@ Todo dia às 7h, horário de Recife, a tarefa calcula a situação dos alunos at
 - quem saiu do atraso, mudou de situação ou deixou de estar ativo tem o aviso encerrado;
 - sem aviso novo nem pendente, nenhum e-mail sai.
 
-O primeiro e-mail é o levantamento inicial, com todos os alunos que já estavam atrasados. Os destinatários são os membros atuais e ativos da Secretaria PPGEC e da Coordenação PPG que têm e-mail cadastrado.
-
 Para ver o e-mail do dia sem enviar nem gravar nada, com o aviso ligado ou desligado:
 
 ```
 docker compose -f docker-compose-prod.yml exec web python manage.py mostrar_aviso_do_dia
 ```
 
-Para gerar a prévia em arquivo, acrescentar `--html previa.html`.
+Para gerar a prévia em arquivo, acrescentar `--html previa.html`. A saída tem nomes de alunos reais: não colar em grupo nem em issue.
 
 ### O que fazer se algo falhar
 
@@ -232,138 +232,40 @@ Para gerar a prévia em arquivo, acrescentar `--html previa.html`.
 | Muitos alunos como "Não foi possível calcular" | Falta data no calendário ou no cadastro | Cadastrar a data do semestre ou corrigir o cadastro. Falhas de cálculo também ficam registradas no log |
 | O cartão "Alunos irregulares" sumiu da página inicial | Erro no cálculo. A página continua abrindo | Ver o log `Falha ao calcular o cartão de alunos irregulares` |
 
-Se a tarefa ficar dias sem rodar, nenhum atraso se perde: a execução seguinte compara a situação do dia com os avisos abertos e recupera tudo.
-
-Cada envio faz até três tentativas, com 30 segundos de pausa entre elas.
+Se a tarefa ficar dias sem rodar, nenhum atraso se perde: a execução seguinte compara a situação do dia com os avisos abertos e recupera tudo. Cada envio faz até três tentativas, com 30 segundos de pausa entre elas.
 
 ### Registros
 
-A planilha baixada fica registrada com quem baixou, quando e com quais filtros. Esse registro pode ser consultado no admin do Django, junto com o calendário.
+O calendário, as planilhas baixadas e as execuções do aviso podem ser consultados no admin do Django.
 
-## 6. Regras de negócio
-
-As regras estão em `acompanhamento/situacao.py`. Elas foram confirmadas com a secretaria em 12/10/2026 e com a coordenação em 16/10/2026. Os três estados vêm da reunião de 27/10/2026.
-
-### Estados na tela
-
-| Estado | Quando aparece |
-|---|---|
-| Irregular | Atraso no marco, com ou sem nova chance. O motivo explica o caso |
-| Regular | Em dia ou com o marco já cumprido |
-| Não foi possível calcular | Falta dado para o cálculo, ou o cálculo falhou naquele cadastro |
-
-Só entra a trajetória ativa de mestrado ou doutorado. Quem já defendeu não aparece na lista da defesa.
-
-### Projeto de dissertação e qualificação
-
-- **Mestrado:** vale a data limite do projeto na trajetória. Sem ela, vale a data do calendário para o semestre do projeto.
-- **Doutorado:** vale a data do calendário para o semestre da qualificação, que por padrão é o quinto.
-- **Trancamento:** os dias trancados somam à data limite.
-- **Conceito A ou B:** marco cumprido.
-- **Conceito C:** uma única repetição, em até 3 meses (mestrado) ou 6 meses (doutorado).
-- **Conceito D:** irregular, sem nova chance.
-- **Sem apresentação até a data:** uma nova chance, no mesmo prazo de 3 ou 6 meses. Se esse prazo passar, ou se apresentar nele e não for aprovado, fica irregular sem nova chance.
-
-### Defesa
-
-O prazo termina no último dia do mês em que se completam 24 meses (mestrado) ou 48 meses (doutorado) do mês de ingresso. As prorrogações somam meses e valem até o fim do mês em que terminam. Depois, somam-se os dias de trancamento.
-
-Exemplo: ingresso em fevereiro de 2025, no mestrado, com 3 meses de prorrogação, tem limite em 31/05/2027.
-
-### Painel de Sucesso por Turma
-
-A turma é o semestre de ingresso. As barras são Concluídos, Desligados, Trancados, Ativos, Ativos regulares, Ativos irregulares e Com prorrogação, sempre em percentual dos ingressantes da turma. Trajetórias removidas ou em homologação ficam de fora.
-
-Ativo irregular é quem está irregular no marco ou na defesa. Ativos regulares inclui quem aparece como "Não foi possível calcular" na lista, e a tela informa isso.
-
-Turmas anteriores a 2026.2 aparecem com aviso, porque desligamentos, prorrogações e defesas dessas turmas podem não ter sido lançados.
-
-Concluídos, desligados, trancados e ativos somam sempre 100,0%. Quando o arredondamento deixa sobra, ela vai para a categoria com mais alunos. Da mesma forma, ativos regulares e irregulares somam a taxa de ativos. A barra Com prorrogação é contada à parte.
-
-### Painel por Professor
-
-As regras foram confirmadas pelo professor em 06/11/2026.
-
-- **Professor:** é o orientador da trajetória. A coorientação fica fora, e quem não tem orientador aparece na linha "Sem orientador".
-- **Prazo vencido:** alunos cujo prazo regimental da defesa já passou, sem contar prorrogações nem trancamentos. No último dia do prazo, o aluno ainda não conta. Sem data de ingresso, não entra.
-- **Defenderam:** alunos concluídos com data de defesa, entre os que têm prazo vencido.
-- **No prazo regular:** quem defendeu até o prazo regimental.
-- **Taxa de sucesso:** defenderam sobre prazo vencido. Sem nenhum aluno com prazo vencido, a tela mostra "Sem base" em vez de 0%.
-- **Taxa de prorrogação:** alunos com pelo menos uma prorrogação sobre o total de alunos do professor.
-- **Previsão de conclusão:** só alunos ativos. Usa o mesmo limite de defesa da lista de alunos, já com prorrogações e trancamentos, e o converte em semestre pelo calendário. Limite já passado aparece como "Prazo vencido", e aluno sem data de ingresso, como "Sem previsão".
-- **Troca de orientador:** o sistema guarda só o orientador atual, então todo o histórico do aluno fica com ele.
-
-### Diferença conhecida
-
-A página do aluno, do sistema original, conta a prorrogação mantendo o dia. No exemplo acima, ela mostra 28/05/2027, e o módulo mostra 31/05/2027. O módulo segue a resposta da coordenação, e a página do aluno não foi alterada.
-
-## 7. Decisões
+## 7. Decisões técnicas
 
 | Decisão | Motivo | Consequência |
 |---|---|---|
 | Módulo em app próprio | Reduz os conflitos com as atualizações do sistema original | Parte da lista de alunos continua em `processos/views.py` |
 | Chaves desligadas por padrão | Permite instalar sem mudar nada para o usuário e voltar atrás sem reverter código | Alguém precisa ligar as chaves em cada ambiente |
-| Aviso no Celery, sem n8n | O Celery já roda em produção, a regra fica em um lugar só e dias perdidos são recuperados. Informado ao professor em 27/10/2026 | O aviso depende do worker e do beat |
+| Aviso no Celery, sem n8n | O Celery já roda em produção, a regra fica em um lugar só e dias perdidos são recuperados. Informado ao coordenador em 27/10/2026 | O aviso depende do worker e do beat |
 | Situação calculada na hora | Evita guardar um valor que pode ficar defasado quando o cadastro muda | Toda abertura da lista e da página inicial refaz o cálculo |
-| Mesma regra de acesso da gestão do sistema | Não cria uma segunda regra para manter | Servidor, bolsista e voluntário também veem as telas (ver seção 8) |
+| Mesma regra de acesso da gestão do sistema | Não cria uma segunda regra para manter | O módulo usa a função privada `_has_gestao_access`, e um teste avisa se as duas cópias divergirem |
 | Mesmo cálculo para cartão, lista e planilha | Os números não podem divergir entre as telas | Uma mudança na lista afeta as três saídas |
-| Painel por Professor só para o coordenador e a Coordenação PPG | Os números por professor são sensíveis. Confirmado pelo professor em 06/11/2026 | Cada professor ainda não vê os próprios números |
-| Taxa de sucesso só entre quem tem prazo vencido | Alunos ainda dentro do prazo baixariam a taxa sem ter falhado | Turmas recentes aparecem como "Sem base" |
 | Versões fixas no `requirements.txt` | Em 03/11/2026, uma versão nova do `kombu` derrubou o worker sem nenhuma mudança no código | Atualizar uma dependência passa a ser uma mudança explícita, com teste e ensaio |
 
-## 8. Riscos, pendências e o que ficou de fora
-
-### Conferir antes de ligar em produção
-
-| Item | Por que importa | Quem decide ou confere |
-|---|---|---|
-| Contas de teste no banco | A migration `0003_seed_mock_data`, do sistema original, cria o "Aluno Mock 1". Se ele existir em produção, entra no cartão, na lista e no aviso | Equipe confere, coordenação decide a remoção |
-| Quem pode ver as telas | A lista e a planilha têm dados pessoais. Hoje, servidor, bolsista e voluntário também veem | Coordenação |
-| Números e lista | A secretaria e a coordenação precisam validar os números com dados reais | Secretaria e coordenação |
-| E-mail e Celery no servidor | Nada disso foi conferido no servidor do cliente. A equipe não tem acesso a ele, que exige a VPN da POLI | Professor ou DTI, com os comandos de "Atualizar para esta versão" e a lista de verificação |
-
-### Limitações conhecidas
-
-- O início dos registros (2026.2) está fixo em `servicos.py`.
-- No Painel por Professor, o histórico do aluno fica com o orientador atual. Se o orientador mudou, os números antigos passam para o novo.
-- O desempenho do Painel por Professor com o tamanho real do programa, cerca de 400 alunos e 40 professores, ainda está sendo medido.
-- A lista considera a trajetória ativa mais recente do aluno, e o painel conta todas as ativas. Os números só divergem se um aluno tiver duas trajetórias ativas.
-- O desempenho do Painel de Processos com muitos dados não foi medido.
-- O módulo usa uma função privada do sistema, `_has_gestao_access`. Um teste avisa se as duas cópias dessa regra divergirem.
-
-### Pedidos que não entraram
-
-Pedidos da coordenação ainda sem definição de prioridade:
-
-- curvas semestre a semestre;
-- melhoria da página de Dashboard.
-
-### Fora do escopo
-
-- Integração com n8n.
-- Tela de Planejamento Estratégico.
-- Reorganização do app `processos`.
-- Correções no código original, que são tratadas diretamente com o professor.
-
-## 9. Glossário e links
+## 8. Termos técnicos
 
 | Termo | Significado |
 |---|---|
-| Trajetória | Passagem do aluno por um curso, com nível, ingresso, orientador e status |
-| Turma | Alunos com o mesmo semestre de ingresso, como 2025.1 |
-| Marco | Projeto de dissertação (mestrado), qualificação (doutorado) ou defesa |
-| Data limite | Último dia para cumprir o marco, já com trancamentos e prorrogações, quando for o caso |
-| Reapresentação | Nova chance depois da data limite ou de um conceito C |
-| Prorrogação | Meses acrescentados ao prazo da defesa |
-| Trancamento | Período de suspensão, cujos dias somam aos prazos |
-| Levantamento inicial | Primeiro e-mail do aviso, com todos os atrasados daquele momento |
 | Chave | Variável do `.env` que liga ou desliga o módulo ou o aviso |
-| Prazo regimental | Prazo da defesa sem prorrogações nem trancamentos: 24 meses no mestrado e 48 no doutorado |
-| Sem base | Taxa que não pode ser calculada porque nenhum aluno chegou ao fim do prazo |
-| Previsão de conclusão | Semestre em que termina o limite de defesa de um aluno ativo |
+| Worker | Contêiner `celery`, que executa a tarefa do aviso |
+| Beat | Contêiner `celery-beat`, que dispara a tarefa às 7h |
+| Watchtower | Serviço do servidor que troca os contêineres quando sai imagem nova |
+| Ensaio de produção | Teste com Docker que sobe o sistema como em produção, sobre o banco migrado com a `main` oficial |
+
+Os termos de negócio estão no documento de negócio.
 
 Documentos relacionados:
 
+- [Documento de negócio](documento-de-negocio.md)
+- [Passagem de conhecimento](passagem-de-conhecimento.md)
 - [Manual de uso para a secretaria](manual-de-uso-secretaria.md)
 - [Lista de verificação do servidor para o aviso](verificacao-do-servidor-para-o-aviso.md)
 - [Guia do ambiente local](guia-do-ambiente-local.md)

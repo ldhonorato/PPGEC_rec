@@ -37,7 +37,7 @@ class MostrarAvisoDoDiaTests(TestCase):
         saida = self.rodar()
 
         self.assertIn("Aluno Atrasado", saida)
-        self.assertIn("1 aluno(s) com prazo vencido", saida)
+        self.assertIn("1 discente(s) com prazo vencido", saida)
         self.assertIn(self.secretaria.email, saida)
         self.assertIn(self.coordenacao.email, saida)
         self.assertIn("Atrasado com chance", saida)

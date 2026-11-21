@@ -36,7 +36,7 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
            href="{{ cartao_irregulares.endereco }}">
             <svg class="metric-icon" aria-hidden="true"><use href="#i-alerta"></use></svg>
             <p class="metric-value">{{ cartao_irregulares.total }}</p>
-            <p class="metric-label">Alunos irregulares</p>
+            <p class="metric-label">Alunos(as) irregulares</p>
         </a>
     {% endif %}
     {% if user.tipo_usuario == "DOCENTE" %}
@@ -48,12 +48,12 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
         <a class="card metric-card is-green" href="{% url 'menu_meus_orientandos' %}">
             <svg class="metric-icon" aria-hidden="true"><use href="#i-orientandos"></use></svg>
             <p class="metric-value">{{ orientandos|length|default:"0" }}</p>
-            <p class="metric-label">Orientandos ativos</p>
+            <p class="metric-label">Orientandos(as) ativos(as)</p>
         </a>
         <a class="card metric-card is-purple" href="{% url 'menu_processos_orientandos' %}">
             <svg class="metric-icon" aria-hidden="true"><use href="#i-processos-orientandos"></use></svg>
             <p class="metric-value">{{ processos_orientandos|length|default:"0" }}</p>
-            <p class="metric-label">Processos dos orientandos</p>
+            <p class="metric-label">Processos dos(as) orientandos(as)</p>
         </a>
         <a class="card metric-card {% if cientes_pendentes_orientador %}is-alerta{% else %}is-orange{% endif %}"
            href="{% url 'menu_ciencias_manifestadas' %}">
@@ -99,7 +99,7 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
         <a class="card metric-card" href="{% url 'coordenacao_alunos' %}">
             <svg class="metric-icon" aria-hidden="true"><use href="#i-alunos"></use></svg>
             <p class="metric-value">{{ gestao_metricas.alunos_ativos }}</p>
-            <p class="metric-label">Alunos com trajetória ativa</p>
+            <p class="metric-label">Alunos(as) com trajetória ativa</p>
         </a>
         <a class="card metric-card is-green" href="{% url 'coordenacao_processos' %}">
             <svg class="metric-icon" aria-hidden="true"><use href="#i-todos-processos"></use></svg>
@@ -164,7 +164,7 @@ os verdadeiros. Os atalhos puros vivem em "Acesso rapido", mais abaixo.
                 <div><dt>Nível</dt><dd>{{ aluno_trajetoria_recente.get_nivel_curso_display }}</dd></div>
                 <div><dt>Ingresso</dt><dd>{{ aluno_trajetoria_recente.ingresso|default:"—" }}</dd></div>
                 <div><dt>Status</dt><dd><span class="badge badge-info">{{ aluno_trajetoria_recente.get_status_display }}</span></dd></div>
-                <div><dt>Orientador</dt><dd>{{ aluno_trajetoria_recente.orientador.nome|default:"—" }}</dd></div>
+                <div><dt>Orientador(a)</dt><dd>{{ aluno_trajetoria_recente.orientador.nome|default:"—" }}</dd></div>
             </dl>
         {% else %}
             <div class="estado-vazio">

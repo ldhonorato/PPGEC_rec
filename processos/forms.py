@@ -183,6 +183,7 @@ class PublicacaoTrajetoriaForm(forms.ModelForm):
     class Meta:
         model = PublicacaoTrajetoria
         fields = ["titulo", "tipo", "autores", "veiculo", "ano", "doi_url"]
+        labels = {"autores": "Autores(as)"}
         widgets = {
             "autores": forms.Textarea(attrs={"rows": 3}),
             "ano": forms.NumberInput(attrs={"min": "1900", "max": "2100"}),
@@ -420,13 +421,13 @@ class SetorComissaoForm(forms.ModelForm):
             is_active=True,
         ).order_by("nome", "email"),
         required=False,
-        label="Servidores e bolsistas/voluntários",
+        label="Servidores(as) e bolsistas/voluntários(as)",
         widget=forms.CheckboxSelectMultiple,
     )
     alunos = forms.ModelMultipleChoiceField(
         queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.ALUNO).order_by("nome", "email"),
         required=False,
-        label="Alunos",
+        label="Alunos(as)",
         widget=forms.CheckboxSelectMultiple,
     )
 
@@ -576,7 +577,7 @@ class DisponibilidadeSalaLoteForm(forms.Form):
 
 
 class SolicitacaoBancaForm(OpcoesVaziasNomeadas, forms.ModelForm):
-    aluno = forms.ModelChoiceField(queryset=Aluno.objects.none(), label="Aluno")
+    aluno = forms.ModelChoiceField(queryset=Aluno.objects.none(), label="Aluno(a)")
     trajetoria = forms.ModelChoiceField(queryset=TrajetoriaAcademica.objects.none(), label="Trajetória acadêmica")
 
     class Meta:
@@ -659,7 +660,7 @@ class SolicitacaoBancaForm(OpcoesVaziasNomeadas, forms.ModelForm):
         tipo_defesa = cleaned_data.get("tipo_defesa")
 
         if aluno and trajetoria and trajetoria.aluno_id != aluno.id:
-            self.add_error("trajetoria", "A trajetória selecionada não pertence ao aluno.")
+            self.add_error("trajetoria", "A trajetória selecionada não pertence ao(a) aluno(a).")
         if trajetoria and self.docente:
             docente_vinculado = trajetoria.orientador_id == self.docente.id or trajetoria.coorientador_id == self.docente.id
             if not docente_vinculado:
@@ -885,6 +886,10 @@ class DocumentoCadastroForm(forms.Form):
 
 
 class EncaminhamentoForm(OpcoesVaziasNomeadas, forms.Form):
+    destinatario_devolucao = forms.ChoiceField(
+        required=False, label="Quem deve atender à devolução?",
+        help_text="Obrigatório ao encaminhar para Requerente.",
+    )
     setor_destino = forms.ModelChoiceField(
         queryset=Setor.objects.none(),
         label="Setor de destino",
@@ -907,8 +912,16 @@ class EncaminhamentoForm(OpcoesVaziasNomeadas, forms.Form):
         label="Data Limite",
     )
 
-    def __init__(self, *args, current_setor_id=None, allowed_setor_ids=None, **kwargs):
+    def __init__(self, *args, processo=None, current_setor_id=None, allowed_setor_ids=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.processo = processo
+        escolhas = [("", "Selecione quem deve agir")]
+        if processo:
+            escolhas.append(("REQUERENTE", f"Requerente — {processo.usuario_criado_por.nome}"))
+            if processo.aluno_interessado_id:
+                escolhas.append(("ALUNO", f"Aluno(a) interessado(a) — {processo.aluno_interessado.nome}"))
+        self.fields["destinatario_devolucao"].choices = escolhas
+        self.order_fields(["setor_destino", "destinatario_devolucao", "despacho", "prazo_pleno", "prazo_limite"])
         queryset = Setor.objects.filter(ativo=True).order_by("nome")
         if allowed_setor_ids is not None:
             queryset = queryset.filter(id__in=allowed_setor_ids)
@@ -919,6 +932,8 @@ class EncaminhamentoForm(OpcoesVaziasNomeadas, forms.Form):
     def clean(self):
         cleaned_data = super().clean()
         setor = cleaned_data.get("setor_destino")
+        if setor and setor.nome == "Requerente" and not cleaned_data.get("destinatario_devolucao"):
+            self.add_error("destinatario_devolucao", "Selecione quem deve atender à devolução.")
         if setor and "pleno" in setor.nome.lower() and not cleaned_data.get("prazo_pleno"):
             self.add_error("prazo_pleno", "Informe a data limite para deliberação no Pleno.")
         return cleaned_data
@@ -935,6 +950,7 @@ class ProcessoAberturaForm(forms.ModelForm):
     class Meta:
         model = Processo
         fields = ["aluno_interessado", "tipo", "assunto", "descricao"]
+        labels = {"aluno_interessado": "Aluno(a) interessado(a)"}
         widgets = {
             "descricao": forms.Textarea(attrs={"rows": 6}),
         }
@@ -960,16 +976,28 @@ class ProcessoAberturaForm(forms.ModelForm):
                 .distinct()
                 .order_by("nome")
             )
-            self.fields["aluno_interessado"].required = True
-            self.fields["aluno_interessado"].label = "Aluno interessado"
+            self.fields["aluno_interessado"].required = False
+            self.fields["aluno_interessado"].empty_label = "Nenhum(a) aluno(a) interessado(a)"
+            self.fields["aluno_interessado"].help_text = (
+                "Opcional. Selecione o discente quando o processo se referir a um(a) orientando(a)."
+            )
+            self.fields["aluno_interessado"].label = "Aluno(a) interessado(a)"
         # O padrao do Django e "---------", que ocupa a primeira posicao da lista
         # sem dizer o que fazer com ela. Como "tipo" tem choices e nao e chave
         # estrangeira, o campo e um TypedChoiceField -- que nao tem empty_label;
         # a opcao vazia vem dentro de choices e e la que se troca.
-        escolhas = list(self.fields["tipo"].choices)
+        tipos_banca = {
+            Processo.TipoProcesso.DEFESA_MESTRADO,
+            Processo.TipoProcesso.DEFESA_DOUTORADO,
+            Processo.TipoProcesso.QUALIFICACAO_DOUTORADO,
+        }
+        escolhas = [
+            (valor, rotulo) for valor, rotulo in self.fields["tipo"].choices
+            if valor not in tipos_banca
+        ]
         if escolhas and escolhas[0][0] == "":
             escolhas[0] = ("", "Selecione o tipo de requerimento")
-            self.fields["tipo"].choices = escolhas
+        self.fields["tipo"].choices = escolhas
         self.fields["assunto"].widget.attrs.setdefault(
             "placeholder", "Ex.: Prorrogação de prazo para defesa"
         )
@@ -1315,7 +1343,7 @@ class AlunoComentarioForm(OpcoesVaziasNomeadas, forms.Form):
 
 
 class AlunoStatusForm(AlunoComentarioForm):
-    status_aluno = forms.ChoiceField(choices=Aluno.StatusAluno.choices, label="Status do aluno")
+    status_aluno = forms.ChoiceField(choices=Aluno.StatusAluno.choices, label="Status do(a) aluno(a)")
 
 
 class AlunoDadosForm(AlunoComentarioForm):
@@ -1350,7 +1378,7 @@ class AlunoDadosForm(AlunoComentarioForm):
         if self.aluno:
             queryset = queryset.exclude(pk=self.aluno.pk)
         if queryset.exists():
-            raise forms.ValidationError("Já existe um usuário com este email.")
+            raise forms.ValidationError("Já existe um(a) usuário(a) com este email.")
         return email
 
     def clean_cpf(self):
@@ -1361,7 +1389,7 @@ class AlunoDadosForm(AlunoComentarioForm):
         if self.aluno:
             queryset = queryset.exclude(pk=self.aluno.pk)
         if cpf and queryset.exists():
-            raise forms.ValidationError("Já existe um aluno com este CPF.")
+            raise forms.ValidationError("Já existe um(a) aluno(a) com este CPF.")
         return cpf or None
 
 
@@ -1399,7 +1427,7 @@ class AlunoCadastroForm(OpcoesVaziasNomeadas, forms.Form):
     password2 = forms.CharField(label="Confirmar senha", widget=forms.PasswordInput)
     polo_atuacao = forms.ModelChoiceField(
         queryset=Polo.objects.none(),
-        label="Polo do aluno",
+        label="Polo do(a) aluno(a)",
     )
     sexo_atribuido_nascimento = forms.ChoiceField(
         choices=(("", "---------"), *Aluno.SexoAtribuidoNascimento.choices),
@@ -1411,27 +1439,27 @@ class AlunoCadastroForm(OpcoesVaziasNomeadas, forms.Form):
     orientador = forms.ModelChoiceField(
         queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE, is_active=True).order_by("nome"),
         required=False,
-        label="Orientador",
+        label="Orientador(a)",
     )
     tipo_coorientador = forms.ChoiceField(
         choices=(
-            ("NENHUM", "Sem coorientador"),
+            ("NENHUM", "Sem coorientador(a)"),
             ("CADASTRADO", "Docente cadastrado"),
-            ("EXTERNO", "Coorientador externo"),
+            ("EXTERNO", "Coorientador(a) externo(a)"),
         ),
-        label="Tipo de coorientador",
+        label="Tipo de coorientador(a)",
     )
     coorientador = forms.ModelChoiceField(
         queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE, is_active=True).order_by("nome"),
         required=False,
-        label="Coorientador cadastrado",
+        label="Coorientador(a) cadastrado(a)",
     )
-    coorientador_externo_nome = forms.CharField(max_length=255, required=False, label="Nome do coorientador externo")
-    coorientador_externo_email = forms.EmailField(required=False, label="Email do coorientador externo")
+    coorientador_externo_nome = forms.CharField(max_length=255, required=False, label="Nome do(a) coorientador(a) externo(a)")
+    coorientador_externo_email = forms.EmailField(required=False, label="Email do(a) coorientador(a) externo(a)")
     coorientador_externo_instituicao = forms.CharField(
         max_length=255,
         required=False,
-        label="Instituição do coorientador externo",
+        label="Instituição do(a) coorientador(a) externo(a)",
     )
 
     def __init__(self, *args, **kwargs):
@@ -1447,7 +1475,7 @@ class AlunoCadastroForm(OpcoesVaziasNomeadas, forms.Form):
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
         if User.objects.filter(email__iexact=email).exists():
-            raise forms.ValidationError("Já existe um usuário com este email.")
+            raise forms.ValidationError("Já existe um(a) usuário(a) com este email.")
         return email
 
     def clean_cpf(self):
@@ -1498,11 +1526,11 @@ class AlunoCadastroForm(OpcoesVaziasNomeadas, forms.Form):
             cleaned_data["coorientador_externo_instituicao"] = ""
 
         if usa_supervisao and not cleaned_data.get("orientador"):
-            self.add_error("orientador", "Selecione o supervisor do Pós-Doutorado.")
+            self.add_error("orientador", "Selecione o(a) supervisor(a) do Pós-Doutorado.")
         elif tipo_coorientador == "CADASTRADO" and not coorientador:
             self.add_error("coorientador", "Selecione um docente cadastrado.")
         elif tipo_coorientador == "EXTERNO" and not externo_nome:
-            self.add_error("coorientador_externo_nome", "Informe o nome do coorientador externo.")
+            self.add_error("coorientador_externo_nome", "Informe o nome do(a) coorientador(a) externo(a).")
 
         return cleaned_data
 
@@ -1571,12 +1599,12 @@ class ImportacaoDeclaracoesVinculoForm(OpcoesVaziasNomeadas, forms.Form):
     arquivos = MultiploArquivoField(
         label="Declarações em PDF",
         widget=MultiploArquivoInput(attrs={"accept": ".pdf", "multiple": True}),
-        help_text="Cada arquivo deve ser nomeado com o CPF do aluno. Selecione a pasta inteira de uma vez.",
+        help_text="Cada arquivo deve ser nomeado com o CPF do(a) aluno(a). Selecione a pasta inteira de uma vez.",
     )
     substituir = forms.BooleanField(
         label="Substituir declarações já existentes deste semestre",
         required=False,
-        help_text="Sem isto, um aluno que já tem declaração neste período é pulado e aparece no relatório.",
+        help_text="Sem esta opção, declarações já existentes no período são mantidas e informadas no relatório.",
     )
 
 
@@ -1584,12 +1612,12 @@ class ImportacaoIngressantesForm(forms.Form):
     arquivo = forms.FileField(
         label="Planilha de ingressantes",
         widget=forms.FileInput(attrs={"accept": ".csv,.xls,.xlsx"}),
-        help_text="Arquivo CSV, XLS ou XLSX com as colunas nome, cpf, e-mail e orientador.",
+        help_text="Arquivo CSV, XLS ou XLSX com as colunas nome, cpf, e-mail e orientador(a).",
     )
     nivel_curso = forms.ChoiceField(
-        label="Ingresso do aluno",
+        label="Ingresso do(a) aluno(a)",
         choices=(
-            (Aluno.NivelCurso.ALUNO_ESPECIAL, "Aluno especial"),
+            (Aluno.NivelCurso.ALUNO_ESPECIAL, "Aluno(a) especial"),
             (Aluno.NivelCurso.MESTRADO, "Mestrado"),
             (Aluno.NivelCurso.DOUTORADO, "Doutorado"),
         ),
@@ -1617,7 +1645,7 @@ class ImportacaoIngressantesForm(forms.Form):
 
 
 class AlunoQualificacaoForm(AlunoComentarioForm):
-    isQualificado = forms.BooleanField(required=False, label="Aluno qualificado")
+    isQualificado = forms.BooleanField(required=False, label="Aluno(a) qualificado(a)")
 
 
 class AlunoPrazoForm(AlunoComentarioForm):
@@ -1658,7 +1686,7 @@ class AlunoIniciarDoutoradoForm(AlunoComentarioForm):
     orientador = forms.ModelChoiceField(
         queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE).order_by("nome"),
         required=False,
-        label="Orientador do doutorado",
+        label="Orientador(a) do doutorado",
     )
 
 
@@ -1678,7 +1706,7 @@ class AlunoOrientadorForm(AlunoComentarioForm):
     orientador = forms.ModelChoiceField(
         queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE).order_by("nome"),
         required=False,
-        label="Orientador",
+        label="Orientador(a)",
     )
 
 
@@ -1689,33 +1717,33 @@ class AlunoCoorientadorForm(AlunoComentarioForm):
         EXTERNO = "EXTERNO"
 
         choices = (
-            (NENHUM, "Sem coorientador"),
+            (NENHUM, "Sem coorientador(a)"),
             (CADASTRADO, "Docente cadastrado"),
-            (EXTERNO, "Coorientador externo"),
+            (EXTERNO, "Coorientador(a) externo(a)"),
         )
 
     tipo_coorientador = forms.ChoiceField(
         choices=TipoCoorientador.choices,
-        label="Tipo de coorientador",
+        label="Tipo de coorientador(a)",
     )
     coorientador = forms.ModelChoiceField(
         queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE).order_by("nome"),
         required=False,
-        label="Coorientador cadastrado",
+        label="Coorientador(a) cadastrado(a)",
     )
     coorientador_externo_nome = forms.CharField(
         max_length=255,
         required=False,
-        label="Nome do coorientador externo",
+        label="Nome do(a) coorientador(a) externo(a)",
     )
     coorientador_externo_email = forms.EmailField(
         required=False,
-        label="Email do coorientador externo",
+        label="Email do(a) coorientador(a) externo(a)",
     )
     coorientador_externo_instituicao = forms.CharField(
         max_length=255,
         required=False,
-        label="Instituição do coorientador externo",
+        label="Instituição do(a) coorientador(a) externo(a)",
     )
 
     def clean(self):
@@ -1728,7 +1756,7 @@ class AlunoCoorientadorForm(AlunoComentarioForm):
             self.add_error("coorientador", "Selecione um docente cadastrado.")
 
         if tipo_coorientador == self.TipoCoorientador.EXTERNO and not externo_nome:
-            self.add_error("coorientador_externo_nome", "Informe o nome do coorientador externo.")
+            self.add_error("coorientador_externo_nome", "Informe o nome do(a) coorientador(a) externo(a).")
 
         return cleaned_data
 
@@ -1750,9 +1778,9 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
         EXTERNO = "EXTERNO"
 
         choices = (
-            (NENHUM, "Sem coorientador"),
+            (NENHUM, "Sem coorientador(a)"),
             (CADASTRADO, "Docente cadastrado"),
-            (EXTERNO, "Coorientador externo"),
+            (EXTERNO, "Coorientador(a) externo(a)"),
         )
 
     trajetoria_id = forms.IntegerField(required=False, widget=forms.HiddenInput)
@@ -1777,20 +1805,20 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
     orientador = forms.ModelChoiceField(
         queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE).order_by("nome"),
         required=False,
-        label="Orientador",
+        label="Orientador(a)",
     )
-    tipo_coorientador = forms.ChoiceField(choices=TipoCoorientador.choices, label="Tipo de coorientador")
+    tipo_coorientador = forms.ChoiceField(choices=TipoCoorientador.choices, label="Tipo de coorientador(a)")
     coorientador = forms.ModelChoiceField(
         queryset=User.objects.filter(tipo_usuario=User.TipoUsuario.DOCENTE).order_by("nome"),
         required=False,
-        label="Coorientador cadastrado",
+        label="Coorientador(a) cadastrado(a)",
     )
-    coorientador_externo_nome = forms.CharField(max_length=255, required=False, label="Nome do coorientador externo")
-    coorientador_externo_email = forms.EmailField(required=False, label="Email do coorientador externo")
+    coorientador_externo_nome = forms.CharField(max_length=255, required=False, label="Nome do(a) coorientador(a) externo(a)")
+    coorientador_externo_email = forms.EmailField(required=False, label="Email do(a) coorientador(a) externo(a)")
     coorientador_externo_instituicao = forms.CharField(
         max_length=255,
         required=False,
-        label="Instituição do coorientador externo",
+        label="Instituição do(a) coorientador(a) externo(a)",
     )
     numero_defesa = forms.CharField(max_length=80, required=False, label="Número da defesa")
     data_defesa = forms.DateField(required=False, label="Data da defesa", widget=forms.DateInput(attrs={"type": "date"}))
@@ -1837,7 +1865,7 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
             cleaned_data["coorientador_externo_instituicao"] = ""
 
         if usa_supervisao and not cleaned_data.get("orientador"):
-            self.add_error("orientador", "Selecione o supervisor do Pós-Doutorado.")
+            self.add_error("orientador", "Selecione o(a) supervisor(a) do Pós-Doutorado.")
 
         if not usa_conclusao:
             cleaned_data["numero_defesa"] = ""
@@ -1849,7 +1877,7 @@ class TrajetoriaAcademicaForm(AlunoComentarioForm):
         if usa_orientacao and tipo_coorientador == self.TipoCoorientador.CADASTRADO and not coorientador:
             self.add_error("coorientador", "Selecione um docente cadastrado.")
         if usa_orientacao and tipo_coorientador == self.TipoCoorientador.EXTERNO and not externo_nome:
-            self.add_error("coorientador_externo_nome", "Informe o nome do coorientador externo.")
+            self.add_error("coorientador_externo_nome", "Informe o nome do(a) coorientador(a) externo(a).")
         if status == TrajetoriaAcademica.Status.CONCLUIDA and usa_conclusao:
             if not numero_defesa:
                 self.add_error("numero_defesa", f"Informe o número do {conclusao_label}.")
@@ -1905,7 +1933,7 @@ class TrajetoriaStatusForm(AlunoComentarioForm):
 
 class NovoEstagioDocenciaForm(AlunoComentarioForm):
     trajetoria_id = forms.IntegerField(widget=forms.HiddenInput())
-    supervisor = forms.CharField(max_length=255, label="Supervisor", required=True)
+    supervisor = forms.CharField(max_length=255, label="Supervisor(a)", required=True)
     status = forms.ChoiceField(choices=EstagioDocencia.Status.choices, required=True, label="Em Andamento")
     
     # Removendo o 'required=False', eles se tornam obrigatórios automaticamente
@@ -1915,7 +1943,7 @@ class NovoEstagioDocenciaForm(AlunoComentarioForm):
 
 class EstagioDocenciaUpdateForm(AlunoComentarioForm):
     estagio_id = forms.IntegerField(widget=forms.HiddenInput())
-    supervisor = forms.CharField(max_length=255, required=False, label="Nome do Supervisor")
+    supervisor = forms.CharField(max_length=255, required=False, label="Nome do(a) Supervisor(a)")
     status = forms.ChoiceField(choices=EstagioDocencia.Status.choices, label="Status")
     inicio = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
     termino = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
