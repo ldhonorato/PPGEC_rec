@@ -3,7 +3,7 @@
 
 {% block auth_largura %}auth-cartao-largo{% endblock %}
 
-{% block auth_titulo %}Criar cadastro de aluno{% endblock %}
+{% block auth_titulo %}Criar cadastro de aluno(a){% endblock %}
 {% block auth_subtitulo %}
     <p class="auth-apoio">
         O cadastro passa por avaliação da secretaria antes de liberar o acesso.
@@ -199,7 +199,7 @@
                 legend.textContent = usaSupervisao ? "Supervisão" : "Orientação";
             });
             document.querySelectorAll("[data-vinculo-docente-label]").forEach((label) => {
-                label.textContent = usaSupervisao ? "Supervisor" : "Orientador";
+                label.textContent = usaSupervisao ? "Supervisor(a)" : "Orientador(a)";
             });
             if (tipoCoorientador) tipoCoorientador.closest(".campo").style.display = usaOrientacao ? "" : "none";
             document.querySelectorAll("[data-coorientador-section]").forEach((section) => {

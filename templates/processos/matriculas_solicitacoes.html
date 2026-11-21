@@ -5,7 +5,7 @@
     <div class="actions-row">
         <div>
             <h1 class="section-title">Solicitações de Matrícula</h1>
-            <p class="muted">Selecione uma disciplina para consultar os alunos que solicitaram matrícula.</p>
+            <p class="muted">Selecione uma disciplina para consultar os(as) alunos(as) que solicitaram matrícula.</p>
         </div>
         <div class="calendar-nav">
             {% if periodo %}
@@ -107,7 +107,7 @@
 {% elif disciplina_selecionada == "vinculo" %}
 <section class="card">
     <h2 class="section-title">Matrícula vínculo</h2>
-    <p class="muted">Alunos que solicitaram manutenção do vínculo sem matrícula em disciplinas.</p>
+    <p class="muted">Alunos(as) que solicitaram manutenção do vínculo sem matrícula em disciplinas.</p>
     {% if solicitacoes_vinculo %}
         <ul class="list">
             {% for solicitacao in solicitacoes_vinculo %}
@@ -136,7 +136,7 @@
     <div class="estado-vazio">
         <svg aria-hidden="true"><use href="#i-disciplinas"></use></svg>
         <p class="estado-vazio-titulo">Selecione uma disciplina</p>
-        <p>A lista de alunos será carregada somente após a seleção.</p>
+        <p>A lista de alunos(as) será carregada somente após a seleção.</p>
     </div>
 </section>
 {% endif %}

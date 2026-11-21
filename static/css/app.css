@@ -3306,6 +3306,38 @@ dialog::backdrop {
     color: var(--color-accent-strong);
 }
 
+.activity-list.chart-bars li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    min-height: 0;
+    padding: 0.85rem 0;
+}
+
+.chart-bar-label {
+    min-width: 0;
+    color: var(--color-text);
+    font-size: 0.95rem;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.chart-bar-value {
+    min-width: 2.5rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    background: var(--color-primary-soft);
+    color: var(--color-primary-strong);
+    font-size: 0.9rem;
+    font-weight: var(--peso-forte);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.chart-bar-track {
+    grid-column: 1 / -1;
+    height: 0.75rem;
+}
+
 .activity-list .is-cumprido .soft-icon,
 .soft-icon.is-ok {
     color: var(--color-accent-strong);

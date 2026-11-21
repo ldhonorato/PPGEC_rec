@@ -11,7 +11,11 @@ Se uma delas mudar e a outra não, o teste quebra na sincronização com o
 repositório original.
 """
 
-from processos.context_processors import _has_gestao_access
+from processos.context_processors import (
+    _has_gestao_access,
+    _is_coordenacao_member,
+    _is_coordenador,
+)
 
 
 def tem_acesso_gestao(usuario) -> bool:
@@ -22,3 +26,8 @@ def tem_acesso_gestao(usuario) -> bool:
     Secretaria PPGEC ou Coordenação PPG.
     """
     return _has_gestao_access(usuario)
+
+
+def pode_ver_painel_professores(usuario) -> bool:
+    """Diz se o usuário pode ver o painel de acompanhamento por professor."""
+    return _is_coordenador(usuario) or _is_coordenacao_member(usuario)

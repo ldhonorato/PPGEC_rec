@@ -5,9 +5,10 @@ from django.contrib.auth.models import AnonymousUser
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
-from acompanhamento.permissoes import tem_acesso_gestao
+from acompanhamento.permissoes import pode_ver_painel_professores, tem_acesso_gestao
 from acompanhamento.tests import test_linha_de_base as linha_de_base
 from acompanhamento.tests.test_linha_de_base import criar_perfis
+from ppgec.settings import env_bool
 from processos import context_processors
 from processos import views as processos_views
 
@@ -24,7 +25,9 @@ PERFIS_COM_GESTAO = {
 
 class ChavePadraoTests(SimpleTestCase):
     def test_chave_desligada_quando_a_variavel_nao_existe(self):
-        self.assertIs(settings.ACOMPANHAMENTO_ATIVO, False)
+        with patch.dict("os.environ") as ambiente:
+            ambiente.pop("ACOMPANHAMENTO_ATIVO", None)
+            self.assertIs(env_bool("ACOMPANHAMENTO_ATIVO", False), False)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -57,6 +60,27 @@ class PaginaInicialTests(TestCase):
                 self.assertEqual(self.client.get(self.endereco).status_code, esperado)
 
     @override_settings(ACOMPANHAMENTO_ATIVO=True)
+    def test_pagina_inicial_mostra_as_telas_e_o_total_de_irregulares(self):
+        self.client.force_login(self.perfis["servidor"])
+        cartao = {"total": 3, "endereco": "/coordenacao/alunos/?marco=qualquer"}
+        with patch("acompanhamento.views.cartao_alunos_irregulares", return_value=cartao):
+            resposta = self.client.get(self.endereco)
+
+        self.assertContains(resposta, "alunos(as) irregulares")
+        self.assertContains(resposta, "/coordenacao/alunos/?marco=qualquer")
+        self.assertContains(resposta, "Concluídos, desligados e ativos de cada turma.")
+
+    @override_settings(ACOMPANHAMENTO_ATIVO=True)
+    def test_erro_na_conta_de_irregulares_nao_derruba_a_pagina_inicial(self):
+        self.client.force_login(self.perfis["servidor"])
+        with patch("acompanhamento.views.cartao_alunos_irregulares", return_value=None):
+            resposta = self.client.get(self.endereco)
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertNotContains(resposta, "Ver a lista")
+        self.assertContains(resposta, "Painel de Processos")
+
+    @override_settings(ACOMPANHAMENTO_ATIVO=True)
     def test_modulo_sem_telas_informa_que_nao_ha_telas(self):
 
         self.client.force_login(self.perfis["servidor"])
@@ -80,6 +104,17 @@ class RegraDeAcessoTests(TestCase):
                 self.assertEqual(da_tela, do_menu, "as duas cópias da regra do sistema divergiram")
                 self.assertEqual(tem_acesso_gestao(usuario), do_menu)
                 self.assertEqual(do_menu, nome in PERFIS_COM_GESTAO)
+
+    def test_painel_professores_e_restrito_a_coordenador_e_coordenacao(self):
+        usuarios = dict(self.perfis, visitante=AnonymousUser())
+        perfis_autorizados = {"docente_coordenador", "membro_coordenacao"}
+
+        for nome, usuario in usuarios.items():
+            with self.subTest(perfil=nome):
+                self.assertEqual(
+                    pode_ver_painel_professores(usuario),
+                    nome in perfis_autorizados,
+                )
 
 
 @override_settings(ACOMPANHAMENTO_ATIVO=True)

@@ -13,7 +13,21 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from processos.models import Aluno, Docente, Polo, Processo, Setor, User
+from acompanhamento.models import MarcoCalendario
+from acompanhamento.situacao import somar_meses
+from processos.models import (
+    Aluno,
+    ApresentacaoQualificacao,
+    DisciplinaTrajetoria,
+    Docente,
+    Polo,
+    Processo,
+    ProrrogacaoTrajetoria,
+    Setor,
+    TrajetoriaAcademica,
+    TrancamentoTrajetoria,
+    User,
+)
 
 DOMINIO = "@ficticio.invalid"
 PREFIXO_POLO = "Fictício"
@@ -40,6 +54,56 @@ STATUS_ABERTOS = [
 # Quantos dias para trás os processos podem ter sido abertos (um pouco
 # mais de seis meses, que é o mínimo pedido).
 JANELA_DIAS = 200
+
+
+# Alunos das turmas antigas: (nível, meses desde o ingresso, desfecho,
+# meses de prorrogação). Concluído precisa de pelo menos 14 meses no
+# mestrado e 26 no doutorado, senão a data da defesa é recusada.
+TURMAS_DO_PAINEL = [
+    ("MESTRADO", 6, "ativo", 0),
+    ("MESTRADO", 20, "ativo", 3),
+    ("MESTRADO", 30, "concluido", 3),
+    ("MESTRADO", 42, "concluido", 0),
+    ("MESTRADO", 42, "desligado", 0),
+    ("MESTRADO", 54, "concluido", 6),
+    ("MESTRADO", 54, "trancado", 0),
+    ("MESTRADO", 66, "concluido", 0),
+    ("MESTRADO", 66, "desligado", 0),
+    ("DOUTORADO", 6, "ativo", 0),
+    ("DOUTORADO", 18, "desligado", 0),
+    ("DOUTORADO", 30, "trancado", 0),
+    ("DOUTORADO", 40, "concluido", 6),
+    ("DOUTORADO", 40, "ativo", 6),
+    ("DOUTORADO", 52, "concluido", 0),
+    ("DOUTORADO", 62, "concluido", 0),
+    ("DOUTORADO", 62, "desligado", 0),
+    ("DOUTORADO", 74, "concluido", 12),
+    # Defenderam dentro do prazo regular, para a taxa "no prazo" do painel
+    # por professor.
+    ("MESTRADO", 40, "concluido_no_prazo", 0),
+    ("MESTRADO", 50, "concluido_no_prazo", 0),
+    ("DOUTORADO", 60, "concluido_no_prazo", 0),
+    ("DOUTORADO", 64, "concluido_no_prazo", 6),
+]
+
+# Orientadores fictícios e os alunos de cada um, pelo número de criação da
+# trajetória (1 = primeira). Cada um tem um perfil diferente no painel:
+# Alice defende muito, Bruno pouco, Carla prorroga muito e Diego só tem
+# alunos novos (sem ninguém com prazo vencido).
+ORIENTADORES = {
+    "Alice Moura": [1, 6, 17, 18, 20, 29, 30, 33, 34, 35],
+    "Bruno Tavares": [2, 3, 5, 9, 13, 19, 22, 23, 31, 32],
+    "Carla Duarte": [7, 8, 10, 11, 16, 21, 25, 26, 27, 28, 36],
+    "Diego Ferraz": [4, 12, 14, 15, 24],
+}
+
+STATUS_DO_DESFECHO = {
+    "ativo": TrajetoriaAcademica.Status.ATIVA,
+    "concluido": TrajetoriaAcademica.Status.ATIVA,  # nova_trajetoria conclui
+    "concluido_no_prazo": TrajetoriaAcademica.Status.ATIVA,
+    "desligado": TrajetoriaAcademica.Status.DESLIGADA,
+    "trancado": TrajetoriaAcademica.Status.TRANCADA,
+}
 
 
 class Command(BaseCommand):
@@ -89,6 +153,16 @@ class Command(BaseCommand):
         total_processos = processos.count()
         processos.delete()
 
+        # Trajetórias antes dos usuários, porque apresentação, prorrogação
+        # e trancamento têm PROTECT em quem registrou.
+        trajetorias = TrajetoriaAcademica.objects.filter(aluno__email__endswith=DOMINIO)
+        total_trajetorias = trajetorias.count()
+        trajetorias.delete()
+
+        # Datas do calendário criadas aqui ficam marcadas com a secretaria
+        # fictícia. Saem antes dela, senão perdem a marca (SET_NULL).
+        MarcoCalendario.objects.filter(alterado_por__email__endswith=DOMINIO).delete()
+
         usuarios = User.objects.filter(email__endswith=DOMINIO)
         total_usuarios = usuarios.count()
         usuarios.delete()
@@ -99,6 +173,7 @@ class Command(BaseCommand):
 
         return {
             "Processos": total_processos,
+            "Trajetórias": total_trajetorias,
             "Usuários": total_usuarios,
             "Polos": total_polos,
         }
@@ -116,6 +191,7 @@ class Command(BaseCommand):
         resumo["Alunos"] = len(alunos)
 
         resumo.update(self.criar_processos(alunos))
+        resumo["Alunos com trajetória"] = self.criar_alunos_com_trajetoria()
         return resumo
 
     def criar_docentes(self):
@@ -209,6 +285,182 @@ class Command(BaseCommand):
             )
 
         return {"Processos abertos": abertos, "Processos finalizados": finalizados}
+
+    def criar_alunos_com_trajetoria(self):
+        # Um aluno em cada situação de prazo, contando a partir da data de
+        # referência. Os números são meses desde o ingresso e dias até a
+        # data limite do projeto (negativo = já passou).
+        self.secretaria = User(nome="Secretaria Fictícia", email="secretaria" + DOMINIO)
+        self.secretaria.set_unusable_password()
+        self.secretaria.save()
+
+        # Mestrado
+        self.nova_trajetoria("MESTRADO", ingresso=12, limite_projeto=60)  # tudo em dia
+        self.nova_trajetoria("MESTRADO", ingresso=14, limite_projeto=-30)  # projeto atrasado, com chance
+        self.nova_trajetoria("MESTRADO", ingresso=18, limite_projeto=-120)  # projeto atrasado, sem chance
+        self.nova_trajetoria("MESTRADO", ingresso=None)  # sem datas cadastradas
+        self.nova_trajetoria("MESTRADO", ingresso=30, limite_projeto=-300)  # projeto e defesa vencidos
+        self.nova_trajetoria("MESTRADO", ingresso=26, defendeu=True)  # já defendeu
+
+        # Projeto aprovado antes da data limite
+        trajetoria = self.nova_trajetoria("MESTRADO", ingresso=14, limite_projeto=-30)
+        self.apresentar(trajetoria, dias_atras=40, conceito="A")
+
+        # Caso 7: primeira apresentação depois da data limite, com conceito C.
+        # Ela já era a reapresentação, então não sobra chance.
+        trajetoria = self.nova_trajetoria("MESTRADO", ingresso=15, limite_projeto=-60)
+        self.apresentar(trajetoria, dias_atras=20, conceito="C")
+
+        # Defesa venceria, mas a prorrogação e o trancamento estendem o prazo
+        trajetoria = self.nova_trajetoria("MESTRADO", ingresso=25, limite_projeto=-30)
+        ProrrogacaoTrajetoria.objects.create(
+            trajetoria=trajetoria, meses=3, registrado_por=self.secretaria
+        )
+        inicio = somar_meses(self.referencia, -6)
+        TrancamentoTrajetoria.objects.create(
+            trajetoria=trajetoria,
+            data_inicio=inicio,
+            data_fim=inicio + timedelta(days=29),
+            registrado_por=self.secretaria,
+        )
+
+        # Trancado e desligado: estariam atrasados, mas não entram na lista
+        self.nova_trajetoria(
+            "MESTRADO", ingresso=18, limite_projeto=-120,
+            status=TrajetoriaAcademica.Status.TRANCADA,
+        )
+        self.nova_trajetoria(
+            "MESTRADO", ingresso=18, limite_projeto=-120,
+            status=TrajetoriaAcademica.Status.DESLIGADA,
+        )
+
+        # Doutorado: qualificados, um em dia e um com a defesa vencida
+        trajetoria = self.nova_trajetoria("DOUTORADO", ingresso=30)
+        self.apresentar(trajetoria, dias_atras=60, conceito="A")
+        trajetoria = self.nova_trajetoria("DOUTORADO", ingresso=50)
+        self.apresentar(trajetoria, dias_atras=400, conceito="A")
+
+        # Doutorado com a qualificação atrasada, ainda com chance. A data
+        # limite vem do calendário, no quinto semestre (dois anos após o
+        # ingresso).
+        limite = self.referencia - timedelta(days=30)
+        self.data_no_calendario(limite)
+        self.nova_trajetoria("DOUTORADO", data_ingresso=somar_meses(limite, -24))
+
+        # Turmas de anos diferentes para o painel de sucesso por turma. Vêm
+        # depois dos 14 de cima, sem mudar a ordem deles.
+        for nivel, meses, desfecho, prorrogacao in TURMAS_DO_PAINEL:
+            trajetoria = self.nova_trajetoria(
+                nivel,
+                ingresso=meses,
+                defendeu=desfecho.startswith("concluido"),
+                no_prazo=desfecho == "concluido_no_prazo",
+                status=STATUS_DO_DESFECHO[desfecho],
+            )
+            self.prorrogar(trajetoria, prorrogacao)
+
+        self.distribuir_orientadores()
+
+        return TrajetoriaAcademica.objects.filter(aluno__email__endswith=DOMINIO).count()
+
+    def distribuir_orientadores(self):
+        trajetorias = list(
+            TrajetoriaAcademica.objects.filter(aluno__email__endswith=DOMINIO).order_by("pk")
+        )
+        for nome, numeros in ORIENTADORES.items():
+            orientador = Docente(nome=nome, permanente=True, externo=False)
+            orientador.email = self.email_para(nome)
+            orientador.set_unusable_password()
+            orientador.save()
+            pks = [trajetorias[numero - 1].pk for numero in numeros]
+            TrajetoriaAcademica.objects.filter(pk__in=pks).update(orientador=orientador)
+
+    def prorrogar(self, trajetoria, meses):
+        # Cada concessão tem no máximo 3 meses no mestrado e 6 no doutorado.
+        por_vez = 3 if trajetoria.nivel_curso == "MESTRADO" else 6
+        while meses > 0:
+            parte = min(meses, por_vez)
+            ProrrogacaoTrajetoria.objects.create(
+                trajetoria=trajetoria, meses=parte, registrado_por=self.secretaria
+            )
+            meses -= parte
+
+    def nova_trajetoria(
+        self,
+        nivel,
+        ingresso=None,
+        limite_projeto=None,
+        defendeu=False,
+        status=TrajetoriaAcademica.Status.ATIVA,
+        data_ingresso=None,
+        no_prazo=False,
+    ):
+        aluno = Aluno(nome=self.nome_aleatorio())
+        aluno.email = self.email_para(aluno.nome)
+        if defendeu:
+            aluno.status_aluno = Aluno.StatusAluno.DEFENDEU
+        if status == TrajetoriaAcademica.Status.DESLIGADA:
+            aluno.status_aluno = Aluno.StatusAluno.DESLIGADO
+        aluno.set_unusable_password()
+        aluno.save()
+
+        if ingresso is not None:
+            data_ingresso = somar_meses(self.referencia, -ingresso)
+
+        trajetoria = TrajetoriaAcademica(aluno=aluno, nivel_curso=nivel, status=status)
+        if data_ingresso is None:
+            trajetoria.ingresso = MarcoCalendario.semestre_da_data(self.referencia)
+        else:
+            trajetoria.data_ingresso = data_ingresso
+            trajetoria.ingresso = MarcoCalendario.semestre_da_data(data_ingresso)
+
+        if limite_projeto is not None:
+            limite = self.referencia + timedelta(days=limite_projeto)
+            trajetoria.data_limite_qualificacao = limite
+            trajetoria.prazo_qualificacao = MarcoCalendario.semestre_da_data(limite)
+
+        if defendeu:
+            trajetoria.status = TrajetoriaAcademica.Status.CONCLUIDA
+            trajetoria.isQualificado = True
+            trajetoria.numero_defesa = "Defesa fictícia"
+            trajetoria.data_defesa = self.referencia - timedelta(days=30)
+            if no_prazo:
+                # 22 meses no mestrado e 44 no doutorado: depois do mínimo e
+                # antes do fim do prazo regular (24 e 48 meses).
+                meses = 22 if nivel == "MESTRADO" else 44
+                trajetoria.data_defesa = somar_meses(data_ingresso, meses)
+
+        trajetoria.save()
+        return trajetoria
+
+    def apresentar(self, trajetoria, dias_atras, conceito):
+        # No mestrado, o projeto só pode ser apresentado com 12 créditos.
+        if trajetoria.nivel_curso == "MESTRADO":
+            DisciplinaTrajetoria.objects.create(
+                trajetoria=trajetoria,
+                nome="Disciplina fictícia",
+                creditos=12,
+                situacao=DisciplinaTrajetoria.Situacao.APROVADA,
+            )
+        ApresentacaoQualificacao.objects.create(
+            trajetoria=trajetoria,
+            data_apresentacao=self.referencia - timedelta(days=dias_atras),
+            conceito=conceito,
+            registrado_por=self.secretaria,
+        )
+
+    def data_no_calendario(self, data):
+        # Só cria se o semestre ainda não tiver data, para não mexer em
+        # datas que já estão no banco.
+        semestre = MarcoCalendario.semestre_da_data(data)
+        tipo = MarcoCalendario.TipoMarco.QUALIFICACAO
+        if not MarcoCalendario.objects.filter(semestre=semestre, tipo=tipo).exists():
+            MarcoCalendario.objects.create(
+                semestre=semestre,
+                tipo=tipo,
+                data_limite=data,
+                alterado_por=self.secretaria,
+            )
 
     def nome_aleatorio(self):
         # Sorteia até achar um nome que ainda não saiu nesta execução.

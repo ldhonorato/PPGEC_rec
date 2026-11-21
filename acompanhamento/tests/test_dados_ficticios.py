@@ -8,7 +8,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 
-from processos.models import Docente, Polo, Processo, User
+from processos.models import Docente, Polo, Processo, TrajetoriaAcademica, User
 
 DOMINIO = "@ficticio.invalid"
 
@@ -98,3 +98,9 @@ class GerarDadosFicticiosTests(TestCase):
             with self.assertRaises(RuntimeError):
                 rodar()
         self.assertEqual(User.objects.filter(email__endswith=DOMINIO).count(), antes)
+    
+    def test_cria_os_alunos_com_trajetoria_sem_duplicar(self):
+        rodar()
+        rodar()
+        trajetorias = TrajetoriaAcademica.objects.filter(aluno__email__endswith=DOMINIO)
+        self.assertEqual(trajetorias.count(), 36)

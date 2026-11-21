@@ -27,6 +27,10 @@ app.conf.beat_schedule = {
         "task": "processos.tasks.send_email_lembrete_planejamento_presencial",
         "schedule": crontab(hour=11, minute=0),
     },
+    "acompanhamento-aviso-diario": {
+        "task": "acompanhamento.tasks.enviar_avisos_irregularidade",
+        "schedule": crontab(hour=7, minute=0),
+    },
 }
 
 # # ROTINA AUTÔNOMA DE TEMPO (CELERY BEAT) ===============================================

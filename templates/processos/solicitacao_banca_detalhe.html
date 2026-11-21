@@ -22,12 +22,12 @@
 <section class="card panel">
     <h2 class="section-title">Discente e trajetória</h2>
     <ul class="info-list">
-        <li><span class="info-label">Aluno</span><span>{{ solicitacao.aluno.nome }}{% if solicitacao.aluno.matricula %} - {{ solicitacao.aluno.matricula }}{% endif %}</span></li>
+        <li><span class="info-label">Aluno(a)</span><span>{{ solicitacao.aluno.nome }}{% if solicitacao.aluno.matricula %} - {{ solicitacao.aluno.matricula }}{% endif %}</span></li>
         <li><span class="info-label">E-mail</span><span>{{ solicitacao.aluno.email }}</span></li>
         <li><span class="info-label">Nível</span><span>{{ solicitacao.trajetoria.get_nivel_curso_display }}</span></li>
         <li><span class="info-label">Ingresso</span><span>{{ solicitacao.trajetoria.ingresso }}</span></li>
-        <li><span class="info-label">Orientador</span><span>{{ solicitacao.trajetoria.orientador.nome|default:"-" }}</span></li>
-        <li><span class="info-label">Coorientador</span><span>{{ solicitacao.trajetoria.coorientador_display|default:"-" }}</span></li>
+        <li><span class="info-label">Orientador(a)</span><span>{{ solicitacao.trajetoria.orientador.nome|default:"-" }}</span></li>
+        <li><span class="info-label">Coorientador(a)</span><span>{{ solicitacao.trajetoria.coorientador_display|default:"-" }}</span></li>
     </ul>
 </section>
 

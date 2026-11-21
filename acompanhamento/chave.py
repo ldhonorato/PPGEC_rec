@@ -10,3 +10,12 @@ def modulo_ativo() -> bool:
     testes possam ligar e desligar a chave com override_settings.
     """
     return bool(getattr(settings, "ACOMPANHAMENTO_ATIVO", False))
+
+def aviso_ativo() -> bool:
+    """Diz se o aviso diário está ligado.
+
+    Só vale com o módulo também ligado: as duas chaves precisam estar ativas.
+    """
+    return modulo_ativo() and bool(
+        getattr(settings, "ACOMPANHAMENTO_AVISO_ATIVO", False)
+    )

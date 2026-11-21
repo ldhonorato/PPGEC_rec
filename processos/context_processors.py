@@ -122,7 +122,7 @@ DESCRICOES_MENU = {
     "Caixa de Processos": "Aguardando análise do seu setor",
     "Processos": "Buscar em todos os processos",
     "Processos no Pleno": "Em debate no colegiado",
-    "Processos dos Orientandos": "Acompanhar seus orientandos",
+    "Processos dos(as) Orientandos(as)": "Acompanhar seus orientandos(as)",
     # Aluno
     "Matrícula": "Suas solicitações do período",
     "Histórico Escolar": "Emissão em construção",
@@ -137,21 +137,21 @@ DESCRICOES_MENU = {
     # Docente
     "Ofertas de Disciplinas": "Turmas que você leciona",
     "Ciências": "Ciências solicitadas a você",
-    "Meus Orientandos": "Alunos sob sua orientação",
+    "Meus Orientandos(as)": "Alunos(as) sob sua orientação",
     "Solicitação de Banca": "Qualificação e defesa",
     # Gestao
     "Dashboard": "Indicadores do programa",
-    "Acompanhamento": "Prazos e indicadores dos alunos",
+    "Acompanhamento": "Prazos e indicadores dos(as) alunos(as)",
     "Matrículas": "Períodos, turmas e solicitações",
     "Períodos letivos": "Calendário e prazos do semestre",
-    "Solicitações": "Pedidos de matrícula dos alunos",
+    "Solicitações": "Pedidos de matrícula dos(as) alunos(as)",
     "Disciplinas": "Catálogo e ementários",
     "Ofertas de disciplinas": "Turmas abertas no período",
-    "Alunos": "Cadastro e trajetória dos alunos",
+    "Alunos(as)": "Cadastro e trajetória dos(as) alunos(as)",
     "Validar Cadastros": "Cadastros aguardando aprovação",
     "Cadastro": "Inclusão e validação de pessoas",
     "Declarações de vínculo": "Comprovantes do semestre",
-    "Cadastro de ingressantes": "Importar novos alunos por planilha",
+    "Cadastro de ingressantes": "Importar novos alunos(as) por planilha",
     "Setores e Comissões": "Estrutura de tramitação",
     "Metas do Planejamento": "Objetivos e indicadores estratégicos",
     "Criar Comissão": "Montar uma nova comissão",
@@ -290,7 +290,7 @@ def _menu_lateral_sections(user):
             _menu_item("Ofertas de Disciplinas", "/gestao/matriculas/ofertas/", ["matriculas_ofertas"], "ofertas"),
             _menu_item("Ciências", "/menu/ciencias-manifestadas/", ["menu_ciencias_manifestadas"], "ciencias"),
             _menu_item(
-                "Meus Orientandos",
+                "Meus Orientandos(as)",
                 "/menu/meus-orientandos/",
                 # O orientador passou a poder abrir a trajetoria do orientando; sem
                 # aluno_detalhe aqui, essa tela nao acendia nada para o docente.
@@ -304,7 +304,7 @@ def _menu_lateral_sections(user):
                 "banca",
             ),
             _menu_item(
-                "Processos dos Orientandos",
+                "Processos dos(as) Orientandos(as)",
                 "/menu/processos-orientandos/",
                 ["menu_processos_orientandos"],
                 "processos-orientandos",
@@ -338,7 +338,6 @@ def _menu_lateral_sections(user):
                 ["coordenacao_processos", "processo_detalhe"],
                 "todos-processos",
             ),
-            _menu_item("Dashboard", "/coordenacao/dashboard/", ["coordenacao_dashboard"], "dashboard"),
             _menu_item(
                 "Matrículas",
                 "/gestao/matriculas/periodos/",
@@ -387,7 +386,7 @@ def _menu_lateral_sections(user):
                 ["coordenacao_alunos", "aluno_detalhe", "validar_cadastros_alunos", "importar_ingressantes"],
                 "alunos",
                 children=[
-                    _menu_item("Alunos", "/coordenacao/alunos/", ["coordenacao_alunos", "aluno_detalhe"], "alunos"),
+                    _menu_item("Alunos(as)", "/coordenacao/alunos/", ["coordenacao_alunos", "aluno_detalhe"], "alunos"),
                     _menu_item(
                         "Cadastro de ingressantes",
                         "/gestao/cadastro/ingressantes/",
@@ -416,7 +415,7 @@ def _menu_lateral_sections(user):
         # banco. As telas do módulo ficam na página inicial dele, e não aqui.
         if getattr(settings, "ACOMPANHAMENTO_ATIVO", False):
             coordenacao_items.append(
-                _menu_item("Acompanhamento", "/acompanhamento/", ["acompanhamento_inicio"], "trajetoria")
+                _menu_item("Acompanhamento", "/acompanhamento/", ["acompanhamento_inicio", "coordenacao_dashboard"], "trajetoria")
             )
         coordenacao_items.append(
             _menu_item(
@@ -490,9 +489,9 @@ def _menu_lateral_items(user):
 # ativo, que e a divergencia que uma segunda lista de rotas produziria.
 BARRA_FLUTUANTE = {
     User.TipoUsuario.ALUNO: ("Início", "Meus Processos", "Matrícula"),
-    User.TipoUsuario.DOCENTE: ("Início", "Meus Processos", "Meus Orientandos"),
-    User.TipoUsuario.SERVIDOR: ("Início", "Caixa de Processos", "Alunos"),
-    User.TipoUsuario.BOLSISTA_VOLUNTARIO: ("Início", "Caixa de Processos", "Alunos"),
+    User.TipoUsuario.DOCENTE: ("Início", "Meus Processos", "Meus Orientandos(as)"),
+    User.TipoUsuario.SERVIDOR: ("Início", "Caixa de Processos", "Alunos(as)"),
+    User.TipoUsuario.BOLSISTA_VOLUNTARIO: ("Início", "Caixa de Processos", "Alunos(as)"),
 }
 
 # O circulo de destaque e uma acao, nao um destino: abre um processo. Quem nao

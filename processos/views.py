@@ -281,6 +281,9 @@ def _can_view_processo_detalhe(user, processo):
     # Esta verificacao precisa anteceder a restricao geral de alunos.
     if _can_view_processos(user):
         return True
+    if (processo.setor_atual.nome == "Requerente"
+            and processo.setor_acompanhamento_id in {setor.id for setor in _setores_caixa(user)}):
+        return True
     if user.tipo_usuario == User.TipoUsuario.ALUNO:
         return False
     if processo.setor_atual_id in {setor.id for setor in _setores_caixa(user)}:
@@ -296,7 +299,7 @@ def _can_view_processo_detalhe(user, processo):
 
 
 def _is_requerente_do_processo(user, processo):
-    return user.is_authenticated and processo.aluno_interessado_id == user.id
+    return user.is_authenticated and (processo.destinatario_devolucao_id or processo.aluno_interessado_id or processo.usuario_criado_por_id) == user.id
 
 
 def _setores_membro_queryset(user):
@@ -647,10 +650,10 @@ def _trajetoria_campo_historico(trajetoria: TrajetoriaAcademica, campo: str) -> 
     if campo == "isQualificado":
         return trajetoria.qualificacao_label, _bool_label(trajetoria.isQualificado)
     if campo == "orientador":
-        rotulo = "Supervisor" if trajetoria.usa_supervisao else "Orientador"
+        rotulo = "Supervisor(a)" if trajetoria.usa_supervisao else "Orientador(a)"
         return rotulo, _docente_label(trajetoria.orientador)
     if campo == "coorientador":
-        return "Coorientador", _coorientador_label(trajetoria)
+        return "Coorientador(a)", _coorientador_label(trajetoria)
     if campo == "defesa":
         return "Defesa", _defesa_display(trajetoria)
     if campo == "deposito_versao_final":
@@ -686,10 +689,10 @@ def _campo_alteracao_label(campo: str) -> str:
         "Ingresso": "Ingresso",
         "defesa": "Defesa",
         "Defesa": "Defesa",
-        "orientador": "Orientador",
-        "Orientador": "Orientador",
-        "coorientador": "Coorientador",
-        "Coorientador": "Coorientador",
+        "orientador": "Orientador(a)",
+        "Orientador(a)": "Orientador(a)",
+        "coorientador": "Coorientador(a)",
+        "Coorientador(a)": "Coorientador(a)",
         "reingressante": "Reingressante",
         "Reingressante": "Reingressante",
         "nome": "Nome",
@@ -713,7 +716,7 @@ def _alteracao_aluno_display(alteracao: AlteracaoAluno) -> dict:
     elif nivel:
         trajetoria = nivel
     else:
-        trajetoria = "Dados do aluno"
+        trajetoria = "Dados do(a) aluno(a)"
 
     alteracoes = []
     for campo in sorted(set(anterior) | set(novo)):
@@ -814,9 +817,9 @@ def _menu_lateral_home(user):
     if user.tipo_usuario == User.TipoUsuario.DOCENTE:
         items = [
             {"label": "Meus Processos", "href": "/menu/meus-processos/"},
-            {"label": "Processos dos orientandos", "href": "/menu/processos-orientandos/"},
+            {"label": "Processos dos(as) orientandos(as)", "href": "/menu/processos-orientandos/"},
             {"label": "Ciências manifestadas", "href": "/menu/ciencias-manifestadas/"},
-            {"label": "Meus Orientandos", "href": "/menu/meus-orientandos/"},
+            {"label": "Meus Orientandos(as)", "href": "/menu/meus-orientandos/"},
         ]
         if _is_membro_setor_nome(user, Setor.NOME_PLENO):
             items.insert(1, {"label": "Processos no Pleno", "href": "/menu/processos-pleno/"})
@@ -913,7 +916,7 @@ def matriculas_periodos_view(request):
             periodo = get_object_or_404(PeriodoLetivo, pk=request.POST.get("periodo_id"))
             total_pendentes = alunos_ativos_sem_matricula(periodo).count()
             send_email_alunos_sem_matricula.delay(periodo.pk)
-            messages.success(request, f"Envio de e-mail agendado para {total_pendentes} aluno(s) sem matrícula.")
+            messages.success(request, f"Envio de e-mail agendado para {total_pendentes} discente(s) sem matrícula.")
             return redirect("matriculas_periodos")
         elif acao == "indeferir_vinculo":
             solicitacao = get_object_or_404(SolicitacaoMatricula, pk=request.POST.get("solicitacao_id"))
@@ -1345,7 +1348,7 @@ def agendamento_aula_presencial_alunos_polos_view(request, aula_id):
 @login_required
 def matricula_solicitar_view(request, periodo_id=None):
     if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
-        raise PermissionDenied("Apenas alunos podem solicitar matrícula.")
+        raise PermissionDenied("Apenas alunos(as) podem solicitar matrícula.")
 
     trajetoria_ativa = request.user.aluno.trajetoria_ativa()
     tipo_aluno = tipo_aluno_matricula_por_trajetoria(trajetoria_ativa) if trajetoria_ativa else None
@@ -1485,7 +1488,7 @@ def matricula_solicitar_view(request, periodo_id=None):
 @login_required
 def matriculas_minhas_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
-        raise PermissionDenied("Apenas alunos acessam suas matrículas.")
+        raise PermissionDenied("Apenas alunos(as) acessam suas matrículas.")
     solicitacoes = (
         SolicitacaoMatricula.objects.filter(aluno=request.user)
         .select_related("periodo")
@@ -1831,7 +1834,7 @@ def _checklist_integralizacao_trajetoria(trajetoria: TrajetoriaAcademica):
                     _check_item("Cursar 2 disciplinas obrigatórias (8 créditos)."),
                     _check_item("Cursar 2 disciplinas eletivas da área (8 créditos)."),
                     _check_item(
-                        "Cursar 2 disciplinas eletivas gerais (8 créditos). Pode substituir uma eletiva geral por uma da área, ou vice-versa, mediante justificativa e anuência do orientador.",
+                        "Cursar 2 disciplinas eletivas gerais (8 créditos). Pode substituir uma eletiva geral por uma da área, ou vice-versa, mediante justificativa e anuência do(a) orientador(a).",
                     ),
                 ],
             },
@@ -1947,7 +1950,11 @@ def home_view(request):
         if request.user.tipo_usuario == User.TipoUsuario.ALUNO
         else Processo.objects.filter(usuario_criado_por=request.user)
     )
-    meus_processos_requerente = meus_processos_base.filter(setor_atual__nome="Requerente")
+    meus_processos_requerente = meus_processos_base.filter(setor_atual__nome="Requerente").filter(
+        Q(destinatario_devolucao=request.user)
+        | Q(destinatario_devolucao__isnull=True, aluno_interessado=request.user)
+        | Q(destinatario_devolucao__isnull=True, aluno_interessado__isnull=True, usuario_criado_por=request.user)
+    )
     assinaturas_pendentes = _assinaturas_pendentes_queryset(request.user)
     context = {
         "meus_processos_requerente": meus_processos_requerente,
@@ -1973,7 +1980,7 @@ def home_view(request):
             .order_by("nome")
         )
         processos_orientandos = (
-            Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual")
+            Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual", "destinatario_devolucao", "setor_acompanhamento")
             .filter(aluno_interessado__in=orientandos.values("id"))
             .order_by("-data_criacao")
         )
@@ -2010,6 +2017,11 @@ def home_view(request):
                 status_aluno=Aluno.StatusAluno.EM_AVALIACAO
             ).count(),
         }
+        # O import fica aqui dentro para o modulo desligado nao ser carregado.
+        if settings.ACOMPANHAMENTO_ATIVO:
+            from acompanhamento.lista_alunos import cartao_alunos_irregulares
+
+            context["cartao_irregulares"] = cartao_alunos_irregulares()
 
     if request.user.tipo_usuario == User.TipoUsuario.ALUNO:
         aluno = getattr(request.user, "aluno", None)
@@ -2104,13 +2116,13 @@ def me_view(request):
 def setores_comissoes_view(request):
     can_edit_setores = _is_coordenador(request.user)
     if not _has_gestao_access(request.user):
-        raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
+        raise PermissionDenied("Acesso restrito a coordenadores(as) e servidores(as).")
 
     setor_editado = None
     setor_id = request.GET.get("editar") if can_edit_setores else None
     if request.method == "POST":
         if not can_edit_setores:
-            raise PermissionDenied("Apenas coordenadores podem alterar setores e comissões.")
+            raise PermissionDenied("Apenas coordenadores(as) podem alterar setores e comissões.")
         setor_id = request.POST.get("setor_id")
     if setor_id:
         setor_editado = get_object_or_404(Setor, pk=setor_id)
@@ -2202,7 +2214,7 @@ def setores_comissoes_view(request):
 @login_required
 def criar_comissao_view(request):
     if not _is_coordenador(request.user):
-        raise PermissionDenied("Acesso restrito a coordenadores.")
+        raise PermissionDenied("Acesso restrito a coordenadores(as).")
 
     if request.method == "POST":
         form = SetorComissaoForm(request.POST)
@@ -2244,7 +2256,7 @@ def criar_comissao_view(request):
 @login_required
 def coordenacao_dashboard_view(request):
     if not _can_view_dashboard(request.user):
-        raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
+        raise PermissionDenied("Acesso restrito a coordenadores(as) e servidores(as).")
 
     trajetorias_ativas = TrajetoriaAcademica.objects.filter(
         status=TrajetoriaAcademica.Status.ATIVA,
@@ -2313,9 +2325,9 @@ def coordenacao_dashboard_view(request):
 @login_required
 def processos_view(request):
     if not _can_view_processos(request.user):
-        raise PermissionDenied("Acesso restrito a docentes e servidores.")
+        raise PermissionDenied("Acesso restrito a docentes e servidores(as).")
 
-    queryset = Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual").order_by("-data_criacao")
+    queryset = Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual", "destinatario_devolucao", "setor_acompanhamento").order_by("-data_criacao")
     tipo = request.GET.get("tipo", "").strip()
     status = request.GET.get("status", "").strip()
     setor_id = request.GET.get("setor", "").strip()
@@ -2427,7 +2439,7 @@ def _aprovar_cadastro_aluno(*, aluno, usuario):
 @login_required
 def aluno_informar_cpf_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
-        raise PermissionDenied("Acesso restrito a alunos.")
+        raise PermissionDenied("Acesso restrito a alunos(as).")
     aluno = get_object_or_404(Aluno, pk=request.user.pk)
     if request.method != "POST":
         return redirect("home")
@@ -2588,7 +2600,7 @@ def declaracoes_vinculo_view(request):
 @login_required
 def alunos_view(request):
     if not _has_gestao_access(request.user):
-        raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
+        raise PermissionDenied("Acesso restrito a coordenadores(as) e servidores(as).")
 
     queryset = Aluno.objects.select_related("polo_atuacao").prefetch_related("trajetorias__orientador").order_by("nome")
     nome = request.GET.get("nome", "").strip()
@@ -2623,16 +2635,108 @@ def alunos_view(request):
         alunos_sem_matricula_ids = alunos_ativos_sem_matricula(periodo_sem_matricula).values("pk")
         queryset = queryset.filter(pk__in=alunos_sem_matricula_ids)
 
-    # Pagina antes de anotar a trajetoria: a anotacao faz uma consulta por
-    # aluno, entao rodar sobre a lista inteira custaria N consultas para exibir
-    # 25 linhas.
-    pagina = _paginar(request, queryset.distinct().order_by("nome"))
-    alunos = list(pagina.object_list)
-    for aluno_item in alunos:
-        trajetoria_atual = aluno_item.trajetoria_ativa()
-        if not trajetoria_atual:
-            trajetoria_atual = aluno_item.trajetorias.order_by("-criado_em").first()
-        aluno_item.trajetoria_atual = trajetoria_atual
+    acompanhamento_ativo = settings.ACOMPANHAMENTO_ATIVO
+    marco = ""
+    situacao_marco = ""
+    semestre_marco = ""
+    linhas_marco = None
+    filtros_marco_validos = True
+    exportar_excel = False
+    marco_qualquer = False
+    marcos = ()
+    situacoes_marco = ()
+    filtros_rotulos = {
+        "nome": ("Nome", None),
+        "status": ("Status", dict(Aluno.StatusAluno.choices).get),
+        "polo": ("Polo", lambda v: Polo.objects.filter(pk=v).values_list("nome", flat=True).first()),
+        "nivel": ("Nível", dict(Aluno.NivelCurso.choices).get),
+        "reingressante": ("Reingressante", lambda v: "Sim" if v == "1" else "Não"),
+        "ingresso_inicio": ("Ingresso de", None),
+        "ingresso_fim": ("Ingresso até", None),
+        "sem_matricula_periodo": ("Sem matrícula em", _nome_do_periodo),
+    }
+
+    if acompanhamento_ativo:
+        from acompanhamento.lista_alunos import (
+            IRREGULARES,
+            MARCOS,
+            QUALQUER_MARCO,
+            SITUACOES_FILTRO,
+            listar_alunos_por_marco,
+        )
+
+        marco = request.GET.get("marco", "").strip()
+        marco_qualquer = marco == QUALQUER_MARCO
+        situacao_marco = request.GET.get("situacao_marco", "").strip()
+        # "Qualquer marco" só lista irregulares: a opção "Todas" do formulário
+        # não pode virar um erro na tela.
+        if marco_qualquer and not situacao_marco:
+            situacao_marco = IRREGULARES
+        semestre_marco = request.GET.get("semestre_marco", "").strip()
+        exportar_excel = request.GET.get("exportar") == "xlsx"
+        marcos = tuple(MARCOS.items())
+        situacoes_marco = tuple(SITUACOES_FILTRO.items())
+        filtros_rotulos.update(
+            {
+                "marco": ("Marco", MARCOS.get),
+                "situacao_marco": (
+                    "Situação no marco",
+                    SITUACOES_FILTRO.get,
+                ),
+                "semestre_marco": ("Semestre do marco", None),
+            }
+        )
+
+    if marco:
+        try:
+            linhas_marco = listar_alunos_por_marco(
+                queryset.distinct(),
+                marco,
+                situacao=situacao_marco,
+                semestre_marco=semestre_marco,
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            linhas_marco = []
+            filtros_marco_validos = False
+        if exportar_excel and filtros_marco_validos:
+            from acompanhamento.models import PlanilhaBaixada
+            from acompanhamento.planilha_alunos import resposta_planilha_alunos
+
+            resposta = resposta_planilha_alunos(
+                linhas_marco,
+                marco,
+                _filtros_ativos(request, filtros_rotulos),
+            )
+            PlanilhaBaixada.objects.create(
+                baixada_por=request.user,
+                filtros={
+                    parametro: valor.strip()
+                    for parametro in filtros_rotulos
+                    if (valor := request.GET.get(parametro, "").strip())
+                },
+            )
+            return resposta
+        for linha in linhas_marco:
+            linha.aluno.trajetoria_atual = linha.trajetoria
+            linha.aluno.linha_marco = linha
+        pagina = _paginar(request, linhas_marco)
+        alunos = [linha.aluno for linha in pagina.object_list]
+    else:
+        if situacao_marco or semestre_marco:
+            messages.error(request, "Selecione um marco para filtrar a situação dos(as) alunos(as).")
+        if exportar_excel:
+            messages.error(request, "Selecione um marco antes de baixar a planilha.")
+        # Pagina antes de anotar a trajetoria: a anotacao faz uma consulta por
+        # aluno, entao rodar sobre a lista inteira custaria N consultas para exibir
+        # 25 linhas.
+        pagina = _paginar(request, queryset.distinct().order_by("nome"))
+        alunos = list(pagina.object_list)
+        for aluno_item in alunos:
+            trajetoria_atual = aluno_item.trajetoria_ativa()
+            if not trajetoria_atual:
+                trajetoria_atual = aluno_item.trajetorias.order_by("-criado_em").first()
+            aluno_item.trajetoria_atual = trajetoria_atual
 
     return render(
         request,
@@ -2650,22 +2754,18 @@ def alunos_view(request):
             "periodos_letivos": PeriodoLetivo.objects.order_by("-nome"),
             "filtro_sem_matricula_periodo": periodo_sem_matricula_id,
             "periodo_sem_matricula": periodo_sem_matricula,
+            "marcos": marcos,
+            "situacoes_marco": situacoes_marco,
+            "acompanhamento_ativo": acompanhamento_ativo,
+            "filtro_marco": marco,
+            "filtro_situacao_marco": situacao_marco,
+            "filtro_semestre_marco": semestre_marco,
+            "marco_selecionado": bool(marco),
+            "marco_qualquer": marco_qualquer,
             "total_alunos_filtrados": pagina.paginator.count,
             "status_list": Aluno.StatusAluno.choices,
             "nivel_list": Aluno.NivelCurso.choices,
-            "filtros_ativos": _filtros_ativos(
-                request,
-                {
-                    "nome": ("Nome", None),
-                    "status": ("Status", dict(Aluno.StatusAluno.choices).get),
-                    "polo": ("Polo", lambda v: Polo.objects.filter(pk=v).values_list("nome", flat=True).first()),
-                    "nivel": ("Nível", dict(Aluno.NivelCurso.choices).get),
-                    "reingressante": ("Reingressante", lambda v: "Sim" if v == "1" else "Não"),
-                    "ingresso_inicio": ("Ingresso de", None),
-                    "ingresso_fim": ("Ingresso até", None),
-                    "sem_matricula_periodo": ("Sem matrícula em", _nome_do_periodo),
-                },
-            ),
+            "filtros_ativos": _filtros_ativos(request, filtros_rotulos),
             "is_coordenador": _is_coordenador(request.user),
             "has_gestao_access": _has_gestao_access(request.user),
             "can_view_dashboard": _can_view_dashboard(request.user),
@@ -2735,11 +2835,11 @@ def _linhas_trajetoria(trajetoria):
                 "campo": "qualificacao",
             },
             {
-                "rotulo": "Orientador",
+                "rotulo": "Orientador(a)",
                 "valor": trajetoria.orientador.nome if trajetoria.orientador else "—",
                 "campo": "orientador",
             },
-            {"rotulo": "Coorientador", "valor": trajetoria.coorientador_display or "—", "campo": "coorientador"},
+            {"rotulo": "Coorientador(a)", "valor": trajetoria.coorientador_display or "—", "campo": "coorientador"},
         ]
         if trajetoria.nivel_curso == Aluno.NivelCurso.MESTRADO:
             linhas.insert(
@@ -2754,7 +2854,7 @@ def _linhas_trajetoria(trajetoria):
     if trajetoria.usa_supervisao:
         linhas.append(
             {
-                "rotulo": "Supervisor",
+                "rotulo": "Supervisor(a)",
                 "valor": trajetoria.orientador.nome if trajetoria.orientador else "—",
                 "campo": "orientador",
             }
@@ -2782,6 +2882,59 @@ def _linhas_trajetoria(trajetoria):
     return linhas
 
 
+def _pendencias_registro_marco(trajetoria, marco):
+    """Pendências dos registros locais; não presume descumprimento pelo discente."""
+    if not trajetoria or not trajetoria.usa_prazos_academicos:
+        return []
+    mestrado = trajetoria.nivel_curso == Aluno.NivelCurso.MESTRADO
+    minimo_creditos = 12 if marco == "qualificacao" and mestrado else (24 if mestrado else 32)
+    creditos = (trajetoria.disciplinas.filter(
+        situacao=DisciplinaTrajetoria.Situacao.APROVADA,
+    ).aggregate(total=Sum("creditos"))["total"] or 0) if trajetoria.pk else 0
+    pendencias = []
+    if creditos < minimo_creditos:
+        pendencias.append(f"Créditos aprovados registrados: {creditos} de {minimo_creditos}.")
+    if marco == "defesa":
+        if not trajetoria.isQualificado:
+            pendencias.append(f"Aprovação do {trajetoria.qualificacao_label_lower} não registrada.")
+        horas = LancamentoHorasComplementares.resumo_trajetoria(trajetoria)["horas_computadas"] if trajetoria.pk else 0
+        if horas < 45:
+            pendencias.append(f"Horas complementares registradas: {horas} de 45.")
+        estagios = trajetoria.estagios_docencia.filter(status=EstagioDocencia.Status.CONCLUIDO).count() if trajetoria.pk else 0
+        minimo_estagios = 1 if mestrado else 2
+        if estagios < minimo_estagios:
+            pendencias.append(f"Estágios de docência concluídos registrados: {estagios} de {minimo_estagios}.")
+        if not trajetoria.pk or not trajetoria.publicacoes.exists():
+            pendencias.append("Não há publicações registradas nesta trajetória.")
+    return pendencias
+
+
+def _marco_em_registro(post):
+    acao, campo = post.get("acao"), post.get("campo")
+    if acao == "registrar_apresentacao_qualificacao":
+        return "qualificacao"
+    if (acao == "alterar_qualificacao" or
+            acao == "alterar_trajetoria_campo" and campo == "isQualificado") and post.get("isQualificado"):
+        return "qualificacao"
+    if acao == "registrar_defesa" or acao == "alterar_trajetoria_campo" and campo == "defesa":
+        if post.get("numero_defesa") or post.get("data_defesa"):
+            return "defesa"
+    if acao in {"nova_trajetoria", "editar_trajetoria"}:
+        if post.get("status") == TrajetoriaAcademica.Status.CONCLUIDA:
+            return "defesa"
+        if post.get("isQualificado"):
+            return "qualificacao"
+    if acao == "alterar_trajetoria_campo" and campo == "status" and post.get("status") == TrajetoriaAcademica.Status.CONCLUIDA:
+        return "defesa"
+    return None
+
+
+def _salvar_trajetoria_com_confirmacao(trajetoria, confirmacao):
+    if confirmacao and trajetoria.status == TrajetoriaAcademica.Status.CONCLUIDA:
+        trajetoria.registro_defesa_com_pendencias = True
+    trajetoria.save()
+
+
 @login_required
 def aluno_detalhe_view(request, aluno_id):
     can_manage_aluno = _has_gestao_access(request.user)
@@ -2792,7 +2945,7 @@ def aluno_detalhe_view(request, aluno_id):
     is_orientador_do_aluno = _e_orientador_do_aluno(request.user, aluno_id)
     if not (can_manage_aluno or is_self_aluno or is_orientador_do_aluno):
         raise PermissionDenied(
-            "Esta ficha é acessível ao próprio aluno, ao orientador dele e à coordenação."
+            "Esta ficha é acessível ao próprio aluno(a), ao(a) orientador(a) dele e à coordenação."
         )
 
     aluno = get_object_or_404(
@@ -2814,8 +2967,43 @@ def aluno_detalhe_view(request, aluno_id):
         # Sem o "is_self_aluno" explicito ele herdaria a edicao de publicacoes.
         if not can_manage_aluno and not (is_self_aluno and acao == "salvar_publicacao"):
             raise PermissionDenied(
-                "Somente a coordenação altera esta ficha. O aluno pode editar as próprias publicações."
+                "Somente a coordenação altera esta ficha. O(a) aluno(a) pode editar as próprias publicações."
             )
+
+        confirmacao_integralizacao = False
+        marco = _marco_em_registro(request.POST)
+        if marco:
+            if acao == "nova_trajetoria":
+                trajetoria_registro = TrajetoriaAcademica(
+                    aluno=aluno, nivel_curso=request.POST.get("nivel_curso", ""),
+                )
+            elif request.POST.get("trajetoria_id"):
+                trajetoria_registro = get_object_or_404(
+                    TrajetoriaAcademica, pk=request.POST["trajetoria_id"], aluno=aluno,
+                )
+            else:
+                trajetoria_registro = trajetoria_atual
+            pendencias = _pendencias_registro_marco(trajetoria_registro, marco)
+            if (marco == "qualificacao" and trajetoria_registro and trajetoria_registro.isQualificado
+                    and acao != "registrar_apresentacao_qualificacao"):
+                # Editing another field must not ask to confirm an already recorded milestone.
+                pendencias = []
+            if pendencias:
+                if request.POST.get("confirmar_pendencias_integralizacao") != "1":
+                    return render(request, "processos/confirmar_registro_marco.html", {
+                        "aluno": aluno,
+                        "marco": "defesa" if marco == "defesa" else trajetoria_registro.qualificacao_label_lower,
+                        "pendencias": pendencias,
+                        "dados": [(chave, valor) for chave, valores in request.POST.lists()
+                                  if chave not in {"csrfmiddlewaretoken", "confirmar_pendencias_integralizacao"}
+                                  for valor in valores],
+                    })
+                confirmacao_integralizacao = True
+                dados = request.POST.copy()
+                nota = "Registro confirmado com pendências de integralização no AcadFlow durante a migração: " + " ".join(pendencias)
+                for campo_nota in ("comentario", "observacao"):
+                    dados[campo_nota] = "\n".join(filter(None, [dados.get(campo_nota, "").strip(), nota]))
+                request.POST = dados
 
         if acao == "alterar_dados":
             form = AlunoDadosForm(request.POST, aluno=aluno)
@@ -2837,13 +3025,13 @@ def aluno_detalhe_view(request, aluno_id):
                     comentario=form.cleaned_data["comentario"],
                     alterado_por=request.user,
                 )
-                messages.success(request, "Dados do aluno atualizados.")
+                messages.success(request, "Dados do(a) aluno(a) atualizados.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
-            messages.error(request, "Não foi possível atualizar os dados do aluno.")
+            messages.error(request, "Não foi possível atualizar os dados do(a) aluno(a).")
 
         elif acao == "aprovar_cadastro":
             if aluno.status_aluno != Aluno.StatusAluno.EM_AVALIACAO:
-                messages.info(request, "O cadastro deste aluno já foi analisado.")
+                messages.info(request, "O cadastro deste aluno(a) já foi analisado.")
             else:
                 _aprovar_cadastro_aluno(aluno=aluno, usuario=request.user)
                 messages.success(request, f"Cadastro de {aluno.nome} aprovado.")
@@ -2880,7 +3068,7 @@ def aluno_detalhe_view(request, aluno_id):
                     trajetoria.coorientador_externo_nome = dados["coorientador_externo_nome"]
                     trajetoria.coorientador_externo_email = dados["coorientador_externo_email"]
                     trajetoria.coorientador_externo_instituicao = dados["coorientador_externo_instituicao"]
-                trajetoria.save()
+                _salvar_trajetoria_com_confirmacao(trajetoria, confirmacao_integralizacao)
                 _registrar_alteracao_trajetoria(
                     trajetoria,
                     AlteracaoAluno.TipoAlteracao.TRAJETORIA,
@@ -2933,7 +3121,7 @@ def aluno_detalhe_view(request, aluno_id):
                     trajetoria.coorientador_externo_nome = dados["coorientador_externo_nome"]
                     trajetoria.coorientador_externo_email = dados["coorientador_externo_email"]
                     trajetoria.coorientador_externo_instituicao = dados["coorientador_externo_instituicao"]
-                trajetoria.save()
+                _salvar_trajetoria_com_confirmacao(trajetoria, confirmacao_integralizacao)
 
                 if trajetoria.status == TrajetoriaAcademica.Status.CONCLUIDA and trajetoria.usa_deposito_final:
                     aluno.status_aluno = Aluno.StatusAluno.DEFENDEU
@@ -3080,9 +3268,6 @@ def aluno_detalhe_view(request, aluno_id):
                 trajetoria.data_defesa = parse_date(request.POST.get("data_defesa", ""))
                 if trajetoria.numero_defesa and trajetoria.data_defesa:
                     trajetoria.status = TrajetoriaAcademica.Status.CONCLUIDA
-                    if trajetoria.usa_deposito_final:
-                        aluno.status_aluno = Aluno.StatusAluno.DEFENDEU
-                        aluno.save()
                 novo = f"numero={trajetoria.numero_defesa or '-'};data={trajetoria.data_defesa or '-'}"
             elif campo == "deposito_versao_final":
                 tipo = AlteracaoAluno.TipoAlteracao.DEPOSITO_FINAL
@@ -3094,11 +3279,14 @@ def aluno_detalhe_view(request, aluno_id):
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
 
             try:
-                trajetoria.save()
+                _salvar_trajetoria_com_confirmacao(trajetoria, confirmacao_integralizacao)
             except ValidationError as exc:
                 messages.error(request, "; ".join(exc.messages))
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
 
+            if campo == "defesa" and trajetoria.status == TrajetoriaAcademica.Status.CONCLUIDA and trajetoria.usa_deposito_final:
+                aluno.status_aluno = Aluno.StatusAluno.DEFENDEU
+                aluno.save()
             _registrar_alteracao_trajetoria(trajetoria, tipo, anterior, novo, comentario, request.user)
             messages.success(request, "Trajetória acadêmica atualizada.")
             return redirect("aluno_detalhe", aluno_id=aluno.id)
@@ -3118,9 +3306,9 @@ def aluno_detalhe_view(request, aluno_id):
                     comentario=form.cleaned_data["comentario"],
                     alterado_por=request.user,
                 )
-                messages.success(request, "Status do aluno atualizado.")
+                messages.success(request, "Status do(a) aluno(a) atualizado.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
-            messages.error(request, "Não foi possível alterar o status do aluno.")
+            messages.error(request, "Não foi possível alterar o status do(a) aluno(a).")
 
         elif acao == "alterar_dados":
             form = AlunoDadosForm(request.POST, aluno=aluno)
@@ -3142,10 +3330,10 @@ def aluno_detalhe_view(request, aluno_id):
                         comentario=form.cleaned_data["comentario"],
                         alterado_por=request.user,
                     )
-                    messages.success(request, "Dados do aluno atualizados.")
+                    messages.success(request, "Dados do(a) aluno(a) atualizados.")
                     return redirect("aluno_detalhe", aluno_id=aluno.id)
             else:
-                messages.error(request, "Não foi possível atualizar os dados do aluno.")
+                messages.error(request, "Não foi possível atualizar os dados do(a) aluno(a).")
 
         elif acao == "editar_trajetoria":
             form = TrajetoriaAcademicaForm(request.POST)
@@ -3180,7 +3368,7 @@ def aluno_detalhe_view(request, aluno_id):
                 trajetoria.data_defesa = form.cleaned_data["data_defesa"]
                 trajetoria.deposito_versao_final = form.cleaned_data["deposito_versao_final"]
                 try:
-                    trajetoria.save()
+                    _salvar_trajetoria_com_confirmacao(trajetoria, confirmacao_integralizacao)
                 except ValidationError as exc:
                     messages.error(request, exc.message_dict if hasattr(exc, "message_dict") else str(exc))
                 else:
@@ -3229,7 +3417,7 @@ def aluno_detalhe_view(request, aluno_id):
                         "coorientador_externo_instituicao"
                     ].strip()
                 try:
-                    trajetoria.save()
+                    _salvar_trajetoria_com_confirmacao(trajetoria, confirmacao_integralizacao)
                 except ValidationError as exc:
                     messages.error(request, exc.message_dict if hasattr(exc, "message_dict") else str(exc))
                 else:
@@ -3318,7 +3506,7 @@ def aluno_detalhe_view(request, aluno_id):
                         elif tipo_coorientador == TrajetoriaAcademicaForm.TipoCoorientador.EXTERNO:
                             externo_nome = request.POST.get("coorientador_externo_nome", "").strip()
                             if not externo_nome:
-                                raise ValidationError("Informe o nome do coorientador externo.")
+                                raise ValidationError("Informe o nome do(a) coorientador(a) externo(a).")
                             trajetoria.coorientador_externo_nome = externo_nome
                             trajetoria.coorientador_externo_email = request.POST.get(
                                 "coorientador_externo_email",
@@ -3329,7 +3517,7 @@ def aluno_detalhe_view(request, aluno_id):
                                 "",
                             ).strip()
                         elif tipo_coorientador != TrajetoriaAcademicaForm.TipoCoorientador.NENHUM:
-                            raise ValidationError("Tipo de coorientador inválido.")
+                            raise ValidationError("Tipo de coorientador(a) inválido.")
                     elif campo == "defesa":
                         trajetoria.numero_defesa = request.POST.get("numero_defesa", "").strip()
                         data_defesa = request.POST.get("data_defesa", "").strip()
@@ -3341,7 +3529,7 @@ def aluno_detalhe_view(request, aluno_id):
                     else:
                         raise ValidationError("Campo de trajetória inválido.")
 
-                    trajetoria.save()
+                    _salvar_trajetoria_com_confirmacao(trajetoria, confirmacao_integralizacao)
                 except ValidationError as exc:
                     messages.error(request, exc.message_dict if hasattr(exc, "message_dict") else str(exc))
                 else:
@@ -3440,7 +3628,7 @@ def aluno_detalhe_view(request, aluno_id):
             if form.is_valid() and _trajetoria_required():
                 anterior = "Sim" if trajetoria_atual.isQualificado else "Nao"
                 trajetoria_atual.isQualificado = form.cleaned_data["isQualificado"]
-                trajetoria_atual.save()
+                _salvar_trajetoria_com_confirmacao(trajetoria_atual, confirmacao_integralizacao)
                 _registrar_alteracao_aluno(
                     aluno=aluno,
                     tipo=AlteracaoAluno.TipoAlteracao.QUALIFICACAO,
@@ -3449,7 +3637,7 @@ def aluno_detalhe_view(request, aluno_id):
                     comentario=form.cleaned_data["comentario"],
                     alterado_por=request.user,
                 )
-                messages.success(request, "Qualificação do aluno atualizada.")
+                messages.success(request, "Qualificação do(a) aluno(a) atualizada.")
                 return redirect("aluno_detalhe", aluno_id=aluno.id)
             messages.error(request, "Não foi possível atualizar a qualificação.")
 
@@ -3462,7 +3650,7 @@ def aluno_detalhe_view(request, aluno_id):
                 else:
                     anterior = trajetoria_atual.prazo_qualificacao or "-"
                     trajetoria_atual.prazo_qualificacao = semestre
-                    trajetoria_atual.save()
+                    _salvar_trajetoria_com_confirmacao(trajetoria_atual, confirmacao_integralizacao)
                     _registrar_alteracao_aluno(
                         aluno=aluno,
                         tipo=AlteracaoAluno.TipoAlteracao.PRAZO_QUALIFICACAO,
@@ -3484,7 +3672,7 @@ def aluno_detalhe_view(request, aluno_id):
                 else:
                     anterior = trajetoria_atual.prazo_defesa or "-"
                     trajetoria_atual.prazo_defesa = semestre
-                    trajetoria_atual.save()
+                    _salvar_trajetoria_com_confirmacao(trajetoria_atual, confirmacao_integralizacao)
                     _registrar_alteracao_aluno(
                         aluno=aluno,
                         tipo=AlteracaoAluno.TipoAlteracao.PRAZO_DEFESA,
@@ -3505,7 +3693,11 @@ def aluno_detalhe_view(request, aluno_id):
                 trajetoria_atual.numero_defesa = form.cleaned_data["numero_defesa"]
                 trajetoria_atual.data_defesa = form.cleaned_data["data_defesa"]
                 trajetoria_atual.status = TrajetoriaAcademica.Status.CONCLUIDA
-                trajetoria_atual.save()
+                try:
+                    _salvar_trajetoria_com_confirmacao(trajetoria_atual, confirmacao_integralizacao)
+                except ValidationError as exc:
+                    messages.error(request, "; ".join(exc.messages))
+                    return redirect("aluno_detalhe", aluno_id=aluno.id)
                 aluno.status_aluno = Aluno.StatusAluno.DEFENDEU
                 aluno.save()
                 _registrar_alteracao_aluno(
@@ -3524,11 +3716,11 @@ def aluno_detalhe_view(request, aluno_id):
             form = AlunoDepositoFinalForm(request.POST)
             if form.is_valid() and _trajetoria_required():
                 if aluno.status_aluno != Aluno.StatusAluno.DEFENDEU:
-                    form.add_error("deposito_versao_final", "O aluno precisa estar com status Defendeu.")
+                    form.add_error("deposito_versao_final", "O(a) aluno(a) precisa estar com status Defendeu.")
                 else:
                     anterior = "Sim" if trajetoria_atual.deposito_versao_final else "Nao"
                     trajetoria_atual.deposito_versao_final = form.cleaned_data["deposito_versao_final"]
-                    trajetoria_atual.save()
+                    _salvar_trajetoria_com_confirmacao(trajetoria_atual, confirmacao_integralizacao)
                     _registrar_alteracao_aluno(
                         aluno=aluno,
                         tipo=AlteracaoAluno.TipoAlteracao.DEPOSITO_FINAL,
@@ -3569,6 +3761,7 @@ def aluno_detalhe_view(request, aluno_id):
                 apresentacao = form.save(commit=False)
                 apresentacao.trajetoria = trajetoria
                 apresentacao.registrado_por = request.user
+                apresentacao.registro_com_pendencias = confirmacao_integralizacao
                 try:
                     apresentacao.save()
                 except ValidationError as exc:
@@ -3746,7 +3939,7 @@ def aluno_detalhe_view(request, aluno_id):
     alteracoes_display = [
         {
             "obj": alteracao,
-            "trajetoria": alteracao.valor_novo.split(":", 1)[0] if ":" in alteracao.valor_novo else "Aluno",
+            "trajetoria": alteracao.valor_novo.split(":", 1)[0] if ":" in alteracao.valor_novo else "Aluno(a)",
             "alteracao": alteracao.get_tipo_display(),
         }
         for alteracao in aluno.alteracoes.select_related("alterado_por").all()
@@ -3807,7 +4000,7 @@ def aluno_detalhe_view(request, aluno_id):
 @login_required
 def caixa_processos_view(request):
     if not _can_view_caixa(request.user):
-        raise PermissionDenied("Acesso restrito a docentes e servidores.")
+        raise PermissionDenied("Acesso restrito a docentes e servidores(as).")
 
     setores_caixa = _setores_caixa(request.user)
     selected_caixa = request.GET.get("caixa", "").strip()
@@ -3816,7 +4009,7 @@ def caixa_processos_view(request):
     if tipo_caixa not in tipos_validos:
         tipo_caixa = ""
     status_caixa = request.GET.get("status_caixa", "").strip().upper()
-    if status_caixa not in {"AGUARDANDO_CIENCIA", "EM_ANALISE"}:
+    if status_caixa not in {"AGUARDANDO_CIENCIA", "EM_ANALISE", "AGUARDANDO_RETORNO"}:
         status_caixa = "EM_ANALISE"
 
     opcoes_caixa = [{"value": str(setor.id), "label": setor.nome} for setor in setores_caixa]
@@ -3839,17 +4032,24 @@ def caixa_processos_view(request):
         selected_setor_ids = [setores_caixa[0].id]
         selected_caixa = str(setores_caixa[0].id)
 
-    processos_base = (
-        Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual")
-        .filter(setor_atual_id__in=selected_setor_ids)
-        .filter(
+    processos_base = Processo.objects.select_related(
+        "usuario_criado_por", "aluno_interessado", "setor_atual", "destinatario_devolucao",
+    )
+    if status_caixa == "AGUARDANDO_RETORNO":
+        processos_base = processos_base.filter(
+            setor_atual__nome="Requerente",
+            setor_acompanhamento_id__in=selected_setor_ids,
+            status=Processo.StatusProcesso.AGUARDANDO_DOCUMENTO,
+        )
+    else:
+        processos_base = processos_base.filter(
+            setor_atual_id__in=selected_setor_ids,
             status__in=(
                 [Processo.StatusProcesso.EM_ANALISE, Processo.StatusProcesso.EM_DEBATE]
                 if status_caixa == Processo.StatusProcesso.EM_ANALISE
                 else [Processo.StatusProcesso.AGUARDANDO_CIENCIA]
-            )
+            ),
         )
-    )
     distribuicao_contagens = {
         item["tipo"]: item["total"]
         for item in processos_base.values("tipo").annotate(total=Count("id"))
@@ -3892,7 +4092,7 @@ def caixa_processos_view(request):
 @login_required
 def processo_detalhe_view(request, processo_id):
     processo = get_object_or_404(
-        Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual")
+        Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual", "destinatario_devolucao", "setor_acompanhamento")
         .prefetch_related(
             "solicitacoes_banca_anexadas__aluno",
             "solicitacoes_banca_anexadas__trajetoria",
@@ -3914,6 +4114,7 @@ def processo_detalhe_view(request, processo_id):
                     "setor_origem",
                     "setor_destino",
                     "encaminhado_por",
+                    "destinatario_devolucao",
                 ).order_by("-data_encaminhamento"),
                 to_attr="tramitacoes_historico",
             ),
@@ -3931,7 +4132,9 @@ def processo_detalhe_view(request, processo_id):
         .order_by("-data_encaminhamento")
         .first()
     )
-    setor_solicitante = tramitacao_para_requerente.setor_origem if tramitacao_para_requerente else None
+    setor_solicitante = processo.setor_acompanhamento or (
+        tramitacao_para_requerente.setor_origem if tramitacao_para_requerente else None
+    )
     can_manage_requerente = processo.setor_atual.nome == "Requerente" and _is_requerente_do_processo(
         request.user, processo
     )
@@ -4093,7 +4296,7 @@ def processo_detalhe_view(request, processo_id):
             if acao_rapida == "solicitar_correcao":
                 processo.status = Processo.StatusProcesso.AGUARDANDO_DOCUMENTO
                 processo.save(update_fields=["status", "atualizado_em"])
-                messages.success(request, "Correção solicitada ao aluno.")
+                messages.success(request, "Correção solicitada ao(a) aluno(a).")
                 return redirect("processo_detalhe", processo_id=processo.id)
 
         elif "adicionar_documento" in request.POST:
@@ -4101,9 +4304,10 @@ def processo_detalhe_view(request, processo_id):
                 raise PermissionDenied("Você não pode adicionar documento neste processo.")
             documento_form = DocumentoCadastroForm(request.POST, request.FILES)
             if can_manage_in_caixa:
-                encaminhamento_form = EncaminhamentoForm(current_setor_id=processo.setor_atual_id)
+                encaminhamento_form = EncaminhamentoForm(processo=processo, current_setor_id=processo.setor_atual_id)
             else:
                 encaminhamento_form = EncaminhamentoForm(
+                    processo=processo,
                     current_setor_id=processo.setor_atual_id,
                     allowed_setor_ids=[setor_solicitante.id] if setor_solicitante else [],
                 )
@@ -4121,7 +4325,7 @@ def processo_detalhe_view(request, processo_id):
 
         elif "solicitar_ciente_orientador" in request.POST:
             if not can_solicitar_ciente:
-                raise PermissionDenied("Você não pode solicitar ciente do orientador neste processo.")
+                raise PermissionDenied("Você não pode solicitar ciente do(a) orientador(a) neste processo.")
             solicitar_ciente_form = SolicitarCienteOrientadorForm(request.POST)
             if solicitar_ciente_form.is_valid():
                 try:
@@ -4132,7 +4336,7 @@ def processo_detalhe_view(request, processo_id):
                 except ValidationError as exc:
                     messages.error(request, str(exc))
                 else:
-                    messages.success(request, "Solicitação de ciente do orientador registrada.")
+                    messages.success(request, "Solicitação de ciente do(a) orientador(a) registrada.")
                     send_email_solicitacao_ciencia.delay(manifestacao.id)
                     return redirect("processo_detalhe", processo_id=processo.id)
             open_ciente_modal = True
@@ -4194,11 +4398,13 @@ def processo_detalhe_view(request, processo_id):
             if can_manage_in_caixa:
                 encaminhamento_form = EncaminhamentoForm(
                     request.POST,
+                    processo=processo,
                     current_setor_id=processo.setor_atual_id,
                 )
             else:
                 encaminhamento_form = EncaminhamentoForm(
                     request.POST,
+                    processo=processo,
                     current_setor_id=processo.setor_atual_id,
                     allowed_setor_ids=[setor_solicitante.id] if setor_solicitante else [],
                 )
@@ -4221,7 +4427,14 @@ def processo_detalhe_view(request, processo_id):
                         encaminhado_por=request.user,
                         observacao=despacho_texto,
                         status_resultante=status_resultante,
-                        prazo_limite=prazo_limite,  
+                        prazo_limite=prazo_limite,
+                        destinatario_devolucao=(
+                            processo.usuario_criado_por
+                            if encaminhamento_form.cleaned_data.get("destinatario_devolucao") == "REQUERENTE"
+                            else processo.aluno_interessado
+                            if encaminhamento_form.cleaned_data.get("destinatario_devolucao") == "ALUNO"
+                            else None
+                        ),
                     )
                 except ValidationError as exc:
                     messages.error(request, str(exc))
@@ -4233,7 +4446,7 @@ def processo_detalhe_view(request, processo_id):
                             processo.save(update_fields=["prazo_limite", "atualizado_em"])
                     messages.success(request, "Processo encaminhado com sucesso.")
                     if setor_destino and setor_destino.nome == "Requerente":
-                        send_email_devolucao_requerente.delay(processo.id, despacho_texto)
+                        send_email_devolucao_requerente.delay(processo.id, despacho_texto, processo.destinatario_devolucao_id)
                     else:
                         send_email_movimentacao_aluno.delay(processo.id, f"Encaminhado para o setor: {setor_destino.nome}")
                         if setor_destino and _is_setor_pleno_nome(setor_destino.nome):
@@ -4250,9 +4463,10 @@ def processo_detalhe_view(request, processo_id):
             finalizar_form = FinalizarProcessoForm(request.POST)
             documento_form = DocumentoCadastroForm()
             if can_manage_in_caixa:
-                encaminhamento_form = EncaminhamentoForm(current_setor_id=processo.setor_atual_id)
+                encaminhamento_form = EncaminhamentoForm(processo=processo, current_setor_id=processo.setor_atual_id)
             else:
                 encaminhamento_form = EncaminhamentoForm(
+                    processo=processo,
                     current_setor_id=processo.setor_atual_id,
                     allowed_setor_ids=[setor_solicitante.id] if setor_solicitante else [],
                 )
@@ -4274,9 +4488,10 @@ def processo_detalhe_view(request, processo_id):
         elif "remover_arquivo_documento" in request.POST:
             documento_form = DocumentoCadastroForm()
             if can_manage_in_caixa:
-                encaminhamento_form = EncaminhamentoForm(current_setor_id=processo.setor_atual_id)
+                encaminhamento_form = EncaminhamentoForm(processo=processo, current_setor_id=processo.setor_atual_id)
             else:
                 encaminhamento_form = EncaminhamentoForm(
+                    processo=processo,
                     current_setor_id=processo.setor_atual_id,
                     allowed_setor_ids=[setor_solicitante.id] if setor_solicitante else [],
                 )
@@ -4350,9 +4565,10 @@ def processo_detalhe_view(request, processo_id):
         else:
             documento_form = DocumentoCadastroForm()
             if can_manage_in_caixa:
-                encaminhamento_form = EncaminhamentoForm(current_setor_id=processo.setor_atual_id)
+                encaminhamento_form = EncaminhamentoForm(processo=processo, current_setor_id=processo.setor_atual_id)
             else:
                 encaminhamento_form = EncaminhamentoForm(
+                    processo=processo,
                     current_setor_id=processo.setor_atual_id,
                     allowed_setor_ids=[setor_solicitante.id] if setor_solicitante else [],
                 )
@@ -4361,9 +4577,10 @@ def processo_detalhe_view(request, processo_id):
     else:
         documento_form = DocumentoCadastroForm()
         if can_manage_in_caixa:
-            encaminhamento_form = EncaminhamentoForm(current_setor_id=processo.setor_atual_id)
+            encaminhamento_form = EncaminhamentoForm(processo=processo, current_setor_id=processo.setor_atual_id)
         else:
             encaminhamento_form = EncaminhamentoForm(
+                processo=processo,
                 current_setor_id=processo.setor_atual_id,
                 allowed_setor_ids=[setor_solicitante.id] if setor_solicitante else [],
             )
@@ -4809,7 +5026,7 @@ def _calendario_reservas_context(request):
 @login_required
 def reservas_ambientes_view(request):
     if not _can_use_reservas(request.user):
-        raise PermissionDenied("Acesso restrito a docentes e servidores.")
+        raise PermissionDenied("Acesso restrito a docentes e servidores(as).")
 
     polo_servidor = request.user.polo_atuacao if _is_servidor(request.user) else None
     form = ReservaAmbienteForm(request.POST or None, user=request.user)
@@ -4843,7 +5060,7 @@ def reservas_ambientes_view(request):
 @login_required
 def disponibilidade_ambientes_view(request):
     if not _can_use_reservas(request.user):
-        raise PermissionDenied("Acesso restrito a docentes e servidores.")
+        raise PermissionDenied("Acesso restrito a docentes e servidores(as).")
 
     context = _reservas_base_context()
     context.update(_calendario_reservas_context(request))
@@ -4853,7 +5070,7 @@ def disponibilidade_ambientes_view(request):
 @login_required
 def reservas_ambientes_feitas_view(request):
     if not _can_use_reservas(request.user):
-        raise PermissionDenied("Acesso restrito a docentes e servidores.")
+        raise PermissionDenied("Acesso restrito a docentes e servidores(as).")
 
     exclusao_form = ReservaAmbienteExclusaoForm()
     if request.method == "POST":
@@ -4894,7 +5111,7 @@ def reservas_ambientes_feitas_view(request):
 @login_required
 def salas_ambientes_view(request):
     if not _has_gestao_access(request.user):
-        raise PermissionDenied("Acesso restrito a coordenadores e servidores.")
+        raise PermissionDenied("Acesso restrito a coordenadores(as) e servidores(as).")
 
     # Coordenadores administram todos os polos, mesmo quando possuem um polo de
     # atuação no próprio cadastro. Servidores continuam restritos ao seu polo.
@@ -5333,7 +5550,7 @@ def solicitacao_banca_detalhe_view(request, solicitacao_id):
 @login_required
 def aluno_documento_vinculo_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
-        raise PermissionDenied("Acesso restrito a alunos.")
+        raise PermissionDenied("Acesso restrito a alunos(as).")
 
     periodo = periodo_em_curso()
     vigente = declaracao_vigente(request.user.aluno, periodo)
@@ -5363,7 +5580,7 @@ def aluno_documento_vinculo_view(request):
 @login_required
 def aluno_documento_historico_view(request):
     if request.user.tipo_usuario != User.TipoUsuario.ALUNO:
-        raise PermissionDenied("Acesso restrito a alunos.")
+        raise PermissionDenied("Acesso restrito a alunos(as).")
     # A tela entrou no menu: ate agora so se chegava a ela por endereco direto.
     # O contexto de menu que a view montava a mao saiu junto -- nenhum template
     # le show_side_menu nem side_menu_items desde que a barra lateral passou a
@@ -5435,7 +5652,7 @@ def menu_meus_processos_view(request):
     if _is_servidor(request.user):
         raise PermissionDenied("Perfil SERVIDOR não possui meus processos.")
 
-    meus_processos = Processo.objects.select_related("aluno_interessado", "setor_atual")
+    meus_processos = Processo.objects.select_related("aluno_interessado", "setor_atual", "destinatario_devolucao")
     if request.user.tipo_usuario == User.TipoUsuario.ALUNO:
         meus_processos = meus_processos.filter(aluno_interessado_id=request.user.id)
     else:
@@ -5520,7 +5737,7 @@ def menu_processos_orientandos_view(request):
         .distinct()
     )
     processos_orientandos = (
-        Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual")
+        Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual", "destinatario_devolucao", "setor_acompanhamento")
         .filter(aluno_interessado__in=orientandos.values("id"))
         .order_by("-data_criacao")
     )
@@ -5592,7 +5809,7 @@ def menu_processos_pleno_view(request):
         raise PermissionDenied("Acesso restrito a membros do Colegiado PPGEC (Pleno).")
 
     processos_pleno = (
-        Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual")
+        Processo.objects.select_related("usuario_criado_por", "aluno_interessado", "setor_atual", "destinatario_devolucao", "setor_acompanhamento")
         .filter(setor_atual__nome__icontains="Pleno")
         .order_by("-data_criacao")
     )

@@ -1,0 +1,38 @@
+.filtros-acoes {
+    margin-top: var(--espaco-4);
+}
+
+.tabela th.coluna-marco-detalhe,
+.tabela td.coluna-marco-detalhe {
+    min-width: 24rem;
+}
+
+.tabela th.coluna-marco-nome,
+.tabela td.coluna-marco-nome {
+    min-width: 15rem;
+}
+
+.tabela td.coluna-marco-data {
+    min-width: 8rem;
+}
+
+.filtros-campo.filtros-campo-marco {
+    flex: 0 1 22rem;
+}
+
+/* Os botões têm a mesma altura dos campos e a largura dos campos de escolha. */
+.filtros-linha > .btn,
+.filtros-acoes > .btn {
+    min-height: 46.6px;
+}
+
+@media (min-width: 761px) {
+    .filtros-linha > .filtros-campo-busca {
+        flex-basis: 16rem;
+    }
+
+    .filtros-linha > .btn,
+    .filtros-acoes > .btn {
+        width: 12rem;
+    }
+}

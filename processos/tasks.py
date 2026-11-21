@@ -197,27 +197,28 @@ def send_email_solicitacao_ciencia(self, manifestacao_id):
         raise self.retry(exc=exc)
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
-def send_email_devolucao_requerente(self, processo_id, observacao):
-    from .models import Processo
+def send_email_devolucao_requerente(self, processo_id, observacao, destinatario_id=None):
+    from .models import Processo, User
     from django.utils import timezone
     try:
         processo = Processo.objects.select_related("usuario_criado_por").get(pk=processo_id)
-        aluno = processo.obter_aluno_interessado()
-        if not aluno or not aluno.email:
+        destinatario = (User.objects.get(pk=destinatario_id) if destinatario_id else
+                        processo.destinatario_devolucao or processo.obter_aluno_interessado() or processo.usuario_criado_por)
+        if not destinatario.email:
             return
         
         contexto = {
             "processo": processo,
-            "aluno": aluno,
+            "destinatario": destinatario,
             "observacao": observacao,
             "data_devolucao": timezone.now(),
         }
 
         _send_email(
-            subject=f"[PPGEC] Ajustes necessários — {aluno.nome} — Processo {processo.numero}",
+            subject=f"[PPGEC] Ajustes necessários — {destinatario.nome} — Processo {processo.numero}",
             template_name="emails/orientador/devolucao_processo.html",
             contexto=contexto,
-            recipient=aluno.email,
+            recipient=destinatario.email,
         )
     except Exception as exc:
         logger.exception("Falha ao enviar e-mail de devolução")
@@ -304,7 +305,7 @@ def send_email_movimentacao_orientador(self, processo_id: int, mensagem_status: 
     
     try:
         _send_email(
-            subject=f"[PPGEC] Movimentação no Processo do Orientando {aluno.nome}",
+            subject=f"[PPGEC] Movimentação no Processo do(a) Orientando(a) {aluno.nome}",
             template_name="emails/orientador/movimentacao_processo_orientador.html",
             contexto=contexto,
             recipient=orientador.email,
@@ -365,7 +366,7 @@ def send_email_conclusao_orientador(self, processo_id: int):
     }
     try:
         _send_email(
-            subject=f"[PPGEC] Processo do orientando {aluno.nome} finalizado",
+            subject=f"[PPGEC] Processo do(a) orientando(a) {aluno.nome} finalizado",
             template_name="emails/orientador/conclusao_processo_orientador.html",
             contexto=contexto,
             recipient=orientador.email,

@@ -20,9 +20,10 @@ jobs:
       - name: Baixar o código do pull request
         uses: actions/checkout@v4
 
-      - name: Baixar a main (base do banco já migrado)
+      - name: Baixar a main do repositório do professor (base do banco já migrado)
         uses: actions/checkout@v4
         with:
+          repository: ldhonorato/PPGEC_rec
           ref: main
           path: main
 
@@ -45,6 +46,7 @@ jobs:
           SECURE_HSTS_SECONDS=0
           USE_X_FORWARDED_PROTO=False
           ACOMPANHAMENTO_ATIVO=False
+          ACOMPANHAMENTO_AVISO_ATIVO=False
           EOF
           cat > docker-compose.ensaio.yml <<'EOF'
           services:
@@ -122,6 +124,65 @@ jobs:
           docker compose exec -T web python manage.py test processos.tests.TodasAsTelasRenderizamTests
           docker compose exec -T web python manage.py test acompanhamento
 
+      - name: A tarefa do beat está registrada no worker
+        id: beat
+        env:
+          ENSAIO_TAG: ensaio
+        run: |
+          tarefa=$(docker compose exec -T web python -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE','ppgec.settings'); import django; django.setup(); from ppgec.celery import app; print(app.conf.beat_schedule['acompanhamento-aviso-diario']['task'])" | tail -n 1 | tr -d '\r')
+          echo "Tarefa da entrada do beat: $tarefa"
+          [ -n "$tarefa" ]
+          registradas=""
+          for i in $(seq 1 15); do
+            registradas=$(docker compose exec -T celery celery -A ppgec inspect registered 2>&1 || true)
+            if echo "$registradas" | grep -qF "$tarefa"; then
+              echo "Tarefa registrada no worker (tentativa $i)"; exit 0
+            fi
+            sleep 4
+          done
+          echo "$registradas"
+          echo "A tarefa $tarefa não aparece em inspect registered"
+          docker inspect -f 'estado={{.State.Status}} código={{.State.ExitCode}} erro={{.State.Error}} oom={{.State.OOMKilled}}' ppgec_celery || true
+          docker compose logs --no-color --tail=100 celery || true
+          exit 1
+
+      - name: Com o módulo ligado e o aviso desligado, a tarefa não faz nada
+        id: aviso_desligado
+        env:
+          ENSAIO_TAG: ensaio
+        run: |
+          # Estado do primeiro dia do professor: módulo ligado, aviso desligado.
+          sed -i 's/^ACOMPANHAMENTO_ATIVO=.*/ACOMPANHAMENTO_ATIVO=True/' .env
+          grep -E "^ACOMPANHAMENTO_(AVISO_)?ATIVO=" .env
+          grep -qx "ACOMPANHAMENTO_AVISO_ATIVO=False" .env
+          docker compose up -d web celery celery-beat
+          for i in $(seq 1 60); do
+            if docker compose exec -T web python manage.py migrate --check > /dev/null 2>&1; then
+              echo "Web pronto (tentativa $i)"; break
+            fi
+            if [ "$i" = "60" ]; then
+              echo "O web não subiu a tempo"
+              docker compose logs --no-color web; exit 1
+            fi
+            sleep 2
+          done
+          # Com o módulo ligado, a página do módulo deixa de dar 404.
+          acomp=000
+          for i in $(seq 1 15); do
+            acomp=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/acompanhamento/ || true)
+            if [ "$acomp" != "000" ] && [ "$acomp" != "404" ]; then break; fi
+            sleep 2
+          done
+          echo "/acompanhamento/ com o módulo ligado: HTTP $acomp"
+          [ "$acomp" = "200" ] || [ "$acomp" = "302" ]
+          # A tarefa sai sem fazer nada e sem gravar aviso.
+          resultado=$(docker compose exec -T celery python manage.py shell -c "from acompanhamento.tasks import enviar_avisos_irregularidade as t; print(t())" | tail -n 1 | tr -d '\r')
+          echo "Resultado da tarefa: $resultado"
+          [ "$resultado" = "{'avisos_novos': 0, 'emails_enviados': 0}" ]
+          avisos=$(docker compose exec -T web python manage.py shell -c "from acompanhamento.models import AvisoIrregularidade as A; print(A.objects.count())" | tail -n 1 | tr -d '\r')
+          echo "Avisos gravados: $avisos"
+          [ "$avisos" = "0" ]
+
       - name: Nenhum contêiner reiniciou
         id: reinicios
         env:
@@ -162,15 +223,19 @@ jobs:
             echo "## Ensaio de produção"
             echo "Commit testado: \`${GITHUB_SHA}\`"
             echo ""
+            echo "Base do banco: main de ldhonorato/PPGEC_rec."
+            echo ""
             echo "Diferença em relação à produção: sem HTTPS (redirecionamento SSL, cookies seguros e HSTS desligados) e imagens construídas no próprio job."
             echo ""
             echo "| Item | Resultado |"
             echo "|---|---|"
             echo "| Imagem construída com o Dockerfile | $(marca '${{ steps.build.outcome }}') |"
-            echo "| Migrations sobre banco já migrado até a main | $(marca '${{ steps.migra_main.outcome }}') |"
+            echo "| Migrations sobre banco já migrado até a main do professor | $(marca '${{ steps.migra_main.outcome }}') |"
             echo "| Serviços do docker-compose-prod.yml no ar, migrations do PR e makemigrations --check | $(marca '${{ steps.sobe.outcome }}') |"
             echo "| Site responde e /acompanhamento/ dá 404 com a chave desligada | $(marca '${{ steps.site.outcome }}') |"
             echo "| Páginas principais com cada perfil | $(marca '${{ steps.paginas.outcome }}') |"
+            echo "| Tarefa do beat registrada no worker | $(marca '${{ steps.beat.outcome }}') |"
+            echo "| Módulo ligado e aviso desligado: tarefa não faz nada | $(marca '${{ steps.aviso_desligado.outcome }}') |"
             echo "| Nenhum contêiner reiniciou | $(marca '${{ steps.reinicios.outcome }}') |"
             echo "| Nenhum log com exceção | $(marca '${{ steps.logs.outcome }}') |"
           } >> "$GITHUB_STEP_SUMMARY"

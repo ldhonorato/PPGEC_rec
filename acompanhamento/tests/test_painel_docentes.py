@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.test import TestCase, override_settings
@@ -27,6 +29,35 @@ class ServicoPainelDocentesTests(TestCase):
             externo=externo,
             polo_atuacao=polo,
         )
+
+    def test_percentuais_de_permanentes_e_colaboradores_somam_cem(self):
+        Docente.objects.update(is_active=False)
+
+        for indice in range(3):
+            self._criar_docente(
+                f"Docente permanente {indice}",
+                f"permanente{indice}@teste.com",
+                permanente=True,
+            )
+        self._criar_docente(
+            "Docente colaborador",
+            "colaborador@teste.com",
+            permanente=False,
+        )
+
+        resultado = calcular_painel_docentes()
+
+        self.assertEqual(resultado["percentual_permanentes"], Decimal("75.0"))
+        self.assertEqual(resultado["percentual_colaboradores"], Decimal("25.0"))
+
+    def test_percentuais_sao_zero_sem_docentes_ativos(self):
+        Docente.objects.update(is_active=False)
+
+        resultado = calcular_painel_docentes()
+
+        self.assertEqual(resultado["total_ativos"], 0)
+        self.assertEqual(resultado["percentual_permanentes"], Decimal("0.0"))
+        self.assertEqual(resultado["percentual_colaboradores"], Decimal("0.0"))
 
     def test_distribuicao_percentuais_somam_cem_por_cento(self):
         antes = calcular_painel_docentes()

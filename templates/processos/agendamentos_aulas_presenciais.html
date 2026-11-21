@@ -20,7 +20,7 @@
         <p><span class="badge {% if aula.status_agendamento == 'ATENDIDA' %}badge-ok{% elif aula.status_agendamento == 'NAO_ATENDIDA' %}badge-no{% else %}badge-info{% endif %}">{{ aula.get_status_agendamento_display }}</span></p>
         {% if aula.ambientes_reservados.all %}<ul class="availability-list">{% for ambiente in aula.ambientes_reservados.all %}<li>{{ ambiente.sala }}</li>{% endfor %}</ul>{% endif %}
         {% if aula.observacao_atendimento %}<p class="item-observacao">{{ aula.observacao_atendimento }}</p>{% endif %}
-    </div><button class="btn btn-secondary" type="button" data-demanda-url="{% url 'agendamento_aula_presencial_alunos_polos' aula.pk %}">Alunos por polo</button></div>
+    </div><button class="btn btn-secondary" type="button" data-demanda-url="{% url 'agendamento_aula_presencial_alunos_polos' aula.pk %}">Alunos(as) por polo</button></div>
     <form method="post" class="filtros panel" data-reservas-form>{% csrf_token %}<input type="hidden" name="aula_id" value="{{ aula.pk }}">
         <div data-salas-list>
             {% for ambiente in aula.ambientes_reservados.all %}<div class="filtros-linha" data-sala-row><div class="filtros-campo"><label>Ambiente</label><select name="salas" required><option value="">Selecione</option>{% for sala in aula.salas_disponiveis %}<option value="{{ sala.pk }}" {% if ambiente.sala_id == sala.pk %}selected{% endif %}>{{ sala.polo.nome }} — {{ sala.nome }}{% if sala.capacidade %} ({{ sala.capacidade }} lugares){% endif %}</option>{% endfor %}</select></div><button class="btn btn-secondary" type="button" data-remove-sala>Remover</button></div>{% empty %}<div class="filtros-linha" data-sala-row><div class="filtros-campo"><label>Ambiente</label><select name="salas" required><option value="">Selecione</option>{% for sala in aula.salas_disponiveis %}<option value="{{ sala.pk }}">{{ sala.polo.nome }} — {{ sala.nome }}{% if sala.capacidade %} ({{ sala.capacidade }} lugares){% endif %}</option>{% endfor %}</select></div><button class="btn btn-secondary" type="button" data-remove-sala>Remover</button></div>{% endfor %}
@@ -31,7 +31,7 @@
 </li>{% endfor %}</ul>{% else %}<div class="estado-vazio"><p class="estado-vazio-titulo">Nenhuma solicitação encontrada</p></div>{% endif %}
 {% include "includes/paginacao.html" %}
 </section>
-<dialog id="demanda-polos" class="modal-dialog"><div class="modal-body"><div class="actions-row"><h2 class="section-title">Alunos por polo</h2><button class="btn btn-secondary" type="button" data-close-demanda>Fechar</button></div><div data-demanda-content><p class="muted">Carregando…</p></div></div></dialog>
+<dialog id="demanda-polos" class="modal-dialog"><div class="modal-body"><div class="actions-row"><h2 class="section-title">Alunos(as) por polo</h2><button class="btn btn-secondary" type="button" data-close-demanda>Fechar</button></div><div data-demanda-content><p class="muted">Carregando…</p></div></div></dialog>
 {% endblock %}
 {% block scripts %}<script>
 function bindRemove(row) { row.querySelector('[data-remove-sala]')?.addEventListener('click', () => { if (row.parentElement.querySelectorAll('[data-sala-row]').length > 1) row.remove(); }); }

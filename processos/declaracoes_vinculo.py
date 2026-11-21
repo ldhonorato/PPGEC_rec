@@ -74,7 +74,7 @@ def importar_declaracoes_de_vinculo(*, periodo, arquivos, enviado_por, substitui
 
         aluno = Aluno.objects.filter(cpf=cpf).first()
         if aluno is None:
-            resultado["motivo"] = "Nenhum aluno cadastrado com este CPF."
+            resultado["motivo"] = "Nenhum(a) aluno(a) cadastrado(a) com este CPF."
             resultados.append(resultado)
             continue
 

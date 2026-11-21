@@ -1,0 +1,122 @@
+.acomp-icone {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    padding: 7px;
+    border-radius: var(--radius-sm);
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+}
+
+.acomp-irregulares {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    margin-top: var(--espaco-4);
+    padding: var(--espaco-3) var(--espaco-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    text-decoration: none;
+    transition: border-color 0.14s ease;
+}
+
+.acomp-irregulares.tem-irregulares {
+    border-color: #f3c6cd;
+    background: #fff5f6;
+}
+
+.acomp-irregulares.tem-irregulares .acomp-icone {
+    color: var(--color-danger);
+    background: #fff0f1;
+}
+
+.acomp-irregulares-total {
+    font-size: 1.6rem;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.acomp-irregulares.tem-irregulares .acomp-irregulares-total {
+    color: var(--color-danger);
+}
+
+.acomp-irregulares-texto {
+    font-weight: 560;
+}
+
+.acomp-irregulares-acao {
+    flex: none;
+    margin-left: auto;
+    color: var(--color-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.acomp-telas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--espaco-3);
+    margin: var(--espaco-4) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.acomp-tela {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--espaco-3);
+    height: 100%;
+    padding: var(--espaco-3) var(--espaco-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    text-decoration: none;
+    transition: border-color 0.14s ease, background-color 0.14s ease;
+}
+
+.acomp-tela:hover,
+.acomp-tela:focus-visible,
+.acomp-irregulares:hover,
+.acomp-irregulares:focus-visible {
+    border-color: var(--color-primary);
+}
+
+.acomp-tela:hover,
+.acomp-tela:focus-visible {
+    background: var(--color-surface-soft);
+}
+
+.acomp-tela:focus-visible,
+.acomp-irregulares:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 72, 154, 0.16);
+}
+
+.acomp-tela-texto {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.acomp-tela-titulo {
+    font-weight: 600;
+}
+
+.acomp-tela-descricao {
+    color: var(--color-muted);
+    font-size: 0.9rem;
+}
+
+.acomp-aviso {
+    margin: var(--espaco-4) 0 0;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 700px) {
+    .acomp-telas {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

@@ -59,7 +59,7 @@
                                 <div><dt>Modificação</dt><dd>{{ periodo.modificacao_inicio|date:"d/m/Y" }} a {{ periodo.modificacao_fim|date:"d/m/Y" }}</dd></div>
                             </dl>
                             <span class="meta-linha">
-                                <span>{{ periodo.alunos_sem_matricula|length }} aluno{{ periodo.alunos_sem_matricula|length|pluralize }} sem matrícula</span>
+                                <span>{{ periodo.alunos_sem_matricula|length }} aluno{{ periodo.alunos_sem_matricula|length|pluralize }}{{ periodo.alunos_sem_matricula|length|pluralize:"(a),(as)" }} sem matrícula</span>
                                 <span>{{ periodo.solicitacoes_disciplinas_total }} solicitaç{{ periodo.solicitacoes_disciplinas_total|pluralize:"ão,ões" }} de disciplinas</span>
                                 <span>{{ periodo.solicitacoes_vinculo|length }} matrícula{{ periodo.solicitacoes_vinculo|length|pluralize }} vínculo</span>
                             </span>
@@ -106,7 +106,7 @@
 
         <div class="card room-modal-card panel">
             <div class="actions-row">
-                <h3 class="section-title">Alunos sem matrícula</h3>
+                <h3 class="section-title">Alunos(as) sem matrícula</h3>
                 <form method="post">
                     {% csrf_token %}
                     <input type="hidden" name="acao" value="enviar_email_sem_matricula">
@@ -127,7 +127,7 @@
                     {% endfor %}
                 </ul>
             {% else %}
-                <p class="muted">Todos os alunos com trajetória ativa possuem matrícula registrada neste período.</p>
+                <p class="muted">Todos(as) os(as) alunos(as) com trajetória ativa possuem matrícula registrada neste período.</p>
             {% endif %}
         </div>
 

@@ -5,7 +5,7 @@
     <div>
         <p class="eyebrow">Cadastro</p>
         <h1 class="section-title">Cadastro de ingressantes</h1>
-        <p class="muted">Importe uma planilha com as colunas nome, cpf, e-mail e orientador.</p>
+        <p class="muted">Importe uma planilha com as colunas nome, cpf, e-mail e orientador(a).</p>
     </div>
 </section>
 
@@ -28,7 +28,7 @@
     <p><strong>{{ resultados|length }}</strong> registro{{ resultados|length|pluralize }} processado{{ resultados|length|pluralize }}.</p>
     <div class="table-responsive">
         <table>
-            <thead><tr><th>Linha</th><th>Aluno</th><th>Resultado</th><th>Detalhes</th></tr></thead>
+            <thead><tr><th>Linha</th><th>Aluno(a)</th><th>Resultado</th><th>Detalhes</th></tr></thead>
             <tbody>
             {% for resultado in resultados %}
                 <tr>

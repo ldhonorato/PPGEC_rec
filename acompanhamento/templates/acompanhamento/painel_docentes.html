@@ -30,6 +30,14 @@
         <p class="metric-value">{{ total_colaboradores }}</p>
         <p class="metric-label">Colaboradores</p>
     </article>
+    <article class="card metric-card is-green">
+        <p class="metric-value">{{ percentual_permanentes|floatformat:1 }}%</p>
+        <p class="metric-label">% de permanentes</p>
+    </article>
+    <article class="card metric-card is-purple">
+        <p class="metric-value">{{ percentual_colaboradores|floatformat:1 }}%</p>
+        <p class="metric-label">% de colaboradores</p>
+    </article>
     <article class="card metric-card is-orange">
         <p class="metric-value">{{ total_internos }}</p>
         <p class="metric-label">Internos</p>

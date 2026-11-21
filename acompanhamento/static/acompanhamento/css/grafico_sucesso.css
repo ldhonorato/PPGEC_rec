@@ -1,0 +1,166 @@
+.grafico-sucesso-container {
+    margin-top: 16px;
+}
+
+.grafico-alerta-espacado {
+    margin-top: 16px;
+}
+
+.grafico-aviso {
+    padding: 0.75rem 1rem;
+    border: 1px solid #c9dcf5;
+    border-radius: var(--radius-sm);
+}
+
+.grafico-legenda {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.legenda-item {
+    display: flex;
+    align-items: center;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.legenda-cor {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    margin-right: 8px;
+}
+
+/* 7 Cores das Categorias */
+.cor-1 { background-color: #059669; }
+.cor-2 { background-color: #dc2626; }
+.cor-3 { background-color: #d97706; }
+.cor-4 { background-color: #2563eb; }
+.cor-5 { background-color: #60a5fa; }
+.cor-6 { background-color: #7c3aed; }
+.cor-7 { background-color: #6b7280; }
+
+.grafico-corpo {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+/* Os rótulos seguem a mesma altura das barras: 22px para o número da barra
+   mais alta e 218px da escala de 0% a 100%. */
+.grafico-escala {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+    width: 36px;
+    height: 240px;
+    padding-top: 22px;
+    color: #637083;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.grafico-escala span {
+    height: 0;
+    line-height: 0;
+}
+
+.grafico-corpo .tabela-envolvido {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.grafico-area {
+    display: flex;
+    width: max-content;
+    min-width: 100%;
+    padding-bottom: 8px;
+}
+
+.turma-grupo {
+    display: flex;
+    flex: 1 0 174px;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* As linhas ficam no bloco inteiro da turma, sem espaço entre os grupos, para
+   atravessarem o gráfico sem falhas. */
+.turma-barras {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+    box-sizing: border-box;
+    width: 100%;
+    height: 240px;
+    padding-top: 22px;
+    border-bottom: 1px solid #c9d2df;
+    background-image: linear-gradient(#e9edf3 1px, transparent 1px);
+    background-size: 100% 25%;
+    background-origin: content-box;
+    background-clip: content-box;
+}
+
+.barra-coluna-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    width: 18px;
+}
+
+.barra-coluna {
+    width: 100%;
+    border-radius: 4px 4px 0 0;
+    transition: height 0.3s ease;
+    min-height: 2px;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.barra-quantidade {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #4b5563;
+    position: absolute;
+    bottom: 100%;
+    left: -6px;
+    right: -6px;
+    text-align: center;
+}
+
+.turma-rotulo {
+    margin-top: 12px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #1f2937;
+    text-align: center;
+}
+
+.turma-ingressantes {
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.badge-dados-limitados {
+    font-size: 0.7rem;
+    color: #b45309;
+    display: inline;
+    margin-left: 2px;
+}
+
+/* O botão tem a mesma altura dos campos do filtro. */
+.filtros-linha > .btn {
+    min-height: 46.6px;
+}

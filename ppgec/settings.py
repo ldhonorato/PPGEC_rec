@@ -371,6 +371,7 @@ LOGGING = {
 
 # celery config
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 #CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0") (tirar comentario dessa linha)
 
 CELERY_ACCEPT_CONTENT = ["json"]
@@ -386,3 +387,5 @@ INSTALLED_APPS += ["django_celery_results"]
 # acessível. Ligar ou desligar exige apenas mudar a variável e reiniciar os
 # contêineres, sem reverter código.
 ACOMPANHAMENTO_ATIVO = env_bool("ACOMPANHAMENTO_ATIVO", False)
+# Aviso diário de alunos irregulares. Só funciona com o módulo também ativo.
+ACOMPANHAMENTO_AVISO_ATIVO = env_bool("ACOMPANHAMENTO_AVISO_ATIVO", False)

@@ -4,10 +4,47 @@ Cada tela nova do módulo entra nesta lista, e não no menu lateral do sistema.
 O menu tem um único item do módulo, que leva à página inicial. Assim nenhuma
 tela nova mexe no código que monta o menu em todas as páginas.
 
-Cada item é um par (título, nome da rota).
+Cada item tem título, frase da tela, nome da rota e ícone de includes/icons.html.
 """
 
 TELAS = [
-    ("Painel de Docentes", "acompanhamento:painel_docentes"),
-    ("Carga de orientação", "coordenacao_dashboard"),
+    (
+        "Painel de Sucesso por Turma",
+        "Concluídos, desligados e ativos de cada turma.",
+        "acompanhamento:painel_sucesso_turma",
+        "i-dashboard",
+    ),
+    (
+        "Painel de Processos",
+        "Abertos, atrasados e tempo médio no período.",
+        "acompanhamento:painel_processos",
+        "i-todos-processos",
+    ),
+    (
+        "Painel de Docentes",
+        "Distribuição por polo, permanentes e colaboradores.",
+        "acompanhamento:painel_docentes",
+        "i-setores",
+    ),
+    (
+        "Dashboard",
+        "Indicadores do programa e distribuição de alunos(as) por orientador(a).",
+        "coordenacao_dashboard",
+        "i-orientandos",
+    ),
+    (
+        "Calendário de Marcos",
+        "Datas de projeto e qualificação por semestre.",
+        "acompanhamento:calendario_marcos",
+        "i-periodos",
+    ),
 ]
+
+# Registrada separadamente para que a view inicio só adicione o cartão
+# para quem possui a permissão pode_ver_painel_professores
+TELA_PAINEL_PROFESSORES = (
+    "Painel por Professor(a)",
+    "Turmas, prazos, defesas e previsão de conclusão por docente.",
+    "acompanhamento:painel_professores",
+    "i-orientandos",
+)

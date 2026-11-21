@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load static %}
+{% load l10n %}
+{% block title %}Painel de Processos | Coordenação{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'acompanhamento/css/painel_processos.css' %}">
+{% endblock %}
+{% block content %}
+<section class="card">
+    <div class="lista-cabecalho">
+        <div>
+            <h1 class="section-title">Painel de Processos</h1>
+            <p class="muted">Processos abertos de {{ data_inicio|date:"d/m/Y" }} a {{ data_fim|date:"d/m/Y" }}.</p>
+        </div>
+    </div>
+    <form method="get" class="filtros"><div class="filtros-linha">
+        <div class="filtros-campo">
+            <label for="semestre">Semestre</label>
+            <select id="semestre" name="semestre">
+                {% for opcao in semestres %}
+                    <option value="{{ opcao }}" {% if opcao == semestre_selecionado %}selected{% endif %}>{{ opcao }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filtros-campo">
+            <label for="data_inicio">Data inicial</label>
+            <input id="data_inicio" name="data_inicio" type="date" value="{{ data_inicio_filtro|date:'Y-m-d' }}">
+        </div>
+        <div class="filtros-campo">
+            <label for="data_fim">Data final</label>
+            <input id="data_fim" name="data_fim" type="date" value="{{ data_fim_filtro|date:'Y-m-d' }}">
+        </div>
+        <button class="btn" type="submit">Filtrar</button>
+    </div></form>
+    <p class="muted">Se as duas datas forem informadas, o intervalo prevalece sobre o semestre.</p>
+</section>
+
+<section class="metric-grid" aria-label="Totais de processos">
+    <article class="card metric-card">
+        <p class="metric-value">{{ total_processos }}</p>
+        <p class="metric-label">Processos abertos</p>
+    </article>
+    <article class="card metric-card {% if total_atrasados %}is-alerta{% endif %}">
+        <p class="metric-value">{{ total_atrasados }}</p>
+        <p class="metric-label">Em atraso</p>
+    </article>
+    <article class="card metric-card is-green">
+        {% if tempo_medio_dias is None %}
+            <p class="metric-value">Sem dados</p>
+            <p class="metric-label">Nenhum processo finalizado no período</p>
+        {% else %}
+            <p class="metric-value">{{ tempo_medio_dias|floatformat:1 }}</p>
+            <p class="metric-label">Dias, em média, até a finalização</p>
+        {% endif %}
+    </article>
+</section>
+
+{% include "acompanhamento/_barras.html" with titulo="Por tipo" barras=barras_tipo vazio="Nenhum processo aberto no período." %}
+{% include "acompanhamento/_barras.html" with titulo="Por tipo e mês" barras=barras_tipo_mes vazio="Nenhum processo aberto no período." %}
+{% include "acompanhamento/_barras.html" with titulo="Por status" barras=barras_status vazio="Nenhum processo aberto no período." %}
+{% include "acompanhamento/_barras.html" with titulo="Abertos por mês" barras=barras_mes vazio="Nenhum processo aberto no período." %}
+{% endblock %}

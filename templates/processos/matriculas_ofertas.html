@@ -139,7 +139,7 @@ tinha um unico filho e os cartoes encostavam um no outro.
                         </div>
                         <div class="calendar-nav">
                             {% if can_manage_matriculas %}
-                                <a class="btn" href="{% url 'matricula_oferta_alunos' oferta.pk %}">Alunos</a>
+                                <a class="btn" href="{% url 'matricula_oferta_alunos' oferta.pk %}">Alunos(as)</a>
                                 <a class="btn btn-secondary" href="{% url 'matricula_oferta_exportar' oferta.pk %}">Excel</a>
                             {% endif %}
                             {% if can_manage_matriculas or oferta.docente_responsavel_id == request.user.id or oferta.docente_colaborador_id == request.user.id %}

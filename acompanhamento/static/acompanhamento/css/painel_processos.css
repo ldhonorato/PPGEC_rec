@@ -1,0 +1,4 @@
+/* O botão tem a mesma altura dos campos do filtro. */
+.filtros-linha > .btn {
+    min-height: 46.6px;
+}

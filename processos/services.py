@@ -361,15 +361,15 @@ def salvar_solicitacao_matricula(
     tipo_matricula=SolicitacaoMatricula.TipoMatricula.DISCIPLINAS,
 ):
     if aluno.tipo_usuario != User.TipoUsuario.ALUNO:
-        raise ValidationError("A solicitação de matrícula deve ser feita por aluno.")
+        raise ValidationError("A solicitação de matrícula deve ser feita por aluno(a).")
     trajetoria_ativa = aluno.trajetoria_ativa()
     if not trajetoria_ativa:
         raise ValidationError("A solicitação de matrícula exige trajetória acadêmica ativa.")
     tipo_aluno_esperado = tipo_aluno_matricula_por_trajetoria(trajetoria_ativa)
     if tipo_aluno_esperado is None:
-        raise ValidationError("Aluno de Pós-Doutorado não realiza matrícula em disciplinas.")
+        raise ValidationError("Aluno(a) de Pós-Doutorado não realiza matrícula em disciplinas.")
     if tipo_aluno != tipo_aluno_esperado:
-        raise ValidationError("O tipo de aluno deve ser obtido da trajetória acadêmica ativa.")
+        raise ValidationError("O tipo de aluno(a) deve ser obtido da trajetória acadêmica ativa.")
     if not periodo.aceita_solicitacao_matricula:
         raise ValidationError("O período não está aberto para matrícula ou modificação.")
 
@@ -727,7 +727,7 @@ def gerar_xlsx_lista_oferta(oferta):
         "Matrícula",
         "Nome",
         "E-mail",
-        "Tipo de aluno",
+        "Tipo de aluno(a)",
         "Trajetória acadêmica mais recente",
         "Status",
         "Solicitado em",
@@ -872,7 +872,7 @@ def gerar_xlsx_solicitacoes_periodo(periodo, estado="consolidada"):
     if estado not in {"originais", "modificacoes", "consolidada"}:
         raise ValidationError("Tipo de planilha de matrícula inválido.")
 
-    cabecalho = ["Matrícula", "Nome", "Polo", "E-mail", "Tipo de aluno", "Nível", "Status", "Solicitado em", "Observação"]
+    cabecalho = ["Matrícula", "Nome", "Polo", "E-mail", "Tipo de aluno(a)", "Nível", "Status", "Solicitado em", "Observação"]
     if estado == "modificacoes":
         linhas = [[
             "Data e hora",

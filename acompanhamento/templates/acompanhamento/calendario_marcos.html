@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Calendário de Marcos | AcadFlow{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1 class="section-title">Calendário de Marcos</h1>
+
+  <!-- Formulário de Cadastro / Edição -->
+  <div style="margin-bottom: 2rem;">
+    <h2>{% if marco_edicao %}Editar Marco{% else %}Cadastrar Novo Marco{% endif %}</h2>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit" class="btn">Salvar</button>
+      {% if marco_edicao %}
+        <a href="{% url 'acompanhamento:calendario_marcos' %}" class="btn btn-secondary">Cancelar</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Tabela de Listagem -->
+  <table>
+    <thead>
+      <tr>
+        <th>Tipo</th>
+        <th>Semestre</th>
+        <th>Data Limite</th>
+        <th>Alterado por</th>
+        <th>Alterado em</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for marco in marcos %}
+        <tr>
+          <td>{{ marco.get_tipo_display }}</td>
+          <td>{{ marco.semestre }}</td>
+          <td>{{ marco.data_limite|date:"d/m/Y" }}</td>
+          <td>{{ marco.alterado_por|default:"-" }}</td>
+          <td>{{ marco.alterado_em|date:"d/m/Y H:i"|default:"-" }}</td>
+          <td>
+            <a href="?editar={{ marco.id }}" class="btn btn-secondary">Editar</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="6">Nenhum marco cadastrado.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
