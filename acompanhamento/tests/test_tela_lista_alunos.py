@@ -231,7 +231,7 @@ class TelaListaAlunosTests(TestCase):
         workbook = load_workbook(BytesIO(resposta.content), read_only=True)
         linhas = list(workbook.active.values)
 
-        self.assertEqual(linhas[6][0], "ALUNO")
+        self.assertEqual(linhas[6][0], "ALUNO(A)")
         self.assertEqual(linhas[7][0], "Atrasado Tela Marco")
         self.assertEqual(linhas[7][1], "Irregular")
         self.assertEqual(len(linhas), 8)
@@ -293,10 +293,10 @@ class TelaListaAlunosTests(TestCase):
         self.assertEqual(
             planilha["A2"].value, "PPGEC · Pós-Graduação em Engenharia de Computação"
         )
-        self.assertEqual(planilha["A3"].value, "Alunos por marco acadêmico")
+        self.assertEqual(planilha["A3"].value, "Alunos(as) por marco acadêmico")
         self.assertIn("Nome: Atrasado Tela Marco", planilha["A4"].value)
         self.assertIn("Situação no marco: Irregular", planilha["A4"].value)
-        self.assertIn("1 aluno ", planilha["A5"].value)
+        self.assertIn("1 aluno(a) ", planilha["A5"].value)
         self.assertEqual(planilha["A1"].fill.start_color.rgb[-6:], "002F69")
         self.assertEqual(planilha["A7"].font.color.rgb[-6:], "00489A")
         self.assertEqual(planilha["B8"].font.color.rgb[-6:], "B42336")

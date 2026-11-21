@@ -29,7 +29,11 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
     <dl class="dados-grid">
         <div>
             <dt>Setor atual</dt>
-            <dd>{{ processo.setor_atual.nome|default:"—" }}</dd>
+            <dd>{{ processo.setor_atual.nome|default:"—" }}
+                {% if processo.destinatario_devolucao_id and processo.setor_atual.nome == "Requerente" %}
+                    <span class="dado-nota">Aguardando ação de {{ processo.destinatario_devolucao.nome }}</span>
+                {% endif %}
+            </dd>
         </div>
         <div{% if processo.esta_atrasado %} class="dado-alerta"{% endif %}>
             <dt>Prazo limite</dt>
@@ -39,7 +43,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
             </dd>
         </div>
         <div>
-            <dt>Aluno interessado</dt>
+            <dt>Aluno(a) interessado(a)</dt>
             <dd>
                 {% if processo.aluno_interessado %}
                     <a href="{% url 'aluno_detalhe' processo.aluno_interessado.id %}">{{ processo.aluno_interessado.nome }}</a>
@@ -111,6 +115,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                     <div class="linha-tempo-conteudo">
                         <p class="linha-tempo-titulo">{{ tramitacao.setor_origem.nome|default:"Requerente" }} → {{ tramitacao.setor_destino.nome }}</p>
                         <p class="linha-tempo-meta">{{ tramitacao.data_encaminhamento|date:"d/m/Y H:i" }} · por {{ tramitacao.encaminhado_por.nome }}</p>
+                        {% if tramitacao.destinatario_devolucao_id %}<p class="linha-tempo-meta">Ação solicitada a {{ tramitacao.destinatario_devolucao.nome }}</p>{% endif %}
                         {% if tramitacao.observacao %}<p class="linha-tempo-observacao">{{ tramitacao.observacao }}</p>{% endif %}
                     </div>
                 </li>
@@ -130,7 +135,8 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                             <div class="linha-tempo-conteudo">
                                 <p class="linha-tempo-titulo">{{ tramitacao.setor_origem.nome|default:"Requerente" }} → {{ tramitacao.setor_destino.nome }}</p>
                                 <p class="linha-tempo-meta">{{ tramitacao.data_encaminhamento|date:"d/m/Y H:i" }} · por {{ tramitacao.encaminhado_por.nome }}</p>
-                                {% if tramitacao.observacao %}<p class="linha-tempo-observacao">{{ tramitacao.observacao }}</p>{% endif %}
+                                {% if tramitacao.destinatario_devolucao_id %}<p class="linha-tempo-meta">Ação solicitada a {{ tramitacao.destinatario_devolucao.nome }}</p>{% endif %}
+                        {% if tramitacao.observacao %}<p class="linha-tempo-observacao">{{ tramitacao.observacao }}</p>{% endif %}
                             </div>
                         </li>
                     {% endif %}
@@ -181,14 +187,14 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
 
             <h3>Discente e trajetória</h3>
             <ul class="info-list">
-                <li><span class="info-label">Aluno</span><span>{{ solicitacao.aluno.nome }}{% if solicitacao.aluno.matricula %} - {{ solicitacao.aluno.matricula }}{% endif %}</span></li>
+                <li><span class="info-label">Aluno(a)</span><span>{{ solicitacao.aluno.nome }}{% if solicitacao.aluno.matricula %} - {{ solicitacao.aluno.matricula }}{% endif %}</span></li>
                 <li><span class="info-label">E-mail</span><span>{{ solicitacao.aluno.email }}</span></li>
                 <li><span class="info-label">Nível</span><span>{{ solicitacao.trajetoria.get_nivel_curso_display }}</span></li>
                 <li><span class="info-label">Ingresso</span><span>{{ solicitacao.trajetoria.ingresso|default:"-" }}</span></li>
                 <li><span class="info-label">Prazo qualificação/projeto</span><span>{{ solicitacao.trajetoria.prazo_qualificacao|default:"-" }}</span></li>
                 <li><span class="info-label">Prazo defesa</span><span>{{ solicitacao.trajetoria.prazo_defesa|default:"-" }}</span></li>
-                <li><span class="info-label">Orientador</span><span>{{ solicitacao.trajetoria.orientador.nome|default:"-" }}</span></li>
-                <li><span class="info-label">Coorientador</span><span>{{ solicitacao.trajetoria.coorientador_display|default:"-" }}</span></li>
+                <li><span class="info-label">Orientador(a)</span><span>{{ solicitacao.trajetoria.orientador.nome|default:"-" }}</span></li>
+                <li><span class="info-label">Coorientador(a)</span><span>{{ solicitacao.trajetoria.coorientador_display|default:"-" }}</span></li>
             </ul>
 
             {% if item.checklist %}
@@ -222,7 +228,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                                 {% if publicacao.doi_url %}<span>{{ publicacao.doi_url }}</span>{% endif %}
                             </span>
                             {% if publicacao.autores %}
-                                <p class="item-observacao"><strong>Autores:</strong> {{ publicacao.autores }}</p>
+                                <p class="item-observacao"><strong>Autores(as):</strong> {{ publicacao.autores }}</p>
                             {% endif %}
                         </li>
                     {% endfor %}
@@ -297,13 +303,13 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
             {% endif %}
         {% endif %}
         {% if can_manifestar_ciente %}
-            <button type="button" class="btn" id="btn-abrir-modal-ciente">Manifestar ciente do orientador</button>
+            <button type="button" class="btn" id="btn-abrir-modal-ciente">Manifestar ciente do(a) orientador(a)</button>
         {% endif %}
         {% if can_manifestar_ciencia_espontanea %}
             <button type="button" class="btn" id="btn-abrir-modal-ciente">Dar ciência antecipadamente</button>
         {% endif %}
         {% if can_solicitar_ciente %}
-            <button type="button" class="btn btn-secondary" id="btn-abrir-modal-ciente">Solicitar ciente do orientador</button>
+            <button type="button" class="btn btn-secondary" id="btn-abrir-modal-ciente">Solicitar ciente do(a) orientador(a)</button>
         {% endif %}
         {% if can_add_documento %}
             <button type="button" class="btn btn-secondary" id="btn-abrir-modal-documento">Adicionar documento</button>
@@ -326,7 +332,7 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
 <section class="card">
     <h2 class="section-title">Horas complementares</h2>
     <dl class="dados-grid">
-        <div><dt>Aluno</dt><dd>{{ aluno_horas_complementares.nome }}</dd></div>
+        <div><dt>Aluno(a)</dt><dd>{{ aluno_horas_complementares.nome }}</dd></div>
         <div>
             <dt>Trajetória</dt>
             <dd>{{ trajetoria_horas_complementares.get_nivel_curso_display }}</dd>
@@ -375,11 +381,11 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
 {% endif %}
 
 <section class="card">
-    <h2 class="section-title">Ciente do orientador</h2>
+    <h2 class="section-title">Ciente do(a) orientador(a)</h2>
     {% if orientador_responsavel %}
-        <p class="muted nota-antes-lista">Orientador responsável: {{ orientador_responsavel.nome }} ({{ orientador_responsavel.email }})</p>
+        <p class="muted nota-antes-lista">Orientador(a) responsável: {{ orientador_responsavel.nome }} ({{ orientador_responsavel.email }})</p>
     {% else %}
-        <p class="muted nota-antes-lista">Não há orientador vinculado ao requerente deste processo.</p>
+        <p class="muted nota-antes-lista">Não há orientador(a) vinculado(a) ao requerente deste processo.</p>
     {% endif %}
 
     {% if processo.manifestacoes.all %}
@@ -481,9 +487,10 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         {% csrf_token %}
         <input type="hidden" name="encaminhar_processo" value="1">
         {% for field in encaminhamento_form %}
-            <div class="formulario-campo" {% if field.html_name == "prazo_limite" %}id="campo-prazo-pleno" hidden{% endif %}>
+            <div class="formulario-campo" {% if field.html_name == "prazo_limite" %}id="campo-prazo-pleno" hidden{% elif field.html_name == "destinatario_devolucao" %}id="campo-destinatario-devolucao"{% endif %}>
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
+                {% if field.help_text %}<p class="formulario-ajuda">{{ field.help_text }}</p>{% endif %}
                 {{ field.errors }}
             </div>
         {% endfor %}
@@ -501,9 +508,9 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
 <dialog id="modal-ciente" class="modal-dialog">
     <div class="modal-cabecalho">
         {% if can_manifestar_ciente or can_manifestar_ciencia_espontanea %}
-            <h2 class="section-title">Manifestar ciente do orientador</h2>
+            <h2 class="section-title">Manifestar ciente do(a) orientador(a)</h2>
         {% else %}
-            <h2 class="section-title">Solicitar ciente do orientador</h2>
+            <h2 class="section-title">Solicitar ciente do(a) orientador(a)</h2>
         {% endif %}
     </div>
     <form method="post" class="modal-formulario">
@@ -738,7 +745,8 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
                             · <span class="badge badge-{{ tramitacao.status_resultante|status_processo_tom }}">{{ tramitacao.get_status_resultante_display }}</span>
                         {% endif %}
                     </p>
-                    {% if tramitacao.observacao %}
+                    {% if tramitacao.destinatario_devolucao_id %}<p class="linha-tempo-meta">Ação solicitada a {{ tramitacao.destinatario_devolucao.nome }}</p>{% endif %}
+                        {% if tramitacao.observacao %}
                         <p class="linha-tempo-observacao">{{ tramitacao.observacao }}</p>
                     {% endif %}
                 </div>
@@ -901,11 +909,16 @@ ordem: do que se trata, em que pe esta, com quem esta e ate quando.
         const setorDestino = document.getElementById("id_setor_destino");
         const campoPrazoPleno = document.getElementById("campo-prazo-pleno");
         const inputPrazoPleno = document.getElementById("id_prazo_limite");
+        const campoDestinatario = document.getElementById("campo-destinatario-devolucao");
+        const inputDestinatario = document.getElementById("id_destinatario_devolucao");
 
         function togglePrazoPleno() {
             if (!setorDestino || !campoPrazoPleno) return;
             const selectedText = setorDestino.options[setorDestino.selectedIndex]?.text || "";
             const isPleno = selectedText.toLowerCase().includes("pleno");
+            const isRequerente = selectedText.trim() === "Requerente";
+            if (campoDestinatario) campoDestinatario.hidden = !isRequerente;
+            if (inputDestinatario) inputDestinatario.required = isRequerente;
             // hidden, nao style.display: o campo nasce escondido pelo atributo
             // no template, e escrever em style.display deixaria os dois
             // mecanismos disputando -- o hidden do markup venceria a string

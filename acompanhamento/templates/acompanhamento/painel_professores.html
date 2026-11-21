@@ -5,13 +5,13 @@
     <link rel="stylesheet" href="{% static 'acompanhamento/css/grafico_sucesso.css' %}">
 {% endblock %}
 
-{% block title %}Painel por Professor | Acadflow{% endblock %}
+{% block title %}Painel por Professor(a) | Acadflow{% endblock %}
 
 {% block content %}
 <section class="card">
     <div class="lista-cabecalho">
         <div>
-            <h1 class="section-title">Painel por Professor</h1>
+            <h1 class="section-title">Painel por Professor(a)</h1>
             <p class="muted">Acompanhamento de turmas, prazos, defesas e previsão de conclusão por docente.</p>
         </div>
     </div>
@@ -35,9 +35,9 @@
             </div>
 
             <div class="filtros-campo">
-                <label for="orientador_id">Professor</label>
+                <label for="orientador_id">Professor(a)</label>
                 <select id="orientador_id" name="orientador_id">
-                    <option value="">Todos os professores</option>
+                    <option value="">Todos os(as) professores(as)</option>
                     {% for prof in professores_list %}
                         <option value="{{ prof.id }}" {% if orientador_id == prof.id %}selected{% endif %}>
                             {{ prof.nome }}
@@ -68,8 +68,8 @@
                 <table class="tabela">
                     <thead>
                         <tr>
-                            <th>Professor</th>
-                            <th>Alunos</th>
+                            <th>Professor(a)</th>
+                            <th>Alunos(as)</th>
                             <th>Ativos</th>
                             <th>Concluídos</th>
                             <th>Desligados</th>
@@ -150,7 +150,7 @@
     {% if turmas %}
         <section class="card">
             <h2 class="section-title">Indicadores por Turma</h2>
-            <p class="muted">Comparativo de discentes sob orientação do professor por turma de ingresso.</p>
+            <p class="muted">Comparativo de discentes sob orientação do(a) professor(a) por turma de ingresso.</p>
 
             {% if alerta_dados_limitados %}
                 <p class="alert alert-info grafico-alerta-espacado grafico-aviso">
@@ -162,17 +162,17 @@
         </section>
     {% else %}
         <section class="card">
-            <p class="estado-vazio-inline">Nenhuma turma encontrada para o professor selecionado.</p>
+            <p class="estado-vazio-inline">Nenhuma turma encontrada para o(a) professor(a) selecionado(a).</p>
         </section>
     {% endif %}
 
     <section class="card">
         <h2 class="section-title">Previsão de conclusão</h2>
-        <p class="muted">Alunos ativos do professor, pelo limite de defesa com prorrogações e trancamentos.</p>
+        <p class="muted">Alunos(as) ativos(as) do(a) professor(a), pelo limite de defesa com prorrogações e trancamentos.</p>
         {% if dados_previsao and dados_previsao.alunos %}
             <div class="tabela-envolvido">
                 <table class="tabela">
-                    <thead><tr><th>Semestre</th><th>Alunos</th></tr></thead>
+                    <thead><tr><th>Semestre</th><th>Alunos(as)</th></tr></thead>
                     <tbody>
                         {% for item in dados_previsao.por_semestre %}
                             <tr><td>{{ item.semestre }}</td><td>{{ item.alunos }}</td></tr>
@@ -184,7 +184,7 @@
             </div>
             <div class="tabela-envolvido">
                 <table class="tabela">
-                    <thead><tr><th>Aluno</th><th>Turma</th><th>Limite de defesa</th><th>Semestre</th></tr></thead>
+                    <thead><tr><th>Aluno(a)</th><th>Turma</th><th>Limite de defesa</th><th>Semestre</th></tr></thead>
                     <tbody>
                         {% for aluno in dados_previsao.alunos %}
                             <tr>
@@ -202,7 +202,7 @@
                 </table>
             </div>
         {% else %}
-            <p class="estado-vazio-inline">Nenhum aluno ativo para este professor.</p>
+            <p class="estado-vazio-inline">Nenhum(a) aluno(a) ativo(a) para este professor(a).</p>
         {% endif %}
     </section>
 {% endif %}

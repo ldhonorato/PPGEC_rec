@@ -16,9 +16,9 @@
     </p>
     {% if user.tipo_usuario == "DOCENTE" %}
     <p class="formulario-aviso">
-        <svg aria-hidden="true"><use href="#i-caixa"></use></svg>
+        <svg aria-hidden="true"><use href="#i-pleno"></use></svg>
         <span>Solicitações de banca podem ser realizadas preenchendo o
-        <a href="{% url 'solicitacoes_banca' %}">formulário em /bancas/</a>.</span>
+        <a href="{% url 'solicitacoes_banca' %}">formulário de solicitação de banca</a>.</span>
     </p>
     {% endif %}
 

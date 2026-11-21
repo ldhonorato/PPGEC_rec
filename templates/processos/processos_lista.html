@@ -13,7 +13,7 @@
             <div class="filtros-campo filtros-campo-busca">
                 <label for="id_q">Busca</label>
                 <input id="id_q" type="search" name="q" value="{{ filtro_q }}"
-                       placeholder="número, assunto, descrição ou usuário">
+                       placeholder="número, assunto, descrição ou usuário(a)">
             </div>
             <div class="filtros-campo filtros-campo-escolha">
                 <label for="id_status">Status</label>
@@ -88,7 +88,8 @@
                 <thead>
                     <tr>
                         <th scope="col">Processo</th>
-                        <th scope="col">Aluno interessado</th>
+                        <th scope="col">Aluno(a) interessado(a)</th>
+                        <th scope="col">Requerente</th>
                         <th scope="col">Tipo</th>
                         <th scope="col">Setor atual</th>
                         <th scope="col">Prazo</th>
@@ -103,6 +104,7 @@
                                 <span class="celula-secundaria celula-numero">{{ processo.numero }}</span>
                             </td>
                             <td class="celula-apoio">{{ processo.aluno_interessado.nome|default:"—" }}</td>
+                            <td class="celula-apoio">{{ processo.usuario_criado_por.nome|default:"—" }}</td>
                             <td class="celula-apoio">{{ processo.get_tipo_display }}</td>
                             <td class="celula-apoio">{{ processo.setor_atual.nome|default:"—" }}</td>
                             <td class="celula-numero {% if processo.esta_atrasado %}celula-atrasada{% else %}celula-apoio{% endif %}">

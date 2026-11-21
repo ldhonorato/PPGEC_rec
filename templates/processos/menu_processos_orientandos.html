@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Processos dos Orientandos | PPGEC{% endblock %}
+{% block title %}Processos dos(as) Orientandos(as) | PPGEC{% endblock %}
 {% block content %}
 <section class="card">
-    <h1 class="section-title">Processos dos orientandos</h1>
+    <h1 class="section-title">Processos dos(as) orientandos(as)</h1>
     {% if processos_orientandos %}
         {% include "includes/tabela_processos.html" with processos=processos_orientandos coluna_pessoa="Aluno" mostrar_setor=True mostrar_prazo=True vazio_titulo="Nenhum processo dos seus orientandos" vazio_texto="Processos abertos por quem você orienta aparecem aqui." %}
     {% else %}
         <div class="estado-vazio">
     <svg aria-hidden="true"><use href="#i-processos-orientandos"></use></svg>
-    <p class="estado-vazio-titulo">Nenhum processo de orientando</p>
-    <p>Processos abertos pelos seus orientandos aparecem aqui.</p>
+    <p class="estado-vazio-titulo">Nenhum processo de orientando(a)</p>
+    <p>Processos abertos pelos seus orientandos(as) aparecem aqui.</p>
 </div>
     {% endif %}
 </section>

@@ -156,9 +156,9 @@ def montar_email(avisos):
         enviado_em__isnull=False
     ).exists()
     alunos = len({aviso.trajetoria.aluno_id for aviso in avisos})
-    assunto = f"[PPGEC] {alunos} aluno(s) com prazo vencido"
+    assunto = f"[PPGEC] {alunos} discente(s) com prazo vencido"
     if levantamento_inicial:
-        assunto = f"[PPGEC] Levantamento inicial: {alunos} aluno(s) com prazo vencido"
+        assunto = f"[PPGEC] Levantamento inicial: {alunos} discente(s) com prazo vencido"
 
     html = render_to_string(
         "acompanhamento/emails/aviso_irregularidade.html",

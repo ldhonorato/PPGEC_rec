@@ -1,7 +1,8 @@
 django==5.2
 celery==5.4.0
-kombu==5.6.2
-redis==5.2.1
+kombu[redis]==5.6.2
+# O transporte Redis do Kombu exige redis-py >= 6.1.0.
+redis==6.1.0
 django-celery-results==2.5.1
 python-dotenv==1.0.0
 whitenoise==6.4.0

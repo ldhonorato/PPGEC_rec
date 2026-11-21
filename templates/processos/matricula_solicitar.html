@@ -46,9 +46,9 @@ nenhum para mostrar.
 <section class="card panel">
     <h2 class="section-title">Matrícula não disponível</h2>
     {% if em_modificacao and not pode_modificar_matricula %}
-        <p class="muted">A modificação está disponível somente para alunos que enviaram a solicitação no prazo de matrícula.</p>
+        <p class="muted">A modificação está disponível somente para alunos(as) que enviaram a solicitação no prazo de matrícula.</p>
     {% else %}
-        <p class="muted">Alunos de Pós-Doutorado não realizam matrícula em disciplinas pelo AcadFlow.</p>
+        <p class="muted">Alunos(as) de Pós-Doutorado não realizam matrícula em disciplinas pelo AcadFlow.</p>
     {% endif %}
 </section>
 {% endif %}
@@ -70,7 +70,7 @@ nenhum para mostrar.
             <div>
                 <dt>Tipo de vínculo</dt>
                 <dd>{{ nivel_trajetoria_display }}</dd>
-                <p class="dado-nota">Matrícula como aluno {{ tipo_aluno_display|lower }}.</p>
+                <p class="dado-nota">Matrícula como aluno(a) {{ tipo_aluno_display|lower }}.</p>
             </div>
         </dl>
 
@@ -180,7 +180,7 @@ comparar de cabeca.
             <div>
                 <dt>Tipo de vínculo</dt>
                 <dd>{{ nivel_trajetoria_display }}</dd>
-                <p class="dado-nota">Aluno {{ tipo_aluno_display|lower }}</p>
+                <p class="dado-nota">Aluno(a) {{ tipo_aluno_display|lower }}</p>
             </div>
             <div><dt>Solicitação</dt><dd data-resumo-tipo>Matrícula vínculo</dd></div>
         </dl>

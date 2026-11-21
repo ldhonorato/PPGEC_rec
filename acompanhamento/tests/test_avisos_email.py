@@ -62,7 +62,7 @@ class ConteudoDoEmailTests(TestCase):
         rodar_aviso_diario(HOJE)
 
         self.assertEqual(AvisoIrregularidade.objects.count(), 2)
-        self.assertIn(" 1 aluno(s)", mail.outbox[0].subject)
+        self.assertIn(" 1 discente(s)", mail.outbox[0].subject)
 
 
 class MotivoDaPendenciaTests(TestCase):

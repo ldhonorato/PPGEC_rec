@@ -2,9 +2,9 @@
 {% block title %}Validar cadastros | Secretaria{% endblock %}
 {% block content %}
 <section class="card">
-    <h1 class="section-title">Validar cadastros de alunos</h1>
+    <h1 class="section-title">Validar cadastros de alunos(as)</h1>
     <p class="muted">
-        <strong>{{ total_pendentes }}</strong> aluno{{ total_pendentes|pluralize }} aguardando aprovação.
+        <strong>{{ total_pendentes }}</strong> aluno{{ total_pendentes|pluralize }}{{ total_pendentes|pluralize:"(a),(as)" }} aguardando aprovação.
         {% if filtro_polo %}Exibindo {{ total_filtrado }} no polo selecionado.{% endif %}
     </p>
     <form method="get" class="filtros">
@@ -36,8 +36,8 @@
                                 {% if aluno.trajetoria_atual %}
                                     <span>{{ aluno.trajetoria_atual.get_nivel_curso_display }}</span>
                                     {% if aluno.trajetoria_atual.ingresso %}<span>Ingresso {{ aluno.trajetoria_atual.ingresso }}</span>{% endif %}
-                                    {% if aluno.trajetoria_atual.orientador %}<span>Orientador: {{ aluno.trajetoria_atual.orientador.nome }}</span>{% endif %}
-                                    {% if aluno.trajetoria_atual.coorientador_display %}<span>Coorientador: {{ aluno.trajetoria_atual.coorientador_display }}</span>{% endif %}
+                                    {% if aluno.trajetoria_atual.orientador %}<span>Orientador(a): {{ aluno.trajetoria_atual.orientador.nome }}</span>{% endif %}
+                                    {% if aluno.trajetoria_atual.coorientador_display %}<span>Coorientador(a): {{ aluno.trajetoria_atual.coorientador_display }}</span>{% endif %}
                                 {% endif %}
                             </span>
                         </div>
@@ -77,7 +77,7 @@
         <div class="estado-vazio">
             <svg aria-hidden="true"><use href="#i-validar"></use></svg>
             <p class="estado-vazio-titulo">Nenhum cadastro a validar</p>
-            <p>Ajuste o filtro ou aguarde novos cadastros de alunos.</p>
+            <p>Ajuste o filtro ou aguarde novos cadastros de alunos(as).</p>
         </div>
     {% endif %}
 </section>
