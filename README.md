@@ -2,6 +2,21 @@
 
 Aplicação Django para gestão de processos acadêmicos do PPGEC, com perfis de acesso para alunos, docentes, coordenação e servidores.
 
+## Documentação do Projeto
+
+Os documentos abaixo apresentam informações necessárias para compreender, executar, manter e dar continuidade ao desenvolvimento do sistema.
+
+| Documento | Descrição |
+|---|---|
+| [Documento de Negócio](docs/documento-de-negocio.md) | Apresenta o propósito do sistema, o público atendido, as funcionalidades implementadas, as regras de negócio e as evoluções realizadas durante o semestre. |
+| [Documento Técnico](docs/entrega-modulo-acompanhamento.md) | Descreve a arquitetura, as tecnologias utilizadas, a configuração do ambiente, a execução do sistema, os testes e os procedimentos técnicos. |
+| [Documento de Passagem de Conhecimento](docs/passagem-de-conhecimento.md) | Registra o estado atual do projeto, as decisões importantes, os aprendizados da equipe e as recomendações para sua continuidade. |
+
+**Documentação complementar:**
+
+- [Manual de Uso da Secretaria](docs/manual-de-uso-secretaria.md): orientações para utilização das funcionalidades do módulo de acompanhamento.
+- [Guia do Ambiente Local](docs/guia-do-ambiente-local.md): instruções detalhadas para configuração e execução do projeto em ambiente de desenvolvimento.
+
 ## Requisitos
 
 - Python 3.12+
@@ -47,7 +62,7 @@ O pgAdmin fica disponível em `http://localhost:5050`. Para conectar ao banco pe
 - Host: `db`
 - Porta: `5432`
 - Database: valor de `POSTGRES_DB`
-- Usuario: valor de `POSTGRES_USER`
+- Usuário: valor de `POSTGRES_USER`
 - Senha: valor de `POSTGRES_PASSWORD`
 
 Para voltar temporariamente ao SQLite local, defina `USE_POSTGRES=False` no `.env`.
