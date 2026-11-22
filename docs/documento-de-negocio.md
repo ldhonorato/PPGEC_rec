@@ -14,14 +14,14 @@ O módulo de Acompanhamento Acadêmico foi desenvolvido pela Equipe E4, composta
 
 | Integrante | Papel | Responsabilidades |
 |---|---|---|
-| Carlos Bentzen | Product Owner | Alinhamento com cliente e validação de requisitos. |
-| Gabriela Pereira | Scrum Master | Facilitação de rituais e gestão do fluxo. |
-| Gustavo Souto | Tech Lead | Arquitetura geral do sistema e reviews no GitHub. |
-| Daniel Medeiros | Lead Frontend | Desenvolvimento das telas e componentes React. |
-| Marllon Kauan | Lead Backend | Construção das APIs Node.js e regras de negócio. |
-| Antonio Carlos | Especialista BI | Desenvolvimento dos dashboards e métricas. |
-| Dyhego Alexandre | Especialista n8n | Mapeamento e automação de fluxos de processos. |
-| Sergio da Silva | QA & DevOps | Pipelines Docker/GitHub e garantia de qualidade. |
+| Carlos Bentzen | Product Owner | Alinhamento com o cliente, levantamento e validação de requisitos e priorização das demandas. |
+| Gabriela Pereira | Scrum Master | Facilitação dos rituais ágeis, acompanhamento das atividades e organização do fluxo de trabalho da equipe. |
+| Gustavo Souto | Tech Lead | Definição da arquitetura da solução, orientação técnica da equipe e revisão de código e Pull Requests no GitHub. |
+| Daniel Medeiros | Lead Frontend | Desenvolvimento e manutenção das interfaces, telas e componentes da aplicação utilizando as tecnologias integradas ao Django. |
+| Marllon Kauan | Lead Backend | Desenvolvimento das funcionalidades no backend com Python e Django, implementação das regras de negócio e integração com o banco de dados. |
+| Antonio Carlos | Especialista BI | Desenvolvimento e aprimoramento de dashboards, indicadores e métricas para acompanhamento acadêmico. |
+| Dyhego Alexandre | Especialista em Automação | Análise dos fluxos de processos e apoio à implementação e manutenção de mecanismos de automação do sistema. |
+| Sergio da Silva | QA & DevOps | Configuração e manutenção dos ambientes Docker, pipelines de integração e entrega contínua no GitHub Actions e atividades de garantia da qualidade. |
 
 ## Apresentação do documento
 

@@ -40,13 +40,19 @@ O módulo foi entregue e suas funcionalidades estão integradas ao AcadFlow.
 - As chaves de ativação permitem controlar separadamente o módulo e o envio dos avisos.
 - Os testes automatizados e o ensaio de produção fazem parte do processo de validação.
 - As dependências possuem versões fixadas no `requirements.txt`.
-- As dívidas técnicas identificadas durante o desenvolvimento foram resolvidas.
+- As dívidas técnicas identificadas durante o desenvolvimento foram quase todas resolvidas.
+
+### Dívidas técnicas identificadas
+
+Foram identificados dois pontos que devem ser considerados pela equipe responsável pela continuidade e evolução do módulo:
+
+1. **Parte do código do módulo localizada no arquivo original do sistema:** algumas funcionalidades relacionadas ao Acompanhamento Acadêmico permanecem implementadas em `processos/views.py`, em vez de estarem integralmente organizadas dentro do aplicativo `acompanhamento`. Essa situação representa um ponto de atenção para futuras manutenções e para a organização da arquitetura do sistema.
+
+2. **Ausência de monitoramento automático do aviso diário:** atualmente, o sistema não notifica os responsáveis caso a rotina de envio do aviso diário deixe de ser executada. Dessa forma, uma eventual interrupção dessa rotina pode passar despercebida, sendo necessário implementar algum mecanismo de monitoramento ou alerta para identificar falhas na execução.
 
 **Bugs conhecidos:** nenhum bug conhecido pela equipe E4 na data de referência.
 
 **Pendências no GitHub:** não existem issues ou tarefas pendentes registradas pelo grupo atual.
-
-**Dívidas técnicas:** não existem dívidas técnicas identificadas e não resolvidas pela equipe na entrega.
 
 Uma observação importante: a equipe de desenvolvimento não teve acesso direto ao servidor de produção durante o semestre. Por isso, algumas verificações operacionais dependem do coordenador, que possui acesso à infraestrutura.
 
