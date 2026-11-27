@@ -1,371 +1,851 @@
-# Entrega do módulo de acompanhamento acadêmico
+# Documento Técnico: Módulo de Acompanhamento Acadêmico
 
-Equipe E4. Situação em 09/11/2026, com base na branch `develop`.
+**Projeto:** AcadFlow – Sistema de Gestão de Processos do Programa de Pós-Graduação em Engenharia da Computação (PPGEC) da UPE  
+**Módulo:** Acompanhamento Acadêmico  
+**Equipe:** E4  
+**Versão do sistema:** 1.4.1  
+**Data de referência:** 21/11/2026  
+**Repositório principal:** [ldhonorato/PPGEC_rec](https://github.com/ldhonorato/PPGEC_rec)  
+**Fork da equipe:** [gustavosouto/PPGEC_rec](https://github.com/gustavosouto/PPGEC_rec)
 
-Este documento é para quem vai instalar, operar ou continuar o módulo. O uso das telas está no [manual da secretaria](manual-de-uso-secretaria.md).
+Este documento apresenta a organização técnica do módulo de Acompanhamento Acadêmico, incluindo tecnologias, arquitetura, estrutura do código, configuração, execução, testes, integração contínua e procedimentos de manutenção.
 
-## O que muda nesta entrega
+O documento foi elaborado para permitir que uma equipe que não participou do desenvolvimento consiga compreender a implementação e dar continuidade ao projeto.
 
-Em relação à versão 1.4.0, que está na `main` do repositório oficial:
+## Histórico de alterações
 
-| Mudança | Efeito |
+Este documento evolui a documentação técnica existente do módulo.
+
+| Data | Alteração |
 |---|---|
-| Painel por Professor | Tela nova, só para o docente coordenador e para os membros da Coordenação PPG. Mostra os números de cada professor, o gráfico por turma dos alunos dele e a previsão de conclusão dos alunos ativos |
-| Taxas do Painel de Sucesso por Turma | Concluídos, desligados, trancados e ativos agora somam sempre 100,0%. Regulares e irregulares somam a taxa de ativos |
-| Versões fixas no `requirements.txt` | Corrige o worker do Celery, que entra em reinício quando a imagem é gerada com o `kombu` 5.7.0, publicado em 03/11/2026. Sem o worker, o aviso diário não roda |
-| Manual da secretaria | Seção nova sobre o Painel por Professor |
-| Dados fictícios | Os alunos de teste passam a ter orientador e defesas. Só valem com `DEBUG=True` |
-
-A entrega não traz migration nova e não muda o `Dockerfile` nem os arquivos do Docker Compose. Os passos para atualizar a produção estão na seção 4, em "Atualizar para esta versão".
+| 02/11/2026 | Documento criado com a primeira entrega completa do módulo: lista por marco, planilha, aviso diário, calendário e painéis. |
+| 03/11/2026 | Módulo disponibilizado em produção na versão 1.4.0, com as chaves de ativação desligadas. |
+| 09/11/2026 | Inclusão do Painel por Professor, ajustes nas taxas do Painel de Sucesso por Turma e fixação das versões das dependências. |
+| 16/11/2026 | Atualização para a versão 1.4.1: compatibilidade entre Redis e Kombu, conferência das dependências durante o build, reorganização do acesso ao Dashboard e ajustes de interface. |
+| 21/11/2026 | Revisão do documento técnico, detalhamento das dependências, inclusão do funcionamento do ensaio de produção, atualização das orientações de CI/CD e consolidação dos documentos complementares. |
 
 ## 1. Visão geral
 
-O módulo acrescenta ao Acadflow o acompanhamento dos prazos dos alunos de mestrado e doutorado e os painéis pedidos pela coordenação do PPGEC. Ele calcula a situação de cada aluno nos marcos acadêmicos, mostra os irregulares e pode avisar a secretaria e a coordenação por e-mail.
+O módulo de Acompanhamento Acadêmico amplia o AcadFlow com funcionalidades para acompanhamento de prazos dos alunos de mestrado e doutorado e consulta de indicadores acadêmicos e administrativos.
 
-O módulo chega desligado. Com a chave desligada, as telas novas respondem como página inexistente e o menu não muda.
+O módulo foi desenvolvido como um aplicativo Django integrado à estrutura existente do AcadFlow.
 
-| O que foi entregue | Onde fica | O que faz |
+Sua ativação é controlada por variáveis de ambiente. Por padrão, o módulo e o serviço de avisos permanecem desligados, permitindo que sua instalação não altere o comportamento do sistema até que a equipe responsável decida ativá-los.
+
+### 1.1. Telas e serviços
+
+| Tela ou serviço | Endereço ou localização |
+|---|---|
+| Página de Acompanhamento | `/acompanhamento/` |
+| Cartão de alunos irregulares | Página inicial do sistema |
+| Lista de alunos por marco e planilha | `/coordenacao/alunos/` |
+| Painel de Sucesso por Turma | `/acompanhamento/painel-sucesso-turma/` |
+| Painel de Processos | `/acompanhamento/processos/` |
+| Painel de Docentes | `/acompanhamento/docentes/` |
+| Painel por Professor | `/acompanhamento/professores/` |
+| Calendário de Marcos | `/acompanhamento/calendario-marcos/` |
+| Dashboard | `/coordenacao/dashboard/` |
+| Aviso diário | Tarefa Celery executada às 7h, horário de Recife |
+
+O Dashboard já existia no sistema. Desde a versão 1.4.1, seu acesso está integrado à página de Acompanhamento, por meio de um cartão.
+
+## 2. Repositórios e organização do desenvolvimento
+
+O projeto utiliza dois repositórios principais no GitHub:
+
+| Repositório | Finalidade |
+|---|---|
+| [ldhonorato/PPGEC_rec](https://github.com/ldhonorato/PPGEC_rec) | Repositório principal do projeto, mantido pelo responsável institucional. |
+| [gustavosouto/PPGEC_rec](https://github.com/gustavosouto/PPGEC_rec) | Fork utilizado pela equipe E4 para desenvolver e integrar as alterações da disciplina. |
+
+Na data de referência deste documento, a versão 1.4.1 está presente na branch `main` do repositório principal e na branch `develop` do fork da equipe.
+
+### 2.1. Fluxo de desenvolvimento
+
+O fluxo de integração utilizado no projeto é:
+
+1. Desenvolvimento das funcionalidades na branch `develop` do fork da equipe.
+2. Integração das alterações na branch `homolog` do fork.
+3. Encaminhamento para a branch `stage` do repositório principal.
+4. Integração final na branch `main` do repositório principal.
+
+Os dois últimos merges dependem da aprovação do responsável pelo repositório principal.
+
+O fluxo deve ser respeitado para evitar que alterações ainda não homologadas sejam incorporadas diretamente à versão de produção.
+
+## 3. Tecnologias e dependências
+
+### 3.1. Tecnologias utilizadas
+
+| Tecnologia | Versão ou referência | Finalidade |
 |---|---|---|
-| Página de Acompanhamento | `/acompanhamento/` | Reúne as telas em cartões, mostra o total de alunos irregulares e o estado do aviso diário |
-| Cartão "Alunos irregulares" | Página inicial do sistema | Mostra o total e abre a lista filtrada |
-| Lista de alunos por marco | `/coordenacao/alunos/` | Tela já existente, com filtros de marco, situação e semestre, colunas novas e download em Excel |
-| Painel de Sucesso por Turma | `/acompanhamento/painel-sucesso-turma/` | Gráfico de sete barras e detalhes por turma de ingresso |
-| Painel de Processos | `/acompanhamento/processos/` | Processos abertos, atrasados e tempo médio no período |
-| Painel de Docentes | `/acompanhamento/docentes/` | Distribuição por polo, permanentes e colaboradores |
-| Painel por Professor | `/acompanhamento/professores/` | Alunos, prazos, defesas e prorrogações por professor. Com um professor escolhido, mostra o gráfico por turma e a previsão de conclusão dos alunos ativos |
-| Calendário de Marcos | `/acompanhamento/calendario-marcos/` | Cadastro das datas de projeto e qualificação por semestre |
-| Aviso diário | E-mail às 7h, horário de Recife | Avisa a Secretaria PPGEC e a Coordenação PPG sobre alunos que ficaram atrasados |
+| Python | 3.11 no CI; consultar guia local para desenvolvimento | Linguagem principal do backend. |
+| Django | 5.2 | Framework web e gerenciamento das funcionalidades do sistema. |
+| PostgreSQL | 16 no CI | Banco de dados utilizado no ambiente de produção e nos testes de integração. |
+| SQLite | Conforme configuração local | Banco de dados para desenvolvimento local. |
+| Celery | 5.4.0 | Execução de tarefas assíncronas. |
+| Redis | 6.1.0 (redis-py) | Transporte de mensagens e broker utilizado pelo Celery. |
+| Kombu | 5.6.2 | Camada de comunicação utilizada pelo Celery. |
+| django-celery-results | 2.5.1 | Integração de resultados de tarefas Celery com Django. |
+| WhiteNoise | 6.4.0 | Disponibilização de arquivos estáticos. |
+| Gunicorn | 26.2.0 | Servidor de aplicação WSGI utilizado no ambiente de produção. |
+| psycopg2-binary | 2.9.10 | Driver de conexão com PostgreSQL. |
+| openpyxl | 3.1.5 | Geração de planilhas Excel. |
+| xlrd | 2.0.1 | Leitura de planilhas em formatos compatíveis. |
+| python-dotenv | 1.0.0 | Leitura de variáveis de ambiente a partir de arquivos `.env`. |
+| django-storages | 1.14.6 | Integração de armazenamento de arquivos com serviços externos. |
+| boto3 | 1.43.123 | Integração com armazenamento compatível com AWS S3. |
+| Docker | Conforme ambiente | Construção e execução dos contêineres. |
+| Docker Compose | Conforme ambiente | Orquestração dos serviços da aplicação. |
+| Git e GitHub | Conforme ambiente | Versionamento e colaboração. |
+| GitHub Actions | Conforme workflows | Automação de testes e ensaio de produção. |
 
-A página de Acompanhamento também leva à Carga de Orientação, que é uma tela original do sistema.
+As versões das dependências Python são controladas pelo arquivo `requirements.txt`.
 
-## 2. Onde o módulo se encaixa
+**Observação sobre versões:** o CI utiliza Python 3.11. O ambiente local deve seguir a versão e as instruções especificadas no `guia-do-ambiente-local.md`. Não se deve presumir que a versão utilizada localmente seja necessariamente a mesma da produção.
+
+### 3.2. Dependências Python
+
+O arquivo `requirements.txt` contém as dependências diretas e indiretas necessárias para a aplicação.
+
+As principais dependências diretas são:
+
+```text
+django==5.2
+celery==5.4.0
+kombu[redis]==5.6.2
+redis==6.1.0
+django-celery-results==2.5.1
+python-dotenv==1.0.0
+whitenoise==6.4.0
+psycopg2-binary==2.9.10
+openpyxl==3.1.5
+xlrd==2.0.1
+gunicorn==26.2.0
+django-storages[s3]==1.14.6
+boto3==1.43.123
+botocore==1.43.123
+s3transfer==0.19.3
+```
+
+As demais dependências estão fixadas no próprio arquivo para garantir a reprodutibilidade do ambiente.
+
+**Atenção à compatibilidade entre Celery, Kombu e Redis:**
+
+Uma incompatibilidade entre versões do Kombu e do transporte Redis provocou falhas no worker durante o desenvolvimento.
+
+A partir da versão 1.4.1, o projeto utiliza:
+
+- `celery==5.4.0`;
+- `kombu[redis]==5.6.2`;
+- `redis==6.1.0`.
+
+O Dockerfile executa verificações de compatibilidade durante a construção da imagem, incluindo `pip check` e um teste de carregamento do transporte Redis do Kombu.
+
+Essa verificação impede que combinações incompatíveis sejam incorporadas silenciosamente à imagem.
+
+### 3.3. Armazenamento de documentos
+
+O projeto possui suporte opcional ao armazenamento de documentos em bucket compatível com AWS S3.
+
+As dependências relacionadas são:
+
+- `django-storages[s3]`;
+- `boto3`;
+- `botocore`;
+- `s3transfer`.
+
+O armazenamento externo depende da configuração da variável `AWS_STORAGE_BUCKET_NAME` e das credenciais correspondentes.
+
+Quando essa configuração não está presente, os arquivos continuam sendo armazenados em disco, conforme a configuração da aplicação.
+
+Não são necessárias credenciais AWS para executar o módulo localmente quando o armazenamento em bucket não estiver habilitado.
+
+## 4. Arquitetura do sistema
+
+### 4.1. Visão geral
+
+O módulo é implementado como um aplicativo independente dentro do projeto Django, aproveitando os modelos, permissões, serviços e infraestrutura já existentes no AcadFlow.
+
+O fluxo geral de utilização é:
 
 ```mermaid
 flowchart LR
-    gestao["Secretaria e coordenação"]
-    acadflow["Acadflow com o módulo de acompanhamento"]
-    email["Servidor de e-mail"]
-
-    gestao -->|"usam as telas"| acadflow
-    acadflow -->|"envia o aviso diário"| email
-    email -->|"entrega o aviso"| gestao
+    A["Secretaria e Coordenação"] --> B["Interface do AcadFlow"]
+    B --> C["Aplicação Django"]
+    C --> D["Módulo acompanhamento"]
+    D --> E["Banco de dados"]
+    D --> F["Geração de planilhas"]
+    D --> G["Agendamento de avisos"]
+    G --> H["Celery Beat"]
+    H --> I["Redis"]
+    I --> J["Celery Worker"]
+    J --> K["Servidor de e-mail"]
+    K --> A
 ```
 
-O módulo não usa serviço novo. Ele roda nos contêineres que o sistema já tem:
+### 4.2. Serviços em execução
 
-```mermaid
-flowchart LR
-    web["web: Django e Gunicorn"]
-    beat["celery-beat: dispara às 7h"]
-    redis["redis: fila"]
-    worker["celery: executa o aviso"]
-    banco[("PostgreSQL")]
-    email["Servidor de e-mail"]
-
-    web --> banco
-    beat --> redis
-    redis --> worker
-    worker --> banco
-    worker --> email
-```
-
-A entrega não altera o `Dockerfile` nem os arquivos do Docker Compose. O `requirements.txt` passa a fixar a versão de todas as dependências, inclusive as indiretas, nas versões da imagem que funcionava em 02/11/2026. Assim, uma versão nova publicada por terceiros não muda mais a imagem sem aviso.
-
-## 3. Como o módulo é organizado
-
-O código fica no app `acompanhamento`. O cálculo está em um único lugar, e telas, planilha e aviso usam o mesmo resultado.
+O módulo utiliza os serviços já existentes na infraestrutura do AcadFlow.
 
 ```mermaid
 flowchart TB
-    calendario["models.py: calendário e registros"]
-    situacao["situacao.py: regra de cada marco"]
-    lista["lista_alunos.py: lista e cartão"]
-    planilha["planilha_alunos.py: Excel"]
-    avisos["avisos.py: aviso diário"]
-    servicos["servicos.py: painéis"]
-    telas["views.py e processos/views.py: telas"]
-    tarefa["tasks.py: tarefa do Celery"]
+    W["web: Django + Gunicorn"]
+    B["celery-beat: agendamento"]
+    R["redis: broker"]
+    C["celery: worker"]
+    P[("PostgreSQL")]
+    E["Servidor de e-mail"]
 
-    calendario --> situacao
-    situacao --> lista
-    situacao --> servicos
-    lista --> planilha
-    lista --> telas
-    planilha --> telas
-    servicos --> telas
-    lista --> avisos
-    situacao --> avisos
-    avisos --> tarefa
+    W --> P
+    B --> R
+    R --> C
+    C --> P
+    C --> E
 ```
 
-| Arquivo em `acompanhamento/` | Papel |
+| Serviço | Responsabilidade |
 |---|---|
-| `chave.py` | Lê as duas chaves |
-| `decoradores.py` e `permissoes.py` | Regras de acesso às telas, inclusive a do Painel por Professor |
-| `situacao.py` | Regras de prazo |
-| `previsao_conclusao.py` | Previsão de conclusão dos alunos ativos de um professor |
-| `lista_alunos.py` | Lista por marco e cartão de irregulares |
-| `planilha_alunos.py` | Arquivo Excel |
-| `servicos.py` | Cálculo dos painéis |
-| `avisos.py` e `tasks.py` | Aviso diário |
-| `telas.py` | Cartões da página de Acompanhamento |
-| `models.py` | Calendário, avisos, planilhas baixadas e execuções do aviso |
-| `management/commands/` | `mostrar_aviso_do_dia` e `gerar_dados_ficticios` |
+| web | Executa a aplicação Django e disponibiliza as páginas do sistema. |
+| db | Armazena os dados da aplicação no PostgreSQL em produção. |
+| redis | Disponibiliza o broker de mensagens para as tarefas assíncronas. |
+| celery | Executa as tarefas assíncronas, incluindo o processamento dos avisos. |
+| celery-beat | Agenda a execução periódica das tarefas. |
 
-Fora do app, o código alterado é:
+O módulo não introduz um novo serviço de infraestrutura. Ele utiliza os contêineres já presentes na configuração de produção.
 
-| Arquivo | Alteração |
+### 4.3. Organização interna do módulo
+
+O código do módulo está concentrado no aplicativo Django `acompanhamento/`.
+
+O cálculo da situação acadêmica é centralizado, permitindo que a lista, a planilha, o cartão e os avisos utilizem a mesma lógica.
+
+```mermaid
+flowchart TB
+    M["models.py: calendário e registros"]
+    S["situacao.py: cálculo das situações"]
+    L["lista_alunos.py: lista e cartão"]
+    P["planilha_alunos.py: exportação Excel"]
+    A["avisos.py: processamento dos avisos"]
+    V["servicos.py: cálculos dos painéis"]
+    T["views.py: apresentação das telas"]
+    C["tasks.py: tarefa Celery"]
+
+    M --> S
+    S --> L
+    S --> V
+    L --> P
+    L --> T
+    V --> T
+    L --> A
+    S --> A
+    A --> C
+```
+
+### 4.4. Arquivos e módulos principais
+
+| Arquivo ou diretório | Responsabilidade |
 |---|---|
-| `ppgec/settings.py` | Registra o app e as duas chaves |
-| `ppgec/urls.py` | Inclui as rotas do módulo |
-| `ppgec/celery.py` | Agenda a tarefa do aviso |
-| `processos/context_processors.py` | Item "Acompanhamento" no menu, só com a chave ligada |
-| `processos/views.py` | Filtros e planilha na lista de alunos, cartão na página inicial |
-| `templates/processos/alunos_lista.html` | Campos, colunas e botão do Excel |
-| `templates/processos/home.html` | Cartão de alunos irregulares |
-| `static/css/app.css` | Estilos das barras de gráfico |
+| `acompanhamento/models.py` | Modelos de calendário, avisos, registros de planilhas e execuções do aviso. |
+| `acompanhamento/chave.py` | Leitura das variáveis de ativação do módulo. |
+| `acompanhamento/decoradores.py` | Decoradores utilizados no controle de acesso às telas. |
+| `acompanhamento/permissoes.py` | Regras de autorização para funcionalidades do módulo. |
+| `acompanhamento/situacao.py` | Cálculo das situações acadêmicas e dos prazos. |
+| `acompanhamento/previsao_conclusao.py` | Previsão de conclusão dos alunos ativos de cada professor. |
+| `acompanhamento/lista_alunos.py` | Preparação da lista de alunos e do cartão de irregulares. |
+| `acompanhamento/planilha_alunos.py` | Geração das planilhas Excel. |
+| `acompanhamento/servicos.py` | Cálculo dos indicadores e painéis. |
+| `acompanhamento/avisos.py` | Processamento dos avisos de irregularidade. |
+| `acompanhamento/tasks.py` | Definição das tarefas assíncronas do módulo. |
+| `acompanhamento/telas.py` | Organização dos cartões da página de Acompanhamento. |
+| `acompanhamento/management/commands/` | Comandos administrativos, incluindo geração de dados fictícios e prévia dos avisos. |
+| `acompanhamento/migrations/` | Histórico de alterações do banco de dados. |
+| `acompanhamento/tests/` | Testes automatizados do módulo. |
+| `acompanhamento/templates/` | Templates das telas do módulo. |
 
-Para continuar o módulo:
+### 4.5. Alterações realizadas fora do aplicativo
 
-- Uma tela nova entra na lista de `telas.py`, sem mexer no menu do sistema, e usa o decorador `tela_do_modulo`.
-- Os dados de teste saem de `python manage.py gerar_dados_ficticios`. O comando recusa rodar com `DEBUG=False`.
-- Os testes rodam com `DEBUG=True`: `python manage.py test` e, com o módulo ligado, `ACOMPANHAMENTO_ATIVO=True python manage.py test processos`.
+Para integrar o módulo ao AcadFlow, também foram necessárias alterações em arquivos existentes do projeto.
 
-## 4. Como ligar e desligar
+| Arquivo | Responsabilidade das alterações |
+|---|---|
+| `ppgec/settings.py` | Registro do aplicativo e das variáveis de configuração. |
+| `ppgec/urls.py` | Inclusão das rotas do módulo. |
+| `ppgec/celery.py` | Configuração do agendamento da tarefa de aviso. |
+| `processos/context_processors.py` | Inclusão do item Acompanhamento no menu e controle de sua apresentação. |
+| `processos/views.py` | Integração dos filtros, exportação e cartão de alunos irregulares. |
+| `templates/processos/alunos_lista.html` | Inclusão de filtros, colunas e botão de exportação Excel. |
+| `templates/processos/home.html` | Inclusão do cartão de alunos irregulares. |
+| `static/css/app.css` | Estilização dos componentes gráficos. |
 
-| Variável no `.env` | Padrão | Efeito |
+### 4.6. Migrations
+
+O módulo possui quatro migrations:
+
+| Migration | Finalidade |
+|---|---|
+| `0001_calendario_marcos` | Criação da estrutura do calendário de marcos. |
+| `0002_aviso_irregularidade` | Criação dos registros de avisos de irregularidade. |
+| `0003_planilhabaixada` | Registro das exportações de planilhas. |
+| `0004_execucaoaviso` | Registro das execuções do serviço de avisos. |
+
+As migrations do módulo criam tabelas próprias e são aplicadas pelo procedimento de inicialização do contêiner `web`.
+
+A aplicação das migrations deve ser conferida antes de considerar uma implantação concluída.
+
+## 5. Configuração e variáveis de ambiente
+
+As configurações da aplicação são controladas por variáveis de ambiente, normalmente disponibilizadas por meio de um arquivo `.env`.
+
+Esse arquivo não deve ser versionado com credenciais reais.
+
+### 5.1. Variáveis de configuração
+
+As variáveis abaixo são utilizadas nos ambientes e procedimentos documentados para o projeto.
+
+| Variável | Finalidade |
+|---|---|
+| `DEBUG` | Define se a aplicação está em modo de depuração. |
+| `SECRET_KEY` | Chave secreta utilizada pelo Django. |
+| `ALLOWED_HOSTS` | Define os hosts autorizados a acessar a aplicação. |
+| `USE_POSTGRES` | Controla a utilização do PostgreSQL. |
+| `POSTGRES_DB` | Nome do banco de dados PostgreSQL. |
+| `POSTGRES_USER` | Usuário de conexão com o banco. |
+| `POSTGRES_PASSWORD` | Senha de conexão com o banco. |
+| `POSTGRES_HOST` | Endereço do servidor de banco de dados. |
+| `POSTGRES_PORT` | Porta de conexão do PostgreSQL. |
+| `CELERY_BROKER_URL` | Endereço de conexão com o broker do Celery. |
+| `SECURE_SSL_REDIRECT` | Controla o redirecionamento obrigatório para HTTPS. |
+| `SESSION_COOKIE_SECURE` | Controla a utilização de cookies de sessão seguros. |
+| `CSRF_COOKIE_SECURE` | Controla a utilização de cookies CSRF seguros. |
+| `SECURE_HSTS_SECONDS` | Define a duração da política HSTS. |
+| `USE_X_FORWARDED_PROTO` | Controla o uso do protocolo informado pelo proxy reverso. |
+| `SITE_URL` | Endereço público utilizado na composição de links enviados por e-mail. |
+| `ACOMPANHAMENTO_ATIVO` | Liga ou desliga o módulo de Acompanhamento. |
+| `ACOMPANHAMENTO_AVISO_ATIVO` | Liga ou desliga o envio dos avisos diários. |
+| `AWS_STORAGE_BUCKET_NAME` | Nome do bucket utilizado para armazenamento externo, quando habilitado. |
+
+Outras variáveis podem ser exigidas pelo projeto, especialmente para configuração de e-mail e autenticação do armazenamento externo. Consultar o arquivo de configuração do Django e o guia do ambiente local antes de configurar um novo ambiente.
+
+**Segurança:** senhas, tokens, chaves privadas e valores reais das variáveis não devem ser incluídos neste documento, no GitHub ou em issues.
+
+### 5.2. Ativação do módulo
+
+O módulo utiliza duas variáveis independentes:
+
+| Variável | Valor padrão | Efeito |
 |---|---|---|
-| `ACOMPANHAMENTO_ATIVO` | `False` | Liga as telas, o menu e o cartão |
-| `ACOMPANHAMENTO_AVISO_ATIVO` | `False` | Liga o aviso diário. Só vale com a chave do módulo ligada |
+| `ACOMPANHAMENTO_ATIVO` | `False` | Controla a disponibilidade das telas e dos cartões. |
+| `ACOMPANHAMENTO_AVISO_ATIVO` | `False` | Controla a execução efetiva dos avisos. |
 
-### Instalação
+O aviso só pode funcionar quando o módulo está ativo.
 
-O contêiner `web` aplica as migrations ao subir, mesmo com as chaves desligadas. A entrega traz quatro migrations, todas do app `acompanhamento`, e elas só criam tabelas novas.
+Com `ACOMPANHAMENTO_ATIVO=False`, as telas do módulo respondem como páginas inexistentes e seus atalhos não aparecem no menu.
 
-| Migration | Tabela |
-|---|---|
-| `0001_calendario_marcos` | Calendário de marcos |
-| `0002_aviso_irregularidade` | Avisos de irregularidade |
-| `0003_planilhabaixada` | Registro de quem baixou cada planilha |
-| `0004_execucaoaviso` | Registro de cada execução do aviso |
+Com `ACOMPANHAMENTO_ATIVO=True`, o módulo fica disponível para os usuários autorizados.
 
-### Ligar o módulo
+Para ligar o módulo em produção:
 
-1. No `.env` do servidor, colocar `ACOMPANHAMENTO_ATIVO=True`.
-2. Rodar `docker compose -f docker-compose-prod.yml up -d`. Só reiniciar os contêineres não relê o `.env`.
-3. Entrar com um usuário de gestão e abrir `/acompanhamento/`.
-4. Cadastrar as datas do semestre no Calendário de Marcos. Sem elas, parte dos alunos aparece como "Não foi possível calcular".
+1. Alterar `ACOMPANHAMENTO_ATIVO=True` no `.env` do servidor.
+2. Executar:
 
-O aviso diário tem um passo a passo próprio, na [lista de verificação do servidor](verificacao-do-servidor-para-o-aviso.md).
-
-### Desligar
-
-1. Colocar `ACOMPANHAMENTO_ATIVO=False` no `.env`.
-2. Rodar `docker compose -f docker-compose-prod.yml up -d`.
-
-As telas voltam a responder como página inexistente, e o cartão e o menu somem. Os dados continuam nas tabelas e voltam a aparecer ao religar. Não é preciso reverter código nem migration.
-
-Para parar só os e-mails, basta colocar `ACOMPANHAMENTO_AVISO_ATIVO=False` e rodar o mesmo comando.
-
-### Atualizar para esta versão
-
-Esta versão não traz migration e não pede mudança no `.env`.
-
-1. Fazer o merge do pull request na `stage` e, depois, da `stage` na `main`.
-2. O workflow "Build and push web image" gera a imagem nova a partir da `main`.
-3. Em até 5 minutos, o Watchtower troca os contêineres `web`, `celery` e `celery-beat` pela imagem nova. Banco, Redis e pgAdmin não mudam.
-
-Depois da troca, conferir no servidor, na pasta do `docker-compose-prod.yml`. Os comandos só leem informações e não enviam e-mail:
-
+```bash
+docker compose -f docker-compose-prod.yml up -d
 ```
+
+3. Acessar `/acompanhamento/` com um usuário autorizado.
+4. Conferir a disponibilidade das telas.
+5. Cadastrar as datas correspondentes no Calendário de Marcos.
+
+Para desligar:
+
+1. Alterar `ACOMPANHAMENTO_ATIVO=False`.
+2. Executar novamente o comando `docker compose` apresentado anteriormente.
+
+Os dados armazenados não são removidos. Ao reativar o módulo, os registros continuam disponíveis.
+
+Para interromper somente os avisos, alterar `ACOMPANHAMENTO_AVISO_ATIVO=False`, mantendo o módulo ligado.
+
+## 6. Configuração e execução do ambiente local
+
+A configuração detalhada do ambiente local está documentada em um arquivo específico:
+
+[Guia do Ambiente Local](guia-do-ambiente-local.md).
+
+Esse guia deve ser utilizado como referência principal para:
+
+- Instalação das ferramentas necessárias.
+- Clonagem do repositório.
+- Configuração do ambiente virtual Python.
+- Instalação das dependências.
+- Configuração do banco de dados local.
+- Criação e preenchimento do arquivo `.env`.
+- Aplicação das migrations.
+- Criação de usuários para testes.
+- Execução do servidor Django.
+- Resolução de problemas de configuração.
+
+O guia deve ser seguido integralmente antes de iniciar alterações no código.
+
+### 6.1. Dados fictícios
+
+O projeto possui o comando:
+
+```bash
+python manage.py gerar_dados_ficticios
+```
+
+Esse comando é utilizado para criar dados de demonstração para o desenvolvimento e os testes.
+
+O comando recusa execução quando `DEBUG=False`, evitando que a geração de dados fictícios seja realizada acidentalmente em produção.
+
+Os dados gerados podem ser utilizados para testar os painéis, listas e demais funcionalidades sem utilizar informações pessoais reais.
+
+As contas de acesso e os procedimentos de criação dos usuários devem ser consultados no guia do ambiente local.
+
+**Não utilizar dados pessoais ou credenciais reais da produção no ambiente de demonstração.**
+
+## 7. Testes automatizados
+
+O projeto possui testes automatizados para verificar a integridade das funcionalidades e evitar regressões durante a manutenção.
+
+Os testes do módulo ficam organizados no diretório:
+
+```text
+acompanhamento/tests/
+```
+
+### 7.1. Comandos principais
+
+Verificação geral do projeto:
+
+```bash
+python manage.py check
+```
+
+Verificação de migrations:
+
+```bash
+python manage.py makemigrations --check --dry-run
+```
+
+Execução de todos os testes:
+
+```bash
+python manage.py test
+```
+
+Execução dos testes do módulo:
+
+```bash
+python manage.py test acompanhamento
+```
+
+Execução dos testes relacionados ao aplicativo de processos:
+
+```bash
+python manage.py test processos
+```
+
+No PowerShell, para executar os testes de processos com o módulo habilitado:
+
+```powershell
+$env:ACOMPANHAMENTO_ATIVO="True"
+python manage.py test processos
+```
+
+Após o teste, a variável pode ser removida da sessão:
+
+```powershell
+Remove-Item Env:ACOMPANHAMENTO_ATIVO
+```
+
+### 7.2. O que deve ser validado
+
+Antes de integrar uma alteração, verificar:
+
+- Inicialização do Django sem erros.
+- Ausência de migrations pendentes.
+- Funcionamento das telas com os diferentes perfis de acesso.
+- Funcionamento das regras de permissão.
+- Consistência dos cálculos de prazos.
+- Consistência entre lista, cartão e planilha.
+- Funcionamento dos painéis e filtros.
+- Funcionamento das tarefas assíncronas.
+- Ausência de regressões nas funcionalidades preexistentes do AcadFlow.
+
+As regras de negócio utilizadas como referência para esses testes estão no [Documento de Negócio](documento-de-negocio.md).
+
+## 8. Integração contínua e ensaio de produção
+
+O projeto utiliza GitHub Actions para automatizar verificações de qualidade e simular condições próximas às de produção.
+
+Existem dois fluxos importantes:
+
+1. Integração contínua (CI).
+2. Ensaio de produção.
+
+### 8.1. Integração contínua
+
+Arquivo:
+
+```text
+.github/workflows/ci.yml
+```
+
+O workflow executa verificações durante os Pull Requests direcionados à branch `develop`.
+
+A configuração documentada utiliza:
+
+- GitHub Actions.
+- Ubuntu.
+- Python 3.11.
+- PostgreSQL 16.
+- Testes automatizados do Django.
+
+Entre as verificações realizadas estão:
+
+- Verificação de configuração do Django.
+- Verificação de migrations.
+- Execução dos testes automatizados.
+- Testes do projeto com a configuração do módulo habilitado, quando aplicável.
+
+O objetivo é identificar erros antes que as alterações sejam integradas à branch de desenvolvimento.
+
+### 8.2. Ensaio de produção
+
+Arquivo:
+
+```text
+.github/workflows/ensaio-producao.yml
+```
+
+Nome do workflow: `Ensaio de produção`.
+
+Esse workflow é executado:
+
+- Automaticamente em Pull Requests direcionados à branch `develop`.
+- Manualmente por meio de `workflow_dispatch`.
+
+O ensaio utiliza Docker Compose e constrói imagens a partir do Dockerfile do projeto.
+
+Sua finalidade é verificar se as alterações continuam compatíveis com um banco de dados que já recebeu as migrations da versão principal do sistema.
+
+### 8.3. Funcionamento do ensaio
+
+O ensaio executa as seguintes etapas:
+
+**Etapa 1 — Preparação do ambiente**
+
+- Baixa o código do Pull Request.
+- Baixa a branch `main` do repositório oficial `ldhonorato/PPGEC_rec`.
+- Prepara um arquivo `.env` com credenciais descartáveis.
+- Prepara a configuração complementar do Docker Compose.
+
+**Etapa 2 — Construção das imagens**
+
+São construídas duas imagens:
+
+- Imagem baseada na `main` oficial.
+- Imagem baseada no código do Pull Request.
+
+Isso permite testar as migrations novas sobre uma base de banco compatível com a versão já integrada ao projeto principal.
+
+**Etapa 3 — Preparação do banco**
+
+- Inicializa PostgreSQL e Redis.
+- Executa as migrations da versão principal.
+- Inicializa os serviços com a imagem do Pull Request.
+- Aguarda a conclusão das migrations novas.
+- Executa `makemigrations --check --dry-run`.
+
+**Etapa 4 — Verificação das páginas**
+
+O workflow verifica se:
+
+- A página inicial responde com HTTP 200 ou 302.
+- A rota `/acompanhamento/` responde com HTTP 404 quando o módulo está desligado.
+
+**Etapa 5 — Testes funcionais**
+
+Executa:
+
+```bash
+python manage.py test processos.tests.TodasAsTelasRenderizamTests
+```
+
+E:
+
+```bash
+python manage.py test acompanhamento
+```
+
+Os testes verificam o funcionamento das telas e do módulo após a aplicação das migrations.
+
+**Etapa 6 — Verificação do Celery**
+
+O workflow consulta o worker para verificar se a tarefa de aviso está registrada.
+
+A tarefa esperada é:
+
+```text
+acompanhamento.tasks.enviar_avisos_irregularidade
+```
+
+**Etapa 7 — Verificação com o módulo ligado e o aviso desligado**
+
+O workflow modifica a configuração de teste para:
+
+```text
+ACOMPANHAMENTO_ATIVO=True
+ACOMPANHAMENTO_AVISO_ATIVO=False
+```
+
+Em seguida, verifica se:
+
+- A rota `/acompanhamento/` fica disponível.
+- A tarefa de avisos não realiza processamento.
+- Nenhum aviso é enviado.
+- Nenhum registro de aviso é criado.
+
+O resultado esperado da execução da tarefa é:
+
+```python
+{'avisos_novos': 0, 'emails_enviados': 0}
+```
+
+**Etapa 8 — Estabilidade dos contêineres**
+
+Após a inicialização, o workflow aguarda 45 segundos e verifica os seguintes contêineres:
+
+- `ppgec_db`;
+- `ppgec_redis`;
+- `ppgec_web`;
+- `ppgec_celery`;
+- `ppgec_celery_beat`.
+
+Todos devem permanecer em execução, sem reinicializações.
+
+**Etapa 9 — Verificação dos logs**
+
+Os logs dos serviços `web`, `celery` e `celery-beat` são analisados em busca de:
+
+- `Traceback`;
+- `Exception`;
+- `ERROR`.
+
+O workflow considera a presença desses registros uma falha no ensaio.
+
+**Etapa 10 — Relatório**
+
+Ao final, o GitHub Actions gera um resumo dos resultados e disponibiliza os logs como artefato do workflow.
+
+### 8.4. Limitações do ensaio
+
+O ensaio de produção utiliza um ambiente descartável e credenciais fictícias.
+
+A configuração não representa integralmente o servidor institucional.
+
+Entre as diferenças estão:
+
+- Ausência de HTTPS.
+- Redirecionamento SSL desabilitado.
+- Cookies seguros desabilitados.
+- HSTS desabilitado.
+- Imagens construídas dentro do próprio workflow.
+
+O ensaio verifica a compatibilidade das alterações com a estrutura de produção, mas não substitui a validação no servidor real.
+
+## 9. Implantação e atualização em produção
+
+O procedimento de atualização utiliza o fluxo de integração do projeto e a infraestrutura de produção existente.
+
+O caminho de integração é:
+
+```text
+develop (fork da equipe)
+        |
+        v
+homolog (fork da equipe)
+        |
+        v
+stage (repositório oficial)
+        |
+        v
+main (repositório oficial)
+        |
+        v
+Build da imagem
+        |
+        v
+Atualização dos contêineres
+```
+
+Conforme o procedimento de implantação documentado para o ambiente:
+
+1. A integração na branch `main` dispara o workflow de construção e publicação da imagem web.
+2. O Watchtower monitora a imagem publicada e realiza a atualização dos contêineres `web`, `celery` e `celery-beat`.
+3. Os demais serviços, como banco de dados e Redis, permanecem em execução.
+
+A atualização deve ser acompanhada por uma verificação dos serviços.
+
+### 9.1. Comandos de verificação
+
+No servidor, dentro da pasta que contém o `docker-compose-prod.yml`, executar:
+
+Verificar os contêineres:
+
+```bash
 docker compose -f docker-compose-prod.yml ps
+```
+
+Verificar o estado e as reinicializações dos serviços:
+
+```bash
 docker inspect -f '{{.Name}} {{.State.Status}} reinicios={{.RestartCount}}' ppgec_celery ppgec_celery_beat
+```
+
+Verificar o registro da tarefa no worker:
+
+```bash
 docker compose -f docker-compose-prod.yml exec celery celery -A ppgec inspect registered | grep enviar_avisos_irregularidade
+```
+
+Verificar erros recentes nos logs:
+
+```bash
 docker compose -f docker-compose-prod.yml logs --since 1h celery celery-beat | grep -i -E "unregistered|Traceback|ERROR"
 ```
 
-O esperado é: os contêineres em `running`, o worker e o beat com `reinicios=0`, a tarefa `acompanhamento.tasks.enviar_avisos_irregularidade` listada e nenhuma linha no último comando.
+### 9.2. Resultado esperado
 
-Com o módulo ligado, entrar como docente coordenador ou como membro da Coordenação PPG e abrir `/acompanhamento/professores/`. Os outros perfis recebem acesso negado nessa tela, e o cartão dela não aparece para eles.
+- Os contêineres devem permanecer em estado `running`.
+- Worker e Beat devem apresentar `reinicios=0`.
+- A tarefa `acompanhamento.tasks.enviar_avisos_irregularidade` deve aparecer entre as tarefas registradas.
+- Os logs não devem apresentar erros relacionados à tarefa ou ao carregamento do worker.
 
-Se a tela nova der problema, desligar o módulo, como em "Desligar", resolve sem mexer no código. Reverter o merge na `main` também funciona, porque não há migration nova, mas traz de volta as versões soltas do `requirements.txt` e, com elas, o problema do worker.
+Se uma atualização apresentar problemas no módulo de Acompanhamento, ele pode ser temporariamente desativado por meio da variável `ACOMPANHAMENTO_ATIVO=False`, sem necessidade de remover migrations ou reverter o código.
 
-### Como a entrega foi conferida
+**Atenção:** alterações no ambiente de produção devem ser realizadas somente por pessoas autorizadas.
 
-A cada pull request para a `develop`, o CI roda os testes em PostgreSQL 16 e Python 3.11. O ensaio de produção parte do banco migrado com a `main` do repositório oficial, aplica as migrations novas e confere que:
+## 10. Operação do aviso diário
 
-- o site responde e `/acompanhamento/` dá 404 com o módulo desligado;
-- as páginas principais abrem com cada perfil;
-- a tarefa do aviso está registrada no worker;
-- com o módulo ligado e o aviso desligado, a tarefa não faz nada;
-- nenhum contêiner reiniciou e os logs não têm exceção.
+O aviso diário utiliza Celery Beat para agendar a execução e Celery Worker para processar a tarefa.
 
-Desde 06/11/2026, o GitHub Actions do fork da equipe está parado. Nesta entrega, os passos do CI rodaram na máquina da equipe antes de cada merge na `develop`, e o ensaio rodou com Docker, também na máquina da equipe, com PostgreSQL 16. O último ensaio, com a `develop` em `cc402fd` sobre o banco migrado com a `main` oficial em `05d2842`, passou em 09/11/2026 em todos os itens acima. O ensaio não cobre o servidor do cliente (ver seção 8).
+A execução está programada para as 7h, horário de Recife.
 
-## 5. Como operar
+A tarefa responsável é:
 
-### Aviso diário
-
-Todo dia às 7h, horário de Recife, a tarefa calcula a situação dos alunos ativos e atualiza os avisos:
-
-- quem ficou atrasado ganha um aviso novo;
-- quem saiu do atraso, mudou de situação ou deixou de estar ativo tem o aviso encerrado;
-- sem aviso novo nem pendente, nenhum e-mail sai.
-
-O primeiro e-mail é o levantamento inicial, com todos os alunos que já estavam atrasados. Os destinatários são os membros atuais e ativos da Secretaria PPGEC e da Coordenação PPG que têm e-mail cadastrado.
-
-Para ver o e-mail do dia sem enviar nem gravar nada, com o aviso ligado ou desligado:
-
+```text
+acompanhamento.tasks.enviar_avisos_irregularidade
 ```
+
+### 10.1. Fluxo de execução
+
+```mermaid
+flowchart TD
+    A["Celery Beat: 7h"] --> B["Enfileira tarefa no Redis"]
+    B --> C["Celery Worker executa"]
+    C --> D["Calcula situações dos alunos"]
+    D --> E["Identifica alterações e avisos pendentes"]
+    E --> F["Registra os avisos"]
+    F --> G["Envia e-mails quando necessário"]
+    G --> H["Atualiza registros da execução"]
+```
+
+O processamento considera os avisos novos e os que ainda estão pendentes de envio.
+
+### 10.2. Visualização da prévia
+
+Para visualizar o conteúdo que seria enviado, sem disparar e-mails nem gravar novos avisos, utilizar:
+
+```bash
 docker compose -f docker-compose-prod.yml exec web python manage.py mostrar_aviso_do_dia
 ```
 
-Para gerar a prévia em arquivo, acrescentar `--html previa.html`.
+Para gerar uma versão HTML:
 
-### O que fazer se algo falhar
+```bash
+docker compose -f docker-compose-prod.yml exec web python manage.py mostrar_aviso_do_dia --html previa.html
+```
 
-| O que aparece | Causa provável | O que fazer |
+**Atenção:** a prévia pode conter nomes e informações acadêmicas reais. Não compartilhar seu conteúdo em grupos públicos, issues ou repositórios.
+
+### 10.3. Problemas operacionais
+
+| Problema observado | Possível causa | Verificação recomendada |
 |---|---|---|
-| "Último aviso rodou em" não mostra a data do dia | O worker ou o beat parou | Ver `docker ps --filter name=ppgec_celery` e os logs de `ppgec_celery` e `ppgec_celery_beat` |
-| A execução mostra avisos pendentes | Falha no envio ou ninguém nos dois setores | Conferir o e-mail no `.env` e os membros dos setores. Os avisos entram no e-mail do dia seguinte |
-| Os links do e-mail apontam para `localhost` | `SITE_URL` não preenchido | Preencher no `.env` e rodar `up -d` |
-| Muitos alunos como "Não foi possível calcular" | Falta data no calendário ou no cadastro | Cadastrar a data do semestre ou corrigir o cadastro. Falhas de cálculo também ficam registradas no log |
-| O cartão "Alunos irregulares" sumiu da página inicial | Erro no cálculo. A página continua abrindo | Ver o log `Falha ao calcular o cartão de alunos irregulares` |
+| Último aviso não apresenta a data esperada | Worker ou Beat indisponível. | Verificar os contêineres e seus logs. |
+| Existem avisos pendentes | Falha no envio ou ausência de destinatários cadastrados. | Conferir as configurações de e-mail e os membros dos setores. |
+| Links dos e-mails apontam para `localhost` | Variável `SITE_URL` não configurada corretamente. | Conferir a variável no `.env` e atualizar os serviços. |
+| Muitos alunos aparecem como não calculáveis | Datas ausentes no calendário ou no cadastro. | Conferir os dados utilizados no cálculo. |
+| Cartão de alunos irregulares desapareceu | Possível falha no cálculo do cartão. | Consultar os logs da aplicação. |
 
-Se a tarefa ficar dias sem rodar, nenhum atraso se perde: a execução seguinte compara a situação do dia com os avisos abertos e recupera tudo.
+A tarefa possui mecanismos para recuperar avisos pendentes após períodos de indisponibilidade, evitando a perda dos registros de irregularidade.
 
-Cada envio faz até três tentativas, com 30 segundos de pausa entre elas.
+Os registros de calendário, planilhas baixadas e execuções do aviso podem ser consultados pelo Django Admin.
 
-### Registros
+## 11. Padrões de desenvolvimento e Pull Requests
 
-A planilha baixada fica registrada com quem baixou, quando e com quais filtros. Esse registro pode ser consultado no admin do Django, junto com o calendário.
+A continuidade do projeto deve respeitar o fluxo de versionamento adotado no GitHub.
 
-## 6. Regras de negócio
+Recomendações:
 
-As regras estão em `acompanhamento/situacao.py`. Elas foram confirmadas com a secretaria em 12/10/2026 e com a coordenação em 16/10/2026. Os três estados vêm da reunião de 27/10/2026.
+1. Atualizar a branch de trabalho antes de iniciar uma tarefa.
+2. Criar uma branch específica para cada funcionalidade ou correção.
+3. Utilizar nomes que identifiquem claramente a alteração.
+4. Manter commits pequenos e objetivos.
+5. Executar os testes relacionados antes de abrir um Pull Request.
+6. Descrever no Pull Request o problema, a solução e os arquivos modificados.
+7. Aguardar a revisão e aprovação antes de integrar as alterações.
 
-### Estados na tela
+O repositório utiliza Pull Requests e GitHub Actions como parte do processo de revisão e integração.
 
-| Estado | Quando aparece |
+Quando uma alteração modificar uma regra de negócio, deve-se atualizar também a documentação correspondente.
+
+Não realizar alterações diretamente na `main` do repositório oficial sem autorização.
+
+## 12. Decisões técnicas importantes
+
+| Decisão | Justificativa | Consequência |
+|---|---|---|
+| Aplicativo Django independente | Reduz conflitos com as funcionalidades existentes do AcadFlow. | Algumas integrações continuam presentes em arquivos do aplicativo `processos`. |
+| Chaves de ativação desligadas por padrão | Permite instalar o módulo sem alterar o comportamento do sistema. | A equipe responsável precisa ativar explicitamente o módulo em cada ambiente. |
+| Utilização do Celery para avisos | Aproveita a infraestrutura já existente e mantém o processamento no ecossistema Django. | A funcionalidade depende do worker, Beat e Redis. |
+| Cálculo das situações durante a consulta | Evita armazenar situações que podem ficar desatualizadas após alterações cadastrais. | O cálculo é executado novamente nas consultas. |
+| Compartilhamento da lógica entre lista, cartão e planilha | Evita divergências entre os resultados apresentados. | Alterações no cálculo podem afetar diferentes funcionalidades simultaneamente. |
+| Controle de acesso alinhado ao sistema existente | Evita manter regras independentes de autorização. | Alterações nas permissões devem considerar os mecanismos já existentes no AcadFlow. |
+| Dependências com versões fixas | Evita que atualizações externas modifiquem o ambiente sem controle. | Atualizações de dependências exigem validação e testes. |
+| Ensaio de produção com banco já migrado até a versão principal | Verifica a compatibilidade das migrations novas com uma base existente. | Não substitui testes no servidor institucional. |
+
+## 13. Documentação complementar
+
+A documentação do projeto está dividida em arquivos com responsabilidades diferentes, evitando duplicação de informações.
+
+| Documento | Conteúdo |
 |---|---|
-| Irregular | Atraso no marco, com ou sem nova chance. O motivo explica o caso |
-| Regular | Em dia ou com o marco já cumprido |
-| Não foi possível calcular | Falta dado para o cálculo, ou o cálculo falhou naquele cadastro |
+| [Documento de Negócio](documento-de-negocio.md) | Objetivos, público atendido, funcionalidades, regras de negócio e backlog não realizado. |
+| [Passagem de Conhecimento](passagem-de-conhecimento.md) | Situação atual, problemas conhecidos, pendências, decisões e orientações para continuidade. |
+| [Manual de Uso da Secretaria](manual-de-uso-secretaria.md) | Instruções para utilização das funcionalidades e telas do módulo. |
+| [Guia do Ambiente Local](guia-do-ambiente-local.md) | Configuração do ambiente, instalação de dependências e execução local. |
+| [Verificação do Servidor para o Aviso](verificacao-do-servidor-para-o-aviso.md) | Procedimentos de conferência da infraestrutura do aviso diário. |
+| [Setup do Ambiente e da Infraestrutura](setup_ambiente_e_infraestrutura.md) | Informações complementares sobre configuração do ambiente e infraestrutura. |
+| [Como Contribuir](../CONTRIBUTING.md) | Orientações de contribuição para o repositório, quando aplicáveis. |
+| [README do projeto](../README.md) | Apresentação geral do sistema e orientações de acesso. |
 
-Só entra a trajetória ativa de mestrado ou doutorado. Quem já defendeu não aparece na lista da defesa.
+## 14. Considerações finais
 
-### Projeto de dissertação e qualificação
+O módulo de Acompanhamento Acadêmico foi desenvolvido como uma extensão do AcadFlow, utilizando a infraestrutura e os mecanismos existentes no sistema.
 
-- **Mestrado:** vale a data limite do projeto na trajetória. Sem ela, vale a data do calendário para o semestre do projeto.
-- **Doutorado:** vale a data do calendário para o semestre da qualificação, que por padrão é o quinto.
-- **Trancamento:** os dias trancados somam à data limite.
-- **Conceito A ou B:** marco cumprido.
-- **Conceito C:** uma única repetição, em até 3 meses (mestrado) ou 6 meses (doutorado).
-- **Conceito D:** irregular, sem nova chance.
-- **Sem apresentação até a data:** uma nova chance, no mesmo prazo de 3 ou 6 meses. Se esse prazo passar, ou se apresentar nele e não for aprovado, fica irregular sem nova chance.
+Sua arquitetura permite a ativação independente das funcionalidades e o aproveitamento dos serviços já utilizados pelo projeto, como PostgreSQL, Redis, Celery e Docker.
 
-### Defesa
+A manutenção deve preservar a centralização dos cálculos, respeitar as regras de acesso e considerar os testes automatizados e o ensaio de produção antes da integração de novas alterações.
 
-O prazo termina no último dia do mês em que se completam 24 meses (mestrado) ou 48 meses (doutorado) do mês de ingresso. As prorrogações somam meses e valem até o fim do mês em que terminam. Depois, somam-se os dias de trancamento.
+Para continuar o desenvolvimento, a nova equipe deve consultar este documento em conjunto com o Documento de Negócio, a Passagem de Conhecimento e o Guia do Ambiente Local.
 
-Exemplo: ingresso em fevereiro de 2025, no mestrado, com 3 meses de prorrogação, tem limite em 31/05/2027.
+---
 
-### Painel de Sucesso por Turma
-
-A turma é o semestre de ingresso. As barras são Concluídos, Desligados, Trancados, Ativos, Ativos regulares, Ativos irregulares e Com prorrogação, sempre em percentual dos ingressantes da turma. Trajetórias removidas ou em homologação ficam de fora.
-
-Ativo irregular é quem está irregular no marco ou na defesa. Ativos regulares inclui quem aparece como "Não foi possível calcular" na lista, e a tela informa isso.
-
-Turmas anteriores a 2026.2 aparecem com aviso, porque desligamentos, prorrogações e defesas dessas turmas podem não ter sido lançados.
-
-Concluídos, desligados, trancados e ativos somam sempre 100,0%. Quando o arredondamento deixa sobra, ela vai para a categoria com mais alunos. Da mesma forma, ativos regulares e irregulares somam a taxa de ativos. A barra Com prorrogação é contada à parte.
-
-### Painel por Professor
-
-As regras foram confirmadas pelo professor em 06/11/2026.
-
-- **Professor:** é o orientador da trajetória. A coorientação fica fora, e quem não tem orientador aparece na linha "Sem orientador".
-- **Prazo vencido:** alunos cujo prazo regimental da defesa já passou, sem contar prorrogações nem trancamentos. No último dia do prazo, o aluno ainda não conta. Sem data de ingresso, não entra.
-- **Defenderam:** alunos concluídos com data de defesa, entre os que têm prazo vencido.
-- **No prazo regular:** quem defendeu até o prazo regimental.
-- **Taxa de sucesso:** defenderam sobre prazo vencido. Sem nenhum aluno com prazo vencido, a tela mostra "Sem base" em vez de 0%.
-- **Taxa de prorrogação:** alunos com pelo menos uma prorrogação sobre o total de alunos do professor.
-- **Previsão de conclusão:** só alunos ativos. Usa o mesmo limite de defesa da lista de alunos, já com prorrogações e trancamentos, e o converte em semestre pelo calendário. Limite já passado aparece como "Prazo vencido", e aluno sem data de ingresso, como "Sem previsão".
-- **Troca de orientador:** o sistema guarda só o orientador atual, então todo o histórico do aluno fica com ele.
-
-### Diferença conhecida
-
-A página do aluno, do sistema original, conta a prorrogação mantendo o dia. No exemplo acima, ela mostra 28/05/2027, e o módulo mostra 31/05/2027. O módulo segue a resposta da coordenação, e a página do aluno não foi alterada.
-
-## 7. Decisões
-
-| Decisão | Motivo | Consequência |
-|---|---|---|
-| Módulo em app próprio | Reduz os conflitos com as atualizações do sistema original | Parte da lista de alunos continua em `processos/views.py` |
-| Chaves desligadas por padrão | Permite instalar sem mudar nada para o usuário e voltar atrás sem reverter código | Alguém precisa ligar as chaves em cada ambiente |
-| Aviso no Celery, sem n8n | O Celery já roda em produção, a regra fica em um lugar só e dias perdidos são recuperados. Informado ao professor em 27/10/2026 | O aviso depende do worker e do beat |
-| Situação calculada na hora | Evita guardar um valor que pode ficar defasado quando o cadastro muda | Toda abertura da lista e da página inicial refaz o cálculo |
-| Mesma regra de acesso da gestão do sistema | Não cria uma segunda regra para manter | Servidor, bolsista e voluntário também veem as telas (ver seção 8) |
-| Mesmo cálculo para cartão, lista e planilha | Os números não podem divergir entre as telas | Uma mudança na lista afeta as três saídas |
-| Painel por Professor só para o coordenador e a Coordenação PPG | Os números por professor são sensíveis. Confirmado pelo professor em 06/11/2026 | Cada professor ainda não vê os próprios números |
-| Taxa de sucesso só entre quem tem prazo vencido | Alunos ainda dentro do prazo baixariam a taxa sem ter falhado | Turmas recentes aparecem como "Sem base" |
-| Versões fixas no `requirements.txt` | Em 03/11/2026, uma versão nova do `kombu` derrubou o worker sem nenhuma mudança no código | Atualizar uma dependência passa a ser uma mudança explícita, com teste e ensaio |
-
-## 8. Riscos, pendências e o que ficou de fora
-
-### Conferir antes de ligar em produção
-
-| Item | Por que importa | Quem decide ou confere |
-|---|---|---|
-| Contas de teste no banco | A migration `0003_seed_mock_data`, do sistema original, cria o "Aluno Mock 1". Se ele existir em produção, entra no cartão, na lista e no aviso | Equipe confere, coordenação decide a remoção |
-| Quem pode ver as telas | A lista e a planilha têm dados pessoais. Hoje, servidor, bolsista e voluntário também veem | Coordenação |
-| Números e lista | A secretaria e a coordenação precisam validar os números com dados reais | Secretaria e coordenação |
-| E-mail e Celery no servidor | Nada disso foi conferido no servidor do cliente. A equipe não tem acesso a ele, que exige a VPN da POLI | Professor ou DTI, com os comandos de "Atualizar para esta versão" e a lista de verificação |
-
-### Limitações conhecidas
-
-- O início dos registros (2026.2) está fixo em `servicos.py`.
-- No Painel por Professor, o histórico do aluno fica com o orientador atual. Se o orientador mudou, os números antigos passam para o novo.
-- O desempenho do Painel por Professor com o tamanho real do programa, cerca de 400 alunos e 40 professores, ainda está sendo medido.
-- A lista considera a trajetória ativa mais recente do aluno, e o painel conta todas as ativas. Os números só divergem se um aluno tiver duas trajetórias ativas.
-- O desempenho do Painel de Processos com muitos dados não foi medido.
-- O módulo usa uma função privada do sistema, `_has_gestao_access`. Um teste avisa se as duas cópias dessa regra divergirem.
-
-### Pedidos que não entraram
-
-Pedidos da coordenação ainda sem definição de prioridade:
-
-- curvas semestre a semestre;
-- melhoria da página de Dashboard.
-
-### Fora do escopo
-
-- Integração com n8n.
-- Tela de Planejamento Estratégico.
-- Reorganização do app `processos`.
-- Correções no código original, que são tratadas diretamente com o professor.
-
-## 9. Glossário e links
-
-| Termo | Significado |
-|---|---|
-| Trajetória | Passagem do aluno por um curso, com nível, ingresso, orientador e status |
-| Turma | Alunos com o mesmo semestre de ingresso, como 2025.1 |
-| Marco | Projeto de dissertação (mestrado), qualificação (doutorado) ou defesa |
-| Data limite | Último dia para cumprir o marco, já com trancamentos e prorrogações, quando for o caso |
-| Reapresentação | Nova chance depois da data limite ou de um conceito C |
-| Prorrogação | Meses acrescentados ao prazo da defesa |
-| Trancamento | Período de suspensão, cujos dias somam aos prazos |
-| Levantamento inicial | Primeiro e-mail do aviso, com todos os atrasados daquele momento |
-| Chave | Variável do `.env` que liga ou desliga o módulo ou o aviso |
-| Prazo regimental | Prazo da defesa sem prorrogações nem trancamentos: 24 meses no mestrado e 48 no doutorado |
-| Sem base | Taxa que não pode ser calculada porque nenhum aluno chegou ao fim do prazo |
-| Previsão de conclusão | Semestre em que termina o limite de defesa de um aluno ativo |
-
-Documentos relacionados:
-
-- [Manual de uso para a secretaria](manual-de-uso-secretaria.md)
-- [Lista de verificação do servidor para o aviso](verificacao-do-servidor-para-o-aviso.md)
-- [Guia do ambiente local](guia-do-ambiente-local.md)
-- [Setup do ambiente e da infraestrutura](setup_ambiente_e_infraestrutura.md)
-- [Como contribuir](../CONTRIBUTING.md)
+**Documento:** Documento Técnico – Módulo de Acompanhamento Acadêmico  
+**Versão:** 1.4.1  
+**Data de referência:** 21/11/2026  
+**Equipe responsável pela entrega:** E4 – Disciplina de Engenharia de Software.

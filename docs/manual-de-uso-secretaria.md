@@ -12,7 +12,7 @@ Este manual tem como objetivo orientar a Secretaria do PPGEC no uso diário do *
 3. Você será direcionado para a central de navegação que reúne as telas em cartões, cada uma com uma frase do que ela faz, exibindo também o total de alunos irregulares no topo da página:
    * **Painel de Docentes**
    * **Painel de Processos**
-   * **Carga de Orientação**
+   * **Dashboard**
    * **Calendário de Marcos**
    * **Painel de Sucesso por Turma**
    * **Painel por Professor**, só para o docente coordenador e para a Coordenação PPG
@@ -62,13 +62,13 @@ Após selecionar um **Marco acadêmico**, o botão **Baixar em Excel** ficará v
 
 ---
 
-## 4. Carga de Orientação
+## 4. Dashboard
 
 ### **Como Navegar e Interpretar**
-1. Acesse **Carga de Orientação** através da página inicial do módulo de Acompanhamento.
+1. Acesse **Dashboard** através da página inicial do módulo de Acompanhamento. Desde 16/11/2026, o Dashboard não tem mais item próprio no menu lateral.
 2. O painel apresenta o quantitativo de orientações, coorientações e supervisões de pós-doutorado vinculadas a cada docente do programa, permitindo o acompanhamento da distribuição de discentes entre o corpo docente.
 
-![Carga de Orientação](imagens/06-carga-de-orientacao.png)
+![Dashboard](imagens/06-carga-de-orientacao.png)
 
 ---
 
